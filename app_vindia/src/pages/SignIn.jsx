@@ -24,7 +24,7 @@ function SignIn() {
 
         {/* Logo */}
         <div className="logo">
-          APP VINDIA
+          VINDIA INFRASEC
         </div>
 
         <h2 className="signin-title">Sign In</h2>
