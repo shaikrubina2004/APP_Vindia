@@ -1,0 +1,137 @@
+/* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Full page container */
+.signin-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  padding: 20px; /* prevents overflow on mobile */
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Card */
+.signin-card {
+  background: #ffffff;
+  padding: 40px 35px;
+  width: 100%;
+  max-width: 420px; /* prevents too wide on desktop */
+  border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+/* Title */
+.signin-title {
+  text-align: center;
+  margin-bottom: 25px;
+  font-size: 26px;
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+/* Form group */
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: #444;
+  font-weight: 500;
+}
+
+/* Input */
+.form-group input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.3);
+}
+
+/* Button */
+.signin-button {
+  width: 100%;
+  padding: 12px;
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.signin-button:hover {
+  background-color: #1e40af;
+}
+
+/* Signup link */
+.signup-link {
+  text-align: center;
+  margin-top: 18px;
+  font-size: 14px;
+  color: #555;
+}
+
+.signup-link a {
+  color: #2563eb;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.signup-link a:hover {
+  text-decoration: underline;
+}
+
+/* ---------------- RESPONSIVENESS ---------------- */
+
+/* Small Mobile (iPhone SE etc.) */
+@media (max-width: 480px) {
+  .signin-card {
+    padding: 30px 20px;
+  }
+
+  .signin-title {
+    font-size: 22px;
+  }
+
+  .form-group input {
+    padding: 10px;
+  }
+
+  .signin-button {
+    padding: 10px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 481px) and (max-width: 768px) {
+  .signin-card {
+    max-width: 380px;
+  }
+}
+
+/* Large Desktop */
+@media (min-width: 1200px) {
+  .signin-card {
+    max-width: 450px;
+  }
+}
