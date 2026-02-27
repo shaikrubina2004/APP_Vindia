@@ -8,6 +8,9 @@ function SignIn() {
     password: "",
   });
 
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(false);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -18,6 +21,12 @@ function SignIn() {
   return (
     <div className="signin-container">
       <div className="signin-card">
+
+        {/* Logo */}
+        <div className="logo">
+          APP VINDIA
+        </div>
+
         <h2 className="signin-title">Sign In</h2>
 
         <div className="form-group">
@@ -33,13 +42,31 @@ function SignIn() {
 
         <div className="form-group">
           <label>Password</label>
+          <div className="password-wrapper">
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Enter your password"
+            />
+            <span
+              className="toggle-password"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </span>
+          </div>
+        </div>
+
+        {/* Remember Me */}
+        <div className="remember-section">
           <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            placeholder="Enter your password"
+            type="checkbox"
+            checked={remember}
+            onChange={() => setRemember(!remember)}
           />
+          <label>Remember Me</label>
         </div>
 
         <button className="signin-button">Sign In</button>
@@ -47,6 +74,7 @@ function SignIn() {
         <p className="signup-link">
           Don’t have an account? <Link to="/signup">Sign Up</Link>
         </p>
+
       </div>
     </div>
   );

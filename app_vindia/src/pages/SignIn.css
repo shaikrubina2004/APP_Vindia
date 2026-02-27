@@ -1,11 +1,9 @@
-/* Reset */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-/* Full page container */
 .signin-container {
   min-height: 100vh;
   width: 100%;
@@ -13,30 +11,36 @@
   justify-content: center;
   align-items: center;
   background: linear-gradient(135deg, #1e3a8a, #2563eb);
-  padding: 20px; /* prevents overflow on mobile */
+  padding: 20px;
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Card */
 .signin-card {
   background: #ffffff;
   padding: 40px 35px;
   width: 100%;
-  max-width: 420px; /* prevents too wide on desktop */
+  max-width: 420px;
   border-radius: 14px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
 
-/* Title */
+.logo {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+}
+
 .signin-title {
   text-align: center;
   margin-bottom: 25px;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 600;
-  color: #1e3a8a;
+  color: #333;
 }
 
-/* Form group */
 .form-group {
   margin-bottom: 18px;
 }
@@ -49,20 +53,49 @@
   font-weight: 500;
 }
 
-/* Input */
 .form-group input {
   width: 100%;
   padding: 12px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 14px;
-  transition: all 0.3s ease;
+  transition: 0.3s;
 }
 
 .form-group input:focus {
   outline: none;
   border-color: #2563eb;
   box-shadow: 0 0 6px rgba(37, 99, 235, 0.3);
+}
+
+/* Password wrapper */
+.password-wrapper {
+  position: relative;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: #2563eb;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* Remember me */
+.remember-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  color: #444;
+}
+
+.remember-section input {
+  cursor: pointer;
 }
 
 /* Button */
@@ -76,14 +109,13 @@
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: 0.3s;
 }
 
 .signin-button:hover {
   background-color: #1e40af;
 }
 
-/* Signup link */
 .signup-link {
   text-align: center;
   margin-top: 18px;
@@ -99,6 +131,21 @@
 
 .signup-link a:hover {
   text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .signin-card {
+    padding: 30px 20px;
+  }
+
+  .logo {
+    font-size: 20px;
+  }
+
+  .signin-title {
+    font-size: 20px;
+  }
 }
 
 /* ---------------- RESPONSIVENESS ---------------- */
