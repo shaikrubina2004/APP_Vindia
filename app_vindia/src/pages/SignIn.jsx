@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import logo from "../assets/logo.png.jpeg";
+
 import "./SignIn.css";
 
 function SignIn() {
@@ -21,10 +23,10 @@ function SignIn() {
   return (
     <div className="signin-container">
       <div className="signin-card">
-
-        {/* Logo */}
-        <div className="logo">
-          VINDIA INFRASEC
+        {/* Logo Section */}
+        <div className="logo-section">
+          <img src={logo} alt="Vindia Logo" className="logo-img" />
+          <h1 className="company-name">VINDIA INFRASEC</h1>
         </div>
 
         <h2 className="signin-title">Sign In</h2>
@@ -74,7 +76,6 @@ function SignIn() {
         <p className="signup-link">
           Don’t have an account? <Link to="/signup">Sign Up</Link>
         </p>
-
       </div>
     </div>
   );

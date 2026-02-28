@@ -1,0 +1,210 @@
+/* ================= GLOBAL ================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.signup-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+
+  background: linear-gradient(
+    135deg,
+    #1e3a8a 0%,
+    #1d4ed8 50%,
+    #2563eb 100%
+  );
+
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ================= CARD ================= */
+.signup-card {
+  width: 100%;
+  max-width: 500px;
+  background: #faf7f7;
+  padding: 45px 40px;
+  border-radius: 16px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.18);
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+/* ================= LOGO ================= */
+.logo-image {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.logo-image img {
+  width: 55px;
+}
+
+.logo {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #1e3a8a;
+  margin-bottom: 8px;
+}
+
+.signup-title {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 28px;
+  color: #333;
+}
+
+/* ================= FORM ================= */
+.row {
+  display: flex;
+  gap: 15px;
+}
+
+.form-group {
+  flex: 1;
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #444;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.25);
+}
+
+/* Password wrapper */
+.password-wrapper {
+  position: relative;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: #2563eb;
+  cursor: pointer;
+}
+
+/* ================= TERMS ================= */
+.terms {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 20px;
+  color: #444;
+}
+
+/* ================= BUTTON ================= */
+.signup-button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.signup-button:hover {
+  background: #1e40af;
+}
+
+/* ================= SIGNIN LINK ================= */
+.signin-link {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 14px;
+}
+
+.signin-link a {
+  color: #2563eb;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.signin-link a:hover {
+  text-decoration: underline;
+}
+
+/* ================= ANIMATION ================= */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ================= RESPONSIVE ================= */
+
+/* Mobile */
+@media (max-width: 480px) {
+  .signup-card {
+    max-width: 340px;
+    padding: 28px 20px;
+  }
+
+  .row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .signup-title {
+    font-size: 20px;
+  }
+
+  .form-group input {
+    padding: 10px;
+  }
+
+  .signup-button {
+    padding: 10px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 481px) and (max-width: 768px) {
+  .signup-card {
+    max-width: 420px;
+  }
+}
+
+/* Large Desktop */
+@media (min-width: 1200px) {
+  .signup-card {
+    max-width: 520px;
+  }
+}
