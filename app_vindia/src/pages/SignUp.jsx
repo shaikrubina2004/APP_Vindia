@@ -1,15 +1,21 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import logo from "../assets/logo.png.jpeg";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { ROLES } from "../roles";
+import logo from "../assets/logo.png";
 import "./SignUp.css";
 
 function SignUp() {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
     password: "",
     confirmPassword: "",
+    role: ROLES.EMPLOYEE, // default role
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -22,10 +28,31 @@ function SignUp() {
     });
   };
 
+  const handleSignup = () => {
+    if (formData.password !== formData.confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
+
+    if (!agree) {
+      alert("Please accept Terms & Conditions");
+      return;
+    }
+
+    // Save user and auto login
+    login({
+      name: formData.firstName,
+      email: formData.email,
+      role: formData.role,
+    });
+
+    navigate("/dashboard");
+  };
+
   return (
     <div className="signup-container">
       <div className="signup-card">
-        {/* Logo */}
+
         <div className="logo-image">
           <img src={logo} alt="Vindia Logo" />
         </div>
@@ -33,7 +60,6 @@ function SignUp() {
         <div className="logo">VINDIA INFRASEC</div>
         <h2 className="signup-title">Create Account</h2>
 
-        {/* Name Row */}
         <div className="row">
           <div className="form-group">
             <label>First Name</label>
@@ -67,6 +93,24 @@ function SignUp() {
             onChange={handleChange}
             placeholder="Enter your email"
           />
+        </div>
+
+        {/* 🔥 Role Selection */}
+        <div className="form-group">
+          <label>Select Role</label>
+          <select
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
+          >
+            <option value={ROLES.EMPLOYEE}>Employee</option>
+            <option value={ROLES.SITE_ENGINEER}>Site Engineer</option>
+            <option value={ROLES.MARKETING}>Marketing</option>
+            <option value={ROLES.FINANCE}>Finance</option>
+            <option value={ROLES.BDA}>BDA</option>
+            <option value={ROLES.CLIENT}>Client</option>
+            <option value={ROLES.CEO}>CEO</option>
+          </select>
         </div>
 
         <div className="form-group">
@@ -108,11 +152,14 @@ function SignUp() {
           <label>I agree to Terms & Conditions</label>
         </div>
 
-        <button className="signup-button">Sign Up</button>
+        <button className="signup-button" onClick={handleSignup}>
+          Sign Up
+        </button>
 
         <p className="signin-link">
           Already have an account? <Link to="/">Sign In</Link>
         </p>
+
       </div>
     </div>
   );

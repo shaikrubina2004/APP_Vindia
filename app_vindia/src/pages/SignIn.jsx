@@ -1,10 +1,14 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import logo from "../assets/logo.png.jpeg";
-
+import { useAuth } from "../context/AuthContext";
+import { ROLES } from "../roles";
+import logo from "../assets/logo.png";
 import "./SignIn.css";
 
 function SignIn() {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -20,10 +24,34 @@ function SignIn() {
     });
   };
 
+  // 🔥 Temporary Role Assignment (For Testing)
+  const handleLogin = () => {
+    let role;
+
+    // Simple demo logic
+    if (formData.email === "ceo@gmail.com") {
+      role = ROLES.CEO;
+    } else if (formData.email === "finance@gmail.com") {
+      role = ROLES.FINANCE;
+    } else if (formData.email === "marketing@gmail.com") {
+      role = ROLES.MARKETING;
+    } else {
+      role = ROLES.EMPLOYEE;
+    }
+
+    login({
+      name: "User",
+      email: formData.email,
+      role: role,
+    });
+
+    navigate("/dashboard");
+  };
+
   return (
     <div className="signin-container">
       <div className="signin-card">
-        {/* Logo Section */}
+
         <div className="logo-section">
           <img src={logo} alt="Vindia Logo" className="logo-img" />
           <h1 className="company-name">VINDIA INFRASEC</h1>
@@ -61,7 +89,6 @@ function SignIn() {
           </div>
         </div>
 
-        {/* Remember Me */}
         <div className="remember-section">
           <input
             type="checkbox"
@@ -71,11 +98,14 @@ function SignIn() {
           <label>Remember Me</label>
         </div>
 
-        <button className="signin-button">Sign In</button>
+        <button className="signin-button" onClick={handleLogin}>
+          Sign In
+        </button>
 
         <p className="signup-link">
           Don’t have an account? <Link to="/signup">Sign Up</Link>
         </p>
+
       </div>
     </div>
   );
