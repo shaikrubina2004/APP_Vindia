@@ -3,12 +3,14 @@ const cors = require("cors");
 require("dotenv").config();
 
 const pool = require("./config/db");
+const authRoutes = require("./routes/authRoutes"); // import routes
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
+/* TEST DATABASE CONNECTION */
 app.get("/", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
@@ -19,6 +21,10 @@ app.get("/", async (req, res) => {
   }
 });
 
+/* AUTH ROUTES */
+app.use("/api/auth", authRoutes);
+
+/* START SERVER */
 app.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);
 });

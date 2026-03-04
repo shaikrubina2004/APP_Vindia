@@ -1,36 +1,170 @@
+/* =========================
+   GLOBAL RESET
+========================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* =========================
+   PAGE BACKGROUND
+========================= */
 .auth-container {
+  min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  background: #f5f6fa;
+
+  background: linear-gradient(
+    135deg,
+    #1e3a8a 0%,
+    #1d4ed8 50%,
+    #2563eb 100%
+  );
+
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
+/* =========================
+   LOGIN CARD
+========================= */
 .auth-card {
-  width: 350px;
-  padding: 30px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 380px;
+  background: #ffffff;
+
+  padding: 40px;
+  border-radius: 14px;
+
+  box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+
   text-align: center;
+
+  animation: fadeIn 0.4s ease-in-out;
 }
 
+/* =========================
+   LOGO
+========================= */
+.logo-img {
+  width: 70px;
+  margin-bottom: 10px;
+}
+
+/* =========================
+   TITLE
+========================= */
+.auth-card h2 {
+  margin-bottom: 25px;
+  font-size: 22px;
+  color: #333;
+}
+
+/* =========================
+   INPUT FIELDS
+========================= */
 .auth-card input {
   width: 100%;
-  padding: 10px;
-  margin: 10px 0;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+
+  font-size: 14px;
+
+  transition: all 0.25s ease;
 }
 
+.auth-card input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 6px rgba(37,99,235,0.3);
+}
+
+/* =========================
+   BUTTON
+========================= */
 .auth-card button {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
+
+  border: none;
+  border-radius: 8px;
+
   background: #2563eb;
   color: white;
-  border: none;
+
+  font-size: 15px;
+  font-weight: 500;
+
   cursor: pointer;
+
+  transition: all 0.3s ease;
 }
 
-.logo-img {
-  width: 80px;
-  margin-bottom: 10px;
+.auth-card button:hover {
+  background: #1e40af;
+  transform: translateY(-1px);
+}
+
+/* =========================
+   SIGNUP LINK
+========================= */
+.auth-card p {
+  margin-top: 18px;
+  font-size: 14px;
+}
+
+.auth-card a {
+  color: #2563eb;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.auth-card a:hover {
+  text-decoration: underline;
+}
+
+/* =========================
+   ANIMATION
+========================= */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =========================
+   MOBILE RESPONSIVE
+========================= */
+@media (max-width: 480px) {
+
+  .auth-card {
+    width: 90%;
+    padding: 30px 20px;
+  }
+
+  .logo-img {
+    width: 55px;
+  }
+
+  .auth-card h2 {
+    font-size: 20px;
+  }
+
+  .auth-card input {
+    padding: 10px;
+  }
+
+  .auth-card button {
+    padding: 10px;
+  }
+
 }

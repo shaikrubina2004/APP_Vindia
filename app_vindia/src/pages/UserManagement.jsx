@@ -1,43 +1,80 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { ROLES } from "../roles";
 import AppLayout from "../layout/AppLayout";
+import axios from "axios";
 
 function UserManagement() {
   const { user } = useAuth();
+  const [users, setUsers] = useState([]);
 
-  const [users, setUsers] = useState([
-    { id: 1, name: "John", role: ROLES.EMPLOYEE },
-    { id: 2, name: "Meena", role: ROLES.FINANCE },
-  ]);
+  // Fetch users from backend
+  const fetchUsers = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/users");
 
-  const handleRoleChange = (id, newRole) => {
-    const updated = users.map((u) =>
-      u.id === id ? { ...u, role: newRole } : u
-    );
-    setUsers(updated);
+      setUsers(res.data);
+
+    } catch (error) {
+      console.error("Error fetching users", error);
+    }
   };
 
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Change role
+  const handleRoleChange = async (id, newRole) => {
+
+    try {
+
+      await axios.put(
+        `http://localhost:5000/api/users/${id}/role`,
+        { role: newRole }
+      );
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === id ? { ...u, role: newRole } : u
+        )
+      );
+
+    } catch (error) {
+      console.error("Role update failed", error);
+    }
+  };
+
+  // Only CEO can access
   if (user?.role !== ROLES.CEO) {
     return <h2 style={{ padding: "40px" }}>Access Denied</h2>;
   }
 
   return (
     <AppLayout>
+
       <h2>User Management</h2>
 
-      <table style={{ width: "100%", marginTop: "20px" }}>
+      <table style={{ width: "100%", marginTop: "20px", borderCollapse: "collapse" }}>
+
         <thead>
-          <tr>
-            <th>Name</th>
-            <th>Role</th>
+          <tr style={{ background: "#f4f4f4" }}>
+            <th style={{ padding: "10px", border: "1px solid #ddd" }}>Name</th>
+            <th style={{ padding: "10px", border: "1px solid #ddd" }}>Role</th>
           </tr>
         </thead>
+
         <tbody>
+
           {users.map((u) => (
+
             <tr key={u.id}>
-              <td>{u.name}</td>
-              <td>
+
+              <td style={{ padding: "10px", border: "1px solid #ddd" }}>
+                {u.name}
+              </td>
+
+              <td style={{ padding: "10px", border: "1px solid #ddd" }}>
                 <select
                   value={u.role}
                   onChange={(e) =>
@@ -51,10 +88,15 @@ function UserManagement() {
                   <option value={ROLES.CEO}>CEO</option>
                 </select>
               </td>
+
             </tr>
+
           ))}
+
         </tbody>
+
       </table>
+
     </AppLayout>
   );
 }

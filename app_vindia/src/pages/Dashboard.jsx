@@ -1,20 +1,24 @@
 import AppLayout from "../layout/AppLayout";
 import { useAuth } from "../context/useAuth";
+import { ROLES } from "../roles";
+
 function Dashboard() {
   const { user } = useAuth();
 
   return (
     <AppLayout>
+      {/* Greeting */}
       <div style={{ marginBottom: "40px" }}>
         <h1 style={{ fontSize: "32px", fontWeight: "600" }}>
           Good Evening, {user?.name}!
         </h1>
+
         <p style={{ color: "#666", marginTop: "8px" }}>
           Role: {user?.role}
         </p>
       </div>
 
-      {/* App Grid */}
+      {/* App Modules Grid */}
       <div
         style={{
           display: "grid",
@@ -22,12 +26,25 @@ function Dashboard() {
           gap: "25px",
         }}
       >
-        <AppCard title="HR Management" />
-        <AppCard title="Finance" />
+        {(user?.role === ROLES.CEO || user?.role === ROLES.EMPLOYEE) && (
+          <AppCard title="HR Management" />
+        )}
+
+        {(user?.role === ROLES.CEO || user?.role === ROLES.FINANCE) && (
+          <AppCard title="Finance" />
+        )}
+
         <AppCard title="Projects" />
+
         <AppCard title="Attendance" />
-        <AppCard title="Payroll" />
-        <AppCard title="Reports" />
+
+        {(user?.role === ROLES.CEO || user?.role === ROLES.EMPLOYEE) && (
+          <AppCard title="Payroll" />
+        )}
+
+        {(user?.role === ROLES.CEO || user?.role === ROLES.FINANCE) && (
+          <AppCard title="Reports" />
+        )}
       </div>
     </AppLayout>
   );
@@ -35,7 +52,7 @@ function Dashboard() {
 
 export default Dashboard;
 
-
+/* Card Component */
 
 function AppCard({ title }) {
   return (
@@ -47,6 +64,12 @@ function AppCard({ title }) {
         boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
         cursor: "pointer",
         transition: "0.3s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-5px)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "translateY(0)";
       }}
     >
       <h3 style={{ marginBottom: "10px" }}>{title}</h3>
