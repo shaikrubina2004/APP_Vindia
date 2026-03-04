@@ -12,7 +12,8 @@ function SignUp() {
     lastName: "",
     email: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    role: "EMPLOYEE" // default role
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -42,7 +43,8 @@ function SignUp() {
       await signup({
         name: formData.firstName + " " + formData.lastName,
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        role: formData.role
       });
 
       alert("Account created successfully");
@@ -100,6 +102,24 @@ function SignUp() {
             onChange={handleChange}
             placeholder="Enter your email"
           />
+        </div>
+
+        {/* ROLE SELECTION */}
+        <div className="form-group">
+          <label>Select Role</label>
+          <select
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
+          >
+            <option value="EMPLOYEE">Employee</option>
+            <option value="SITE_ENGINEER">Site Engineer</option>
+            <option value="MARKETING">Marketing</option>
+            <option value="FINANCE">Finance</option>
+            <option value="BDA">BDA</option>
+            <option value="CLIENT">Client</option>
+            <option value="CEO">CEO</option>
+          </select>
         </div>
 
         <div className="form-group">
