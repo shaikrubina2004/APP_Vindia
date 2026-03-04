@@ -1,9 +1,9 @@
-import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { useAuth } from "../context/AuthContext";
-import { ROLES } from "../roles";
+import { useNavigate, Link } from "react-router-dom";
+import { login as loginAPI } from "../services/authService";
+import { useAuth } from "../context/useAuth";
 import logo from "../assets/logo.png";
-import "./SignIn.css";
+import "./Auth.css";
 
 function SignIn() {
   const navigate = useNavigate();
@@ -14,9 +14,6 @@ function SignIn() {
     password: "",
   });
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(false);
-
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -24,86 +21,56 @@ function SignIn() {
     });
   };
 
-  // 🔥 Temporary Role Assignment (For Testing)
-  const handleLogin = () => {
-    let role;
-
-    // Simple demo logic
-    if (formData.email === "ceo@gmail.com") {
-      role = ROLES.CEO;
-    } else if (formData.email === "finance@gmail.com") {
-      role = ROLES.FINANCE;
-    } else if (formData.email === "marketing@gmail.com") {
-      role = ROLES.MARKETING;
-    } else {
-      role = ROLES.EMPLOYEE;
+  const handleLogin = async () => {
+    if (!formData.email || !formData.password) {
+      alert("Please fill all fields");
+      return;
     }
 
-    login({
-      name: "User",
-      email: formData.email,
-      role: role,
-    });
+    try {
+      const res = await loginAPI({
+        email: formData.email,
+        password: formData.password,
+      });
 
-    navigate("/dashboard");
+      const { token, user } = res.data;
+
+      localStorage.setItem("token", token);
+
+      login(user);
+
+      navigate("/dashboard");
+
+    } catch (error) {
+      alert(error.response?.data?.message || "Invalid credentials");
+    }
   };
 
   return (
-    <div className="signin-container">
-      <div className="signin-card">
+    <div className="auth-container">
+      <div className="auth-card">
 
-        <div className="logo-section">
-          <img src={logo} alt="Vindia Logo" className="logo-img" />
-          <h1 className="company-name">VINDIA INFRASEC</h1>
-        </div>
+        <img src={logo} alt="Logo" className="logo-img" />
+        <h2>Sign In</h2>
 
-        <h2 className="signin-title">Sign In</h2>
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          onChange={handleChange}
+        />
 
-        <div className="form-group">
-          <label>Email</label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            placeholder="Enter your email"
-          />
-        </div>
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          onChange={handleChange}
+        />
 
-        <div className="form-group">
-          <label>Password</label>
-          <div className="password-wrapper">
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Enter your password"
-            />
-            <span
-              className="toggle-password"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? "Hide" : "Show"}
-            </span>
-          </div>
-        </div>
+        <button onClick={handleLogin}>Sign In</button>
 
-        <div className="remember-section">
-          <input
-            type="checkbox"
-            checked={remember}
-            onChange={() => setRemember(!remember)}
-          />
-          <label>Remember Me</label>
-        </div>
-
-        <button className="signin-button" onClick={handleLogin}>
-          Sign In
-        </button>
-
-        <p className="signup-link">
-          Don’t have an account? <Link to="/signup">Sign Up</Link>
+        <p>
+          Don't have an account? <Link to="/signup">Sign Up</Link>
         </p>
 
       </div>

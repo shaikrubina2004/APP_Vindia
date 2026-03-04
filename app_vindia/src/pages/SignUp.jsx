@@ -1,25 +1,18 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { ROLES } from "../roles";
+import { useNavigate, Link } from "react-router-dom";
+import { signup } from "../services/authService";
 import logo from "../assets/logo.png";
-import "./SignUp.css";
+import "./Auth.css";
 
 function SignUp() {
   const navigate = useNavigate();
-  const { login } = useAuth();
 
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
+    name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    role: ROLES.EMPLOYEE, // default role
   });
-
-  const [showPassword, setShowPassword] = useState(false);
-  const [agree, setAgree] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -28,135 +21,65 @@ function SignUp() {
     });
   };
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (formData.password !== formData.confirmPassword) {
       alert("Passwords do not match");
       return;
     }
 
-    if (!agree) {
-      alert("Please accept Terms & Conditions");
-      return;
+    try {
+      await signup({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+      });
+
+      alert("Account created successfully");
+
+      navigate("/");
+    } catch (error) {
+      alert(error.response?.data?.message || "Signup failed");
     }
-
-    // Save user and auto login
-    login({
-      name: formData.firstName,
-      email: formData.email,
-      role: formData.role,
-    });
-
-    navigate("/dashboard");
   };
 
   return (
-    <div className="signup-container">
-      <div className="signup-card">
+    <div className="auth-container">
+      <div className="auth-card">
 
-        <div className="logo-image">
-          <img src={logo} alt="Vindia Logo" />
-        </div>
+        <img src={logo} alt="Logo" className="logo-img" />
+        <h2>Create Account</h2>
 
-        <div className="logo">VINDIA INFRASEC</div>
-        <h2 className="signup-title">Create Account</h2>
+        <input
+          type="text"
+          name="name"
+          placeholder="Full Name"
+          onChange={handleChange}
+        />
 
-        <div className="row">
-          <div className="form-group">
-            <label>First Name</label>
-            <input
-              type="text"
-              name="firstName"
-              value={formData.firstName}
-              onChange={handleChange}
-              placeholder="First name"
-            />
-          </div>
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          onChange={handleChange}
+        />
 
-          <div className="form-group">
-            <label>Last Name</label>
-            <input
-              type="text"
-              name="lastName"
-              value={formData.lastName}
-              onChange={handleChange}
-              placeholder="Last name"
-            />
-          </div>
-        </div>
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          onChange={handleChange}
+        />
 
-        <div className="form-group">
-          <label>Email</label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            placeholder="Enter your email"
-          />
-        </div>
+        <input
+          type="password"
+          name="confirmPassword"
+          placeholder="Confirm Password"
+          onChange={handleChange}
+        />
 
-        {/* 🔥 Role Selection */}
-        <div className="form-group">
-          <label>Select Role</label>
-          <select
-            name="role"
-            value={formData.role}
-            onChange={handleChange}
-          >
-            <option value={ROLES.EMPLOYEE}>Employee</option>
-            <option value={ROLES.SITE_ENGINEER}>Site Engineer</option>
-            <option value={ROLES.MARKETING}>Marketing</option>
-            <option value={ROLES.FINANCE}>Finance</option>
-            <option value={ROLES.BDA}>BDA</option>
-            <option value={ROLES.CLIENT}>Client</option>
-            <option value={ROLES.CEO}>CEO</option>
-          </select>
-        </div>
+        <button onClick={handleSignup}>Sign Up</button>
 
-        <div className="form-group">
-          <label>Password</label>
-          <div className="password-wrapper">
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Enter password"
-            />
-            <span
-              className="toggle-password"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? "Hide" : "Show"}
-            </span>
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label>Confirm Password</label>
-          <input
-            type="password"
-            name="confirmPassword"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            placeholder="Confirm password"
-          />
-        </div>
-
-        <div className="terms">
-          <input
-            type="checkbox"
-            checked={agree}
-            onChange={() => setAgree(!agree)}
-          />
-          <label>I agree to Terms & Conditions</label>
-        </div>
-
-        <button className="signup-button" onClick={handleSignup}>
-          Sign Up
-        </button>
-
-        <p className="signin-link">
+        <p>
           Already have an account? <Link to="/">Sign In</Link>
         </p>
 

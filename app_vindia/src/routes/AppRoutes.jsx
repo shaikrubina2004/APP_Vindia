@@ -6,10 +6,10 @@ import Dashboard from "../pages/Dashboard";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
 
-// Example role pages (create them later)
 import FinancePage from "../pages/FinancePage";
 import MarketingPage from "../pages/MarketingPage";
 import CEOPanel from "../pages/CEOPanel";
+import UserManagement from "../pages/UserManagement";
 
 const AppRoutes = () => {
   return (
@@ -19,7 +19,7 @@ const AppRoutes = () => {
       <Route path="/" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
 
-      {/* Dashboard - Logged in users only */}
+      {/* Dashboard - All Logged In Users */}
       <Route
         path="/dashboard"
         element={
@@ -49,6 +49,16 @@ const AppRoutes = () => {
         }
       />
 
+      {/* CEO - User Management */}
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <UserManagement />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Finance & CEO */}
       <Route
         path="/finance"
@@ -68,6 +78,9 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
+      {/* Fallback */}
+      <Route path="*" element={<h2>Page Not Found</h2>} />
 
     </Routes>
   );
