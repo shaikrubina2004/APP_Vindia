@@ -1,6 +1,5 @@
 import AppLayout from "../layout/AppLayout";
-import { useAuth } from "../context/AuthContext";
-
+import { useAuth } from "../context/useAuth";
 function Dashboard() {
   const { user } = useAuth();
 
