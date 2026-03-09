@@ -7,7 +7,7 @@ import axios from "axios";
 function UserManagement() {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
-
+    
   useEffect(() => {
 
     const fetchUsers = async () => {
