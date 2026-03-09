@@ -10,7 +10,7 @@ function Dashboard() {
       {/* Greeting */}
       <div style={{ marginBottom: "40px" }}>
         <h1 style={{ fontSize: "32px", fontWeight: "600" }}>
-          Good Evening, {user?.name}!
+          Welcome, {user?.name}!
         </h1>
 
         <p style={{ color: "#666", marginTop: "8px" }}>
