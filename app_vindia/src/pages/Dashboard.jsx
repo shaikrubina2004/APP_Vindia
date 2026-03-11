@@ -20,11 +20,7 @@ function Dashboard() {
       {/* Greeting */}
       <div style={{ marginBottom: "40px" }}>
         <h1 style={{ fontSize: "32px", fontWeight: "600" }}>
-<<<<<<< Updated upstream
-          Welcome, {user?.name}!
-=======
           {greeting}, {user?.name}!
->>>>>>> Stashed changes
         </h1>
 
         <p style={{ color: "#666", marginTop: "8px" }}>
