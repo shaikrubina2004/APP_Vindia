@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@600&display=swap');
+
+body{
+  background:#eaeef6;
+  font-family:'Open Sans',sans-serif;
+}
+.sidebar{
+  position:fixed;
+  top:100px;
+  left:1rem;
+  background:#fff;
+  border-radius:10px;
+  padding:1rem 0;
+  box-shadow:0 0 40px rgba(0,0,0,0.03);
+  height:calc(100vh - 4rem);
+  z-index:999;
+}
+
+.sidebar__menu{
+  list-style:none;
+  padding:0;
+  margin:0;
+  position:relative;
+}
+
+.sidebar__item{
+  position:relative;
+}
+
+.sidebar__link{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:4.0rem;
+  width:5.5rem;
+  color:#6a778e;
+  transition:0.25s;
+  position:relative;
+  border-radius:12px;
+}
+.sidebar__link svg{
+  width:28px;
+  height:28px;
+}
+
+.sidebar__link span{
+  position:absolute;
+  left:100%;
+  margin-left:1rem;
+  transform:translate(-3rem);
+  opacity:0;
+  pointer-events:none;
+  color:#406ff3;
+  background:#fff;
+  padding:0.75rem;
+  border-radius:18px;
+  transition:0.25s;
+   z-index:1000; 
+}
+
+.sidebar__link:hover{
+  transform:scale(1.05);
+}
+.sidebar__link:hover span{
+  opacity:1;
+  transform:translate(0);
+}
