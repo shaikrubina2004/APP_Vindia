@@ -1,0 +1,30 @@
+/* GLOBAL RESET */
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:"Inter", sans-serif;
+}
+
+body{
+background:#f5f7fb;
+color:#222;
+}
+
+/* COMMON HEADINGS */
+
+h1{
+font-size:28px;
+font-weight:600;
+}
+
+h2{
+font-size:22px;
+margin-bottom:10px;
+}
+
+p{
+color:#666;
+font-size:14px;
+}

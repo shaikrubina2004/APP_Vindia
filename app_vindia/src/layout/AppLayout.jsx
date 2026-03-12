@@ -1,28 +1,24 @@
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import "../styles/Layout.css";
 
 function AppLayout({ children }) {
+
   return (
-    <div>
-      {/* Top Navbar */}
-      <Navbar />
+    <div className="app-layout">
 
-      {/* Sidebar + Page Content */}
-      <div style={{ display: "flex", marginTop: "70px" }}>
-        <Sidebar />
+      <Sidebar />
 
-        <div
-          style={{
-            flex: 1,
-            padding: "30px",
-            background: "#f1f5f9",
-            minHeight: "100vh",
-            marginLeft: "110px" 
-          }}
-        >
+      <div className="main-section">
+
+        <Navbar />
+
+        <div className="page-content">
           {children}
         </div>
+
       </div>
+
     </div>
   );
 }

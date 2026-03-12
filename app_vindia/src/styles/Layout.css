@@ -1,0 +1,21 @@
+.app-layout{
+display:flex;
+height:100vh;
+background:#f5f7fb;
+}
+
+/* RIGHT SIDE CONTENT */
+
+.main-section{
+flex:1;
+display:flex;
+flex-direction:column;
+}
+
+/* PAGE CONTENT */
+
+.page-content{
+padding:30px;
+overflow-y:auto;
+height:100%;
+}
