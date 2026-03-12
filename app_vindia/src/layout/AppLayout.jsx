@@ -8,7 +8,7 @@ function AppLayout({ children }) {
       <Navbar />
 
       {/* Sidebar + Page Content */}
-      <div style={{ display: "flex" }}>
+      <div style={{ display: "flex", marginTop: "70px" }}>
         <Sidebar />
 
         <div
@@ -16,7 +16,8 @@ function AppLayout({ children }) {
             flex: 1,
             padding: "30px",
             background: "#f1f5f9",
-            minHeight: "100vh"
+            minHeight: "100vh",
+            marginLeft: "110px" 
           }}
         >
           {children}
