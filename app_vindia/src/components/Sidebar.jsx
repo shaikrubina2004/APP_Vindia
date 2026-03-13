@@ -98,16 +98,15 @@ function Sidebar() {
             </Link>
           </li>
 
-          <li className="sidebar__item">
-            <Link to="/settings" className="sidebar__link">
-              <i data-feather="settings"></i>
-              <span>Settings</span>
-            </Link>
-          </li>
+    <li className="sidebar__item">
+      <Link to="/settings" className="sidebar__link">
+        <i data-feather="settings"></i>
+        <span>Settings</span>
+      </Link>
+    </li>
 
-        </ul>
-      </nav>
-    </>
+  </ul>
+</nav>
   );
 }
 
