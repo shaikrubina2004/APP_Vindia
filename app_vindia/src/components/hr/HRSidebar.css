@@ -1,15 +1,18 @@
-.hr-sidebar{
-width:230px;
-height:100vh;
-background:#1e293b;
-color:white;
-position:fixed;
-left:0;
-top:0;
-padding-top:20px;
+
+.hr-sidebar {
+  width: 250px;
+  background: #1e2a3a;
+  color: white;
+  min-height: 100vh;
+}
+.sidebar-header{
+padding:20px;
+font-size:20px;
+font-weight:600;
+border-bottom:1px solid rgba(255,255,255,0.1);
 }
 
-.sidebar-header{
+.hr-logo{
 padding:20px;
 font-size:20px;
 font-weight:600;
@@ -20,6 +23,21 @@ border-bottom:1px solid rgba(255,255,255,0.1);
 list-style:none;
 padding:0;
 margin:0;
+}
+
+.hr-sidebar li{
+padding:14px 22px;
+cursor:pointer;
+font-size:14px;
+transition:0.2s;
+}
+
+.hr-sidebar li:hover{
+background:#334155;
+}
+
+.hr-sidebar li.active{
+background:#3b82f6;
 }
 
 .sidebar-item{

@@ -1,23 +1,21 @@
-function NewJoiners() {
+import { FaUserPlus } from "react-icons/fa";
 
-  return (
+function NewJoiners(){
+return(
 
-    <div className="dashboard-card">
+<div className="dashboard-card">
 
-      <h3>New Joiners</h3>
+<h3><FaUserPlus className="card-icon"/> New Joiners</h3>
 
-      <ul>
+<ul>
+<li>Arjun - Marketing</li>
+<li>Priya - Finance</li>
+<li>Ravi - Engineering</li>
+</ul>
 
-        <li>Arjun - Marketing</li>
-        <li>Priya - Finance</li>
-        <li>Ravi - Engineering</li>
+</div>
 
-      </ul>
-
-    </div>
-
-  );
-
+)
 }
 
 export default NewJoiners;

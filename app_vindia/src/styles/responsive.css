@@ -73,3 +73,20 @@ grid-template-columns:1fr;
 }
 
 }
+
+@media (max-width: 768px) {
+
+  .hr-layout {
+    flex-direction: column;
+  }
+
+  .hr-sidebar {
+    width: 100%;
+    min-height: auto;
+  }
+
+  .hr-content {
+    padding: 10px;
+  }
+
+}

@@ -1,56 +1,146 @@
+/* DASHBOARD PAGE */
+
 .hr-dashboard{
-padding:20px;
+padding:30px;
+background:#f4f6f9;
+min-height:100vh;
 }
 
-.stats-grid{
+/* TITLE */
+
+.hr-content h1{
+font-size:26px;
+font-weight:600;
+margin-bottom:25px;
+color:#1f2937;
+}
+
+/* STATS GRID */
+
+.hr-stats{
 display:grid;
 grid-template-columns:repeat(4,1fr);
 gap:20px;
-margin-bottom:20px;
+margin-bottom:25px;
 }
+
+/* STAT CARD */
 
 .stat-card{
+background:white;
 padding:20px;
-border-radius:10px;
-color:white;
+border-radius:12px;
+box-shadow:0 4px 12px rgba(0,0,0,0.08);
+text-align:center;
 }
 
-.blue{
-background:linear-gradient(135deg,#3b82f6,#2563eb);
+.stat-card h3{
+font-size:14px;
+color:#64748b;
 }
 
-.green{
-background:linear-gradient(135deg,#10b981,#059669);
+.stat-card h2{
+font-size:26px;
+font-weight:700;
+margin-top:6px;
+color:#111827;
 }
 
-.pink{
-background:linear-gradient(135deg,#ec4899,#db2777);
-}
+/* MAIN GRID */
 
-.orange{
-background:linear-gradient(135deg,#f59e0b,#d97706);
-}
-
-.dashboard-row{
+.dashboard-grid{
 display:grid;
-grid-template-columns:1fr 1fr;
+grid-template-columns:repeat(2,1fr);
 gap:20px;
-margin-bottom:20px;
+margin-top:20px;
 }
+
+/* DASHBOARD CARD */
 
 .dashboard-card{
 background:white;
 padding:20px;
-border-radius:10px;
-box-shadow:0 6px 15px rgba(0,0,0,0.05);
+border-radius:12px;
+box-shadow:0 4px 12px rgba(0,0,0,0.08);
+transition:0.2s;
+}
+
+.dashboard-card:hover{
+transform:translateY(-4px);
+box-shadow:0 10px 25px rgba(0,0,0,0.12);
+}
+
+/* CARD TITLE */
+
+.dashboard-card h3{
+font-size:16px;
+font-weight:600;
+margin-bottom:10px;
+color:#111827;
+}
+
+/* CARD TEXT */
+
+.dashboard-card p{
+font-size:14px;
+color:#475569;
+margin:4px 0;
+}
+
+.dashboard-card ul{
+padding-left:18px;
+margin-top:5px;
+}
+
+.dashboard-card li{
+font-size:14px;
+margin-bottom:4px;
+}
+
+/* QUICK ACTIONS */
+
+.quick-actions{
+margin-top:30px;
+}
+
+.quick-actions h3{
+margin-bottom:10px;
 }
 
 .quick-actions button{
-margin-right:10px;
-padding:10px 14px;
-border:none;
 background:#3b82f6;
 color:white;
+border:none;
+padding:9px 16px;
 border-radius:6px;
 cursor:pointer;
+margin-right:10px;
+font-size:13px;
+transition:0.2s;
+}
+
+.quick-actions button:hover{
+background:#2563eb;
+}
+
+/* RESPONSIVE */
+
+@media(max-width:1000px){
+
+.hr-stats{
+grid-template-columns:repeat(2,1fr);
+}
+
+.dashboard-grid{
+grid-template-columns:1fr;
+}
+
+}
+
+@media(max-width:600px){
+
+.hr-stats{
+grid-template-columns:1fr;
+}
+
 }

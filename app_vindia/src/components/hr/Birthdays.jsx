@@ -1,22 +1,20 @@
-function Birthdays() {
+import { FaBirthdayCake } from "react-icons/fa";
 
-  return (
+function Birthdays(){
+return(
 
-    <div className="dashboard-card">
+<div className="dashboard-card">
 
-      <h3>Upcoming Birthdays</h3>
+<h3><FaBirthdayCake className="card-icon"/> Upcoming Birthdays</h3>
 
-      <ul>
+<ul>
+<li>Rahul - 15 Mar</li>
+<li>Sneha - 18 Mar</li>
+</ul>
 
-        <li>Rahul - 15 Mar</li>
-        <li>Sneha - 18 Mar</li>
+</div>
 
-      </ul>
-
-    </div>
-
-  );
-
+)
 }
 
 export default Birthdays;

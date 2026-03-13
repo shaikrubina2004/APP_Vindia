@@ -1,23 +1,21 @@
-function PendingRequests() {
+import { FaClipboardList } from "react-icons/fa";
 
-  return (
+function PendingRequests(){
+return(
 
-    <div className="dashboard-card">
+<div className="dashboard-card">
 
-      <h3>Pending Requests</h3>
+<h3><FaClipboardList className="card-icon"/> Pending Requests</h3>
 
-      <ul>
+<ul>
+<li>Leave Requests : 3</li>
+<li>Travel Requests : 1</li>
+<li>Document Verification : 2</li>
+</ul>
 
-        <li>Leave Requests : 3</li>
-        <li>Travel Requests : 1</li>
-        <li>Document Verification : 2</li>
+</div>
 
-      </ul>
-
-    </div>
-
-  );
-
+)
 }
 
 export default PendingRequests;
