@@ -1,0 +1,190 @@
+.users-container{
+width:100%;
+padding:30px;
+}
+
+.users-container h1{
+margin-bottom:20px;
+}
+
+/* TABLE */
+
+.users-table{
+width:100%;
+border-collapse:collapse;
+background:white;
+border-radius:10px;
+overflow:hidden;
+box-shadow:0 8px 20px rgba(0,0,0,0.06);
+}
+
+/* HEADER */
+
+.users-table thead{
+background:#f1f5f9;
+}
+
+.users-table th{
+text-align:left;
+padding:16px;
+font-size:14px;
+font-weight:600;
+color:#475569;
+}
+
+/* ROWS */
+
+.users-table td{
+padding:16px;
+border-top:1px solid #e5e7eb;
+font-size:14px;
+color:#0f172a;
+}
+
+.users-table tr:hover{
+background:#f8fafc;
+}
+
+/* STATUS BADGE */
+
+.status{
+padding:5px 12px;
+border-radius:20px;
+font-size:12px;
+font-weight:500;
+}
+
+.status.active{
+background:#dcfce7;
+color:#16a34a;
+}
+
+.status.pending{
+background:#fef9c3;
+color:#ca8a04;
+}
+
+/* BUTTONS */
+
+.assign-btn{
+background:#3b82f6;
+color:white;
+border:none;
+padding:6px 14px;
+border-radius:6px;
+cursor:pointer;
+font-size:13px;
+}
+
+.edit-btn{
+background:#10b981;
+color:white;
+border:none;
+padding:6px 14px;
+border-radius:6px;
+cursor:pointer;
+font-size:13px;
+}
+
+.assign-btn:hover{
+background:#2563eb;
+}
+
+.edit-btn:hover{
+background:#059669;
+}
+.modal-overlay{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.4);
+display:flex;
+align-items:center;
+justify-content:center;
+z-index:1000;
+}
+
+.modal{
+background:white;
+padding:25px;
+border-radius:10px;
+width:320px;
+display:flex;
+flex-direction:column;
+gap:15px;
+box-shadow:0 10px 25px rgba(0,0,0,0.2);
+}
+
+.modal select{
+padding:8px;
+border:1px solid #e5e7eb;
+border-radius:6px;
+}
+
+.modal-actions{
+display:flex;
+justify-content:flex-end;
+gap:10px;
+}
+
+.cancel-btn{
+background:#e5e7eb;
+border:none;
+padding:6px 12px;
+border-radius:6px;
+cursor:pointer;
+}
+
+.selected-user{
+font-weight:600;
+color:#0f172a;
+}
+/* HEADER */
+
+.users-header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:20px;
+}
+
+/* ACTIONS */
+
+.users-actions{
+display:flex;
+gap:10px;
+align-items:center;
+}
+
+/* SEARCH INPUT */
+
+.users-actions input{
+padding:8px 12px;
+border:1px solid #e5e7eb;
+border-radius:6px;
+font-size:14px;
+}
+
+/* ADD USER BUTTON */
+
+.add-user-btn{
+background:#6366f1;
+color:white;
+border:none;
+padding:8px 14px;
+border-radius:6px;
+cursor:pointer;
+font-size:14px;
+}
+
+.add-user-btn:hover{
+background:#4f46e5;
+}
+.modal input{
+padding:8px;
+border:1px solid #e5e7eb;
+border-radius:6px;
+font-size:14px;
+}
