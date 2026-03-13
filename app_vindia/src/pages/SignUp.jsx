@@ -5,6 +5,7 @@ import logo from "../assets/logo.png";
 import "./SignUp.css";
 
 function SignUp() {
+
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -12,18 +13,19 @@ function SignUp() {
     lastName: "",
     email: "",
     password: "",
-    confirmPassword: "",
-    role: "EMPLOYEE" // default role
+    confirmPassword: ""
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [agree, setAgree] = useState(false);
 
   const handleChange = (e) => {
+
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
+
   };
 
   const handleSignup = async () => {
@@ -41,23 +43,29 @@ function SignUp() {
     try {
 
       await signup({
+
         name: formData.firstName + " " + formData.lastName,
         email: formData.email,
-        password: formData.password,
-        role: formData.role
+        password: formData.password
+
       });
 
-      alert("Account created successfully");
+      alert("Account created. Waiting for CEO approval.");
 
       navigate("/");
 
     } catch (error) {
+
       alert(error.response?.data?.message || "Signup failed");
+
     }
+
   };
 
   return (
+
     <div className="signup-container">
+
       <div className="signup-card">
 
         <div className="logo-image">
@@ -65,12 +73,15 @@ function SignUp() {
         </div>
 
         <div className="logo">VINDIA INFRASEC</div>
+
         <h2 className="signup-title">Create Account</h2>
 
         <div className="row">
 
           <div className="form-group">
+
             <label>First Name</label>
+
             <input
               type="text"
               name="firstName"
@@ -78,10 +89,13 @@ function SignUp() {
               onChange={handleChange}
               placeholder="First name"
             />
+
           </div>
 
           <div className="form-group">
+
             <label>Last Name</label>
+
             <input
               type="text"
               name="lastName"
@@ -89,12 +103,15 @@ function SignUp() {
               onChange={handleChange}
               placeholder="Last name"
             />
+
           </div>
 
         </div>
 
         <div className="form-group">
+
           <label>Email</label>
+
           <input
             type="email"
             name="email"
@@ -102,27 +119,11 @@ function SignUp() {
             onChange={handleChange}
             placeholder="Enter your email"
           />
-        </div>
 
-        {/* ROLE SELECTION */}
-        <div className="form-group">
-          <label>Select Role</label>
-          <select
-            name="role"
-            value={formData.role}
-            onChange={handleChange}
-          >
-            <option value="EMPLOYEE">Employee</option>
-            <option value="SITE_ENGINEER">Site Engineer</option>
-            <option value="MARKETING">Marketing</option>
-            <option value="FINANCE">Finance</option>
-            <option value="BDA">BDA</option>
-            <option value="CLIENT">Client</option>
-            <option value="CEO">CEO</option>
-          </select>
         </div>
 
         <div className="form-group">
+
           <label>Password</label>
 
           <div className="password-wrapper">
@@ -143,10 +144,13 @@ function SignUp() {
             </span>
 
           </div>
+
         </div>
 
         <div className="form-group">
+
           <label>Confirm Password</label>
+
           <input
             type="password"
             name="confirmPassword"
@@ -154,18 +158,25 @@ function SignUp() {
             onChange={handleChange}
             placeholder="Confirm password"
           />
+
         </div>
 
         <div className="terms">
+
           <input
             type="checkbox"
             checked={agree}
             onChange={() => setAgree(!agree)}
           />
+
           <label>I agree to Terms & Conditions</label>
+
         </div>
 
-        <button className="signup-button" onClick={handleSignup}>
+        <button
+          className="signup-button"
+          onClick={handleSignup}
+        >
           Sign Up
         </button>
 
@@ -174,8 +185,11 @@ function SignUp() {
         </p>
 
       </div>
+
     </div>
+
   );
+
 }
 
 export default SignUp;
