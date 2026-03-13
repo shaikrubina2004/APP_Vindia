@@ -1,112 +1,123 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import AppLayout from "../layout/AppLayout";
 import "../styles/users.css";
 
 const roles = [
-  "CEO",
   "HR",
   "FINANCE",
   "MARKETING",
   "SITE_ENGINEER",
-  "EMPLOYEE"
-];
+  "EMPLOYEE",
+  "CLIENT"
+]; // CEO removed
 
 function UserManagement() {
 
+  const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
+
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedRole, setSelectedRole] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
 
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
-  const [newUser, setNewUser] = useState({
-    name: "",
-    email: "",
-    role: ""
-  });
+  /* FETCH USERS */
 
-  const users = [
-    {
-      id: 1,
-      name: "Ravi Kumar",
-      email: "ravi@mail.com",
-      role: "Employee",
-      status: "Active"
-    },
-    {
-      id: 2,
-      name: "Meena Sharma",
-      email: "meena@mail.com",
-      role: "HR",
-      status: "Active"
-    },
-    {
-      id: 3,
-      name: "Arun Das",
-      email: "arun@mail.com",
-      role: null,
-      status: "Pending"
+  const fetchUsers = async () => {
+    try {
+
+      const res = await axios.get("http://localhost:5000/api/users");
+      setUsers(res.data);
+
+    } catch (error) {
+      console.error(error);
     }
-  ];
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  /* SEARCH FILTER */
 
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const openRoleModal = (user) => {
+  /* OPEN ASSIGN ROLE MODAL */
+
+  const openAssignModal = (user) => {
     setSelectedUser(user);
+    setSelectedRole("");
+    setSelectedStatus("Active");
+    setEditMode(false);
+  };
+
+  /* OPEN EDIT MODAL */
+
+  const openEditModal = (user) => {
+    setSelectedUser(user);
+    setSelectedRole(user.role);
+    setSelectedStatus(user.status);
+    setEditMode(true);
   };
 
   const closeModal = () => {
     setSelectedUser(null);
-    setSelectedRole("");
   };
 
-  const assignRole = () => {
+  /* UPDATE USER */
 
-    if (!selectedRole) {
-      alert("Please select a role");
-      return;
+  const updateUser = async () => {
+
+    try {
+
+      await axios.put(
+        `http://localhost:5000/api/users/${selectedUser.id}`,
+        {
+          role: selectedRole,
+          status: selectedStatus
+        }
+      );
+
+      fetchUsers();
+      closeModal();
+
+    } catch (error) {
+
+      console.error(error);
+
     }
 
-    alert(`Assigned ${selectedRole} role to ${selectedUser.name}`);
-    closeModal();
   };
 
-  const openAddModal = () => {
-    setShowAddModal(true);
-  };
+  /* DELETE USER */
 
-  const closeAddModal = () => {
-    setShowAddModal(false);
-  };
+  const deleteUser = async () => {
 
-  const handleInputChange = (e) => {
-    setNewUser({
-      ...newUser,
-      [e.target.name]: e.target.value
-    });
-  };
+    if(!window.confirm("Delete this user?")) return;
 
-  const addUser = () => {
+    try {
 
-    if (!newUser.name || !newUser.email || !newUser.role) {
-      alert("Please fill all fields");
-      return;
+      await axios.delete(
+        `http://localhost:5000/api/users/${selectedUser.id}`
+      );
+
+      fetchUsers();
+      closeModal();
+
+    } catch (error) {
+
+      console.error(error);
+
     }
 
-    alert(`User ${newUser.name} added successfully`);
-
-    setNewUser({
-      name: "",
-      email: "",
-      role: ""
-    });
-
-    closeAddModal();
   };
 
   return (
+
     <AppLayout>
 
       <div className="users-container">
@@ -121,15 +132,8 @@ function UserManagement() {
               type="text"
               placeholder="Search users..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e)=>setSearch(e.target.value)}
             />
-
-            <button
-              className="add-user-btn"
-              onClick={openAddModal}
-            >
-              + Add User
-            </button>
 
           </div>
 
@@ -138,27 +142,30 @@ function UserManagement() {
         <table className="users-table">
 
           <thead>
+
             <tr>
+
               <th>Name</th>
               <th>Email</th>
               <th>Role</th>
               <th>Status</th>
               <th>Action</th>
+
             </tr>
+
           </thead>
 
           <tbody>
 
-            {filteredUsers.map((user) => (
+            {filteredUsers.map((user)=>(
 
               <tr key={user.id}>
 
                 <td>{user.name}</td>
+
                 <td>{user.email}</td>
 
-                <td>
-                  {user.role ? user.role : "Not Assigned"}
-                </td>
+                <td>{user.role || "Not Assigned"}</td>
 
                 <td>
                   <span className={`status ${user.status.toLowerCase()}`}>
@@ -168,11 +175,15 @@ function UserManagement() {
 
                 <td>
 
-                  {user.status === "Pending" ? (
+                  {user.role === "CEO" ? (
+
+                    <span>Locked</span>
+
+                  ) : user.status === "Pending" ? (
 
                     <button
                       className="assign-btn"
-                      onClick={() => openRoleModal(user)}
+                      onClick={()=>openAssignModal(user)}
                     >
                       Assign Role
                     </button>
@@ -181,7 +192,7 @@ function UserManagement() {
 
                     <button
                       className="edit-btn"
-                      onClick={() => openRoleModal(user)}
+                      onClick={()=>openEditModal(user)}
                     >
                       Edit
                     </button>
@@ -200,7 +211,7 @@ function UserManagement() {
 
       </div>
 
-      {/* ASSIGN ROLE MODAL */}
+      {/* MODAL */}
 
       {selectedUser && (
 
@@ -208,26 +219,38 @@ function UserManagement() {
 
           <div className="modal">
 
-            <h2>Assign Role</h2>
+            <h2>{editMode ? "Edit User" : "Assign Role"}</h2>
 
-            <p className="selected-user">
-              {selectedUser.name}
-            </p>
+            <p className="selected-user">{selectedUser.name}</p>
 
             <select
               value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
+              onChange={(e)=>setSelectedRole(e.target.value)}
             >
 
               <option value="">Select Role</option>
 
-              {roles.map((role) => (
+              {roles.map(role=>(
                 <option key={role} value={role}>
                   {role}
                 </option>
               ))}
 
             </select>
+
+            {editMode && (
+
+              <select
+                value={selectedStatus}
+                onChange={(e)=>setSelectedStatus(e.target.value)}
+              >
+
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+
+              </select>
+
+            )}
 
             <div className="modal-actions">
 
@@ -240,74 +263,21 @@ function UserManagement() {
 
               <button
                 className="assign-btn"
-                onClick={assignRole}
+                onClick={updateUser}
               >
                 Save
               </button>
 
-            </div>
+              {editMode && (
 
-          </div>
+                <button
+                  className="delete-btn"
+                  onClick={deleteUser}
+                >
+                  Delete
+                </button>
 
-        </div>
-
-      )}
-
-      {/* ADD USER MODAL */}
-
-      {showAddModal && (
-
-        <div className="modal-overlay">
-
-          <div className="modal">
-
-            <h2>Add User</h2>
-
-            <input
-              type="text"
-              name="name"
-              placeholder="Name"
-              value={newUser.name}
-              onChange={handleInputChange}
-            />
-
-            <input
-              type="email"
-              name="email"
-              placeholder="Email"
-              value={newUser.email}
-              onChange={handleInputChange}
-            />
-
-            <select
-              name="role"
-              value={newUser.role}
-              onChange={handleInputChange}
-            >
-
-              <option value="">Select Role</option>
-
-              {roles.map(role => (
-                <option key={role}>{role}</option>
-              ))}
-
-            </select>
-
-            <div className="modal-actions">
-
-              <button
-                className="cancel-btn"
-                onClick={closeAddModal}
-              >
-                Cancel
-              </button>
-
-              <button
-                className="assign-btn"
-                onClick={addUser}
-              >
-                Add
-              </button>
+              )}
 
             </div>
 
@@ -318,7 +288,9 @@ function UserManagement() {
       )}
 
     </AppLayout>
+
   );
+
 }
 
 export default UserManagement;
