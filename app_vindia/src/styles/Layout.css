@@ -3,20 +3,22 @@
 .app-layout{
 display:flex;
 width:100%;
-height:100vh;
+
 background:#f5f7fb;
 }
 
 
 /* SIDEBAR */
 
-.sidebar{
-width:80px;
-transition:width 0.3s ease;
-background:white;
-flex-shrink:0;
+.sidebar {
+  width: 80px;
+  transition: width 0.3s ease;
+  background: white;
+  flex-shrink: 0;
+  overflow-x: visible; 
+  position: relative;   
+  margin-top: 0;        
 }
-
 
 /* MAIN CONTENT AREA */
 
@@ -46,6 +48,6 @@ padding:0 25px;
 .page-content{
 flex:1;
 padding:30px;
-overflow-y:auto;
+
 overflow-x:hidden;
 }
