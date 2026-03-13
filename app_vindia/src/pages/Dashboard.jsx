@@ -3,7 +3,7 @@ import { useAuth } from "../context/useAuth";
 import { ROLES } from "../roles";
 import { useNavigate } from "react-router-dom";
 
-import "../styles/Dashboard.css";
+import "../styles/dashboard.css";
 
 import KpiCard from "../components/dashboard/KpiCard";
 import QuickModuleCard from "../components/dashboard/QuickModuleCard";
@@ -29,7 +29,7 @@ function Dashboard() {
 
       <div className="dashboard-container">
 
-        {/* Header */}
+        {/* HEADER */}
 
         <div className="dashboard-header">
           <h1>{greeting}, {user?.name}</h1>
@@ -37,29 +37,97 @@ function Dashboard() {
         </div>
 
 
-        {/* KPI Cards */}
+        {/* FINANCIAL SNAPSHOT (THIS MONTH) */}
 
-        <div className="kpi-grid">
+        <h2 className="dashboard-section-title">
+          Financial Snapshot (This Month)
+        </h2>
 
-          <KpiCard title="Revenue" value="₹45L" />
-          <KpiCard title="Projects" value="12" />
-          <KpiCard title="Employees" value="38" />
-          <KpiCard title="Leads" value="15" />
+        <div className="snapshot-grid">
+
+          <KpiCard title="Monthly Revenue" value="₹45L" />
+          <KpiCard title="Monthly Expenses" value="₹30L" />
+          <KpiCard title="Net Profit" value="₹15L" />
+          <KpiCard title="Active Clients" value="8" />
 
         </div>
 
 
-        {/* Project Overview */}
+        {/* OPERATIONS TODAY */}
+
+        <h2 className="dashboard-section-title">
+          Operations Today
+        </h2>
+
+        <div className="kpi-grid">
+
+          <KpiCard title="Active Projects" value="12" />
+          <KpiCard title="Employees Present Today" value="32" />
+          <KpiCard title="New Leads Today" value="4" />
+
+        </div>
+
+
+        {/* ANALYTICS */}
+
+        <div className="analytics-grid">
+
+          <div className="chart-box">
+            <h3>Revenue Analytics</h3>
+            <p>Revenue chart will appear here</p>
+          </div>
+
+          <div className="chart-box">
+            <h3>Expense Distribution</h3>
+            <p>Expense chart will appear here</p>
+          </div>
+
+        </div>
+
+
+        {/* ONGOING PROJECTS */}
 
         <ProjectTable />
 
 
-        {/* WBS Section */}
+        {/* WBS COST OVERVIEW */}
 
         <WbsOverview />
 
 
-        {/* Quick Modules */}
+        {/* LEAD PIPELINE + HR OVERVIEW */}
+
+        <div className="dual-section">
+
+          <div className="info-card">
+
+            <h3>Lead Pipeline</h3>
+
+            <ul>
+              <li>New Leads: 15</li>
+              <li>Contacted: 10</li>
+              <li>Proposal Sent: 5</li>
+              <li>Converted: 3</li>
+            </ul>
+
+          </div>
+
+          <div className="info-card">
+
+            <h3>HR Overview</h3>
+
+            <ul>
+              <li>Total Employees: 38</li>
+              <li>Present Today: 32</li>
+              <li>On Leave: 4</li>
+            </ul>
+
+          </div>
+
+        </div>
+
+
+        {/* QUICK MODULES */}
 
         <div className="quick-modules">
 
@@ -114,7 +182,6 @@ function Dashboard() {
     </AppLayout>
 
   );
-
 }
 
 export default Dashboard;

@@ -1,36 +1,96 @@
-function ProjectTable() {
-  return (
-    <div style={{ marginTop: "40px" }}>
-      <h2>Project Overview</h2>
+import ProgressBar from "./ProgressBar";
 
-      <table style={{ width: "100%", marginTop: "15px" }}>
+function ProjectTable() {
+
+  const projects = [
+    {
+      name: "Metro Bridge",
+      client: "ABC Infra",
+      currentWork: "Foundation Work",
+      received: "₹60L",
+      spent: "₹35L",
+      progress: 45,
+      status: "ongoing"
+    },
+    {
+      name: "Highway Construction",
+      client: "XYZ Ltd",
+      currentWork: "Asphalt Laying",
+      received: "₹40L",
+      spent: "₹20L",
+      progress: 35,
+      status: "ongoing"
+    },
+    {
+      name: "Airport Terminal",
+      client: "Global Airports",
+      currentWork: "Interior Finishing",
+      received: "₹1.5Cr",
+      spent: "₹1.2Cr",
+      progress: 85,
+      status: "ongoing"
+    },
+    {
+      name: "Office Tower",
+      client: "Skyline Ltd",
+      currentWork: "Completed",
+      received: "₹90L",
+      spent: "₹85L",
+      progress: 100,
+      status: "completed"
+    }
+  ];
+
+  // Show only ongoing projects
+  const ongoingProjects = projects.filter(
+    (project) => project.status === "ongoing"
+  );
+
+  return (
+
+    <div className="project-table">
+
+      <h2>Ongoing Projects Overview</h2>
+
+      <table>
+
         <thead>
           <tr>
             <th>Project</th>
             <th>Client</th>
-            <th>Status</th>
-            <th>Budget</th>
+            <th>Current Work (WBS)</th>
+            <th>Amount Received</th>
+            <th>Amount Spent</th>
+            <th>Progress</th>
           </tr>
         </thead>
 
         <tbody>
-          <tr>
-            <td>Metro Bridge</td>
-            <td>ABC Infra</td>
-            <td>Active</td>
-            <td>₹1.2Cr</td>
-          </tr>
 
-          <tr>
-            <td>Road Construction</td>
-            <td>PQR Ltd</td>
-            <td>Completed</td>
-            <td>₹50L</td>
-          </tr>
+          {ongoingProjects.map((project, index) => (
+
+            <tr key={index}>
+              <td>{project.name}</td>
+              <td>{project.client}</td>
+              <td>{project.currentWork}</td>
+              <td>{project.received}</td>
+              <td>{project.spent}</td>
+
+              <td>
+                <ProgressBar value={project.progress} />
+              </td>
+            </tr>
+
+          ))}
+
         </tbody>
+
       </table>
+
     </div>
+
   );
+
 }
 
 export default ProjectTable;

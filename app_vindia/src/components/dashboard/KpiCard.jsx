@@ -1,16 +1,28 @@
-function KpiCard({title,value}){
+function KpiCard({ title, value, color = "#4f46e5", icon }) {
 
-return(
+  return (
 
-<div className="kpi-card">
+    <div className="kpi-card">
 
-<h4>{title}</h4>
-<h2>{value}</h2>
+      <div
+        className="kpi-icon"
+        style={{ backgroundColor: color }}
+      >
+        {icon}
+      </div>
 
-</div>
+      <div className="kpi-content">
 
-)
+        <p className="kpi-title">{title}</p>
+
+        <h2 className="kpi-value">{value}</h2>
+
+      </div>
+
+    </div>
+
+  );
 
 }
 
-export default KpiCard
+export default KpiCard;
