@@ -10,11 +10,14 @@ import FinancePage from "../pages/FinancePage";
 import MarketingPage from "../pages/MarketingPage";
 import CEOPanel from "../pages/CEOPanel";
 import UserManagement from "../pages/UserManagement";
+import HRDashboard from "../pages/hr/HRDashboard";
+import Employees from "../pages/hr/Employees";
+import Attendance from "../pages/hr/Attendance";
+import Leaves from "../pages/hr/Leaves";
 
 const AppRoutes = () => {
   return (
     <Routes>
-
       {/* Public Routes */}
       <Route path="/" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
@@ -81,7 +84,41 @@ const AppRoutes = () => {
 
       {/* Fallback */}
       <Route path="*" element={<h2>Page Not Found</h2>} />
+      <Route
+        path="/hr"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRDashboard />
+          </ProtectedRoute>
+        }
+      />
 
+      <Route
+        path="/hr/employees"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <Employees />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/hr/attendance"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <Attendance />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/hr/leaves"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <Leaves />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 };

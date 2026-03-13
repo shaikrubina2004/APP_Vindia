@@ -68,6 +68,7 @@ function Sidebar() {
         <span>Settings</span>
       </Link>
     </li>
+    
 
   </ul>
 </nav>
