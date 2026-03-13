@@ -17,12 +17,6 @@ background:white;
 flex-shrink:0;
 }
 
-/* EXPAND SIDEBAR */
-
-.sidebar:hover{
-width:220px;
-}
-
 
 /* MAIN CONTENT AREA */
 

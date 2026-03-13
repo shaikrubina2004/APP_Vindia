@@ -3,7 +3,7 @@ import { useAuth } from "../context/useAuth";
 import { ROLES } from "../roles";
 import { useNavigate } from "react-router-dom";
 
-import "../styles/dashboard.css";
+import "../styles/Dashboard.css";
 
 import KpiCard from "../components/dashboard/KpiCard";
 import QuickModuleCard from "../components/dashboard/QuickModuleCard";
@@ -17,7 +17,7 @@ function Dashboard() {
 
   const hour = new Date().getHours();
 
-  let greeting = "Hello";
+  let greeting = "Hello"; 
 
   if (hour < 12) greeting = "Good Morning";
   else if (hour < 18) greeting = "Good Afternoon";
