@@ -1,13 +1,11 @@
 /* MAIN APP LAYOUT */
 
 .app-layout{
-display:flex;
-width:100%;
-
-background:#f5f7fb;
+  display:flex;
+  width:100%;
+  background:#f5f7fb;
+  align-items:flex-start;   /* important for sticky */
 }
-
-
 /* SIDEBAR */
 
 .sidebar {
@@ -15,9 +13,7 @@ background:#f5f7fb;
   transition: width 0.3s ease;
   background: white;
   flex-shrink: 0;
-  overflow-x: visible; 
-  position: relative;   
-  margin-top: 0;        
+  overflow: visible;
 }
 
 /* MAIN CONTENT AREA */

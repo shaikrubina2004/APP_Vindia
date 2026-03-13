@@ -6,14 +6,12 @@ body{
 }
 
 .sidebar{
-  position: sticky;      
-  top: 120px;          
-  left: 1rem;            
+  position: sticky;
+  top: 90px;   /* just below navbar */
   background: #fff;
   border-radius: 10px;
   padding: 1rem 0;
   box-shadow: 0 0 40px rgba(0,0,0,0.03);
-  height: calc(100vh - 120px); 
   z-index: 999;
 }
 .sidebar__menu{
