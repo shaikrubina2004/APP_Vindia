@@ -1,12 +1,20 @@
+/* ============================= */
 /* DASHBOARD CONTAINER */
+/* ============================= */
 
 .dashboard-container{
 width:100%;
 max-width:1400px;
-margin:auto;
+margin:0 auto;
+display:flex;
+flex-direction:column;
+gap:30px;
 }
 
+
+/* ============================= */
 /* HEADER */
+/* ============================= */
 
 .dashboard-header{
 display:flex;
@@ -21,29 +29,36 @@ color:#0f172a;
 }
 
 .dashboard-header p{
-color:#64748b;
 font-size:14px;
+color:#64748b;
 }
 
 
+/* ============================= */
 /* SNAPSHOT GRID */
+/* ============================= */
 
 .snapshot-grid{
 display:grid;
 grid-template-columns:repeat(4,minmax(0,1fr));
-gap:24px;
+gap:22px;
 }
 
+
+/* ============================= */
 /* KPI GRID */
+/* ============================= */
 
 .kpi-grid{
 display:grid;
 grid-template-columns:repeat(3,minmax(0,1fr));
-gap:24px;
+gap:22px;
 }
 
 
+/* ============================= */
 /* KPI CARD */
+/* ============================= */
 
 .kpi-card{
 padding:24px 28px;
@@ -54,7 +69,8 @@ transition:all .25s ease;
 box-shadow:0 12px 28px rgba(0,0,0,0.12);
 
 display:flex;
-align-items:center;
+flex-direction:column;
+justify-content:center;
 
 min-height:100px;
 }
@@ -67,20 +83,22 @@ box-shadow:0 18px 40px rgba(0,0,0,0.18);
 
 /* KPI TEXT */
 
-.kpi-title{
+.kpi-card h4{
 font-size:14px;
 color:rgba(255,255,255,0.9);
 margin-bottom:6px;
 }
 
-.kpi-value{
-font-size:28px;
+.kpi-card h2{
+font-size:26px;
 font-weight:700;
 color:white;
 }
 
 
+/* ============================= */
 /* KPI COLORS */
+/* ============================= */
 
 .snapshot-grid .kpi-card:nth-child(1){
 background:linear-gradient(135deg,#6366f1,#4f46e5);
@@ -111,7 +129,9 @@ background:linear-gradient(135deg,#ec4899,#db2777);
 }
 
 
+/* ============================= */
 /* ANALYTICS */
+/* ============================= */
 
 .analytics-grid{
 display:grid;
@@ -135,7 +155,9 @@ color:#0f172a;
 }
 
 
+/* ============================= */
 /* PROJECT TABLE */
+/* ============================= */
 
 .project-table{
 background:white;
@@ -166,17 +188,50 @@ color:#0f172a;
 }
 
 
-/* WBS GRID */
+/* ============================= */
+/* WBS SECTION */
+/* ============================= */
+
+.wbs-section{
+margin-top:30px;
+}
 
 .wbs-grid{
 display:grid;
 grid-template-columns:repeat(4,1fr);
 gap:22px;
-margin-top:10px;
+margin-top:20px;
+}
+
+.wbs-card{
+background:white;
+padding:22px;
+border-radius:12px;
+box-shadow:0 8px 20px rgba(0,0,0,0.08);
+border-left:4px solid #6366f1;
+transition:0.2s;
+}
+
+.wbs-card:hover{
+transform:translateY(-3px);
+box-shadow:0 12px 25px rgba(0,0,0,0.12);
+}
+
+.wbs-card p{
+font-size:14px;
+color:#64748b;
+}
+
+.wbs-card h3{
+margin-top:6px;
+font-size:22px;
+color:#0f172a;
 }
 
 
+/* ============================= */
 /* LEAD + HR SECTION */
+/* ============================= */
 
 .dual-section{
 display:grid;
@@ -209,7 +264,9 @@ color:#475569;
 }
 
 
+/* ============================= */
 /* QUICK MODULES */
+/* ============================= */
 
 .quick-modules{
 display:flex;
@@ -249,7 +306,9 @@ margin-top:4px;
 }
 
 
+/* ============================= */
 /* RESPONSIVE */
+/* ============================= */
 
 @media(max-width:1100px){
 

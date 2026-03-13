@@ -1,24 +1,35 @@
-import KpiCard from "./KpiCard";
-
 function WbsOverview() {
+
+  const wbsData = [
+    { title: "Labour Cost", value: "₹25L" },
+    { title: "Material Cost", value: "₹40L" },
+    { title: "Equipment", value: "₹15L" },
+    { title: "Travel", value: "₹3L" }
+  ];
+
   return (
-    <div style={{ marginTop: "40px" }}>
+
+    <div className="wbs-section">
+
       <h2>WBS Cost Overview</h2>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4,1fr)",
-          gap: "20px",
-          marginTop: "20px",
-        }}
-      >
-        <KpiCard title="Labour Cost" value="₹25L" />
-        <KpiCard title="Material Cost" value="₹40L" />
-        <KpiCard title="Equipment" value="₹15L" />
-        <KpiCard title="Travel" value="₹3L" />
+      <div className="wbs-grid">
+
+        {wbsData.map((item, index) => (
+
+          <div key={index} className="wbs-card">
+
+            <p>{item.title}</p>
+            <h3>{item.value}</h3>
+
+          </div>
+
+        ))}
+
       </div>
+
     </div>
+
   );
 }
 
