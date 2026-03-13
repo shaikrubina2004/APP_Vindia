@@ -119,6 +119,14 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/hr"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRDashboard />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 };
