@@ -22,8 +22,9 @@ function HRDashboard() {
         {/* Dashboard Grid */}
         <div className="dashboard-grid">
           <AttendanceOverview />
-          <AttendanceChart />
           <NewJoiners />
+          <AttendanceChart />
+          
           <PendingRequests />
           <Birthdays />
         </div>
