@@ -2,7 +2,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import "./HRSidebar.css";
 
 function HRSidebar() {
-
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -13,20 +12,15 @@ function HRSidebar() {
     { name: "Leaves", path: "/hr/leaves" },
     { name: "Payroll", path: "/hr/payroll" },
     { name: "Documents", path: "/hr/documents" },
-    { name: "Travel Requests", path: "/hr/travel" }
+    { name: "Travel Requests", path: "/hr/travel" },
   ];
 
   return (
     <aside className="hr-sidebar">
-
-      <div className="sidebar-header">
-        HR Panel
-      </div>
+      <div className="sidebar-header">HR Panel</div>
 
       <ul>
-
         {menu.map((item) => (
-
           <li
             key={item.path}
             className={
@@ -36,18 +30,12 @@ function HRSidebar() {
             }
             onClick={() => navigate(item.path)}
           >
-
             {item.name}
-
           </li>
-
         ))}
-
       </ul>
-
     </aside>
   );
-
 }
 
 export default HRSidebar;
