@@ -51,9 +51,7 @@ function Navbar() {
           <div className="search-glow"></div>
         </div>
       </div>
-      <div className="nav-search">
-        <input type="text" placeholder="Search modules, employees..." />
-      </div>
+
       {/* Right Section - User Menu */}
       <div className="navbar-right">
         {/* Quick Add Button */}

@@ -5,7 +5,7 @@ import PendingRequests from "../../components/hr/PendingRequests";
 import Birthdays from "../../components/hr/Birthdays";
 import QuickActions from "../../components/hr/QuickActions";
 import HRSidebar from "../../components/hr/HRSidebar";
-
+import AttendanceChart from "../../components/hr/AttendanceChart";
 import "../../styles/HRDashboard.css";
 
 function HRDashboard() {
@@ -24,6 +24,7 @@ function HRDashboard() {
         {/* Dashboard Grid */}
         <div className="dashboard-grid">
           <AttendanceOverview />
+          <AttendanceChart />
           <NewJoiners />
           <PendingRequests />
           <Birthdays />

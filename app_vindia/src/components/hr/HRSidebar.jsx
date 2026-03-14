@@ -17,11 +17,10 @@ function HRSidebar() {
   ];
 
   return (
-
     <aside className="hr-sidebar">
 
       <div className="sidebar-header">
-        <h2>HR Panel</h2>
+        HR Panel
       </div>
 
       <ul>
@@ -47,7 +46,6 @@ function HRSidebar() {
       </ul>
 
     </aside>
-
   );
 
 }
