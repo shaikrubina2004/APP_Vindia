@@ -1,115 +1,166 @@
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@600&display=swap');
 
+/* PAGE */
+
 body{
   background:#eaeef6;
-  font-family:'Open Sans',sans-serif;
+  font-family:'Open Sans', sans-serif;
 }
 
+
+/* SIDEBAR */
+
 .sidebar{
-  position: sticky;
-  top: 90px;   /* just below navbar */
-  background: #fff;
-  border-radius: 10px;
-  padding: 1rem 0;
-  box-shadow: 0 0 40px rgba(0,0,0,0.03);
-  z-index: 999;
+
+  width:72px;
+  background:white;
+
+  position:fixed;
+  left:12px;
+  top:90px;
+
+  border-radius:14px;
+
+  padding:10px 0;
+
+  box-shadow:0 8px 20px rgba(0,0,0,0.06);
+
+  z-index:1000;
+
+  display:flex;
+  justify-content:center;
 }
+
+
+/* MENU */
+
 .sidebar__menu{
+
   list-style:none;
   padding:0;
   margin:0;
-  position:relative;
+
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+
+  gap:8px;
 }
+
+
+/* ITEM */
 
 .sidebar__item{
   position:relative;
 }
 
+
+/* LINK */
+
 .sidebar__link{
+
   display:flex;
   align-items:center;
   justify-content:center;
-  height:4.0rem;
-  width:5.5rem;
-  color:#406ff3;
-  transition:0.25s;
-  position:relative;
-  border-radius:12px;
 
-  /* remove mobile tap highlight */
-  -webkit-tap-highlight-color: transparent;
+  height:34px;
+  width:34px;
+
+  color:#3b5bfd;
+
+  border-radius:8px;
+
+  transition:all .2s ease;
+
+  position:relative;
 }
+
+
+/* ICON */
 
 .sidebar__link svg{
-  width:28px;
-  height:28px;
+  width:18px;
+  height:18px;
 }
 
-.sidebar__link span{
-  position:absolute;
-  left:100%;
-  margin-left:1rem;
-  transform:translate(-3rem);
-  opacity:0;
-  pointer-events:none;
-  color:#406ff3;
-  background:#fff;
-  padding:0.75rem;
-  border-radius:18px;
-  transition:0.25s;
-  z-index:1000;
-  white-space:nowrap;
-}
 
-/* DESKTOP HOVER */
+/* HOVER */
 
 .sidebar__link:hover{
-  transform:scale(1.05);
+  background:#eef2ff;
 }
+
+
+/* TOOLTIP */
+
+.sidebar__link span{
+
+  position:absolute;
+
+  left:100%;
+  margin-left:10px;
+
+  opacity:0;
+
+  background:white;
+  color:#406ff3;
+
+  padding:6px 10px;
+
+  border-radius:14px;
+
+  font-size:12px;
+
+  white-space:nowrap;
+
+  box-shadow:0 6px 18px rgba(0,0,0,0.08);
+
+  transition:0.2s;
+
+}
+
+
+/* SHOW TOOLTIP */
 
 .sidebar__link:hover span{
   opacity:1;
-  transform:translate(0);
 }
 
-/* MOBILE RESPONSIVE SIDEBAR */
+
+/* ACTIVE */
+
+.sidebar__link.active{
+  background:#e8efff;
+}
+
+
+/* MOBILE */
 
 .sidebar-toggle{
   display:none;
 }
-@media (max-width:768px){
 
-  .sidebar-toggle{
-    display:block;
-    position:absolute;
-    top:70px;
-    left:20px;
-    z-index:2000;
-    background:#406ff3;
-    color:white;
-    border:none;
-    padding:10px 14px;
-    border-radius:6px;
-    font-size:18px;
-    cursor:pointer;
-  }
+@media(max-width:768px){
 
-  .sidebar{
-    left:0;
-    top: 120;
-    height:150vh;
-    transform:translateX(-110%);
-    transition:0.3s;
-  }
+.sidebar-toggle{
+  display:block;
+  position:fixed;
+  top:70px;
+  left:20px;
+  z-index:2000;
+}
 
-  .sidebar.open{
-    transform:translateX(0);
-  }
+.sidebar{
+  transform:translateX(-110%);
+  transition:.3s;
+}
 
-  /* ❌ Disable tooltip text on mobile */
+.sidebar.open{
+  transform:translateX(0);
+}
 
-  .sidebar__link span{
-    display:none;
-  }
+.sidebar__link span{
+  display:none;
+}
 
 }

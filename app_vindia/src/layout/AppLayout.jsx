@@ -7,7 +7,7 @@ function AppLayout({ children }) {
     <div className="app-layout">
 
       {/* Sidebar */}
-      <Sidebar  />
+      <Sidebar />
 
       {/* Main Section */}
       <div className="main-section">
