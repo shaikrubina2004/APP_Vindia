@@ -32,13 +32,18 @@ function AttendanceChart() {
       legend: {
         position: "bottom"
       }
-    }
+    },
+    maintainAspectRatio: false
   };
 
   return (
     <div className="dashboard-card">
       <h3>Attendance Distribution</h3>
-      <Doughnut data={data} options={options} />
+
+      <div className="chart-container">
+        <Doughnut data={data} options={options} />
+      </div>
+
     </div>
   );
 }

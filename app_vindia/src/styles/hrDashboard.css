@@ -74,6 +74,11 @@ background:#fee2e2;
 color:#dc2626;
 }
 
+.chart-container{
+height:260px;
+max-width:300px;
+margin:auto;
+}
 /* TEXT */
 
 .stat-card h3{
