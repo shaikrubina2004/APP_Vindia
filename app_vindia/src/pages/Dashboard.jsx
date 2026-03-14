@@ -9,6 +9,7 @@ import KpiCard from "../components/dashboard/KpiCard";
 import QuickModuleCard from "../components/dashboard/QuickModuleCard";
 import ProjectTable from "../components/dashboard/ProjectTable";
 import WbsOverview from "../components/dashboard/WbsOverview";
+import FinanceChart from "../components/dashboard/FinanceChart";
 
 function Dashboard() {
 
@@ -17,7 +18,7 @@ function Dashboard() {
 
   const hour = new Date().getHours();
 
-  let greeting = "Hello"; 
+  let greeting = "Hello";
 
   if (hour < 12) greeting = "Good Morning";
   else if (hour < 18) greeting = "Good Afternoon";
@@ -37,7 +38,7 @@ function Dashboard() {
         </div>
 
 
-        {/* FINANCIAL SNAPSHOT (THIS MONTH) */}
+        {/* FINANCIAL SNAPSHOT */}
 
         <h2 className="dashboard-section-title">
           Financial Snapshot (This Month)
@@ -68,34 +69,26 @@ function Dashboard() {
         </div>
 
 
-        {/* ANALYTICS */}
+        {/* FINANCE OVERVIEW */}
 
-        <div className="analytics-grid">
+        <h2 className="dashboard-section-title">
+          Finance Overview
+        </h2>
 
-          <div className="chart-box">
-            <h3>Revenue Analytics</h3>
-            <p>Revenue chart will appear here</p>
-          </div>
-
-          <div className="chart-box">
-            <h3>Expense Distribution</h3>
-            <p>Expense chart will appear here</p>
-          </div>
-
-        </div>
+        <FinanceChart />
 
 
-        {/* ONGOING PROJECTS */}
+        {/* PROJECT TABLE */}
 
         <ProjectTable />
 
 
-        {/* WBS COST OVERVIEW */}
+        {/* WBS OVERVIEW */}
 
         <WbsOverview />
 
 
-        {/* LEAD PIPELINE + HR OVERVIEW */}
+        {/* LEAD + HR */}
 
         <div className="dual-section">
 
