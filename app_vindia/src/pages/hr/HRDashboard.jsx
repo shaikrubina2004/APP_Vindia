@@ -11,11 +11,9 @@ import "../../styles/HRDashboard.css";
 function HRDashboard() {
   return (
     <div className="hr-layout">
-
       <HRSidebar />
 
       <div className="hr-content">
-
         <h1>HR Dashboard</h1>
 
         {/* Top Stats */}
@@ -32,9 +30,7 @@ function HRDashboard() {
 
         {/* Quick Actions */}
         <QuickActions />
-
       </div>
-
     </div>
   );
 }
