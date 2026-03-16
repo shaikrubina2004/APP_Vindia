@@ -1,13 +1,10 @@
 import { Routes, Route } from "react-router-dom";
-import ProtectedRoute from "./ProtectedRoute";
-import { ROLES } from "../roles";
 
-/* Layouts */
-import CEOLayout from "../layouts/CEOLayout";
-import HRLayout from "../layouts/HRLayout";
+import SignIn from "../pages/SignIn";
+import SignUp from "../pages/SignUp";
 
-/* Pages */
 import Dashboard from "../pages/ceo/Dashboard";
+import CEOPanel from "../pages/ceo/CEOPanel";
 import UserManagement from "../pages/ceo/UserManagement";
 
 import HRDashboard from "../pages/hr/HRDashboard";
@@ -15,15 +12,25 @@ import Employees from "../pages/hr/Employees";
 import Attendance from "../pages/hr/Attendance";
 import Leaves from "../pages/hr/Leaves";
 
-const AdminRoutes = () => {
+import ProtectedRoute from "./ProtectedRoute";
+import { ROLES } from "../roles";
+
+import CEOLayout from "../layouts/CEOLayout";
+import HRLayout from "../layouts/HRLayout";
+
+const AppRoutes = () => {
   return (
     <Routes>
 
-      {/* CEO Dashboard */}
+      {/* PUBLIC ROUTES */}
+      <Route path="/" element={<SignIn />} />
+      <Route path="/signup" element={<SignUp />} />
+
+      {/* DASHBOARD */}
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
             <CEOLayout>
               <Dashboard />
             </CEOLayout>
@@ -31,7 +38,19 @@ const AdminRoutes = () => {
         }
       />
 
-      {/* CEO - User Management */}
+      {/* CEO PANEL */}
+      <Route
+        path="/ceo"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <CEOLayout>
+              <CEOPanel />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* USER MANAGEMENT */}
       <Route
         path="/users"
         element={
@@ -43,7 +62,7 @@ const AdminRoutes = () => {
         }
       />
 
-      {/* HR Dashboard */}
+      {/* HR DASHBOARD */}
       <Route
         path="/hr"
         element={
@@ -55,7 +74,7 @@ const AdminRoutes = () => {
         }
       />
 
-      {/* HR Employees */}
+      {/* HR EMPLOYEES */}
       <Route
         path="/hr/employees"
         element={
@@ -67,7 +86,7 @@ const AdminRoutes = () => {
         }
       />
 
-      {/* HR Attendance */}
+      {/* HR ATTENDANCE */}
       <Route
         path="/hr/attendance"
         element={
@@ -79,7 +98,7 @@ const AdminRoutes = () => {
         }
       />
 
-      {/* HR Leaves */}
+      {/* HR LEAVES */}
       <Route
         path="/hr/leaves"
         element={
@@ -91,8 +110,11 @@ const AdminRoutes = () => {
         }
       />
 
+      {/* FALLBACK */}
+      <Route path="*" element={<h2>Page Not Found</h2>} />
+
     </Routes>
   );
 };
 
-export default AdminRoutes;
+export default AppRoutes;
