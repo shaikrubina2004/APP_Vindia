@@ -1,21 +1,18 @@
-import Navbar from "../components/Navbar";
-import Sidebar from "../components/Sidebar";
+import Navbar from "../components/layout/Navbar";
+import Sidebar from "../components/layout/Sidebar";
 import "../styles/Layout.css";
 
-function AppLayout({ children }) {
+function AppLayout({ menuItems, children }) {
+
   return (
     <div className="app-layout">
 
-      {/* Sidebar */}
-      <Sidebar />
+      <Sidebar menuItems={menuItems} />
 
-      {/* Main Section */}
       <div className="main-section">
 
-        {/* Top Navbar */}
         <Navbar />
 
-        {/* Page Content */}
         <div className="page-content">
           {children}
         </div>

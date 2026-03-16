@@ -1,8 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { useAuth } from "../context/useAuth";
-import "./Navbar.css";
-import logo from "../assets/logo.png.png"; // Your logo file
+import { useAuth } from "../../context/useAuth";
+
+import "../../styles/layout/Navbar.css";
+
+import logo from "../../assets/logo.png";
 
 function Navbar() {
   const navigate = useNavigate();
