@@ -82,10 +82,6 @@ function Dashboard() {
 
       {/* WBS COST TRACKING */}
 
-      <h2 className="dashboard-section-title">
-        WBS Cost Tracking
-      </h2>
-
       <WbsCostTable />
 
       {/* LEAD + HR SECTION */}

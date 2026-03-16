@@ -22,6 +22,7 @@ function UserManagement() {
 
   const [editMode, setEditMode] = useState(false);
 
+  // FETCH USERS
   const fetchUsers = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/users");
@@ -35,10 +36,12 @@ function UserManagement() {
     fetchUsers();
   }, []);
 
+  // SEARCH FILTER
   const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(search.toLowerCase())
+    user.name?.toLowerCase().includes(search.toLowerCase())
   );
 
+  // OPEN ASSIGN ROLE MODAL
   const openAssignModal = (user) => {
     setSelectedUser(user);
     setSelectedRole("");
@@ -46,6 +49,7 @@ function UserManagement() {
     setEditMode(false);
   };
 
+  // OPEN EDIT MODAL
   const openEditModal = (user) => {
     setSelectedUser(user);
     setSelectedRole(user.role);
@@ -57,8 +61,16 @@ function UserManagement() {
     setSelectedUser(null);
   };
 
+  // UPDATE USER
   const updateUser = async () => {
+
+    if (!selectedRole) {
+      alert("Please select a role");
+      return;
+    }
+
     try {
+
       await axios.put(
         `http://localhost:5000/api/users/${selectedUser.id}`,
         {
@@ -75,9 +87,10 @@ function UserManagement() {
     }
   };
 
+  // DELETE USER
   const deleteUser = async () => {
 
-    if(!window.confirm("Delete this user?")) return;
+    if (!window.confirm("Delete this user?")) return;
 
     try {
 
@@ -91,7 +104,6 @@ function UserManagement() {
     } catch (error) {
       console.error(error);
     }
-
   };
 
   return (
@@ -152,7 +164,7 @@ function UserManagement() {
 
                   <button
                     className="assign-btn"
-                    onClick={()=>openAssignModal(user)}
+                    onClick={() => openAssignModal(user)}
                   >
                     Assign Role
                   </button>
@@ -161,7 +173,7 @@ function UserManagement() {
 
                   <button
                     className="edit-btn"
-                    onClick={()=>openEditModal(user)}
+                    onClick={() => openEditModal(user)}
                   >
                     Edit
                   </button>
@@ -178,10 +190,83 @@ function UserManagement() {
 
       </table>
 
+
+      {/* MODAL */}
+
+      {selectedUser && (
+
+        <div className="modal-overlay">
+
+          <div className="modal">
+
+            <h2>{editMode ? "Edit User" : "Assign Role"}</h2>
+
+            <p className="selected-user">{selectedUser.name}</p>
+
+            <select
+              value={selectedRole}
+              onChange={(e)=>setSelectedRole(e.target.value)}
+            >
+              <option value="">Select Role</option>
+
+              {roles.map(role => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+
+            </select>
+
+            {editMode && (
+
+              <select
+                value={selectedStatus}
+                onChange={(e)=>setSelectedStatus(e.target.value)}
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+
+            )}
+
+            <div className="modal-actions">
+
+              <button
+                className="cancel-btn"
+                onClick={closeModal}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="assign-btn"
+                onClick={updateUser}
+              >
+                Save
+              </button>
+
+              {editMode && (
+
+                <button
+                  className="delete-btn"
+                  onClick={deleteUser}
+                >
+                  Delete
+                </button>
+
+              )}
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
     </div>
 
   );
-
 }
 
 export default UserManagement;
