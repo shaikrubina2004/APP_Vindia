@@ -8,6 +8,16 @@ function AttendanceManagement() {
   const [leaveRequestsCount] = useState(3);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showLeaveForm, setShowLeaveForm] = useState(false);
+
+  // Edit inline state
+  const [editingEmployeeId, setEditingEmployeeId] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    status: "",
+    checkIn: "",
+    checkOut: "",
+    remarks: "",
+  });
+
   const [leaveFormData, setLeaveFormData] = useState({
     employeeName: "",
     fromDate: "",
@@ -18,7 +28,7 @@ function AttendanceManagement() {
   const [appliedLeaves, setAppliedLeaves] = useState([]);
 
   // Database of attendance records by date
-  const allAttendanceByDate = {
+  const [attendanceByDate, setAttendanceByDate] = useState({
     "2024-1-5": [
       {
         id: 1,
@@ -219,11 +229,11 @@ function AttendanceManagement() {
         remarks: "-",
       },
     ],
-  };
+  });
 
   const getAttendanceRecordsForDate = () => {
     const dateKey = `${selectedDateObj.getFullYear()}-${selectedDateObj.getMonth() + 1}-${selectedDateObj.getDate()}`;
-    return allAttendanceByDate[dateKey] || [];
+    return attendanceByDate[dateKey] || [];
   };
 
   const attendanceRecords = getAttendanceRecordsForDate();
@@ -232,7 +242,7 @@ function AttendanceManagement() {
   const getStatusCounts = () => {
     const records = attendanceRecords;
     const counts = {
-      total: 125, // Total employees
+      total: 125,
       present: 0,
       absent: 0,
       late: 0,
@@ -252,6 +262,52 @@ function AttendanceManagement() {
   };
 
   const statusCounts = getStatusCounts();
+
+  // Edit button handler - show form for that employee
+  const handleEditClick = (employee) => {
+    setEditingEmployeeId(employee.id);
+    setEditFormData({
+      status: employee.status,
+      checkIn: employee.checkIn,
+      checkOut: employee.checkOut,
+      remarks: employee.remarks,
+    });
+  };
+
+  // Save edit changes
+  const handleSaveEdit = (employeeId) => {
+    const dateKey = `${selectedDateObj.getFullYear()}-${selectedDateObj.getMonth() + 1}-${selectedDateObj.getDate()}`;
+
+    setAttendanceByDate((prev) => ({
+      ...prev,
+      [dateKey]: prev[dateKey].map((emp) =>
+        emp.id === employeeId ? { ...emp, ...editFormData } : emp,
+      ),
+    }));
+
+    setEditingEmployeeId(null);
+    console.log("Updated employee:", employeeId, editFormData);
+    // Here you would also save to Supabase
+  };
+
+  // Cancel edit
+  const handleCancelEdit = () => {
+    setEditingEmployeeId(null);
+    setEditFormData({
+      status: "",
+      checkIn: "",
+      checkOut: "",
+      remarks: "",
+    });
+  };
+
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
   const handleLeaveFormChange = (e) => {
     const { name, value } = e.target;
@@ -358,8 +414,6 @@ function AttendanceManagement() {
         return "status-absent";
       case "wfh":
         return "status-wfh";
-      case "leave":
-        return "status-leave";
       default:
         return "status-default";
     }
@@ -375,10 +429,8 @@ function AttendanceManagement() {
         return "Absent";
       case "wfh":
         return "WFH";
-      case "leave":
-        return "Leave";
       default:
-        return "-";
+        return "Unknown";
     }
   };
 
@@ -521,8 +573,7 @@ function AttendanceManagement() {
                   key={idx}
                   className={`cal-day ${
                     day === selectedDateObj.getDate() &&
-                    selectedDateObj.getMonth() === currentDate.getMonth() &&
-                    selectedDateObj.getFullYear() === currentDate.getFullYear()
+                    currentDate.getMonth() === selectedDateObj.getMonth()
                       ? "selected"
                       : ""
                   } ${day === new Date().getDate() && currentDate.getMonth() === new Date().getMonth() ? "today" : ""}`}
@@ -559,7 +610,6 @@ function AttendanceManagement() {
                   <option value="late">Late</option>
                   <option value="absent">Absent</option>
                   <option value="wfh">WFH</option>
-                  <option value="leave">Leave</option>
                 </select>
               </div>
             </div>
@@ -569,45 +619,142 @@ function AttendanceManagement() {
           <div className="records-block-container">
             {filteredRecords.length > 0 ? (
               filteredRecords.map((record) => (
-                <div
-                  key={record.id}
-                  className={`record-block ${getStatusClass(record.status)}`}
-                >
-                  <div className="record-header">
-                    <div className="emp-info">
-                      <div className="emp-avatar">{record.name.charAt(0)}</div>
-                      <div className="emp-details">
-                        <h4>{record.name}</h4>
-                        <p>{getStatusLabel(record.status)}</p>
+                <div key={record.id}>
+                  {editingEmployeeId === record.id ? (
+                    // Inline Edit Form
+                    <div className="inline-edit-form">
+                      <div className="edit-form-header">
+                        <h4>Edit - {record.name}</h4>
+                        <button
+                          className="close-edit"
+                          onClick={handleCancelEdit}
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      <div className="edit-form-grid">
+                        <div className="edit-form-group">
+                          <label>Status</label>
+                          <select
+                            name="status"
+                            value={editFormData.status}
+                            onChange={handleEditFormChange}
+                            className="edit-form-input"
+                          >
+                            <option value="present">Present</option>
+                            <option value="late">Late</option>
+                            <option value="absent">Absent</option>
+                            <option value="wfh">WFH</option>
+                            <option value="leave">Leave</option>
+                          </select>
+                        </div>
+
+                        <div className="edit-form-group">
+                          <label>Check In</label>
+                          <input
+                            type="time"
+                            name="checkIn"
+                            value={editFormData.checkIn}
+                            onChange={handleEditFormChange}
+                            className="edit-form-input"
+                          />
+                        </div>
+
+                        <div className="edit-form-group">
+                          <label>Check Out</label>
+                          <input
+                            type="time"
+                            name="checkOut"
+                            value={editFormData.checkOut}
+                            onChange={handleEditFormChange}
+                            className="edit-form-input"
+                          />
+                        </div>
+
+                        <div className="edit-form-group">
+                          <label>Remarks</label>
+                          <input
+                            type="text"
+                            name="remarks"
+                            value={editFormData.remarks}
+                            onChange={handleEditFormChange}
+                            placeholder="Add remarks..."
+                            className="edit-form-input"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="edit-form-actions">
+                        <button
+                          className="edit-save-btn"
+                          onClick={() => handleSaveEdit(record.id)}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="edit-cancel-btn"
+                          onClick={handleCancelEdit}
+                        >
+                          Cancel
+                        </button>
                       </div>
                     </div>
-                    <button className="edit-btn-block">Edit</button>
-                  </div>
+                  ) : (
+                    // Normal Record Display
+                    <div
+                      className={`record-block ${getStatusClass(record.status)}`}
+                    >
+                      <div className="record-header">
+                        <div className="emp-info">
+                          <div className="emp-avatar">
+                            {record.name.charAt(0)}
+                          </div>
+                          <div className="emp-details">
+                            <h4>{record.name}</h4>
+                            <p>{getStatusLabel(record.status)}</p>
+                          </div>
+                        </div>
+                        <button
+                          className="edit-btn-block"
+                          onClick={() => handleEditClick(record)}
+                        >
+                          Edit
+                        </button>
+                      </div>
 
-                  <div className="record-details">
-                    <div className="detail-item">
-                      <span className="detail-label">Check In</span>
-                      <span className="detail-value">{record.checkIn}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Check Out</span>
-                      <span className="detail-value">{record.checkOut}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Shift</span>
-                      <span className="detail-value">{record.shift}</span>
-                    </div>
-                  </div>
+                      <div className="record-details">
+                        <div className="detail-item">
+                          <span className="detail-label">Check In</span>
+                          <span className="detail-value">{record.checkIn}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Check Out</span>
+                          <span className="detail-value">
+                            {record.checkOut}
+                          </span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Shift</span>
+                          <span className="detail-value">{record.shift}</span>
+                        </div>
+                      </div>
 
-                  <div className="shift-time-display">
-                    <span className="shift-time-label">Shift Time:</span>
-                    <span className="shift-time-value">{record.shiftTime}</span>
-                  </div>
+                      <div className="shift-time-display">
+                        <span className="shift-time-label">Shift Time:</span>
+                        <span className="shift-time-value">
+                          {record.shiftTime}
+                        </span>
+                      </div>
 
-                  {record.remarks !== "-" && (
-                    <div className="record-remarks">
-                      <span className="remarks-label">Remarks:</span>
-                      <span className="remarks-value">{record.remarks}</span>
+                      {record.remarks !== "-" && (
+                        <div className="record-remarks">
+                          <span className="remarks-label">Remarks:</span>
+                          <span className="remarks-value">
+                            {record.remarks}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

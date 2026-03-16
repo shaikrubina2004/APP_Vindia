@@ -212,6 +212,157 @@
 }
 
 /* ===================== */
+/* INLINE EDIT FORM */
+/* ===================== */
+
+.inline-edit-form {
+  background: linear-gradient(135deg, #f7f9fc 0%, #f0f4f9 100%);
+  border: 2px solid var(--primary-blue);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 16px rgba(30, 90, 150, 0.15);
+  animation: slideDown 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.edit-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid rgba(30, 90, 150, 0.2);
+}
+
+.edit-form-header h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary-blue);
+  margin: 0;
+}
+
+.close-edit {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-edit:hover {
+  color: var(--text-primary);
+  transform: scale(1.1);
+}
+
+.edit-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.edit-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.edit-form-group label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.edit-form-input {
+  padding: 8px 10px;
+  border: 1px solid rgba(30, 90, 150, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  background: white;
+  color: var(--text-primary);
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.edit-form-input:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(30, 90, 150, 0.1);
+  background: white;
+}
+
+.edit-form-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.edit-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.edit-save-btn,
+.edit-cancel-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.edit-save-btn {
+  background: linear-gradient(
+    135deg,
+    var(--primary-blue) 0%,
+    var(--secondary-blue) 100%
+  );
+  color: white;
+  box-shadow: 0 2px 8px rgba(30, 90, 150, 0.15);
+}
+
+.edit-save-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(30, 90, 150, 0.25);
+}
+
+.edit-cancel-btn {
+  background: white;
+  color: var(--text-secondary);
+  border: 1px solid rgba(30, 90, 150, 0.3);
+}
+
+.edit-cancel-btn:hover {
+  background: var(--bg-light);
+  color: var(--text-primary);
+  border-color: rgba(30, 90, 150, 0.5);
+}
+
+/* ===================== */
 /* CONTENT GRID */
 /* ===================== */
 
@@ -267,6 +418,10 @@
   padding: 6px 10px;
   transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
   border-radius: 6px;
+}
+
+.cal-btn:hover {
+  background: rgba(30, 90, 150, 0.1);
 }
 
 .cal-btn:hover {
@@ -1396,6 +1551,19 @@
     font-size: 10px;
   }
 
+  .edit-form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .edit-form-actions {
+    flex-direction: column;
+  }
+
+  .edit-save-btn,
+  .edit-cancel-btn {
+    width: 100%;
+  }
+
   .att-content {
     grid-template-columns: 1fr;
   }
@@ -1473,6 +1641,43 @@
 
   .status-value {
     font-size: 18px;
+  }
+
+  .inline-edit-form {
+    padding: 12px;
+  }
+
+  .edit-form-header {
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+  }
+
+  .edit-form-header h4 {
+    font-size: 13px;
+  }
+
+  .edit-form-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .edit-form-group label {
+    font-size: 10px;
+  }
+
+  .edit-form-input {
+    padding: 7px 8px;
+    font-size: 11px;
+  }
+
+  .edit-form-actions {
+    gap: 6px;
+  }
+
+  .edit-save-btn,
+  .edit-cancel-btn {
+    padding: 7px 12px;
+    font-size: 11px;
   }
 
   .att-table {

@@ -4,7 +4,7 @@ import { useAuth } from "../../context/useAuth";
 
 import "../../styles/layout/Navbar.css";
 
-import logo from "../../assets/logo.png";
+import logo from "../../assets/logo.png.png";
 
 function Navbar() {
   const navigate = useNavigate();
