@@ -27,6 +27,7 @@ function AttendanceManagement() {
         checkIn: "09:02",
         checkOut: "18:01",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
       {
@@ -36,6 +37,7 @@ function AttendanceManagement() {
         checkIn: "09:45",
         checkOut: "18:00",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "Traffic delay",
       },
       {
@@ -45,6 +47,7 @@ function AttendanceManagement() {
         checkIn: "-",
         checkOut: "-",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "Sick leave approved",
       },
       {
@@ -54,6 +57,7 @@ function AttendanceManagement() {
         checkIn: "09:00",
         checkOut: "18:00",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
       {
@@ -62,7 +66,8 @@ function AttendanceManagement() {
         status: "wfh",
         checkIn: "09:15",
         checkOut: "18:15",
-        shift: "M",
+        shift: "A",
+        shiftTime: "12:00 PM - 09:00 PM",
         remarks: "Work from home",
       },
     ],
@@ -74,6 +79,7 @@ function AttendanceManagement() {
         checkIn: "09:05",
         checkOut: "18:02",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
       {
@@ -83,6 +89,7 @@ function AttendanceManagement() {
         checkIn: "09:00",
         checkOut: "18:00",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
       {
@@ -92,6 +99,7 @@ function AttendanceManagement() {
         checkIn: "09:10",
         checkOut: "18:05",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
     ],
@@ -103,6 +111,7 @@ function AttendanceManagement() {
         checkIn: "09:00",
         checkOut: "18:00",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
       {
@@ -111,7 +120,8 @@ function AttendanceManagement() {
         status: "late",
         checkIn: "10:30",
         checkOut: "18:30",
-        shift: "M",
+        shift: "E",
+        shiftTime: "06:00 PM - 03:00 AM",
         remarks: "Doctor appointment",
       },
       {
@@ -120,7 +130,8 @@ function AttendanceManagement() {
         status: "wfh",
         checkIn: "09:00",
         checkOut: "17:00",
-        shift: "M",
+        shift: "N",
+        shiftTime: "10:00 PM - 07:00 AM",
         remarks: "Working from home",
       },
     ],
@@ -132,6 +143,7 @@ function AttendanceManagement() {
         checkIn: "09:00",
         checkOut: "18:00",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
       {
@@ -141,6 +153,7 @@ function AttendanceManagement() {
         checkIn: "-",
         checkOut: "-",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "Approved leave",
       },
       {
@@ -150,6 +163,7 @@ function AttendanceManagement() {
         checkIn: "09:00",
         checkOut: "18:00",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
     ],
@@ -161,6 +175,7 @@ function AttendanceManagement() {
         checkIn: "09:00",
         checkOut: "18:00",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
       {
@@ -170,6 +185,7 @@ function AttendanceManagement() {
         checkIn: "09:00",
         checkOut: "18:00",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
       {
@@ -179,6 +195,7 @@ function AttendanceManagement() {
         checkIn: "09:00",
         checkOut: "18:00",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
       {
@@ -188,6 +205,7 @@ function AttendanceManagement() {
         checkIn: "09:00",
         checkOut: "18:00",
         shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
         remarks: "-",
       },
       {
@@ -196,7 +214,8 @@ function AttendanceManagement() {
         status: "present",
         checkIn: "09:00",
         checkOut: "18:00",
-        shift: "M",
+        shift: "A",
+        shiftTime: "12:00 PM - 09:00 PM",
         remarks: "-",
       },
     ],
@@ -578,6 +597,11 @@ function AttendanceManagement() {
                       <span className="detail-label">Shift</span>
                       <span className="detail-value">{record.shift}</span>
                     </div>
+                  </div>
+
+                  <div className="shift-time-display">
+                    <span className="shift-time-label">Shift Time:</span>
+                    <span className="shift-time-value">{record.shiftTime}</span>
                   </div>
 
                   {record.remarks !== "-" && (
