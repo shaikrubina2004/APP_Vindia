@@ -9,6 +9,7 @@ import QuickModuleCard from "../../components/ceo/QuickModuleCard";
 import ProjectTable from "../../components/ceo/ProjectTable";
 import WbsOverview from "../../components/ceo/WbsOverview";
 import FinanceChart from "../../components/ceo/FinanceChart";
+import WbsCostTable from "../../components/ceo/WbsCostTable";
 
 function Dashboard() {
 
@@ -34,7 +35,6 @@ function Dashboard() {
         <p>Role: {user?.role}</p>
       </div>
 
-
       {/* FINANCIAL SNAPSHOT */}
 
       <h2 className="dashboard-section-title">
@@ -50,7 +50,6 @@ function Dashboard() {
 
       </div>
 
-
       {/* OPERATIONS TODAY */}
 
       <h2 className="dashboard-section-title">
@@ -65,7 +64,6 @@ function Dashboard() {
 
       </div>
 
-
       {/* FINANCE OVERVIEW */}
 
       <h2 className="dashboard-section-title">
@@ -74,16 +72,21 @@ function Dashboard() {
 
       <FinanceChart />
 
-
       {/* PROJECT TABLE */}
 
       <ProjectTable />
-
 
       {/* WBS OVERVIEW */}
 
       <WbsOverview />
 
+      {/* WBS COST TRACKING */}
+
+      <h2 className="dashboard-section-title">
+        WBS Cost Tracking
+      </h2>
+
+      <WbsCostTable />
 
       {/* LEAD + HR SECTION */}
 
@@ -115,7 +118,6 @@ function Dashboard() {
         </div>
 
       </div>
-
 
       {/* QUICK MODULES */}
 
