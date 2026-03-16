@@ -59,7 +59,6 @@ function UserManagement() {
 
   const updateUser = async () => {
     try {
-
       await axios.put(
         `http://localhost:5000/api/users/${selectedUser.id}`,
         {
@@ -112,9 +111,72 @@ function UserManagement() {
 
       </div>
 
-      {/* TABLE */}
+      {/* USERS TABLE */}
 
-      {/* your table code unchanged */}
+      <table className="users-table">
+
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+
+        <tbody>
+
+          {filteredUsers.map((user) => (
+
+            <tr key={user.id}>
+
+              <td>{user.name}</td>
+              <td>{user.email}</td>
+
+              <td>{user.role || "Not Assigned"}</td>
+
+              <td>
+                <span className={`status ${user.status?.toLowerCase()}`}>
+                  {user.status}
+                </span>
+              </td>
+
+              <td>
+
+                {user.role === "CEO" ? (
+
+                  <span>Locked</span>
+
+                ) : user.status === "Pending" ? (
+
+                  <button
+                    className="assign-btn"
+                    onClick={()=>openAssignModal(user)}
+                  >
+                    Assign Role
+                  </button>
+
+                ) : (
+
+                  <button
+                    className="edit-btn"
+                    onClick={()=>openEditModal(user)}
+                  >
+                    Edit
+                  </button>
+
+                )}
+
+              </td>
+
+            </tr>
+
+          ))}
+
+        </tbody>
+
+      </table>
 
     </div>
 
