@@ -1,0 +1,36 @@
+.wbs-section{
+  margin-top:40px;
+}
+
+.wbs-table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:15px;
+  background:white;
+  border-radius:8px;
+}
+
+.wbs-table th{
+  background:#f4f6fb;
+  padding:14px;
+  text-align:left;
+}
+
+.wbs-table td{
+  padding:14px;
+  border-bottom:1px solid #eee;
+}
+
+.total{
+  font-weight:600;
+}
+
+.status-complete{
+  color:green;
+  font-weight:600;
+}
+
+.status-progress{
+  color:orange;
+  font-weight:600;
+}

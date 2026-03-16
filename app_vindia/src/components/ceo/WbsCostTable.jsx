@@ -1,31 +1,29 @@
-import { useState } from "react";
+import "../../styles/WbsCostTable.css";
 
 function WbsCostTable() {
 
-  const [wbsTasks] = useState([
+  const tasks = [
     {
-      id: 1,
       project: "Apartment Tower",
       task: "Site Preparation",
       material: 100000,
-      labor: 50000,
+      labour: 50000,
       equipment: 20000,
       status: "Completed"
     },
     {
-      id: 2,
       project: "Apartment Tower",
       task: "Foundation Work",
       material: 500000,
-      labor: 200000,
+      labour: 200000,
       equipment: 100000,
       status: "In Progress"
     }
-  ]);
+  ];
 
   return (
 
-    <div className="wbs-container">
+    <div className="wbs-section">
 
       <h2>WBS Cost Tracking</h2>
 
@@ -35,35 +33,48 @@ function WbsCostTable() {
           <tr>
             <th>Project</th>
             <th>Task</th>
-            <th>Material Cost</th>
-            <th>Labor Cost</th>
-            <th>Equipment Cost</th>
-            <th>Total Cost</th>
+            <th>Material</th>
+            <th>Labour</th>
+            <th>Equipment</th>
+            <th>Total</th>
             <th>Status</th>
           </tr>
         </thead>
 
         <tbody>
 
-          {wbsTasks.map((task) => {
+          {tasks.map((task, index) => {
 
             const total =
-              task.material + task.labor + task.equipment;
+              task.material +
+              task.labour +
+              task.equipment;
 
             return (
 
-              <tr key={task.id}>
+              <tr key={index}>
 
                 <td>{task.project}</td>
+
                 <td>{task.task}</td>
 
                 <td>₹{task.material.toLocaleString()}</td>
-                <td>₹{task.labor.toLocaleString()}</td>
+
+                <td>₹{task.labour.toLocaleString()}</td>
+
                 <td>₹{task.equipment.toLocaleString()}</td>
 
-                <td>₹{total.toLocaleString()}</td>
+                <td className="total">
+                  ₹{total.toLocaleString()}
+                </td>
 
-                <td>{task.status}</td>
+                <td className={
+                  task.status === "Completed"
+                    ? "status-complete"
+                    : "status-progress"
+                }>
+                  {task.status}
+                </td>
 
               </tr>
 
@@ -78,7 +89,6 @@ function WbsCostTable() {
     </div>
 
   );
-
 }
 
 export default WbsCostTable;
