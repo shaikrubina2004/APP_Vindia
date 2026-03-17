@@ -18,7 +18,7 @@ import { ROLES } from "../roles";
 import CEOLayout from "../layouts/CEOLayout";
 import HRLayout from "../layouts/HRLayout";
 import Documents from "../pages/hr/Documents";
-
+import Payroll from "../pages/hr/Payroll";
 const AppRoutes = () => {
   return (
     <Routes>
@@ -93,6 +93,16 @@ const AppRoutes = () => {
           <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
             <HRLayout>
               <Attendance />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/hr/payroll"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Payroll />
             </HRLayout>
           </ProtectedRoute>
         }
