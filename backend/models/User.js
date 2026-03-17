@@ -1,48 +1,61 @@
-const mongoose = require("mongoose");
+const pool = require("../db");
 
-const userSchema = new mongoose.Schema({
+/* CREATE USER */
+const createUser = async ({ name, email, password }) => {
+  const result = await pool.query(
+    `INSERT INTO users (name, email, password)
+     VALUES ($1, $2, $3)
+     RETURNING id, name, email, role, status`,
+    [name, email.toLowerCase(), password]
+  );
 
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
+  return result.rows[0];
+};
 
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true
-  },
+/* GET USER BY EMAIL */
+const getUserByEmail = async (email) => {
+  const result = await pool.query(
+    `SELECT * FROM users WHERE email = $1`,
+    [email.toLowerCase()]
+  );
 
-  password: {
-    type: String,
-    required: true
-  },
+  return result.rows[0];
+};
 
-  role: {
-    type: String,
-    enum: [
-      "CEO",
-      "HR",
-      "FINANCE",
-      "MARKETING",
-      "BDA",
-      "SITE_ENGINEER",
-      "EMPLOYEE",
-      "CLIENT"
-    ],
-    default: null
-  },
+/* UPDATE ROLE + STATUS */
+const updateUser = async (id, role, status) => {
+  const result = await pool.query(
+    `UPDATE users
+     SET role = $1, status = $2
+     WHERE id = $3
+     RETURNING id, name, email, role, status`,
+    [role, status, id]
+  );
 
-  status: {
-    type: String,
-    enum: ["Pending", "Active", "Inactive"],
-    default: "Pending"
-  }
+  return result.rows[0];
+};
 
-}, {
-  timestamps: true
-});
+/* GET ALL USERS */
+const getAllUsers = async () => {
+  const result = await pool.query(
+    `SELECT id, name, email, role, status FROM users`
+  );
 
-module.exports = mongoose.model("User", userSchema);
+  return result.rows;
+};
+
+/* DELETE USER */
+const deleteUser = async (id) => {
+  await pool.query(
+    `DELETE FROM users WHERE id = $1`,
+    [id]
+  );
+};
+
+module.exports = {
+  createUser,
+  getUserByEmail,
+  updateUser,
+  getAllUsers,
+  deleteUser,
+};

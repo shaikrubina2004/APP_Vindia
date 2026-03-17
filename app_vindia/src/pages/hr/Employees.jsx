@@ -1,50 +1,27 @@
-import AppLayout from "../../layouts/AppLayout";
+import EmployeeToolbar from "../../components/hr/EmployeeToolbar";
+import EmployeeStats from "../../components/hr/EmployeeStats";
+import EmployeesTable from "../../components/hr/EmployeesTable";
+
+import "../../styles/employees.css";
 
 function Employees() {
 
-  const employees = [
-    { name: "Ravi Kumar", department: "Engineering", role: "Site Engineer" },
-    { name: "Meena Sharma", department: "HR", role: "HR Manager" },
-    { name: "Arun Das", department: "Marketing", role: "Executive" }
-  ];
-
   return (
 
-    <AppLayout>
+    <div className="employees-page">
 
-      <div className="users-container">
+      <h1>Employees</h1>
 
-        <h1>Employees</h1>
+      {/* Search + Add */}
+      <EmployeeToolbar />
 
-        <table className="users-table">
+      {/* Stats Cards */}
+      <EmployeeStats />
 
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Department</th>
-              <th>Role</th>
-            </tr>
-          </thead>
+      {/* Employees Table */}
+      <EmployeesTable />
 
-          <tbody>
-
-            {employees.map((emp, index) => (
-
-              <tr key={index}>
-                <td>{emp.name}</td>
-                <td>{emp.department}</td>
-                <td>{emp.role}</td>
-              </tr>
-
-            ))}
-
-          </tbody>
-
-        </table>
-
-      </div>
-
-    </AppLayout>
+    </div>
 
   );
 
