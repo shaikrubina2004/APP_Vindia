@@ -3,34 +3,47 @@ import { Routes, Route } from "react-router-dom";
 import SignIn from "../pages/SignIn";
 import SignUp from "../pages/SignUp";
 
+/* Layouts */
+import CEOLayout from "../layouts/CEOLayout";
+import HRLayout from "../layouts/HRLayout";
+
+/* CEO Pages */
 import Dashboard from "../pages/ceo/Dashboard";
 import CEOPanel from "../pages/ceo/CEOPanel";
 import UserManagement from "../pages/ceo/UserManagement";
 
+/* HR Pages */
 import HRDashboard from "../pages/hr/HRDashboard";
 import Employees from "../pages/hr/Employees";
 import Attendance from "../pages/hr/Attendance";
 import Leaves from "../pages/hr/Leaves";
 
+/* WBS Page */
+import WbsPage from "../pages/projects/WbsPage";
+
+/* Auth */
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
 
-import CEOLayout from "../layouts/CEOLayout";
-import HRLayout from "../layouts/HRLayout";
+function AppRoutes() {
 
-const AppRoutes = () => {
   return (
+
     <Routes>
 
       {/* PUBLIC ROUTES */}
+
       <Route path="/" element={<SignIn />} />
+
       <Route path="/signup" element={<SignUp />} />
 
-      {/* DASHBOARD */}
+
+      {/* CEO DASHBOARD */}
+
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
             <CEOLayout>
               <Dashboard />
             </CEOLayout>
@@ -38,7 +51,9 @@ const AppRoutes = () => {
         }
       />
 
+
       {/* CEO PANEL */}
+
       <Route
         path="/ceo"
         element={
@@ -50,7 +65,9 @@ const AppRoutes = () => {
         }
       />
 
+
       {/* USER MANAGEMENT */}
+
       <Route
         path="/users"
         element={
@@ -62,11 +79,27 @@ const AppRoutes = () => {
         }
       />
 
-      {/* HR DASHBOARD */}
+
+      {/* WBS MANAGEMENT */}
+
+      <Route
+        path="/wbs"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <CEOLayout>
+              <WbsPage />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
+
+
+      {/* HR MODULE */}
+
       <Route
         path="/hr"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
             <HRLayout>
               <HRDashboard />
             </HRLayout>
@@ -74,11 +107,10 @@ const AppRoutes = () => {
         }
       />
 
-      {/* HR EMPLOYEES */}
       <Route
         path="/hr/employees"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
             <HRLayout>
               <Employees />
             </HRLayout>
@@ -86,11 +118,10 @@ const AppRoutes = () => {
         }
       />
 
-      {/* HR ATTENDANCE */}
       <Route
         path="/hr/attendance"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
             <HRLayout>
               <Attendance />
             </HRLayout>
@@ -98,11 +129,10 @@ const AppRoutes = () => {
         }
       />
 
-      {/* HR LEAVES */}
       <Route
         path="/hr/leaves"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
             <HRLayout>
               <Leaves />
             </HRLayout>
@@ -110,11 +140,15 @@ const AppRoutes = () => {
         }
       />
 
+
       {/* FALLBACK */}
+
       <Route path="*" element={<h2>Page Not Found</h2>} />
 
     </Routes>
+
   );
-};
+
+}
 
 export default AppRoutes;
