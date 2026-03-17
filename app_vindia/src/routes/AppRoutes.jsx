@@ -24,6 +24,7 @@ import WbsPage from "../pages/projects/WbsPage";
 /* Auth */
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
+import Payroll from "../pages/hr/Payroll";
 
 function AppRoutes() {
 
@@ -129,6 +130,17 @@ function AppRoutes() {
         }
       />
 
+      {/* HR PAYROLL */}
+      <Route
+        path="/hr/payroll"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
+            <HRLayout>
+              <Payroll />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/hr/leaves"
         element={
