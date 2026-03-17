@@ -27,7 +27,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 30px;
+  padding: 8px 30px 8px 30px;
   background: rgba(255, 255, 255, 0.7);
   border-bottom: 1px solid rgba(30, 90, 150, 0.1);
   backdrop-filter: blur(15px);
@@ -37,30 +37,9 @@
   z-index: 1000;
   box-shadow: 0 2px 16px rgba(30, 90, 150, 0.06);
   animation: slideDown 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+  width: 100%;
 }
 
-.nav-search{
-display:flex;
-align-items:center;
-background:white;
-border:1px solid #e2e8f0;
-border-radius:25px;
-padding:6px 14px;
-width:320px;
-box-shadow:0 4px 10px rgba(0,0,0,0.05);
-}
-
-.nav-search input{
-border:none;
-outline:none;
-font-size:14px;
-width:100%;
-background:transparent;
-}
-
-.nav-search input::placeholder{
-color:#94a3b8;
-}
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -96,7 +75,7 @@ color:#94a3b8;
 }
 
 .logo-image {
-  height: 60px;
+  height: 50px;
   width: auto;
   object-fit: contain;
   filter: drop-shadow(0 2px 4px rgba(30, 90, 150, 0.1));
@@ -571,9 +550,11 @@ color:#94a3b8;
 
 @media (max-width: 768px) {
   .navbar {
-    padding: 8px 20px;
+    padding: 8px 20px 8px 20px;
     gap: 10px;
     flex-wrap: wrap;
+    margin-left: 0;
+    width: 100%;
   }
 
   .navbar-left {
@@ -627,14 +608,17 @@ color:#94a3b8;
 
 @media (max-width: 480px) {
   .navbar {
-    padding: 8px 16px;
+    padding: 8px 16px 8px 16px;
     gap: 8px;
     flex-wrap: wrap;
+    margin-left: 0;
+    width: 100%;
   }
 
   .navbar-left {
     order: 1;
     flex: 0 0 auto;
+    padding-left: 0;
   }
 
   .logo-image {

@@ -17,11 +17,11 @@ import { ROLES } from "../roles";
 
 import CEOLayout from "../layouts/CEOLayout";
 import HRLayout from "../layouts/HRLayout";
+import Documents from "../pages/hr/Documents";
 
 const AppRoutes = () => {
   return (
     <Routes>
-
       {/* PUBLIC ROUTES */}
       <Route path="/" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
@@ -98,6 +98,17 @@ const AppRoutes = () => {
         }
       />
 
+      <Route
+        path="/hr/Documents"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Documents />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* HR LEAVES */}
       <Route
         path="/hr/leaves"
@@ -112,7 +123,6 @@ const AppRoutes = () => {
 
       {/* FALLBACK */}
       <Route path="*" element={<h2>Page Not Found</h2>} />
-
     </Routes>
   );
 };
