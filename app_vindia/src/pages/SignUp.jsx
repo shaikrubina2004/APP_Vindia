@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { signup } from "../services/authService";
-import logo from "../assets/logo.png";
+import logo from "../assets/logo.png.png";
 import "./SignUp.css";
 
 function SignUp() {
@@ -63,132 +63,90 @@ function SignUp() {
   };
 
   return (
+  <div className="login-bg signup-page">
 
-    <div className="signup-container">
+    <div className="login-card">
 
-      <div className="signup-card">
+      {/* LEFT SIDE */}
+      <div className="login-left">
+        <img src={logo} alt="Vindia Logo" className="login-logo" />
+          <p>
+          You Dream It. <span className="build-text">We Build It.</span>
+        </p>
+      </div>
 
-        <div className="logo-image">
-          <img src={logo} alt="Vindia Logo" />
-        </div>
+      {/* RIGHT SIDE */}
+      <div className="login-right">
 
-        <div className="logo">VINDIA INFRASEC</div>
+        <h2 style={{marginBottom:"20px"}}>Create Account</h2>
 
-        <h2 className="signup-title">Create Account</h2>
+        <label>First Name</label>
+        <input
+          type="text"
+          name="firstName"
+          value={formData.firstName}
+          onChange={handleChange}
+          placeholder="First name"
+        />
 
-        <div className="row">
+        <label>Last Name</label>
+        <input
+          type="text"
+          name="lastName"
+          value={formData.lastName}
+          onChange={handleChange}
+          placeholder="Last name"
+        />
 
-          <div className="form-group">
+        <label>Email</label>
+        <input
+          type="email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          placeholder="Enter email"
+        />
 
-            <label>First Name</label>
+        <label>Password</label>
+        <input
+          type={showPassword ? "text" : "password"}
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          placeholder="Password"
+        />
 
-            <input
-              type="text"
-              name="firstName"
-              value={formData.firstName}
-              onChange={handleChange}
-              placeholder="First name"
-            />
+        <label>Confirm Password</label>
+        <input
+          type="password"
+          name="confirmPassword"
+          value={formData.confirmPassword}
+          onChange={handleChange}
+          placeholder="Confirm password"
+        />
 
-          </div>
-
-          <div className="form-group">
-
-            <label>Last Name</label>
-
-            <input
-              type="text"
-              name="lastName"
-              value={formData.lastName}
-              onChange={handleChange}
-              placeholder="Last name"
-            />
-
-          </div>
-
-        </div>
-
-        <div className="form-group">
-
-          <label>Email</label>
-
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            placeholder="Enter your email"
-          />
-
-        </div>
-
-        <div className="form-group">
-
-          <label>Password</label>
-
-          <div className="password-wrapper">
-
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Enter password"
-            />
-
-            <span
-              className="toggle-password"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? "Hide" : "Show"}
-            </span>
-
-          </div>
-
-        </div>
-
-        <div className="form-group">
-
-          <label>Confirm Password</label>
-
-          <input
-            type="password"
-            name="confirmPassword"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            placeholder="Confirm password"
-          />
-
-        </div>
-
-        <div className="terms">
-
+        <label className="remember">
           <input
             type="checkbox"
             checked={agree}
             onChange={() => setAgree(!agree)}
           />
+          I agree to Terms & Conditions
+        </label>
 
-          <label>I agree to Terms & Conditions</label>
+        <button onClick={handleSignup}>Sign Up</button>
 
-        </div>
-
-        <button
-          className="signup-button"
-          onClick={handleSignup}
-        >
-          Sign Up
-        </button>
-
-        <p className="signin-link">
-          Already have an account? <Link to="/">Sign In</Link>
+        <p className="signup-text">
+          Already have an account?{" "}
+          <Link to="/" className="signup-link">Sign In</Link>
         </p>
 
       </div>
 
     </div>
 
-  );
+  </div>
+);
 
 }
 

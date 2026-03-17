@@ -25,6 +25,7 @@ const AppRoutes = () => {
       {/* PUBLIC ROUTES */}
       <Route path="/" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
+      
 
       {/* DASHBOARD */}
       <Route
