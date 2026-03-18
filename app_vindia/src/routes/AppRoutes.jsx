@@ -9,6 +9,7 @@ import UserManagement from "../pages/ceo/UserManagement";
 
 import HRDashboard from "../pages/hr/HRDashboard";
 import Employees from "../pages/hr/Employees";
+import AddEmployee from "../pages/hr/AddEmployee"; // ✅ correct
 import Attendance from "../pages/hr/Attendance";
 import Leaves from "../pages/hr/Leaves";
 
@@ -17,9 +18,13 @@ import { ROLES } from "../roles";
 
 import CEOLayout from "../layouts/CEOLayout";
 import HRLayout from "../layouts/HRLayout";
+<<<<<<< Updated upstream
 import Documents from "../pages/hr/Documents";
 import Payroll from "../pages/hr/Payroll";
 import Travel from "../pages/hr/Travel";
+=======
+
+>>>>>>> Stashed changes
 const AppRoutes = () => {
   return (
     <Routes>
@@ -97,6 +102,18 @@ const AppRoutes = () => {
         }
       />
 
+      {/* ✅ ADD EMPLOYEE (FIXED) */}
+      <Route
+        path="/hr/add-employee"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <AddEmployee />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* HR ATTENDANCE */}
       <Route
         path="/hr/attendance"
@@ -108,6 +125,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+<<<<<<< Updated upstream
       <Route
         path="/hr/payroll"
         element={
@@ -139,6 +157,9 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+=======
+
+>>>>>>> Stashed changes
       {/* HR LEAVES */}
       <Route
         path="/hr/leaves"

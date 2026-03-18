@@ -77,7 +77,10 @@ function Navbar() {
             Add
           </button>
           <div className={`quick-add-menu ${isQuickAddOpen ? "show" : ""}`}>
-            <button className="quick-add-item">
+            <button
+              className="quick-add-item"
+              onClick={() => navigate("/hr/add-employee")}
+            >
               <svg
                 width="16"
                 height="16"
