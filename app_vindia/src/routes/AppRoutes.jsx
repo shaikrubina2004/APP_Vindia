@@ -19,6 +19,7 @@ import CEOLayout from "../layouts/CEOLayout";
 import HRLayout from "../layouts/HRLayout";
 import Documents from "../pages/hr/Documents";
 import Payroll from "../pages/hr/Payroll";
+import Travel from "../pages/hr/Travel";
 const AppRoutes = () => {
   return (
     <Routes>
@@ -61,7 +62,17 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
+      {/* PAYROLL */}
+      <Route
+        path="/payroll"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <CEOLayout>
+              <Payroll />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
       {/* HR DASHBOARD */}
       <Route
         path="/hr"
@@ -73,7 +84,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
+      
       {/* HR EMPLOYEES */}
       <Route
         path="/hr/employees"
@@ -118,7 +129,16 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
+      <Route
+        path="/hr/travel"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Travel />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
       {/* HR LEAVES */}
       <Route
         path="/hr/leaves"
