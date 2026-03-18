@@ -109,6 +109,42 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+<<<<<<< Updated upstream
+=======
+
+      <Route
+        path="/attendance"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <CEOLayout>
+              <Attendance />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/hr/payroll"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Payroll />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/hr/documents"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Documents />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+>>>>>>> Stashed changes
 
       {/* HR LEAVES */}
       <Route
