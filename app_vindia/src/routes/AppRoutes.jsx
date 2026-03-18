@@ -12,9 +12,10 @@ import Employees from "../pages/hr/Employees";
 import AddEmployee from "../pages/hr/AddEmployee"; // ✅ correct
 import Attendance from "../pages/hr/Attendance";
 import Leaves from "../pages/hr/Leaves";
-
+import Payroll from "../pages/hr/Payroll";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
+import Travel from "../pages/hr/Travel";
 
 import CEOLayout from "../layouts/CEOLayout";
 import HRLayout from "../layouts/HRLayout";
@@ -121,6 +122,36 @@ const AppRoutes = () => {
         }
       />
 
+      <Route
+        path="/hr/payroll"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Payroll />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+       <Route
+        path="/payroll"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <CEOLayout>
+              <Payroll />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/hr/travel"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Travel />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
       {/* HR LEAVES */}
       <Route
         path="/hr/leaves"
