@@ -11,6 +11,7 @@ import HRDashboard from "../pages/hr/HRDashboard";
 import Employees from "../pages/hr/Employees";
 import AddEmployee from "../pages/hr/AddEmployee"; // ✅ correct
 import Attendance from "../pages/hr/Attendance";
+import Documents from "../pages/hr/Documents";
 import Leaves from "../pages/hr/Leaves";
 import Payroll from "../pages/hr/Payroll";
 import ProtectedRoute from "./ProtectedRoute";
@@ -111,6 +112,18 @@ const AppRoutes = () => {
         }
       />
 
+      {/* HR Document */}
+      <Route
+        path="/hr/documents"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Documents />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/attendance"
         element={
@@ -132,7 +145,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-       <Route
+      <Route
         path="/payroll"
         element={
           <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
