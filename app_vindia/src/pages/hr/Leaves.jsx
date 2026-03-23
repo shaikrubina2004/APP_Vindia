@@ -12,8 +12,8 @@ function Leaves() {
   const [message, setMessage] = useState("");
 
   const [leaves, setLeaves] = useState([
-    { name: "Ravi", type: "Sick Leave", date: "2026-03-18", status: "Pending", reason: "Fever" },
-    { name: "Meena", type: "Casual Leave", date: "2026-03-18", status: "Pending", reason: "Function" },
+    { name: "Ravi", type: "Sick Leave", date: "2026-03-23", status: "Pending", reason: "Fever" },
+    { name: "Meena", type: "Casual Leave", date: "2026-03-23", status: "Pending", reason: "Function" },
 
     // Ravi (6 sick)
     { name: "Ravi", type: "Sick Leave", date: "2026-01-01", status: "Approved" },
@@ -47,7 +47,7 @@ function Leaves() {
 { name: "Arjun", type: "Casual Leave", date: "2026-02-08", status: "Approved" },
 
 // today request (so visible in table)
-{ name: "Arjun", type: "Casual Leave", date: "2026-03-18", status: "Pending", reason: "Personal" },
+{ name: "Arjun", type: "Casual Leave", date: "2026-03-23", status: "Pending", reason: "Personal" },
   ]);
 
   const today = new Date().toISOString().slice(0, 10);
