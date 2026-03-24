@@ -1,5 +1,5 @@
 /* ===================== */
-/* PROJECT MANAGEMENT */
+/* PROJECT MANAGEMENT SYSTEM */
 /* ===================== */
 
 :root {
@@ -42,115 +42,134 @@
   font-size: 13px;
 }
 
-.new-project-btn {
+.pm-header .btn-primary {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 18px;
-  background: linear-gradient(
-    135deg,
-    var(--primary-blue) 0%,
-    var(--secondary-blue) 100%
-  );
-  color: white;
+}
+
+/* Tabs */
+.pm-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border-color);
+  overflow-x: auto;
+  padding-bottom: 0;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: none;
   border: none;
-  border-radius: 8px;
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(30, 90, 150, 0.15);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
 }
 
-.new-project-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(30, 90, 150, 0.25);
+.tab-btn:hover {
+  color: var(--primary-blue);
 }
 
-/* Container Layout */
-.pm-container {
-  display: grid;
-  grid-template-columns: 320px 1fr;
+.tab-btn.active {
+  color: var(--primary-blue);
+  border-bottom-color: var(--primary-blue);
+}
+
+/* Content */
+.pm-content {
+  display: flex;
+  flex-direction: column;
   gap: 20px;
 }
 
-/* Projects Sidebar */
-.projects-sidebar {
+/* Overview Section */
+.overview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.project-card {
   background: white;
   border-radius: 12px;
   padding: 16px;
-  height: fit-content;
-  position: sticky;
-  top: 80px;
-  box-shadow: 0 2px 8px rgba(30, 90, 150, 0.06);
   border: 1px solid var(--border-color);
-}
-
-.projects-sidebar h3 {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.projects-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.project-item {
-  padding: 12px;
-  background: var(--bg-light);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.project-item:hover {
-  background: white;
-  border-color: var(--primary-blue);
-  box-shadow: 0 2px 8px rgba(30, 90, 150, 0.1);
+.project-card:hover {
+  box-shadow: 0 4px 16px rgba(30, 90, 150, 0.1);
+  transform: translateY(-2px);
 }
 
-.project-item.active {
+.project-card.active {
+  border-color: var(--primary-blue);
   background: linear-gradient(
     135deg,
-    rgba(30, 90, 150, 0.1) 0%,
-    rgba(43, 122, 188, 0.05) 100%
+    rgba(30, 90, 150, 0.05) 0%,
+    rgba(43, 122, 188, 0.02) 100%
   );
-  border-color: var(--primary-blue);
 }
 
-.project-item h4 {
-  font-size: 12px;
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+
+.card-header h3 {
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 4px;
-  line-height: 1.3;
+  margin: 0;
+  flex: 1;
 }
 
-.project-item p {
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.card-info p {
   font-size: 11px;
   color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-.project-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  margin: 0;
 }
 
 .progress-bar {
-  flex: 1;
-  height: 4px;
+  height: 6px;
   background: var(--border-color);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
+  margin-bottom: 8px;
 }
 
 .progress-fill {
@@ -164,111 +183,77 @@
 }
 
 .progress-text {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-secondary);
-  min-width: 30px;
-  text-align: right;
 }
 
-/* Main Content */
-.pm-content {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* Project Overview */
-.project-overview {
+.project-details {
   background: white;
   border-radius: 12px;
   padding: 20px;
   border: 1px solid var(--border-color);
-  box-shadow: 0 2px 8px rgba(30, 90, 150, 0.06);
 }
 
-.overview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.overview-header h2 {
+.project-details h2 {
   font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
-}
-
-.status-badge {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
   margin-bottom: 16px;
 }
 
-.overview-card {
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.detail-box {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   padding: 12px;
   background: var(--bg-light);
   border-radius: 8px;
   border: 1px solid var(--border-color);
 }
 
-.overview-card .label {
+.detail-box .label {
   font-size: 10px;
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
 }
 
-.overview-card .value {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* Progress Section */
-.progress-section {
-  padding-top: 12px;
-}
-
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.progress-header h3 {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.percentage {
-  font-size: 14px;
+.detail-box .value {
+  font-size: 16px;
   font-weight: 700;
   color: var(--primary-blue);
 }
 
-.overall-progress-bar {
-  height: 8px;
-  background: var(--border-color);
-  border-radius: 4px;
-  overflow: hidden;
+.budget-progress {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.budget-progress h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.progress-bar.large {
+  height: 12px;
+  margin-bottom: 10px;
+}
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 
 /* WBS Section */
@@ -277,7 +262,6 @@
   border-radius: 12px;
   padding: 20px;
   border: 1px solid var(--border-color);
-  box-shadow: 0 2px 8px rgba(30, 90, 150, 0.06);
 }
 
 .wbs-section h2 {
@@ -290,7 +274,7 @@
 .wbs-tree {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .wbs-item {
@@ -309,33 +293,10 @@
     rgba(30, 90, 150, 0.05) 0%,
     rgba(43, 122, 188, 0.02) 100%
   );
-  cursor: pointer;
-  transition: all 0.2s ease;
 }
 
-.wbs-header:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(30, 90, 150, 0.1) 0%,
-    rgba(43, 122, 188, 0.05) 100%
-  );
-}
-
-.expand-btn {
-  background: none;
-  border: none;
-  color: var(--primary-blue);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 0;
-  width: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.wbs-code {
-  font-size: 12px;
+.code {
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-secondary);
   min-width: 40px;
@@ -358,28 +319,23 @@
 .wbs-info p {
   font-size: 11px;
   color: var(--text-secondary);
+  margin: 0;
 }
 
-.wbs-status {
+.wbs-progress {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 200px;
-  justify-content: flex-end;
+  gap: 8px;
+  min-width: 150px;
 }
 
-.mini-progress {
+.wbs-progress .progress-bar {
   width: 60px;
-  height: 4px;
-  background: var(--border-color);
-  border-radius: 2px;
-  overflow: hidden;
+  margin-bottom: 0;
 }
 
-/* Tasks Container */
-.tasks-container {
+.tasks-list {
   background: var(--bg-light);
-  border-top: 1px solid var(--border-color);
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -393,27 +349,16 @@
   padding: 10px;
   background: white;
   border-radius: 6px;
-  border-left: 3px solid var(--border-color);
 }
 
-.task-checkbox {
-  flex-shrink: 0;
-}
-
-.task-checkbox input[type="checkbox"] {
+.task-item input[type="checkbox"] {
   cursor: pointer;
   width: 16px;
   height: 16px;
 }
 
-.task-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .task-name {
+  flex: 1;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
@@ -422,6 +367,7 @@
 .task-duration {
   font-size: 10px;
   color: var(--text-secondary);
+  min-width: 70px;
 }
 
 .task-status {
@@ -429,43 +375,133 @@
   border-radius: 4px;
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
-/* Statistics Grid */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+.task-status.completed {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--success);
 }
 
-.stat-card {
+.task-status.pending {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+.task-status.in\ progress {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+}
+
+/* Timesheet Section */
+.timesheet-section {
   background: white;
   border-radius: 12px;
-  padding: 16px;
+  padding: 20px;
   border: 1px solid var(--border-color);
-  box-shadow: 0 2px 8px rgba(30, 90, 150, 0.06);
+}
+
+.timesheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.timesheet-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.btn-primary {
+  padding: 10px 16px;
+  background: linear-gradient(
+    135deg,
+    var(--primary-blue) 0%,
+    var(--secondary-blue) 100%
+  );
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
   transition: all 0.3s ease;
 }
 
-.stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 16px rgba(30, 90, 150, 0.12);
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(30, 90, 150, 0.25);
 }
 
-.stat-label {
+.btn-secondary {
+  padding: 10px 16px;
+  background: white;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-light);
+  color: var(--text-primary);
+}
+
+.timesheet-table {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 120px 150px 60px 80px 80px 100px 100px;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-light);
   font-size: 11px;
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
-  margin-bottom: 8px;
 }
 
-.stat-value {
-  font-size: 28px;
+.table-row {
+  display: grid;
+  grid-template-columns: 120px 150px 60px 80px 80px 100px 100px;
+  gap: 12px;
+  padding: 12px;
+  border-top: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-primary);
+  align-items: center;
+}
+
+.table-row:hover {
+  background: var(--bg-light);
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
   font-weight: 700;
-  color: var(--primary-blue);
+  white-space: nowrap;
+}
+
+.status.approved {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--success);
+}
+
+.status.pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
 }
 
 /* Modal */
@@ -508,24 +544,13 @@
   margin: 0;
 }
 
-.modal-close {
+.close-btn {
   background: none;
   border: none;
   font-size: 28px;
   color: var(--text-secondary);
   cursor: pointer;
   padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.modal-close:hover {
-  color: var(--text-primary);
-  transform: scale(1.1);
 }
 
 .modal-body {
@@ -556,7 +581,6 @@
   font-size: 13px;
   background: white;
   color: var(--text-primary);
-  transition: all 0.2s ease;
   font-family: inherit;
 }
 
@@ -579,141 +603,489 @@
   gap: 10px;
   padding: 16px 20px;
   border-top: 1px solid var(--border-color);
-  background: var(--bg-light);
 }
 
-.btn-cancel,
-.btn-create {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
-}
-
-.btn-cancel {
+/* Cost Section */
+.cost-section {
   background: white;
-  color: var(--text-secondary);
+  border-radius: 12px;
+  padding: 20px;
   border: 1px solid var(--border-color);
 }
 
-.btn-cancel:hover {
-  background: var(--bg-light);
+.cost-section h2 {
+  font-size: 18px;
+  font-weight: 700;
   color: var(--text-primary);
+  margin-bottom: 16px;
 }
 
-.btn-create {
+.cost-breakdown {
+  margin-bottom: 24px;
+}
+
+.cost-breakdown h3,
+.budget-comparison h3,
+.phase-wise-cost h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.cost-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.cost-card {
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.cost-card.labour {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.cost-card.material {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.cost-card.equipment {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.cost-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.cost-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.cost-percent {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.comparison-chart {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.chart-item {
+  flex: 1;
+}
+
+.chart-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.chart-bar {
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  text-align: center;
+}
+
+.chart-bar.budget {
   background: linear-gradient(
     135deg,
     var(--primary-blue) 0%,
     var(--secondary-blue) 100%
   );
-  color: white;
-  box-shadow: 0 2px 8px rgba(30, 90, 150, 0.15);
 }
 
-.btn-create:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(30, 90, 150, 0.25);
+.chart-bar.spent {
+  background: linear-gradient(135deg, var(--warning) 0%, var(--danger) 100%);
+}
+
+.chart-bar.remaining {
+  background: linear-gradient(135deg, var(--success) 0%, #10b981 100%);
+}
+
+.phase-wise-cost {
+  margin-top: 24px;
+}
+
+.phase-table {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.phase-table .table-header {
+  grid-template-columns: 1fr 120px 120px 140px 80px;
+}
+
+.phase-table .table-row {
+  grid-template-columns: 1fr 120px 120px 140px 80px;
+}
+
+.phase-name {
+  font-weight: 600;
+}
+
+/* Performance Section */
+.performance-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+}
+
+/* Payments Section */
+.payments-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.payments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.payments-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.payment-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.payment-card {
+  padding: 16px;
+  background: var(--bg-light);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.payment-card.green {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.payment-card.yellow {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.card-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.card-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary-blue);
+}
+
+.payment-card.green .card-value {
+  color: var(--success);
+}
+
+.payment-card.yellow .card-value {
+  color: var(--warning);
+}
+
+.payment-progress {
+  margin-bottom: 24px;
+}
+
+.payment-progress h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.progress-item {
+  background: var(--bg-light);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.progress-header span:first-child {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.percentage {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--success);
+}
+
+.payment-history {
+  margin-top: 24px;
+}
+
+.payment-history h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.payments-table {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.payments-table .table-header {
+  grid-template-columns: 120px 140px 140px 100px;
+}
+
+.payments-table .table-row {
+  grid-template-columns: 120px 140px 140px 100px;
+}
+
+.payments-table .amount {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.info-box {
+  padding: 12px;
+  background: rgba(34, 197, 94, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.info-box strong {
+  color: var(--success);
+}
+
+.performance-section h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.performance-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.perf-card {
+  padding: 16px;
+  background: var(--bg-light);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.perf-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.perf-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary-blue);
+  margin-bottom: 4px;
+}
+
+.perf-unit {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.project-performance {
+  margin-bottom: 24px;
+}
+
+.project-performance h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.metric {
+  padding: 16px;
+  background: var(--bg-light);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.metric-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.metric .progress-bar {
+  margin-bottom: 8px;
+}
+
+.metric-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary-blue);
+}
+
+.employee-performance {
+  margin-top: 24px;
+}
+
+.employee-performance h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.emp-perf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.emp-perf-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--bg-light);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.emp-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.emp-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.emp-stats {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.emp-status {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-blue);
 }
 
 /* Responsive */
-@media (max-width: 1024px) {
-  .pm-container {
-    grid-template-columns: 1fr;
-  }
-
-  .projects-sidebar {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    position: relative;
-    top: auto;
-    height: auto;
-  }
-
-  .projects-list {
-    grid-column: 1 / -1;
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: 8px;
-  }
-
-  .project-item {
-    flex-shrink: 0;
-    min-width: 200px;
-  }
-
-  .wbs-status {
-    flex-direction: column;
-    align-items: flex-end;
-    min-width: auto;
-  }
-}
-
 @media (max-width: 768px) {
   .pm-header {
     flex-direction: column;
-    gap: 12px;
   }
 
-  .pm-header h1 {
-    font-size: 24px;
-  }
-
-  .new-project-btn {
+  .pm-header .btn-primary {
     width: 100%;
     justify-content: center;
   }
 
-  .overview-grid {
+  .details-grid,
+  .cost-cards,
+  .performance-cards,
+  .metrics-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+  .table-header,
+  .table-row {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    font-size: 10px;
   }
 
-  .wbs-header {
-    flex-wrap: wrap;
+  .projects-grid {
+    grid-template-columns: 1fr;
   }
 
-  .wbs-status {
+  .comparison-chart {
     flex-direction: column;
-    width: 100%;
-    margin-top: 8px;
   }
 }
 
 @media (max-width: 480px) {
-  .pm-header {
-    flex-direction: column;
-  }
-
   .pm-header h1 {
     font-size: 20px;
   }
 
-  .overview-grid {
+  .pm-tabs {
+    gap: 4px;
+  }
+
+  .tab-btn {
+    padding: 10px 12px;
+    font-size: 11px;
+  }
+
+  .details-grid,
+  .cost-cards,
+  .performance-cards,
+  .metrics-grid {
     grid-template-columns: 1fr;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .wbs-info h4 {
-    font-size: 12px;
-  }
-
-  .overview-card {
-    padding: 10px;
-  }
-
-  .modal-content {
-    max-width: 95%;
   }
 }
