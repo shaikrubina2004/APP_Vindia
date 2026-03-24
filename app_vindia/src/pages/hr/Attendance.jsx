@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./Attendance.css";
 
 function AttendanceManagement() {
@@ -8,6 +9,7 @@ function AttendanceManagement() {
   const [leaveRequestsCount] = useState(3);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showLeaveForm, setShowLeaveForm] = useState(false);
+  const navigate = useNavigate();
 
   // Edit inline state
   const [editingEmployeeId, setEditingEmployeeId] = useState(null);
@@ -444,7 +446,7 @@ function AttendanceManagement() {
           <h1>Attendance Management</h1>
           <p>View and manage employee attendance records</p>
         </div>
-        <button className="leave-btn" onClick={() => setShowLeaveModal(true)}>
+       <button className="leave-btn" onClick={() => navigate("/hr/leaves")}>
           <svg
             width="16"
             height="16"
