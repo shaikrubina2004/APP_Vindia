@@ -3,23 +3,21 @@ import Sidebar from "../components/layout/Sidebar";
 import "../styles/Layout.css";
 
 function AppLayout({ menuItems, children }) {
-
   return (
-    <div className="app-layout">
+    <>
+      {/* ✅ FULL WIDTH NAVBAR */}
+      <Navbar />
 
-      <Sidebar menuItems={menuItems} />
+      <div className="app-layout">
+        <Sidebar menuItems={menuItems} />
 
-      <div className="main-section">
-
-        <Navbar />
-
-        <div className="page-content">
-          {children}
+        <div className="main-section">
+          <div className="page-content">
+            {children}
+          </div>
         </div>
-
       </div>
-
-    </div>
+    </>
   );
 }
 

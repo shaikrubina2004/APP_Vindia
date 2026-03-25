@@ -8,23 +8,38 @@ function Sidebar({ menuItems }) {
 
   useEffect(() => {
     feather.replace();
-  }, [menuItems]);
+  }, []);
 
   return (
     <>
-      {/* Mobile Toggle */}
-      <button className="sidebar-toggle" onClick={() => setOpen(!open)}>
+      {/* ================= TOGGLE BUTTON ================= */}
+      <button
+        className="sidebar-toggle"
+        onClick={() => setOpen(!open)}
+      >
         ☰
       </button>
 
+      {/* ================= OVERLAY ================= */}
+      {open && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setOpen(false)}
+        ></div>
+      )}
+
+      {/* ================= SIDEBAR ================= */}
       <nav className={`sidebar ${open ? "open" : ""}`}>
         <ul className="sidebar__menu">
-          {menuItems.map((item, index) => (
-            <li key={index} className="sidebar__item">
+          {menuItems?.map((item, index) => (
+            <li key={index}>
               <NavLink
                 to={item.path}
+                onClick={() => setOpen(false)} // ✅ closes on click
                 className={({ isActive }) =>
-                  isActive ? "sidebar__link active" : "sidebar__link"
+                  isActive
+                    ? "sidebar__link active"
+                    : "sidebar__link"
                 }
               >
                 <i data-feather={item.icon}></i>
