@@ -4,38 +4,40 @@ import "./Leaves.css";
 function Leaves() {
   const salaryPerDay = 1000;
 
-  const maxTotalLeaves = 12;
+  const maxTotalLeaves = 18;
   const maxSickLeaves = 6;
+  const maxCasualLeaves = 12;
 
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedIndex, setSelectedIndex] = useState(null);
   const [message, setMessage] = useState("");
 
+  const today = new Date().toISOString().slice(0, 10);
+
   const [leaves, setLeaves] = useState([
-    // ===== TODAY =====
-    { name: "Ravi", type: "Sick Leave", date: "2026-03-24", status: "Pending", reason: "Fever", joiningDate: "2026-02-01" },
-    { name: "Meena", type: "Casual Leave", date: "2026-03-24", status: "Pending", reason: "Function", joiningDate: "2026-02-01" },
-    { name: "Arjun", type: "Casual Leave", date: "2026-03-24", status: "Pending", reason: "Personal", joiningDate: "2026-01-01" },
+    { name: "Ravi", type: "Sick Leave", date: today, status: "Pending", joiningDate: "2026-01-01" },
+    { name: "Meena", type: "Casual Leave", date: today, status: "Pending", joiningDate: "2026-02-01" },
+    { name: "Arjun", type: "Casual Leave", date: today, status: "Pending", joiningDate: "2026-01-15" },
+    { name: "Anu", type: "Sick Leave", date: today, status: "Pending", joiningDate: "2025-12-01" },
+    { name: "Faisal", type: "Casual Leave", date: today, status: "Pending", joiningDate: "2025-11-10" },
 
-    // ===== RAVI =====
-    { name: "Ravi", type: "Casual Leave", date: "2026-02-10", status: "Approved", joiningDate: "2026-02-01" },
-    { name: "Ravi", type: "Sick Leave", date: "2026-02-05", status: "Approved", joiningDate: "2026-02-01" },
-    { name: "Ravi", type: "Sick Leave", date: "2026-03-02", status: "Approved", joiningDate: "2026-02-01" },
-    { name: "Ravi", type: "Sick Leave", date: "2026-03-15", status: "Approved", joiningDate: "2026-02-01" },
-    { name: "Ravi", type: "Sick Leave", date: "2026-04-01", status: "Approved", joiningDate: "2026-02-01" },
-    { name: "Ravi", type: "Sick Leave", date: "2026-04-10", status: "Approved", joiningDate: "2026-02-01" },
-    { name: "Ravi", type: "Sick Leave", date: "2026-05-01", status: "Approved", joiningDate: "2026-02-01" },
+    { name: "Ravi", type: "Casual Leave", date: "2026-02-10", status: "Approved", joiningDate: "2026-01-01" },
+    { name: "Ravi", type: "Sick Leave", date: "2026-02-05", status: "Approved", joiningDate: "2026-01-01" },
+    { name: "Ravi", type: "Sick Leave", date: "2026-03-02", status: "Approved", joiningDate: "2026-01-01" },
 
-    // ===== MEENA =====
     { name: "Meena", type: "Casual Leave", date: "2026-02-05", status: "Approved", joiningDate: "2026-02-01" },
     { name: "Meena", type: "Sick Leave", date: "2026-03-08", status: "Approved", joiningDate: "2026-02-01" },
 
-    // ===== ARJUN =====
-    { name: "Arjun", type: "Casual Leave", date: "2026-01-10", status: "Approved", joiningDate: "2026-01-01" },
-    { name: "Arjun", type: "Casual Leave", date: "2026-02-12", status: "Approved", joiningDate: "2026-01-01" },
-    { name: "Arjun", type: "Sick Leave", date: "2026-02-15", status: "Approved", joiningDate: "2026-01-01" },
-  ]);
+    { name: "Arjun", type: "Casual Leave", date: "2026-01-10", status: "Approved", joiningDate: "2026-01-15" },
+    { name: "Arjun", type: "Casual Leave", date: "2026-02-12", status: "Approved", joiningDate: "2026-01-15" },
+    { name: "Arjun", type: "Sick Leave", date: "2026-02-15", status: "Approved", joiningDate: "2026-01-15" },
 
-  const today = new Date().toISOString().slice(0, 10);
+    { name: "Anu", type: "Sick Leave", date: "2026-01-05", status: "Approved", joiningDate: "2025-12-01" },
+    { name: "Anu", type: "Sick Leave", date: "2026-02-18", status: "Approved", joiningDate: "2025-12-01" },
+
+    { name: "Faisal", type: "Casual Leave", date: "2026-01-20", status: "Approved", joiningDate: "2025-11-10" },
+    { name: "Faisal", type: "Casual Leave", date: "2026-02-25", status: "Approved", joiningDate: "2025-11-10" },
+  ]);
 
   useEffect(() => {
     if (message) {
@@ -44,20 +46,15 @@ function Leaves() {
     }
   }, [message]);
 
-  // 🔥 MONTHLY VIEW FUNCTION
   const getMonthlyLeaves = (name) => {
     const monthMap = {};
 
     leaves.forEach(l => {
       if (l.name === name && l.status === "Approved") {
         const d = new Date(l.date);
-        const month = d.toLocaleString("default", { month: "short" });
-        const year = d.getFullYear();
-        const key = `${month} ${year}`;
+        const key = `${d.toLocaleString("default", { month: "short" })} ${d.getFullYear()}`;
 
-        if (!monthMap[key]) {
-          monthMap[key] = { casual: 0, sick: 0 };
-        }
+        if (!monthMap[key]) monthMap[key] = { casual: 0, sick: 0 };
 
         if (l.type === "Casual Leave") monthMap[key].casual++;
         if (l.type === "Sick Leave") monthMap[key].sick++;
@@ -67,60 +64,39 @@ function Leaves() {
     return monthMap;
   };
 
-  const handleStatusChange = (index, newStatus) => {
-    const leave = leaves[index];
-
-    if (newStatus === "Approved") {
-      const emp = leaves.filter(
-        l => l.name === leave.name && l.status === "Approved"
-      );
-
-      // 🔴 Sick limit
-      const sickCount = emp.filter(l => l.type === "Sick Leave").length;
-      if (leave.type === "Sick Leave" && sickCount >= maxSickLeaves) {
-        setMessage("Max 6 Sick Leaves reached");
-        return;
-      }
-
-      // 🔥 STRICT CASUAL RULE
-      if (leave.type === "Casual Leave") {
-        const leaveMonth = new Date(leave.date).getMonth();
-        const leaveYear = new Date(leave.date).getFullYear();
-
-        const casualThisMonth = leaves.filter(
-          l =>
-            l.name === leave.name &&
-            l.type === "Casual Leave" &&
-            l.status === "Approved" &&
-            new Date(l.date).getMonth() === leaveMonth &&
-            new Date(l.date).getFullYear() === leaveYear
-        ).length;
-
-        if (casualThisMonth >= 1) {
-          setMessage("Only 1 casual leave allowed per month");
-          return;
-        }
-      }
-    }
-
-    setLeaves(prev =>
-      prev.map((l, i) =>
-        i === index ? { ...l, status: newStatus } : l
-      )
-    );
-  };
-
+  // 🔥 Till-date summary logic
   const calculateSummary = (name) => {
+    const todayDate = new Date();
+
     const approved = leaves.filter(
-      l => l.name === name && l.status === "Approved"
+      l =>
+        l.name === name &&
+        l.status === "Approved" &&
+        new Date(l.date) <= todayDate
     );
+
+    const currentYear = todayDate.getFullYear();
+
+    const sickTaken = approved.filter(l => l.type === "Sick Leave").length;
+
+    const casualTaken = approved.filter(
+      l =>
+        l.type === "Casual Leave" &&
+        new Date(l.date).getFullYear() === currentYear
+    ).length;
+
+    const totalTaken = sickTaken + casualTaken;
+
+    const balance = Math.max(maxTotalLeaves - totalTaken, 0);
+
+    const extraLeaves = Math.max(totalTaken - maxTotalLeaves, 0);
 
     return {
-      total: approved.length,
-      sick: approved.filter(l => l.type === "Sick Leave").length,
-      casual: approved.filter(l => l.type === "Casual Leave").length,
-      balance: Math.max(maxTotalLeaves - approved.length, 0),
-      cut: Math.max(approved.length - maxTotalLeaves, 0) * salaryPerDay
+      total: totalTaken,
+      sick: sickTaken,
+      casual: casualTaken,
+      balance,
+      cut: extraLeaves * salaryPerDay
     };
   };
 
@@ -153,111 +129,121 @@ function Leaves() {
             </thead>
 
             <tbody>
-              {leaves.map((l, i) =>
-                l.date === today && (
-                  <tr key={i}>
-                    <td className="emp">{l.name}</td>
-                    <td>{l.type}</td>
-                    <td>{l.date}</td>
+              {leaves
+                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                .map((l, i) =>
+                  l.date === today && (
+                    <>
+                      <tr key={i}>
+                        <td className="emp">{l.name}</td>
+                        <td>{l.type}</td>
+                        <td>{l.date}</td>
 
-                    <td>
-                      <span className={`tag ${l.status.toLowerCase()}`}>
-                        {l.status}
-                      </span>
-                    </td>
+                        <td>
+                          <span className={`tag ${l.status.toLowerCase()}`}>
+                            {l.status}
+                          </span>
+                        </td>
 
-                    <td>
-                      {l.status === "Pending" && (
-                        <>
-                          <button onClick={() => handleStatusChange(i, "Approved")}>
-                            Approve
+                        <td>
+                          {l.status === "Pending" && (
+                            <>
+                              <button onClick={() => handleStatusChange(i, "Approved")}>
+                                Approve
+                              </button>
+                              <button onClick={() => handleStatusChange(i, "Rejected")}>
+                                Reject
+                              </button>
+                            </>
+                          )}
+                        </td>
+
+                        <td>
+                          <button
+                            className="view"
+                            onClick={() => {
+                              setSelectedEmployee(l.name);
+                              setSelectedIndex(i);
+                            }}
+                          >
+                            View
                           </button>
-                          <button onClick={() => handleStatusChange(i, "Rejected")}>
-                            Reject
-                          </button>
-                        </>
+                        </td>
+                      </tr>
+
+                      {selectedIndex === i && summary && (
+                        <tr>
+                          <td colSpan="6">
+                            <div className="summary">
+                              <h3>{selectedEmployee}</h3>
+
+                              {/* 🔥 UPDATED LABELS */}
+                              <div className="grid">
+                                <div>
+                                  <span>Total Leave Taken</span>
+                                  <b>{summary.total}</b>
+                                </div>
+
+                                <div>
+                                  <span>Sick Leave Taken</span>
+                                  <b>{summary.sick}</b>
+                                </div>
+
+                                <div>
+                                  <span>Casual Leave Taken</span>
+                                  <b>{summary.casual}</b>
+                                </div>
+
+                                <div>
+                                  <span>Balance (Till Date)</span>
+                                  <b>{summary.balance}</b>
+                                </div>
+
+                                <div>
+                                  <span>Salary Cut (LOP)</span>
+                                  <b style={{ color: summary.cut > 0 ? "red" : "green" }}>
+                                    ₹{summary.cut}
+                                  </b>
+                                </div>
+                              </div>
+
+                              {/* Monthly Cards */}
+                              <div style={{ marginTop: "15px" }}>
+                                <h4 style={{ color: "#1e3a8a" }}>Monthly Leaves</h4>
+
+                                <div style={{
+                                  display: "flex",
+                                  gap: "12px",
+                                  flexWrap: "wrap"
+                                }}>
+                                  {Object.entries(getMonthlyLeaves(selectedEmployee)).map(
+                                    ([month, data]) => (
+                                      <div key={month} style={{
+                                        padding: "12px",
+                                        background: "#f9fbff",
+                                        border: "1px solid #e5e7eb",
+                                        borderRadius: "8px",
+                                        minWidth: "130px",
+                                        boxShadow: "0 2px 6px rgba(0,0,0,0.05)"
+                                      }}>
+                                        <div style={{ fontWeight: "600" }}>{month}</div>
+                                        <div>Casual: <b>{data.casual}</b></div>
+                                        <div>Sick: <b>{data.sick}</b></div>
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-
-                    <td>
-                      <button className="view" onClick={() => setSelectedEmployee(l.name)}>
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                )
-              )}
+                    </>
+                  )
+                )}
             </tbody>
           </table>
-
-          {summary && (
-            <div className="summary">
-              <h3>{selectedEmployee}</h3>
-
-              {/* 🔴 SICK ALERT */}
-              {summary.sick >= 6 && (
-                <div className="alert-box">
-                  ⚠ Employee reached max 6 Sick Leaves
-                </div>
-              )}
-
-              {/* 🔴 SALARY ALERT */}
-              {summary.cut > 0 && (
-                <div className="alert-box">
-                  ⚠ Salary deduction applied due to extra leaves
-                </div>
-              )}
-
-              <div className="grid">
-                <div><span>Total</span><b>{summary.total}</b></div>
-
-                <div>
-                  <span>Sick</span>
-                  <b className={summary.sick >= 6 ? "danger-text" : ""}>
-                    {summary.sick}
-                  </b>
-                </div>
-
-                <div><span>Casual</span><b>{summary.casual}</b></div>
-                <div><span>Balance</span><b>{summary.balance}</b></div>
-
-                {/* 🔥 SALARY CUT */}
-                <div>
-                  <span>Salary Cut</span>
-                  <b className={summary.cut > 0 ? "danger-text" : ""}>
-                    ₹{summary.cut}
-                  </b>
-                </div>
-              </div>
-
-              {/* 🔥 MONTHLY VIEW */}
-              <div style={{ marginTop: "15px" }}>
-                <h4 style={{ color: "#1e3a8a" }}>Monthly Leaves</h4>
-
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                  {Object.entries(getMonthlyLeaves(selectedEmployee)).map(
-                    ([month, data]) => (
-                      <div
-                        key={month}
-                        style={{
-                          padding: "10px",
-                          background: "#f9fbff",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "6px",
-                          minWidth: "120px",
-                        }}
-                      >
-                        <b>{month}</b>
-                        <div>Casual: {data.casual}</div>
-                        <div>Sick: {data.sick}</div>
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
-
-            </div>
-          )}
 
         </div>
       </div>
