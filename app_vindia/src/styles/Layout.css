@@ -14,7 +14,7 @@
 /* ============================= */
 
 .navbar {
-  position: fixed;   /* 🔥 IMPORTANT */
+  position: fixed; /* 🔥 IMPORTANT */
   top: 0;
   left: 0;
   right: 0;
@@ -33,7 +33,7 @@
 
   z-index: 1100; /* above sidebar */
 
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 /* ============================= */
@@ -45,7 +45,7 @@
   background: white;
 
   position: fixed;
-  top: 70px;   /* below navbar */
+  top: 70px; /* below navbar */
   left: 0;
   bottom: 0;
 
@@ -74,7 +74,7 @@
 /* ============================= */
 
 .page-content {
-  margin-top: 70px;  /* 🔥 ONLY HERE */
+  margin-top: 70px; /* 🔥 ONLY HERE */
   padding: 20px;
   width: 100%;
   flex: 1;
@@ -102,7 +102,6 @@
 }
 
 @media (max-width: 768px) {
-
   /* Toggle button */
   .sidebar-toggle {
     display: block;
@@ -129,7 +128,7 @@
     height: calc(100vh - 70px);
 
     transform: translateX(-100%);
-    box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
   }
 
   .sidebar.open {
@@ -144,7 +143,7 @@
     left: 0;
     width: 100vw;
     height: calc(100vh - 70px);
-    background: rgba(0,0,0,0.3);
+    background: rgba(0, 0, 0, 0.3);
     opacity: 0;
     pointer-events: none;
     transition: 0.3s;
