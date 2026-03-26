@@ -1,56 +1,96 @@
-import React, { useEffect, useState } from "react";
+import { API } from "../../services/authService";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 import ApplyLeave from "../../SharedResourse/ApplyLeave";
-=======
-import axios from "axios";
->>>>>>> Stashed changes
-=======
-import axios from "axios";
->>>>>>> Stashed changes
 import "./Attendance.css";
 
 function AttendanceManagement() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDateObj, setSelectedDateObj] = useState(new Date());
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [leaveRequestsCount] = useState(3);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showLeaveForm, setShowLeaveForm] = useState(false);
   const navigate = useNavigate();
 
-  const employeeId = 3; // later from login token
-  const [attendanceByDate, setAttendanceByDate] = useState({});
-  const [currentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // Edit inline state
+  const [editingEmployeeId, setEditingEmployeeId] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    status: "",
+    checkIn: "",
+    checkOut: "",
+    remarks: "",
+  });
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
   const [appliedLeaves, setAppliedLeaves] = useState([]);
-=======
-=======
->>>>>>> Stashed changes
-  /* ======================
-     FETCH ATTENDANCE
-  ====================== */
+
+  // Database of attendance records by date
+  const [attendanceByDate, setAttendanceByDate] = useState({});
+  
   useEffect(() => {
-    fetchAttendance();
-  }, []);
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+  fetchAttendance();
+}, []);
 
-  const fetchAttendance = async () => {
-    try {
-      const res = await axios.get(
-        `http://localhost:5000/api/attendance/${employeeId}`
-      );
+const fetchAttendance = async () => {
+  try {
+    const res = await API.get("/attendance");
 
-      const grouped = {};
+    console.log("API RESPONSE:", res.data);
 
-      res.data.forEach((row) => {
-        const dateKey = new Date(row.date).toISOString().split("T")[0];
+    const formatted = {};
 
-        if (!grouped[dateKey]) grouped[dateKey] = [];
+    res.data.forEach((row) => {
+      const key = row.date.split("T")[0]; // ✅ FIX
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
+      if (!formatted[key]) formatted[key] = [];
+
+      formatted[key].push({
+        id: row.id,
+        name: row.name || `Employee ${row.employee_id}`,
+        status: row.status.toLowerCase(),
+        checkIn: row.check_in || "-",
+        checkOut: row.check_out || "-",
+        shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
+        remarks: row.remarks || "-",
+      });
+    });
+
+    console.log("FORMATTED:", formatted);
+
+    setAttendanceByDate(formatted);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+  const formatDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate() - 1).padStart(2, "0"); // 🔥 KEY FIX
+
+  return `${year}-${month}-${day}`;
+};
+
+const getAttendanceRecordsForDate = () => {
+  const key = formatDate(selectedDateObj);
+  return attendanceByDate[key] || [];
+};
+
+  const attendanceRecords = getAttendanceRecordsForDate();
+
+  // Calculate status counts for selected date
+  const getStatusCounts = () => {
+    const records = attendanceRecords;
+    const counts = {
+      total: 125,
+      present: 0,
+      absent: 0,
+      late: 0,
+      wfh: 0,
+      leave: 0,
+    };
+
     records.forEach((record) => {
       if (record.status === "present") counts.present++;
       else if (record.status === "absent") counts.absent++;
@@ -76,21 +116,22 @@ function AttendanceManagement() {
   };
 
   // Save edit changes
-  const handleSaveEdit = (employeeId) => {
-    const dateKey = `${selectedDateObj.getFullYear()}-${selectedDateObj.getMonth() + 1}-${selectedDateObj.getDate()}`;
+  const handleSaveEdit = async (employeeId) => {
+  try {
+    await API.put(`/attendance/${employeeId}`, {
+      status:
+        editFormData.status.toLowerCase() === "wfh"
+          ? "WFH"
+          : editFormData.status.charAt(0).toUpperCase() +
+            editFormData.status.slice(1),
+    });
 
-    setAttendanceByDate((prev) => ({
-      ...prev,
-      [dateKey]: prev[dateKey].map((emp) =>
-        emp.id === employeeId ? { ...emp, ...editFormData } : emp,
-      ),
-    }));
-
+    fetchAttendance(); // 🔥 reload from DB
     setEditingEmployeeId(null);
-    console.log("Updated employee:", employeeId, editFormData);
-    // Here you would also save to Supabase
-  };
-
+  } catch (error) {
+    console.error("Update failed:", error);
+  }
+};
   // Cancel edit
   const handleCancelEdit = () => {
     setEditingEmployeeId(null);
@@ -127,59 +168,109 @@ function AttendanceManagement() {
     ]);
     // Close the form after successful submission
     setShowLeaveForm(false);
-=======
-=======
->>>>>>> Stashed changes
-        grouped[dateKey].push({
-          id: row.id,
-          name: row.employee_name || `Employee ${row.employee_id}`,
-          status: row.status?.toLowerCase() || "absent",
-          checkIn: row.check_in || "-",
-          checkOut: row.check_out || "-",
-          shift: row.shift || "M",
-          shiftTime: "09:00 AM - 06:00 PM",
-          remarks: row.remarks || "—",
-        });
-      });
-
-      setAttendanceByDate(grouped);
-    } catch (err) {
-      console.error("Attendance fetch failed", err);
-    }
->>>>>>> Stashed changes
   };
 
-  /* ======================
-     DATE HELPERS
-  ====================== */
-  const selectedKey = selectedDate.toISOString().split("T")[0];
-  const records = attendanceByDate[selectedKey] || [];
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
 
-  const statusCounts = {
-    total: records.length,
-    present: records.filter((r) => r.status === "present").length,
-    absent: records.filter((r) => r.status === "absent").length,
+  const getFirstDayOfMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   };
 
   const monthNames = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December"
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
 
-  /* ======================
-     JSX
-  ====================== */
+  const daysInMonth = getDaysInMonth(currentDate);
+  const firstDay = getFirstDayOfMonth(currentDate);
+  const monthDays = [];
+
+  for (let i = 0; i < firstDay; i++) {
+    monthDays.push(null);
+  }
+  for (let i = 1; i <= daysInMonth; i++) {
+    monthDays.push(i);
+  }
+
+  const handleDateClick = (day) => {
+    if (day) {
+      setSelectedDateObj(
+        new Date(currentDate.getFullYear(), currentDate.getMonth(), day),
+      );
+    }
+  };
+
+  const handlePrevMonth = () => {
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1),
+    );
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1),
+    );
+  };
+
+  const filteredRecords = attendanceRecords.filter((record) => {
+    const matchesStatus =
+      selectedStatus === "all" || record.status === selectedStatus;
+    return matchesStatus;
+  });
+
+  const getStatusClass = (status) => {
+    switch (status) {
+      case "present":
+        return "status-present";
+      case "late":
+        return "status-late";
+      case "absent":
+        return "status-absent";
+      case "wfh":
+        return "status-wfh";
+      default:
+        return "status-default";
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case "present":
+        return "Present";
+      case "late":
+        return "Late";
+      case "absent":
+        return "Absent";
+      case "wfh":
+        return "WFH";
+      default:
+        return "Unknown";
+    }
+  };
+
+  const formattedDate = `${selectedDateObj.getDate()} ${monthNames[selectedDateObj.getMonth()]} ${selectedDateObj.getFullYear()}`;
+
   return (
     <div className="attendance-page">
-      {/* HEADER */}
+      {/* Header */}
       <div className="att-header">
         <div>
           <h1>Attendance Management</h1>
           <p>View and manage employee attendance records</p>
         </div>
         <button className="leave-btn" onClick={() => navigate("/hr/leaves")}>
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
           <svg
             width="16"
             height="16"
@@ -191,42 +282,112 @@ function AttendanceManagement() {
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
           </svg>
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
           Leave Requests
+          <span className="badge-notification">{leaveRequestsCount}</span>
         </button>
       </div>
 
-      {/* STATUS CARDS */}
+      {/* Overall Status Cards */}
       <div className="overall-status">
-        <div className="status-card">
-          <span>Total</span>
-          <strong>{statusCounts.total}</strong>
+        <div className="status-card status-total">
+          <div className="status-icon">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </div>
+          <div className="status-info">
+            <span className="status-label">Total Employees</span>
+            <span className="status-value">{statusCounts.total}</span>
+          </div>
         </div>
-        <div className="status-card">
-          <span>Present</span>
-          <strong>{statusCounts.present}</strong>
+
+        <div className="status-card status-present">
+          <div className="status-icon">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <div className="status-info">
+            <span className="status-label">Present</span>
+            <span className="status-value">{statusCounts.present}</span>
+          </div>
         </div>
-        <div className="status-card">
-          <span>Absent</span>
-          <strong>{statusCounts.absent}</strong>
+
+        <div className="status-card status-absent">
+          <div className="status-icon">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </div>
+          <div className="status-info">
+            <span className="status-label">Absent</span>
+            <span className="status-value">{statusCounts.absent}</span>
+          </div>
+        </div>
+
+        <div className="status-card status-late">
+          <div className="status-icon">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <div className="status-info">
+            <span className="status-label">Late Arrivals</span>
+            <span className="status-value">{statusCounts.late}</span>
+          </div>
         </div>
       </div>
 
-      {/* CONTENT */}
       <div className="att-content">
-        {/* CALENDAR */}
+        {/* Calendar Section */}
         <div className="calendar-section">
           <div className="calendar-card">
-            <h3>
-              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-            </h3>
+            <div className="calendar-nav">
+              <button onClick={handlePrevMonth} className="cal-btn">
+                ←
+              </button>
+              <h3>
+                {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+              </h3>
+              <button onClick={handleNextMonth} className="cal-btn">
+                →
+              </button>
+            </div>
 
             <div className="calendar-grid">
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
                 <div key={day} className="cal-day-header">
                   {day}
@@ -494,67 +655,88 @@ function AttendanceManagement() {
                     <span className={`status-badge status-${leave.status}`}>
                       {leave.status}
                     </span>
-=======
-=======
->>>>>>> Stashed changes
-              {[...Array(31)].map((_, i) => {
-                const day = i + 1;
-                return (
-                  <div
-                    key={day}
-                    className={`cal-day ${
-                      day === selectedDate.getDate() ? "selected" : ""
-                    }`}
-                    onClick={() =>
-                      setSelectedDate(
-                        new Date(
-                          currentDate.getFullYear(),
-                          currentDate.getMonth(),
-                          day
-                        )
-                      )
-                    }
-                  >
-                    {day}
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
                   </div>
-                );
-              })}
+                  <div className="leave-card-details">
+                    <div className="detail">
+                      <span className="label">From:</span>
+                      <span className="value">{leave.fromDate}</span>
+                    </div>
+                    <div className="detail">
+                      <span className="label">To:</span>
+                      <span className="value">{leave.toDate}</span>
+                    </div>
+                    <div className="detail">
+                      <span className="label">Applied On:</span>
+                      <span className="value">{leave.appliedOn}</span>
+                    </div>
+                  </div>
+                  {leave.reason && (
+                    <div className="leave-reason">
+                      <span className="label">Reason:</span>
+                      <span className="value">{leave.reason}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Leave Modal */}
+      {showLeaveModal && (
+        <div className="modal-overlay" onClick={() => setShowLeaveModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Leave Requests</h3>
+              <button
+                className="modal-close"
+                onClick={() => setShowLeaveModal(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="leave-list">
+              <div className="leave-item">
+                <div className="leave-info">
+                  <h4>Anita Verma</h4>
+                  <p>Casual Leave - 2 days</p>
+                  <span className="leave-date">Jan 15-16, 2024</span>
+                </div>
+                <div className="leave-actions">
+                  <button className="btn-approve">Approve</button>
+                  <button className="btn-reject">Reject</button>
+                </div>
+              </div>
+
+              <div className="leave-item">
+                <div className="leave-info">
+                  <h4>Sanjay Mishra</h4>
+                  <p>Sick Leave - 1 day</p>
+                  <span className="leave-date">Jan 20, 2024</span>
+                </div>
+                <div className="leave-actions">
+                  <button className="btn-approve">Approve</button>
+                  <button className="btn-reject">Reject</button>
+                </div>
+              </div>
+
+              <div className="leave-item">
+                <div className="leave-info">
+                  <h4>Neha Patel</h4>
+                  <p>Earned Leave - 3 days</p>
+                  <span className="leave-date">Jan 25-27, 2024</span>
+                </div>
+                <div className="leave-actions">
+                  <button className="btn-approve">Approve</button>
+                  <button className="btn-reject">Reject</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-
-        {/* RECORDS */}
-        <div className="main-content">
-          <h3>
-            📅 {selectedDate.getDate()}{" "}
-            {monthNames[selectedDate.getMonth()]}{" "}
-            {selectedDate.getFullYear()}
-          </h3>
-
-          {records.length ? (
-            records.map((r) => (
-              <div key={r.id} className={`record-block status-${r.status}`}>
-                <strong>{r.name}</strong>
-                <span>{r.status}</span>
-
-                <div className="meta">
-                  <span>Check-in: {r.checkIn}</span>
-                  <span>Check-out: {r.checkOut}</span>
-                  <span>Shift: {r.shift}</span>
-                </div>
-
-                <small>{r.remarks}</small>
-              </div>
-            ))
-          ) : (
-            <p className="no-records">No attendance records</p>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }

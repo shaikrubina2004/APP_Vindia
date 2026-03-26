@@ -87,7 +87,12 @@ exports.getAttendanceByDate = async (req, res) => {
 exports.getAllAttendance = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT * FROM attendance
+      `SELECT 
+        attendance.*, 
+        employees.name
+       FROM attendance
+       JOIN employees 
+       ON attendance.employee_id = employees.id
        ORDER BY date DESC`
     );
 
@@ -131,12 +136,12 @@ exports.updateAttendance = async (req, res) => {
   const { status } = req.body || {};
 
   if (!status) {
-    return res.status(400).json({ message: "Status is required" });
-  }
+      return res.status(400).json({ message: "Status is required" });
+    }
 
-  if (!["Present", "Absent"].includes(status)) {
-    return res.status(400).json({ message: "Invalid status value" });
-  }
+    if (!["Present", "Absent", "Late", "WFH"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
 
   try {
     const result = await pool.query(
