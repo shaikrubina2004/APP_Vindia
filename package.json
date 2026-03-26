@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "feather-icons": "^4.29.2"
+    "feather-icons": "^4.29.2",
+    "lucide-react": "^1.6.0"
   }
 }

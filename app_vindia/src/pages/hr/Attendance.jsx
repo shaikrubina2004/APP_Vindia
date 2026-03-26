@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ApplyLeave from "../../SharedResourse/ApplyLeave";
 import "./Attendance.css";
 
 function AttendanceManagement() {
@@ -20,13 +21,6 @@ function AttendanceManagement() {
     remarks: "",
   });
 
-  const [leaveFormData, setLeaveFormData] = useState({
-    employeeName: "",
-    fromDate: "",
-    toDate: "",
-    leaveType: "casual",
-    reason: "",
-  });
   const [appliedLeaves, setAppliedLeaves] = useState([]);
 
   // Database of attendance records by date
@@ -311,39 +305,23 @@ function AttendanceManagement() {
     }));
   };
 
-  const handleLeaveFormChange = (e) => {
-    const { name, value } = e.target;
-    setLeaveFormData((prev) => ({
+  // Handle leave submission from ApplyLeave component
+  const handleLeaveSubmitted = (leaveData) => {
+    setAppliedLeaves((prev) => [
       ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleSubmitLeaveRequest = (e) => {
-    e.preventDefault();
-    if (
-      leaveFormData.employeeName &&
-      leaveFormData.fromDate &&
-      leaveFormData.toDate
-    ) {
-      setAppliedLeaves((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          ...leaveFormData,
-          status: "pending",
-          appliedOn: new Date().toLocaleDateString(),
-        },
-      ]);
-      setLeaveFormData({
-        employeeName: "",
-        fromDate: "",
-        toDate: "",
-        leaveType: "casual",
-        reason: "",
-      });
-      setShowLeaveForm(false);
-    }
+      {
+        id: Date.now(),
+        employeeName: leaveData.name,
+        leaveType: leaveData.leaveType.toLowerCase().replace(" ", ""),
+        fromDate: leaveData.fromDate,
+        toDate: leaveData.toDate,
+        reason: leaveData.reason,
+        status: leaveData.status.toLowerCase(),
+        appliedOn: leaveData.appliedOn,
+      },
+    ]);
+    // Close the form after successful submission
+    setShowLeaveForm(false);
   };
 
   const getDaysInMonth = (date) => {
@@ -446,7 +424,7 @@ function AttendanceManagement() {
           <h1>Attendance Management</h1>
           <p>View and manage employee attendance records</p>
         </div>
-       <button className="leave-btn" onClick={() => navigate("/hr/leaves")}>
+        <button className="leave-btn" onClick={() => navigate("/hr/leaves")}>
           <svg
             width="16"
             height="16"
@@ -798,85 +776,14 @@ function AttendanceManagement() {
           </button>
         </div>
 
-        {/* Leave Request Form */}
+        {/* ApplyLeave Component - Replaces inline form */}
         {showLeaveForm && (
-          <div className="leave-form-container">
-            <form onSubmit={handleSubmitLeaveRequest} className="leave-form">
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Your Name</label>
-                  <input
-                    type="text"
-                    name="employeeName"
-                    value={leaveFormData.employeeName}
-                    onChange={handleLeaveFormChange}
-                    placeholder="Enter your name"
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Leave Type</label>
-                  <select
-                    name="leaveType"
-                    value={leaveFormData.leaveType}
-                    onChange={handleLeaveFormChange}
-                  >
-                    <option value="casual">Casual Leave</option>
-                    <option value="sick">Sick Leave</option>
-                    <option value="earned">Earned Leave</option>
-                    <option value="maternity">Maternity Leave</option>
-                    <option value="unpaid">Unpaid Leave</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>From Date</label>
-                  <input
-                    type="date"
-                    name="fromDate"
-                    value={leaveFormData.fromDate}
-                    onChange={handleLeaveFormChange}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>To Date</label>
-                  <input
-                    type="date"
-                    name="toDate"
-                    value={leaveFormData.toDate}
-                    onChange={handleLeaveFormChange}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Reason</label>
-                <textarea
-                  name="reason"
-                  value={leaveFormData.reason}
-                  onChange={handleLeaveFormChange}
-                  placeholder="Enter reason for leave"
-                  rows="3"
-                />
-              </div>
-
-              <div className="form-actions">
-                <button type="submit" className="btn-submit">
-                  Submit Request
-                </button>
-                <button
-                  type="button"
-                  className="btn-cancel"
-                  onClick={() => setShowLeaveForm(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+          <div className="leave-form-wrapper">
+            <ApplyLeave
+              userRole="employee"
+              employeeName=""
+              onLeaveSubmitted={handleLeaveSubmitted}
+            />
           </div>
         )}
 
