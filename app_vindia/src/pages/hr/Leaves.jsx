@@ -51,6 +51,10 @@ function Leaves() {
       joiningDate: "2025-11-10",
     },
 
+<<<<<<< Updated upstream
+=======
+    // Approved Data
+>>>>>>> Stashed changes
     {
       name: "Ravi",
       type: "Casual Leave",
@@ -72,7 +76,6 @@ function Leaves() {
       status: "Approved",
       joiningDate: "2026-01-01",
     },
-
     {
       name: "Meena",
       type: "Casual Leave",
@@ -148,6 +151,19 @@ function Leaves() {
     }
   }, [message]);
 
+<<<<<<< Updated upstream
+=======
+  // ✅ APPROVE / REJECT FUNCTION
+  const handleAction = (index, newStatus) => {
+    const updatedLeaves = [...leaves];
+    updatedLeaves[index].status = newStatus;
+    setLeaves(updatedLeaves);
+
+    setMessage(`Leave ${newStatus} successfully`);
+  };
+
+  // 🔥 MONTHLY FUNCTION
+>>>>>>> Stashed changes
   const getMonthlyLeaves = (name) => {
     const monthMap = {};
 
@@ -166,7 +182,11 @@ function Leaves() {
     return monthMap;
   };
 
+<<<<<<< Updated upstream
   // 🔥 Till-date summary logic
+=======
+  // 🔥 SUMMARY FUNCTION
+>>>>>>> Stashed changes
   const calculateSummary = (name) => {
     const todayDate = new Date();
 
@@ -180,7 +200,6 @@ function Leaves() {
     const currentYear = todayDate.getFullYear();
 
     const sickTaken = approved.filter((l) => l.type === "Sick Leave").length;
-
     const casualTaken = approved.filter(
       (l) =>
         l.type === "Casual Leave" &&
@@ -188,9 +207,7 @@ function Leaves() {
     ).length;
 
     const totalTaken = sickTaken + casualTaken;
-
     const balance = Math.max(maxTotalLeaves - totalTaken, 0);
-
     const extraLeaves = Math.max(totalTaken - maxTotalLeaves, 0);
 
     return {
@@ -252,14 +269,25 @@ function Leaves() {
                               <>
                                 <button
                                   onClick={() =>
+<<<<<<< Updated upstream
                                     handleStatusChange(i, "Approved")
+=======
+                                    handleAction(i, "Approved")
+>>>>>>> Stashed changes
                                   }
                                 >
                                   Approve
                                 </button>
+<<<<<<< Updated upstream
                                 <button
                                   onClick={() =>
                                     handleStatusChange(i, "Rejected")
+=======
+
+                                <button
+                                  onClick={() =>
+                                    handleAction(i, "Rejected")
+>>>>>>> Stashed changes
                                   }
                                 >
                                   Reject
@@ -322,7 +350,10 @@ function Leaves() {
                                   </div>
                                 </div>
 
+<<<<<<< Updated upstream
                                 {/* Monthly Cards */}
+=======
+>>>>>>> Stashed changes
                                 <div style={{ marginTop: "15px" }}>
                                   <h4 style={{ color: "#1e3a8a" }}>
                                     Monthly Leaves
@@ -346,8 +377,6 @@ function Leaves() {
                                           border: "1px solid #e5e7eb",
                                           borderRadius: "8px",
                                           minWidth: "130px",
-                                          boxShadow:
-                                            "0 2px 6px rgba(0,0,0,0.05)",
                                         }}
                                       >
                                         <div style={{ fontWeight: "600" }}>

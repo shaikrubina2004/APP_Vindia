@@ -512,8 +512,7 @@ function ProjectManagement() {
          
             <div className="overview-section">
 
-  {/* 🔥 ADD HERE */}
-   
+ 
 
   {/* filter buttons will be here */}
             {/* Project Cards */}
@@ -581,18 +580,16 @@ function ProjectManagement() {
                     ></div>
                   </div>
                   <p className="progress-text">{proj.progress}% Complete</p>
-                  <div className="card-insights">
-   
-</div>
+                  
                 </div>
                 
+                
               ))}
-            </div>
-            <div className="quick-insights">
+            </div><div className="quick-insights">
   <h3>Quick Insights</h3>
-  <p>⚠ 2 projects delayed</p>
-  <p>💰 1 over budget</p>
-  <p>🚀 Top: 90% progress</p>
+  <p>⚠️ {projects.filter(p => p.progress < 50).length} delayed</p>
+  <p>💰 {projects.filter(p => p.spent > p.budget).length} over budget</p>
+  <p>🚀 Top: {Math.max(...projects.map(p => p.progress))}% progress</p>
 </div>
             
 
