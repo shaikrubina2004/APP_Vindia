@@ -11,6 +11,7 @@ function AttendanceManagement() {
   const [leaveRequestsCount] = useState(3);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showLeaveForm, setShowLeaveForm] = useState(false);
+  const [totalEmployees, setTotalEmployees] = useState(0);
   const navigate = useNavigate();
 
   // Edit inline state
@@ -27,8 +28,9 @@ function AttendanceManagement() {
   // Database of attendance records by date
   const [attendanceByDate, setAttendanceByDate] = useState({});
   
-  useEffect(() => {
+ useEffect(() => {
   fetchAttendance();
+  fetchTotalEmployees();
 }, []);
 
 const fetchAttendance = async () => {
@@ -40,7 +42,7 @@ const fetchAttendance = async () => {
     const formatted = {};
 
     res.data.forEach((row) => {
-      const key = row.date.split("T")[0]; // ✅ FIX
+      const key = new Date(row.date).toLocaleDateString("en-CA");// ⭐ IMPORTANT FIX 
 
       if (!formatted[key]) formatted[key] = [];
 
@@ -64,12 +66,17 @@ const fetchAttendance = async () => {
   }
 };
 
-  const formatDate = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate() - 1).padStart(2, "0"); // 🔥 KEY FIX
+const fetchTotalEmployees = async () => {
+  try {
+    const res = await API.get("/attendance/employees/count");
+    setTotalEmployees(res.data.total);
+  } catch (err) {
+    console.error(err);
+  }
+};
 
-  return `${year}-${month}-${day}`;
+  const formatDate = (date) => {
+  return date.toLocaleDateString("en-CA");
 };
 
 const getAttendanceRecordsForDate = () => {
@@ -81,26 +88,28 @@ const getAttendanceRecordsForDate = () => {
 
   // Calculate status counts for selected date
   const getStatusCounts = () => {
-    const records = attendanceRecords;
-    const counts = {
-      total: 125,
-      present: 0,
-      absent: 0,
-      late: 0,
-      wfh: 0,
-      leave: 0,
-    };
-
-    records.forEach((record) => {
-      if (record.status === "present") counts.present++;
-      else if (record.status === "absent") counts.absent++;
-      else if (record.status === "late") counts.late++;
-      else if (record.status === "wfh") counts.wfh++;
-      else if (record.status === "leave") counts.leave++;
-    });
-
-    return counts;
+  const counts = {
+    total: totalEmployees,
+    present: 0,
+    absent: 0,
+    late: 0,
+    wfh: 0,
+    leave: 0,
   };
+
+  attendanceRecords.forEach((record) => {
+    if (!record || !record.status) return;
+
+    const status = record.status.toLowerCase().trim(); // 🔥 IMPORTANT
+
+    if (status === "present") counts.present++;
+    else if (status === "absent") counts.absent++;
+    else if (status === "late") counts.late++;
+    else if (status === "wfh") counts.wfh++;
+  });
+
+  return counts;
+};
 
   const statusCounts = getStatusCounts();
 
@@ -225,10 +234,10 @@ const getAttendanceRecordsForDate = () => {
   };
 
   const filteredRecords = attendanceRecords.filter((record) => {
-    const matchesStatus =
-      selectedStatus === "all" || record.status === selectedStatus;
-    return matchesStatus;
-  });
+  if (selectedStatus === "all") return true;
+
+  return record.status.toLowerCase().trim() === selectedStatus;
+});
 
   const getStatusClass = (status) => {
     switch (status) {
@@ -534,7 +543,7 @@ const getAttendanceRecordsForDate = () => {
                       <div className="record-header">
                         <div className="emp-info">
                           <div className="emp-avatar">
-                            {record.name.charAt(0)}
+                            {record.name ? record.name.trim().charAt(0).toUpperCase() : "?"}
                           </div>
                           <div className="emp-details">
                             <h4>{record.name}</h4>
