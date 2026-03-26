@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 import ApplyLeave from "../../SharedResourse/ApplyLeave";
+=======
+import axios from "axios";
+>>>>>>> Stashed changes
 =======
 import axios from "axios";
 >>>>>>> Stashed changes
@@ -16,14 +20,20 @@ function AttendanceManagement() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   const [appliedLeaves, setAppliedLeaves] = useState([]);
 =======
+=======
+>>>>>>> Stashed changes
   /* ======================
      FETCH ATTENDANCE
   ====================== */
   useEffect(() => {
     fetchAttendance();
   }, []);
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 
   const fetchAttendance = async () => {
@@ -39,6 +49,7 @@ function AttendanceManagement() {
 
         if (!grouped[dateKey]) grouped[dateKey] = [];
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
     records.forEach((record) => {
       if (record.status === "present") counts.present++;
@@ -117,6 +128,8 @@ function AttendanceManagement() {
     // Close the form after successful submission
     setShowLeaveForm(false);
 =======
+=======
+>>>>>>> Stashed changes
         grouped[dateKey].push({
           id: row.id,
           name: row.employee_name || `Employee ${row.employee_id}`,
@@ -166,6 +179,7 @@ function AttendanceManagement() {
         </div>
         <button className="leave-btn" onClick={() => navigate("/hr/leaves")}>
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
           <svg
             width="16"
             height="16"
@@ -177,6 +191,8 @@ function AttendanceManagement() {
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
           </svg>
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
           Leave Requests
@@ -209,6 +225,7 @@ function AttendanceManagement() {
             </h3>
 
             <div className="calendar-grid">
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
                 <div key={day} className="cal-day-header">
@@ -478,6 +495,8 @@ function AttendanceManagement() {
                       {leave.status}
                     </span>
 =======
+=======
+>>>>>>> Stashed changes
               {[...Array(31)].map((_, i) => {
                 const day = i + 1;
                 return (
@@ -497,6 +516,9 @@ function AttendanceManagement() {
                     }
                   >
                     {day}
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
                   </div>
                 );

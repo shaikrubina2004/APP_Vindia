@@ -8,6 +8,7 @@ import {
 function Leaves() {
   const salaryPerDay = 1000;
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 
   const maxTotalLeaves = 18;
   const maxSickLeaves = 6;
@@ -15,10 +16,14 @@ function Leaves() {
 =======
   const maxTotalLeaves = 12;
 >>>>>>> Stashed changes
+=======
+  const maxTotalLeaves = 12;
+>>>>>>> Stashed changes
 
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [message, setMessage] = useState("");
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 
   const today = new Date().toISOString().slice(0, 10);
@@ -155,6 +160,12 @@ function Leaves() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+=======
+  const [leaves, setLeaves] = useState([]);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+>>>>>>> Stashed changes
   // ✅ Load leaves from backend
   useEffect(() => {
     loadLeaves();
@@ -170,6 +181,9 @@ function Leaves() {
   };
 
   // ✅ Auto-hide popup
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   useEffect(() => {
     if (message) {
@@ -178,6 +192,7 @@ function Leaves() {
     }
   }, [message]);
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
   const getMonthlyLeaves = (name) => {
     const monthMap = {};
@@ -204,6 +219,13 @@ function Leaves() {
     try {
       await updateLeaveStatus(leaveId, newStatus);
 
+=======
+  // ✅ Approve / Reject handler
+  const handleStatusChange = async (leaveId, newStatus) => {
+    try {
+      await updateLeaveStatus(leaveId, newStatus);
+
+>>>>>>> Stashed changes
       setLeaves(prev =>
         prev.map(l =>
           l.id === leaveId ? { ...l, status: newStatus } : l
@@ -218,16 +240,23 @@ function Leaves() {
   };
 
   // ✅ Summary calculation
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   const calculateSummary = (name) => {
     const todayDate = new Date();
 
     const approved = leaves.filter(
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       (l) =>
         l.name === name &&
         l.status === "Approved" &&
         new Date(l.date) <= todayDate,
+=======
+      l => l.employee_name === name && l.status === "Approved"
+>>>>>>> Stashed changes
 =======
       l => l.employee_name === name && l.status === "Approved"
 >>>>>>> Stashed changes
@@ -296,6 +325,7 @@ function Leaves() {
             <tbody>
               {leaves
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
                 .sort((a, b) => new Date(a.date) - new Date(b.date))
                 .map(
                   (l, i) =>
@@ -306,12 +336,17 @@ function Leaves() {
                           <td>{l.type}</td>
                           <td>{l.date}</td>
 =======
+=======
+>>>>>>> Stashed changes
                 .filter(l => l.from_date.slice(0, 10) === today)
                 .map(l => (
                   <tr key={l.id}>
                     <td className="emp">{l.employee_name}</td>
                     <td>{l.leave_type}</td>
                     <td>{l.from_date.slice(0, 10)}</td>
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 
                           <td>
