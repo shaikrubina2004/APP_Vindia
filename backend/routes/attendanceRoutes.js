@@ -5,19 +5,31 @@ const {
   getAttendanceByDate,
   getAllAttendance,
   getAttendanceByDateRange,
+  updateAttendance,
 } = require("../controllers/attendanceController");
 
 const router = express.Router();
 
-/* Employee */
+/* ================= EMPLOYEE ROUTES ================= */
+
+// Employee marks attendance
 router.post("/", markAttendance);
 
-/* HR / Admin (specific routes first) */
+// Employee views own attendance (KEEP THIS LAST among GET /:id)
+router.get("/:id", getAttendanceByEmployee);
+
+/* ================= HR / ADMIN ROUTES ================= */
+
+// Get attendance by exact date
 router.get("/date/:date", getAttendanceByDate);
+
+// Filter attendance by date range
 router.get("/filter/date", getAttendanceByDateRange);
+
+// Get all attendance
 router.get("/", getAllAttendance);
 
-/* Employee (keep param routes LAST) */
-router.get("/:id", getAttendanceByEmployee);
+// ✅ Update attendance status (HR edit)
+router.put("/:id", updateAttendance);
 
 module.exports = router;

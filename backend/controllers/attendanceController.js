@@ -4,28 +4,38 @@ const pool = require("../config/db");
  * Employee marks attendance
  */
 exports.markAttendance = async (req, res) => {
-  const { employee_id, date, status } = req.body;
-
-  if (!employee_id || !date || !status) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
-
-  if (!["Present", "Absent"].includes(status)) {
-    return res.status(400).json({ message: "Invalid status" });
-  }
+  console.log("HEADERS:", req.headers);
+  console.log("BODY:", req.body);
 
   try {
-    const result = await pool.query(
-      `INSERT INTO attendance (employee_id, date, status)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [employee_id, date, status]
-    );
+    const { employee_id, date, status } = req.body;
 
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to mark attendance" });
+    if (!employee_id || !date || !status) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        received: req.body,
+      });
+    }
+
+    const query = `
+      INSERT INTO attendance (employee_id, date, status)
+      VALUES ($1, $2, $3)
+      RETURNING *
+    `;
+
+    const values = [employee_id, date, status];
+
+    const result = await pool.query(query, values);
+
+    return res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("🔥 ACTUAL ERROR:", err.message);
+    console.error(err.stack);
+
+    return res.status(500).json({
+      error: "Failed to mark attendance",
+      details: err.message,
+    });
   }
 };
 
@@ -110,5 +120,40 @@ exports.getAttendanceByDateRange = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to filter attendance" });
+  }
+};
+
+/**
+ * ✅ HR - Update attendance status (EDIT + SAVE)
+ */
+exports.updateAttendance = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body || {};
+
+  if (!status) {
+    return res.status(400).json({ message: "Status is required" });
+  }
+
+  if (!["Present", "Absent"].includes(status)) {
+    return res.status(400).json({ message: "Invalid status value" });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE attendance
+       SET status = $1
+       WHERE id = $2
+       RETURNING *`,
+      [status, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Attendance record not found" });
+    }
+
+    res.status(200).json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to update attendance" });
   }
 };

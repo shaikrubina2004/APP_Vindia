@@ -1,16 +1,25 @@
 import { useState, useEffect } from "react";
 import "./Leaves.css";
+import {
+  fetchAllLeaves,
+  updateLeaveStatus
+} from "../../services/leaveService";
 
 function Leaves() {
   const salaryPerDay = 1000;
+<<<<<<< Updated upstream
 
   const maxTotalLeaves = 18;
   const maxSickLeaves = 6;
   const maxCasualLeaves = 12;
+=======
+  const maxTotalLeaves = 12;
+>>>>>>> Stashed changes
 
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [message, setMessage] = useState("");
+<<<<<<< Updated upstream
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -141,6 +150,27 @@ function Leaves() {
     },
   ]);
 
+=======
+  const [leaves, setLeaves] = useState([]);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  // ✅ Load leaves from backend
+  useEffect(() => {
+    loadLeaves();
+  }, []);
+
+  const loadLeaves = async () => {
+    try {
+      const res = await fetchAllLeaves();
+      setLeaves(res.data);
+    } catch (err) {
+      console.error("Failed to fetch leaves", err);
+    }
+  };
+
+  // ✅ Auto-hide popup
+>>>>>>> Stashed changes
   useEffect(() => {
     if (message) {
       const t = setTimeout(() => setMessage(""), 2500);
@@ -148,6 +178,7 @@ function Leaves() {
     }
   }, [message]);
 
+<<<<<<< Updated upstream
   const getMonthlyLeaves = (name) => {
     const monthMap = {};
 
@@ -167,14 +198,39 @@ function Leaves() {
   };
 
   // 🔥 Till-date summary logic
+=======
+  // ✅ Approve / Reject handler
+  const handleStatusChange = async (leaveId, newStatus) => {
+    try {
+      await updateLeaveStatus(leaveId, newStatus);
+
+      setLeaves(prev =>
+        prev.map(l =>
+          l.id === leaveId ? { ...l, status: newStatus } : l
+        )
+      );
+
+      setMessage(`Leave ${newStatus}`);
+    } catch (err) {
+      console.error(err);
+      setMessage("Failed to update leave status");
+    }
+  };
+
+  // ✅ Summary calculation
+>>>>>>> Stashed changes
   const calculateSummary = (name) => {
     const todayDate = new Date();
 
     const approved = leaves.filter(
+<<<<<<< Updated upstream
       (l) =>
         l.name === name &&
         l.status === "Approved" &&
         new Date(l.date) <= todayDate,
+=======
+      l => l.employee_name === name && l.status === "Approved"
+>>>>>>> Stashed changes
     );
 
     const currentYear = todayDate.getFullYear();
@@ -194,11 +250,19 @@ function Leaves() {
     const extraLeaves = Math.max(totalTaken - maxTotalLeaves, 0);
 
     return {
+<<<<<<< Updated upstream
       total: totalTaken,
       sick: sickTaken,
       casual: casualTaken,
       balance,
       cut: extraLeaves * salaryPerDay,
+=======
+      total: approved.length,
+      sick: approved.filter(l => l.leave_type === "Sick").length,
+      casual: approved.filter(l => l.leave_type === "Casual").length,
+      balance: Math.max(maxTotalLeaves - approved.length, 0),
+      cut: Math.max(approved.length - maxTotalLeaves, 0) * salaryPerDay
+>>>>>>> Stashed changes
     };
   };
 
@@ -231,6 +295,7 @@ function Leaves() {
 
             <tbody>
               {leaves
+<<<<<<< Updated upstream
                 .sort((a, b) => new Date(a.date) - new Date(b.date))
                 .map(
                   (l, i) =>
@@ -240,6 +305,14 @@ function Leaves() {
                           <td className="emp">{l.name}</td>
                           <td>{l.type}</td>
                           <td>{l.date}</td>
+=======
+                .filter(l => l.from_date.slice(0, 10) === today)
+                .map(l => (
+                  <tr key={l.id}>
+                    <td className="emp">{l.employee_name}</td>
+                    <td>{l.leave_type}</td>
+                    <td>{l.from_date.slice(0, 10)}</td>
+>>>>>>> Stashed changes
 
                           <td>
                             <span className={`tag ${l.status.toLowerCase()}`}>
@@ -247,6 +320,7 @@ function Leaves() {
                             </span>
                           </td>
 
+<<<<<<< Updated upstream
                           <td>
                             {l.status === "Pending" && (
                               <>
@@ -372,6 +446,47 @@ function Leaves() {
                 )}
             </tbody>
           </table>
+=======
+                    <td>
+                      {l.status === "Pending" && (
+                        <>
+                          <button onClick={() => handleStatusChange(l.id, "Approved")}>
+                            Approve
+                          </button>
+                          <button onClick={() => handleStatusChange(l.id, "Rejected")}>
+                            Reject
+                          </button>
+                        </>
+                      )}
+                    </td>
+
+                    <td>
+                      <button
+                        className="view"
+                        onClick={() => setSelectedEmployee(l.employee_name)}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+
+          {summary && (
+            <div className="summary">
+              <h3>{selectedEmployee}</h3>
+              <div className="grid">
+                <div><span>Total</span><b>{summary.total}</b></div>
+                <div><span>Sick</span><b>{summary.sick}</b></div>
+                <div><span>Casual</span><b>{summary.casual}</b></div>
+                <div><span>Balance</span><b>{summary.balance}</b></div>
+                <div><span>Salary Cut</span><b>₹{summary.cut}</b></div>
+              </div>
+            </div>
+          )}
+
+>>>>>>> Stashed changes
         </div>
       </div>
     </div>
