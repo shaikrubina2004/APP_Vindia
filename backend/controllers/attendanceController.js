@@ -162,3 +162,18 @@ exports.updateAttendance = async (req, res) => {
     res.status(500).json({ error: "Failed to update attendance" });
   }
 };
+
+exports.getTotalEmployees = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*) FROM employees`
+    );
+
+    res.status(200).json({
+      total: parseInt(result.rows[0].count),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch employee count" });
+  }
+};

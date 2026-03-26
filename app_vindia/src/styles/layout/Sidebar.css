@@ -76,12 +76,12 @@
   font-size: 12px;
   opacity: 0;
   transition: 0.2s;
+  pointer-events: none;
 }
 
-.sidebar__link:hover span {
+.sidebar__link svg:hover + span {
   opacity: 1;
 }
-
 /* ================= MOBILE ================= */
 
 .sidebar-toggle {
