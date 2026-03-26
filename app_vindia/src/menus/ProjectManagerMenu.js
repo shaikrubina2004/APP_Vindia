@@ -7,7 +7,6 @@ export const ProjectManagerMenu = [
     icon: LayoutDashboard,
   },
   { name: "WBS", path: "/ProjectManager/WBS", icon: Users },
-  { name: "Timesheet", path: "/ProjectManager/Timesheet", icon: Clock },
   {
     name: "Cost Tracking",
     path: "/ProjectManager/CostTracking",

@@ -1,60 +1,112 @@
-.projects-container {
-  padding: 20px;
-  background: #BDD8E9;
-  min-height: 100vh;
+.project-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 /* HEADER */
-.projects-header {
+.project-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.projects-header h1 {
-  color: #001D39;
+.project-header h1 {
+  font-size: 24px;
 }
 
-/* BUTTON */
-.add-btn {
-  background: #0A4174;
+.project-actions button {
+  margin-left: 10px;
+}
+
+/* BUTTONS */
+.btn-primary {
+  background: #1e5a96;
   color: white;
-  padding: 10px 16px;
   border: none;
+  padding: 8px 14px;
   border-radius: 6px;
+}
+
+.btn-secondary {
+  background: #e2e8f0;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+}
+
+/* TABS */
+.project-tabs {
+  display: flex;
+  gap: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tab {
+  padding: 10px 14px;
+  border: none;
+  background: none;
   cursor: pointer;
+  color: #64748b;
 }
 
-.add-btn:hover {
-  background: #49769F;
+.tab.active {
+  color: #1e5a96;
+  border-bottom: 2px solid #1e5a96;
 }
 
-/* TABLE */
-.table-wrapper {
-  margin-top: 20px;
+/* CONTENT */
+.project-content {
+  margin-top: 10px;
+}
+
+/* CARDS */
+.card {
   background: white;
+  padding: 20px;
   border-radius: 10px;
-  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
 
-.projects-table {
-  width: 100%;
-  border-collapse: collapse;
+/* GRID */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-top: 15px;
 }
 
-.projects-table th {
-  background: #001D39;
-  color: white;
-  padding: 12px;
-  text-align: left;
+/* PROGRESS */
+.progress-bar {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 10px;
+  margin: 10px 0;
 }
 
-.projects-table td {
-  padding: 12px;
-  border-bottom: 1px solid #ddd;
+.progress-fill {
+  height: 100%;
+  background: #1e5a96;
+  border-radius: 10px;
 }
 
-.projects-table tr:hover {
-  background: #BDD8E9;
-  cursor: pointer;
+/* TASK */
+.task {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
 }

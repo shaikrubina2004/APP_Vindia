@@ -6,27 +6,29 @@ import SignUp from "../pages/SignUp";
 import Dashboard from "../pages/ceo/Dashboard";
 import CEOPanel from "../pages/ceo/CEOPanel";
 import UserManagement from "../pages/ceo/UserManagement";
+import ProjectManagement from "../pages/ceo/ProjectManagement";
 
 import HRDashboard from "../pages/hr/HRDashboard";
 import Employees from "../pages/hr/Employees";
-import AddEmployee from "../pages/hr/AddEmployee"; // ✅ correct
+import AddEmployee from "../pages/hr/AddEmployee";
 import Attendance from "../pages/hr/Attendance";
 import Documents from "../pages/hr/Documents";
 import Leaves from "../pages/hr/Leaves";
 import Payroll from "../pages/hr/Payroll";
+import Travel from "../pages/hr/Travel";
+
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
-import Travel from "../pages/hr/Travel";
 
 import CEOLayout from "../layouts/CEOLayout";
 import HRLayout from "../layouts/HRLayout";
-import ProjectManagementLayout from "../layouts/ProjectManagerLayout";
-import ProjectManagement from "../pages/ceo/ProjectManagement";
+import Timesheet from "../pages/timesheet/Timesheet";
 
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* PUBLIC ROUTES */}
+
+      {/* PUBLIC */}
       <Route path="/" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
 
@@ -42,7 +44,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* CEO PANEL */}
+      {/* CEO */}
       <Route
         path="/ceo"
         element={
@@ -54,7 +56,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* USER MANAGEMENT */}
+      {/* CEO USERS */}
       <Route
         path="/users"
         element={
@@ -66,7 +68,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* USER MANAGEMENT */}
+      {/* CEO PROJECTS */}
       <Route
         path="/projects"
         element={
@@ -77,6 +79,17 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      {/* TIMESHEET */}
+<Route
+  path="/timesheet"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
+      <CEOLayout>
+        <Timesheet />
+      </CEOLayout>
+    </ProtectedRoute>
+  }
+/>
 
       {/* HR DASHBOARD */}
       <Route
@@ -102,7 +115,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* ✅ ADD EMPLOYEE (FIXED) */}
+      {/* ADD EMPLOYEE */}
       <Route
         path="/hr/add-employee"
         element={
@@ -126,7 +139,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* HR Document */}
+      {/* HR DOCUMENTS */}
       <Route
         path="/hr/documents"
         element={
@@ -138,6 +151,7 @@ const AppRoutes = () => {
         }
       />
 
+      {/* CEO ATTENDANCE VIEW */}
       <Route
         path="/attendance"
         element={
@@ -149,6 +163,7 @@ const AppRoutes = () => {
         }
       />
 
+      {/* HR PAYROLL */}
       <Route
         path="/hr/payroll"
         element={
@@ -159,16 +174,8 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/hr/payroll"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
-            <HRLayout>
-              <Payroll />
-            </HRLayout>
-          </ProtectedRoute>
-        }
-      />
+
+      {/* CEO PAYROLL VIEW */}
       <Route
         path="/payroll"
         element={
@@ -179,6 +186,8 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
+      {/* HR TRAVEL */}
       <Route
         path="/hr/travel"
         element={
@@ -189,6 +198,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
       {/* HR LEAVES */}
       <Route
         path="/hr/leaves"
@@ -203,6 +213,7 @@ const AppRoutes = () => {
 
       {/* FALLBACK */}
       <Route path="*" element={<h2>Page Not Found</h2>} />
+
     </Routes>
   );
 };

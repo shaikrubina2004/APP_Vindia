@@ -1,0 +1,108 @@
+/* HEADER */
+.ts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ts-sub {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.ts-right {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.status {
+  color: #49769F;
+}
+
+.warn {
+  color: #f59e0b;
+}
+
+.ok {
+  color: #10b981;
+}
+
+/* META CARD */
+.ts-meta-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* GLOBAL CARD */
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 18px;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* TABLE */
+.ts-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ts-table th {
+  padding: 12px;
+  background: #BDD8E9;
+  font-size: 13px;
+}
+
+.ts-table th[colspan] {
+  background: #7BBDE8;
+}
+
+.ts-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.ts-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* INPUT */
+.ts-table input,
+.ts-table select {
+  width: 100%;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+/* TOTAL */
+.total-cell {
+  font-weight: 600;
+}
+
+/* ACTION */
+.ts-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* BUTTON */
+.btn-primary {
+  background: #0A4174;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+}
+
+.btn-primary:hover {
+  background: #001D39;
+}

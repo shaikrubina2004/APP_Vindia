@@ -1,17 +1,16 @@
-import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import axios from "axios";
-import WbsPage from "../wbs/WbsPage";
+import "../styles/projects.css";
 
 function ProjectDetails() {
-
-  const { id } = useParams();
+  const { id } = useParams();   // 🔥 get project id
   const [project, setProject] = useState(null);
-  const [tab, setTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     fetchProject();
-  }, []);
+  }, [id]);
 
   const fetchProject = async () => {
     try {
@@ -25,57 +24,62 @@ function ProjectDetails() {
   if (!project) return <p>Loading...</p>;
 
   return (
-    <div style={{ padding: "20px" }}>
+    <div className="project-details">
 
-      {/* PROJECT HEADER */}
-      <h1>{project.name}</h1>
-
-      <div style={{ display: "flex", gap: "40px", marginTop: "10px" }}>
+      {/* HEADER */}
+      <div className="project-header">
         <div>
-          <p>Client</p>
-          <h3>{project.client}</h3>
-        </div>
-
-        <div>
-          <p>Budget</p>
-          <h3>₹{project.budget}</h3>
+          <h1>{project.name}</h1>
+          <p>
+            Client: {project.client} • Budget: ₹
+            {project.budget?.toLocaleString()}
+          </p>
         </div>
       </div>
 
       {/* TABS */}
-      <div style={{ display: "flex", gap: "20px", marginTop: "20px" }}>
-        <button onClick={() => setTab("overview")}>Overview</button>
-        <button onClick={() => setTab("wbs")}>WBS</button>
-        <button onClick={() => setTab("timesheet")}>Timesheet</button>
-        <button onClick={() => setTab("cost")}>Cost</button>
+      <div className="project-tabs">
+        {["overview", "wbs", "timesheet", "finance"].map((tab) => (
+          <button
+            key={tab}
+            className={activeTab === tab ? "tab active" : "tab"}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab.toUpperCase()}
+          </button>
+        ))}
       </div>
 
       {/* CONTENT */}
-      <div style={{ marginTop: "20px" }}>
+      <div className="project-content">
 
-        {tab === "overview" && (
-          <div>
-            <h2>Overview</h2>
-            <p>Project summary and stats will come here</p>
+        {activeTab === "overview" && (
+          <div className="card">
+            <h3>Project Info</h3>
+            <p><strong>Manager:</strong> {project.manager || "N/A"}</p>
+            <p><strong>Budget:</strong> ₹{project.budget}</p>
           </div>
         )}
 
-        {tab === "wbs" && <WbsPage projectId={id} />}
-
-        {tab === "timesheet" && (
-          <div>
-            <h2>Timesheet (Next Step)</h2>
+        {activeTab === "wbs" && (
+          <div className="card">
+            <h3>WBS (Coming Soon)</h3>
           </div>
         )}
 
-        {tab === "cost" && (
-          <div>
-            <h2>Cost Module (Later)</h2>
+        {activeTab === "timesheet" && (
+          <div className="card">
+            <h3>Timesheet (Coming Soon)</h3>
+          </div>
+        )}
+
+        {activeTab === "finance" && (
+          <div className="card">
+            <h3>Finance (Coming Soon)</h3>
           </div>
         )}
 
       </div>
-
     </div>
   );
 }

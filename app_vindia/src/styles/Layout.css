@@ -10,18 +10,16 @@
 }
 
 /* ============================= */
-/* NAVBAR (FULL WIDTH FIXED) */
+/* NAVBAR */
 /* ============================= */
 
 .navbar {
-  position: fixed;   /* 🔥 IMPORTANT */
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
 
   height: 70px;
-  width: 100%;
-
   background: white;
   border-bottom: 1px solid #e5e7eb;
 
@@ -30,8 +28,7 @@
   justify-content: space-between;
 
   padding: 0 25px;
-
-  z-index: 1100; /* above sidebar */
+  z-index: 1100;
 
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
@@ -45,16 +42,11 @@
   background: white;
 
   position: fixed;
-  top: 70px;   /* below navbar */
+  top: 70px;
   left: 0;
   bottom: 0;
 
   z-index: 1000;
-
-  display: flex;
-  justify-content: center;
-
-  transition: all 0.3s ease;
 }
 
 /* ============================= */
@@ -62,101 +54,25 @@
 /* ============================= */
 
 .main-section {
-  margin-left: 80px; /* sidebar space */
-  display: flex;
-  flex-direction: column;
+  margin-left: 80px;
   width: 100%;
-  min-height: 100vh;
 }
 
 /* ============================= */
-/* PAGE CONTENT */
+/* PAGE CONTENT (ONLY GAP CONTROL) */
 /* ============================= */
 
 .page-content {
-  margin-top: 70px;  /* 🔥 ONLY HERE */
-  padding: 20px;
-  width: 100%;
-  flex: 1;
-
-  overflow-x: hidden;
-  overflow-y: auto;
+  margin-top: 70px; /* navbar offset */
+  padding: 10px 20px 20px 20px; /* 🔥 FIXED GAP */
 }
 
 /* ============================= */
-/* REMOVE THIS IF EXISTS ❌ */
+/* GLOBAL PAGE CONTAINER */
 /* ============================= */
 
-/*
-.dashboard-container {
-  margin-top: 70px; ❌ REMOVE
-}
-*/
-
-/* ============================= */
-/* MOBILE SIDEBAR (PRO UI) */
-/* ============================= */
-
-.sidebar-toggle {
-  display: none;
-}
-
-@media (max-width: 768px) {
-
-  /* Toggle button */
-  .sidebar-toggle {
-    display: block;
-    position: fixed;
-    top: 100px;
-    left: 15px;
-    z-index: 1200;
-
-    background: #1e5a96;
-    color: white;
-    border: none;
-
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 18px;
-    cursor: pointer;
-  }
-
-  /* Sidebar becomes drawer */
-  .sidebar {
-    width: 220px;
-    top: 70px;
-    left: 0;
-    height: calc(100vh - 70px);
-
-    transform: translateX(-100%);
-    box-shadow: 4px 0 20px rgba(0,0,0,0.1);
-  }
-
-  .sidebar.open {
-    transform: translateX(0);
-  }
-
-  /* Overlay (important for professional feel) */
-  .sidebar::before {
-    content: "";
-    position: fixed;
-    top: 70px;
-    left: 0;
-    width: 100vw;
-    height: calc(100vh - 70px);
-    background: rgba(0,0,0,0.3);
-    opacity: 0;
-    pointer-events: none;
-    transition: 0.3s;
-  }
-
-  .sidebar.open::before {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  /* Remove left space on mobile */
-  .main-section {
-    margin-left: 0;
-  }
+.page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px; /* 🔥 STANDARD SPACING */
 }

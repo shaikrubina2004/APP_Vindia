@@ -258,7 +258,17 @@
   border-radius: 50%;
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+.timesheet-btn {
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-weight: 500;
+  transition: 0.2s;
+}
 
+.timesheet-btn:hover {
+  background: #e2e8f0;
+}
 @keyframes pulse {
   0%,
   100% {
