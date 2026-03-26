@@ -3,7 +3,53 @@ import "./ProjectManagement.css";
 
 function ProjectManagement() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [statusFilter, setStatusFilter] = useState("All");
   const [projects, setProjects] = useState([
+    {
+  id: 2,
+  name: "Commercial Tower - Downtown",
+  client: "ABC Developers",
+  startDate: "2024-01-15",
+  endDate: "2025-12-31",
+  budget: 50000000,
+  spent: 0,
+  clientPaid: 0,
+  status: "Pending",
+  progress: 0,
+  manager: "Rajesh Kumar",
+  teamSize: 0,
+  wbs: [],
+},
+{
+  id: 3,
+  name: "Commercial Tower - Downtown",
+  client: "ABC Developers",
+  startDate: "2024-01-15",
+  endDate: "2025-12-31",
+  budget: 50000000,
+  spent: 50000000,
+  clientPaid: 50000000,
+  status: "Completed",
+  progress: 100,
+  manager: "Rajesh Kumar",
+  teamSize: 0,
+  wbs: [],
+},
+{
+  id: 4,
+  name: "Commercial Tower - Downtown",
+  client: "ABC Developers",
+  startDate: "2024-01-15",
+  endDate: "2025-12-31",
+  budget: 50000000,
+  spent: 0,
+  clientPaid: 0,
+  status: "Rejected",
+  progress: 0,
+  manager: "Rajesh Kumar",
+  teamSize: 0,
+  wbs: [],
+},
     {
       id: 1,
       name: "Commercial Tower - Downtown",
@@ -463,10 +509,31 @@ function ProjectManagement() {
       <div className="pm-content">
         {/* OVERVIEW TAB */}
         {activeTab === "overview" && (
-          <div className="overview-section">
+         
+            <div className="overview-section">
+
+  {/* 🔥 ADD HERE */}
+   
+
+  {/* filter buttons will be here */}
             {/* Project Cards */}
+            <div className="filter-buttons">
+  {["All", "In Progress", "Pending", "Completed", "Rejected"].map((status) => (
+    <button
+      key={status}
+      className={`filter-btn ${statusFilter === status ? "active" : ""}`}
+      onClick={() => setStatusFilter(status)}
+    >
+      {status}
+    </button>
+  ))}
+</div>
             <div className="projects-grid">
-              {projects.map((proj) => (
+             {projects
+  .filter((proj) =>
+    statusFilter === "All" ? true : proj.status === statusFilter
+  )
+  .map((proj) => (
                 <div
                   key={proj.id}
                   className={`project-card ${selectedProject.id === proj.id ? "active" : ""}`}
@@ -476,12 +543,24 @@ function ProjectManagement() {
                     <h3>{proj.name}</h3>
                     <span
                       className="status-badge"
-                      style={{
-                        backgroundColor:
-                          proj.status === "In Progress" ? "#fef3c7" : "#dcfce7",
-                        color:
-                          proj.status === "In Progress" ? "#92400e" : "#166534",
-                      }}
+                     style={{
+  backgroundColor:
+    proj.status === "In Progress"
+      ? "#fef3c7"
+      : proj.status === "Pending"
+      ? "#e5e7eb"
+      : proj.status === "Completed"
+      ? "#dcfce7"
+      : "#fee2e2",
+  color:
+    proj.status === "In Progress"
+      ? "#92400e"
+      : proj.status === "Pending"
+      ? "#374151"
+      : proj.status === "Completed"
+      ? "#166534"
+      : "#991b1b",
+}}
                     >
                       {proj.status}
                     </span>
@@ -490,13 +569,11 @@ function ProjectManagement() {
                     <p>
                       <strong>Client:</strong> {proj.client}
                     </p>
-                    <p>
-                      <strong>Manager:</strong> {proj.manager}
-                    </p>
-                    <p>
-                      <strong>Team:</strong> {proj.teamSize} members
-                    </p>
+                  <p>
+  <strong>Site Engineer:</strong> {proj.manager}
+</p>
                   </div>
+                  
                   <div className="progress-bar">
                     <div
                       className="progress-fill"
@@ -504,137 +581,23 @@ function ProjectManagement() {
                     ></div>
                   </div>
                   <p className="progress-text">{proj.progress}% Complete</p>
+                  <div className="card-insights">
+   
+</div>
                 </div>
+                
               ))}
             </div>
+           <div className="quick-insights">
+  <h3>Quick Insights</h3>
+  <p>⚠ 2 projects delayed</p>
+  <p>💰 1 over budget</p>
+  <p>🚀 Top: 90% progress</p>
+</div>
+            
 
             {/* Selected Project Details */}
-            <div className="project-details">
-              <h2>{selectedProject.name}</h2>
-
-              <div className="details-grid">
-                <div className="detail-box">
-                  <span className="label">Total Budget</span>
-                  <span className="value">
-                    ₹{(selectedProject.budget / 10000000).toFixed(1)}Cr
-                  </span>
-                </div>
-                <div className="detail-box">
-                  <span className="label">Amount Spent</span>
-                  <span className="value">
-                    ₹{(selectedProject.spent / 10000000).toFixed(1)}Cr
-                  </span>
-                </div>
-                <div className="detail-box">
-                  <span className="label">Client Paid</span>
-                  <span className="value" style={{ color: "#22c55e" }}>
-                    ₹{((selectedProject.clientPaid || 0) / 10000000).toFixed(1)}
-                    Cr
-                  </span>
-                </div>
-                <div className="detail-box">
-                  <span className="label">Remaining to Bill</span>
-                  <span className="value">
-                    ₹
-                    {(
-                      (selectedProject.spent -
-                        (selectedProject.clientPaid || 0)) /
-                      10000000
-                    ).toFixed(1)}
-                    Cr
-                  </span>
-                </div>
-                <div className="detail-box">
-                  <span className="label">Remaining Budget</span>
-                  <span className="value">
-                    ₹
-                    {(
-                      calculateRemaining(
-                        selectedProject.budget,
-                        selectedProject.spent,
-                      ) / 10000000
-                    ).toFixed(1)}
-                    Cr
-                  </span>
-                </div>
-                <div className="detail-box">
-                  <span className="label">Spent %</span>
-                  <span className="value">
-                    {calculatePercentage(
-                      selectedProject.spent,
-                      selectedProject.budget,
-                    )}
-                    %
-                  </span>
-                </div>
-              </div>
-
-              {/* Budget & Payment Progress */}
-              <div className="budget-progress">
-                <h3>Budget Utilization & Client Payment</h3>
-                <div style={{ marginBottom: "12px" }}>
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      marginBottom: "4px",
-                      fontWeight: "700",
-                    }}
-                  >
-                    Budget Usage
-                  </div>
-                  <div className="progress-bar large">
-                    <div
-                      className="progress-fill"
-                      style={{
-                        width: `${calculatePercentage(selectedProject.spent, selectedProject.budget)}%`,
-                      }}
-                    ></div>
-                  </div>
-                  <div className="progress-labels">
-                    <span>
-                      Spent: ₹{(selectedProject.spent / 10000000).toFixed(1)}Cr
-                    </span>
-                    <span>
-                      Budget: ₹{(selectedProject.budget / 10000000).toFixed(1)}
-                      Cr
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      marginBottom: "4px",
-                      fontWeight: "700",
-                    }}
-                  >
-                    Client Payment
-                  </div>
-                  <div className="progress-bar large">
-                    <div
-                      className="progress-fill"
-                      style={{
-                        width: `${((selectedProject.clientPaid || 0) / selectedProject.spent) * 100}%`,
-                        backgroundColor: "#22c55e",
-                      }}
-                    ></div>
-                  </div>
-                  <div className="progress-labels">
-                    <span>
-                      Paid: ₹
-                      {((selectedProject.clientPaid || 0) / 10000000).toFixed(
-                        1,
-                      )}
-                      Cr
-                    </span>
-                    <span>
-                      Total Spent: ₹
-                      {(selectedProject.spent / 10000000).toFixed(1)}Cr
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            
           </div>
         )}
 

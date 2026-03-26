@@ -1,15 +1,17 @@
-import React, { useState } from "react";
+import { API } from "../../services/authService";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ApplyLeave from "../../SharedResourse/ApplyLeave";
 import "./Attendance.css";
 
 function AttendanceManagement() {
-  const [currentDate, setCurrentDate] = useState(new Date(2024, 0));
-  const [selectedDateObj, setSelectedDateObj] = useState(new Date(2024, 0, 5));
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDateObj, setSelectedDateObj] = useState(new Date());
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [leaveRequestsCount] = useState(3);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showLeaveForm, setShowLeaveForm] = useState(false);
+  const [totalEmployees, setTotalEmployees] = useState(0);
   const navigate = useNavigate();
 
   // Edit inline state
@@ -24,238 +26,90 @@ function AttendanceManagement() {
   const [appliedLeaves, setAppliedLeaves] = useState([]);
 
   // Database of attendance records by date
-  const [attendanceByDate, setAttendanceByDate] = useState({
-    "2024-1-5": [
-      {
-        id: 1,
-        name: "Ravi Kumar",
-        status: "present",
-        checkIn: "09:02",
-        checkOut: "18:01",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-      {
-        id: 2,
-        name: "Meena Sharma",
-        status: "late",
-        checkIn: "09:45",
-        checkOut: "18:00",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "Traffic delay",
-      },
-      {
-        id: 3,
-        name: "Arjun Patel",
-        status: "absent",
-        checkIn: "-",
-        checkOut: "-",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "Sick leave approved",
-      },
-      {
-        id: 4,
-        name: "Priya Singh",
-        status: "present",
-        checkIn: "09:00",
-        checkOut: "18:00",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-      {
-        id: 5,
-        name: "Vikram Gupta",
-        status: "wfh",
-        checkIn: "09:15",
-        checkOut: "18:15",
-        shift: "A",
-        shiftTime: "12:00 PM - 09:00 PM",
-        remarks: "Work from home",
-      },
-    ],
-    "2024-1-6": [
-      {
-        id: 1,
-        name: "Ravi Kumar",
-        status: "present",
-        checkIn: "09:05",
-        checkOut: "18:02",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-      {
-        id: 2,
-        name: "Meena Sharma",
-        status: "present",
-        checkIn: "09:00",
-        checkOut: "18:00",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-      {
-        id: 3,
-        name: "Arjun Patel",
-        status: "present",
-        checkIn: "09:10",
-        checkOut: "18:05",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-    ],
-    "2024-1-8": [
-      {
-        id: 2,
-        name: "Meena Sharma",
-        status: "present",
-        checkIn: "09:00",
-        checkOut: "18:00",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-      {
-        id: 4,
-        name: "Priya Singh",
-        status: "late",
-        checkIn: "10:30",
-        checkOut: "18:30",
-        shift: "E",
-        shiftTime: "06:00 PM - 03:00 AM",
-        remarks: "Doctor appointment",
-      },
-      {
-        id: 5,
-        name: "Vikram Gupta",
-        status: "wfh",
-        checkIn: "09:00",
-        checkOut: "17:00",
-        shift: "N",
-        shiftTime: "10:00 PM - 07:00 AM",
-        remarks: "Working from home",
-      },
-    ],
-    "2024-1-10": [
-      {
-        id: 1,
-        name: "Ravi Kumar",
-        status: "present",
-        checkIn: "09:00",
-        checkOut: "18:00",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-      {
-        id: 3,
-        name: "Arjun Patel",
-        status: "absent",
-        checkIn: "-",
-        checkOut: "-",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "Approved leave",
-      },
-      {
-        id: 4,
-        name: "Priya Singh",
-        status: "present",
-        checkIn: "09:00",
-        checkOut: "18:00",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-    ],
-    "2024-1-12": [
-      {
-        id: 1,
-        name: "Ravi Kumar",
-        status: "present",
-        checkIn: "09:00",
-        checkOut: "18:00",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-      {
-        id: 2,
-        name: "Meena Sharma",
-        status: "present",
-        checkIn: "09:00",
-        checkOut: "18:00",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-      {
-        id: 3,
-        name: "Arjun Patel",
-        status: "present",
-        checkIn: "09:00",
-        checkOut: "18:00",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-      {
-        id: 4,
-        name: "Priya Singh",
-        status: "present",
-        checkIn: "09:00",
-        checkOut: "18:00",
-        shift: "M",
-        shiftTime: "09:00 AM - 06:00 PM",
-        remarks: "-",
-      },
-      {
-        id: 5,
-        name: "Vikram Gupta",
-        status: "present",
-        checkIn: "09:00",
-        checkOut: "18:00",
-        shift: "A",
-        shiftTime: "12:00 PM - 09:00 PM",
-        remarks: "-",
-      },
-    ],
-  });
+  const [attendanceByDate, setAttendanceByDate] = useState({});
+  
+ useEffect(() => {
+  fetchAttendance();
+  fetchTotalEmployees();
+}, []);
 
-  const getAttendanceRecordsForDate = () => {
-    const dateKey = `${selectedDateObj.getFullYear()}-${selectedDateObj.getMonth() + 1}-${selectedDateObj.getDate()}`;
-    return attendanceByDate[dateKey] || [];
-  };
+const fetchAttendance = async () => {
+  try {
+    const res = await API.get("/attendance");
+
+    console.log("API RESPONSE:", res.data);
+
+    const formatted = {};
+
+    res.data.forEach((row) => {
+      const key = new Date(row.date).toLocaleDateString("en-CA");// ⭐ IMPORTANT FIX 
+
+      if (!formatted[key]) formatted[key] = [];
+
+      formatted[key].push({
+        id: row.id,
+        name: row.name || `Employee ${row.employee_id}`,
+        status: row.status.toLowerCase(),
+        checkIn: row.check_in || "-",
+        checkOut: row.check_out || "-",
+        shift: "M",
+        shiftTime: "09:00 AM - 06:00 PM",
+        remarks: row.remarks || "-",
+      });
+    });
+
+    console.log("FORMATTED:", formatted);
+
+    setAttendanceByDate(formatted);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const fetchTotalEmployees = async () => {
+  try {
+    const res = await API.get("/attendance/employees/count");
+    setTotalEmployees(res.data.total);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+  const formatDate = (date) => {
+  return date.toLocaleDateString("en-CA");
+};
+
+const getAttendanceRecordsForDate = () => {
+  const key = formatDate(selectedDateObj);
+  return attendanceByDate[key] || [];
+};
 
   const attendanceRecords = getAttendanceRecordsForDate();
 
   // Calculate status counts for selected date
   const getStatusCounts = () => {
-    const records = attendanceRecords;
-    const counts = {
-      total: 125,
-      present: 0,
-      absent: 0,
-      late: 0,
-      wfh: 0,
-      leave: 0,
-    };
-
-    records.forEach((record) => {
-      if (record.status === "present") counts.present++;
-      else if (record.status === "absent") counts.absent++;
-      else if (record.status === "late") counts.late++;
-      else if (record.status === "wfh") counts.wfh++;
-      else if (record.status === "leave") counts.leave++;
-    });
-
-    return counts;
+  const counts = {
+    total: totalEmployees,
+    present: 0,
+    absent: 0,
+    late: 0,
+    wfh: 0,
+    leave: 0,
   };
+
+  attendanceRecords.forEach((record) => {
+    if (!record || !record.status) return;
+
+    const status = record.status.toLowerCase().trim(); // 🔥 IMPORTANT
+
+    if (status === "present") counts.present++;
+    else if (status === "absent") counts.absent++;
+    else if (status === "late") counts.late++;
+    else if (status === "wfh") counts.wfh++;
+  });
+
+  return counts;
+};
 
   const statusCounts = getStatusCounts();
 
@@ -271,21 +125,22 @@ function AttendanceManagement() {
   };
 
   // Save edit changes
-  const handleSaveEdit = (employeeId) => {
-    const dateKey = `${selectedDateObj.getFullYear()}-${selectedDateObj.getMonth() + 1}-${selectedDateObj.getDate()}`;
+  const handleSaveEdit = async (employeeId) => {
+  try {
+    await API.put(`/attendance/${employeeId}`, {
+      status:
+        editFormData.status.toLowerCase() === "wfh"
+          ? "WFH"
+          : editFormData.status.charAt(0).toUpperCase() +
+            editFormData.status.slice(1),
+    });
 
-    setAttendanceByDate((prev) => ({
-      ...prev,
-      [dateKey]: prev[dateKey].map((emp) =>
-        emp.id === employeeId ? { ...emp, ...editFormData } : emp,
-      ),
-    }));
-
+    fetchAttendance(); // 🔥 reload from DB
     setEditingEmployeeId(null);
-    console.log("Updated employee:", employeeId, editFormData);
-    // Here you would also save to Supabase
-  };
-
+  } catch (error) {
+    console.error("Update failed:", error);
+  }
+};
   // Cancel edit
   const handleCancelEdit = () => {
     setEditingEmployeeId(null);
@@ -379,10 +234,10 @@ function AttendanceManagement() {
   };
 
   const filteredRecords = attendanceRecords.filter((record) => {
-    const matchesStatus =
-      selectedStatus === "all" || record.status === selectedStatus;
-    return matchesStatus;
-  });
+  if (selectedStatus === "all") return true;
+
+  return record.status.toLowerCase().trim() === selectedStatus;
+});
 
   const getStatusClass = (status) => {
     switch (status) {
@@ -688,7 +543,7 @@ function AttendanceManagement() {
                       <div className="record-header">
                         <div className="emp-info">
                           <div className="emp-avatar">
-                            {record.name.charAt(0)}
+                            {record.name ? record.name.trim().charAt(0).toUpperCase() : "?"}
                           </div>
                           <div className="emp-details">
                             <h4>{record.name}</h4>
