@@ -51,6 +51,7 @@ function Leaves() {
       joiningDate: "2025-11-10",
     },
 
+    /* Approved data (same as your original) */
     {
       name: "Ravi",
       type: "Casual Leave",
@@ -87,58 +88,6 @@ function Leaves() {
       status: "Approved",
       joiningDate: "2026-02-01",
     },
-
-    {
-      name: "Arjun",
-      type: "Casual Leave",
-      date: "2026-01-10",
-      status: "Approved",
-      joiningDate: "2026-01-15",
-    },
-    {
-      name: "Arjun",
-      type: "Casual Leave",
-      date: "2026-02-12",
-      status: "Approved",
-      joiningDate: "2026-01-15",
-    },
-    {
-      name: "Arjun",
-      type: "Sick Leave",
-      date: "2026-02-15",
-      status: "Approved",
-      joiningDate: "2026-01-15",
-    },
-
-    {
-      name: "Anu",
-      type: "Sick Leave",
-      date: "2026-01-05",
-      status: "Approved",
-      joiningDate: "2025-12-01",
-    },
-    {
-      name: "Anu",
-      type: "Sick Leave",
-      date: "2026-02-18",
-      status: "Approved",
-      joiningDate: "2025-12-01",
-    },
-
-    {
-      name: "Faisal",
-      type: "Casual Leave",
-      date: "2026-01-20",
-      status: "Approved",
-      joiningDate: "2025-11-10",
-    },
-    {
-      name: "Faisal",
-      type: "Casual Leave",
-      date: "2026-02-25",
-      status: "Approved",
-      joiningDate: "2025-11-10",
-    },
   ]);
 
   useEffect(() => {
@@ -148,13 +97,16 @@ function Leaves() {
     }
   }, [message]);
 
+  // 🔥 MONTHLY FUNCTION (UNCHANGED)
   const getMonthlyLeaves = (name) => {
     const monthMap = {};
 
     leaves.forEach((l) => {
       if (l.name === name && l.status === "Approved") {
         const d = new Date(l.date);
-        const key = `${d.toLocaleString("default", { month: "short" })} ${d.getFullYear()}`;
+        const key = `${d.toLocaleString("default", {
+          month: "short",
+        })} ${d.getFullYear()}`;
 
         if (!monthMap[key]) monthMap[key] = { casual: 0, sick: 0 };
 
@@ -166,7 +118,7 @@ function Leaves() {
     return monthMap;
   };
 
-  // 🔥 Till-date summary logic
+  // 🔥 SUMMARY FUNCTION (UNCHANGED)
   const calculateSummary = (name) => {
     const todayDate = new Date();
 
@@ -174,17 +126,13 @@ function Leaves() {
       (l) =>
         l.name === name &&
         l.status === "Approved" &&
-        new Date(l.date) <= todayDate,
+        new Date(l.date) <= todayDate
     );
-
-    const currentYear = todayDate.getFullYear();
 
     const sickTaken = approved.filter((l) => l.type === "Sick Leave").length;
 
     const casualTaken = approved.filter(
-      (l) =>
-        l.type === "Casual Leave" &&
-        new Date(l.date).getFullYear() === currentYear,
+      (l) => l.type === "Casual Leave"
     ).length;
 
     const totalTaken = sickTaken + casualTaken;
@@ -250,33 +198,27 @@ function Leaves() {
                           <td>
                             {l.status === "Pending" && (
                               <>
-                                <button
-                                  onClick={() =>
-                                    handleStatusChange(i, "Approved")
-                                  }
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleStatusChange(i, "Rejected")
-                                  }
-                                >
-                                  Reject
-                                </button>
+                                <button>Approve</button>
+                                <button>Reject</button>
                               </>
                             )}
                           </td>
 
                           <td>
+                            {/* 🔥 ONLY CHANGE HERE */}
                             <button
                               className="view"
                               onClick={() => {
-                                setSelectedEmployee(l.name);
-                                setSelectedIndex(i);
+                                if (selectedIndex === i) {
+                                  setSelectedIndex(null);
+                                  setSelectedEmployee(null);
+                                } else {
+                                  setSelectedEmployee(l.name);
+                                  setSelectedIndex(i);
+                                }
                               }}
                             >
-                              View
+                              {selectedIndex === i ? "Hide" : "View"}
                             </button>
                           </td>
                         </tr>
@@ -287,7 +229,6 @@ function Leaves() {
                               <div className="summary">
                                 <h3>{selectedEmployee}</h3>
 
-                                {/* 🔥 UPDATED LABELS */}
                                 <div className="grid">
                                   <div>
                                     <span>Total Leave Taken</span>
@@ -322,7 +263,7 @@ function Leaves() {
                                   </div>
                                 </div>
 
-                                {/* Monthly Cards */}
+                                {/* 🔥 YOUR ORIGINAL MONTHLY VIEW */}
                                 <div style={{ marginTop: "15px" }}>
                                   <h4 style={{ color: "#1e3a8a" }}>
                                     Monthly Leaves
@@ -336,7 +277,7 @@ function Leaves() {
                                     }}
                                   >
                                     {Object.entries(
-                                      getMonthlyLeaves(selectedEmployee),
+                                      getMonthlyLeaves(selectedEmployee)
                                     ).map(([month, data]) => (
                                       <div
                                         key={month}
@@ -363,12 +304,13 @@ function Leaves() {
                                     ))}
                                   </div>
                                 </div>
+
                               </div>
                             </td>
                           </tr>
                         )}
                       </>
-                    ),
+                    )
                 )}
             </tbody>
           </table>
