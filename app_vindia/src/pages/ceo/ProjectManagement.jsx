@@ -1,9 +1,32 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./ProjectManagement.css";
+import ProjectCard from "../../components/project/ProjectCard";
+
 
 function ProjectManagement() {
+  
+  
   const [activeTab, setActiveTab] = useState("overview");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [animate, setAnimate] = useState(true);
+
+useEffect(() => {
+  const handleVisibility = () => {
+    if (document.visibilityState === "visible") {
+      setAnimate(false);
+
+      setTimeout(() => {
+        setAnimate(true);
+      }, 200); // 🔥 increased delay (important)
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibility);
+
+  return () => {
+    document.removeEventListener("visibilitychange", handleVisibility);
+  };
+}, []);
   const [projects, setProjects] = useState([
     {
   id: 2,
@@ -511,11 +534,10 @@ function ProjectManagement() {
         {activeTab === "overview" && (
          
             <div className="overview-section">
-
-  {/* 🔥 ADD HERE */}
+ 
    
 
-  {/* filter buttons will be here */}
+ 
             {/* Project Cards */}
             <div className="filter-buttons">
   {["All", "In Progress", "Pending", "Completed", "Rejected"].map((status) => (
@@ -534,71 +556,55 @@ function ProjectManagement() {
     statusFilter === "All" ? true : proj.status === statusFilter
   )
   .map((proj) => (
-                <div
-                  key={proj.id}
-                  className={`project-card ${selectedProject.id === proj.id ? "active" : ""}`}
-                  onClick={() => setSelectedProject(proj)}
-                >
-                  <div className="card-header">
-                    <h3>{proj.name}</h3>
-                    <span
-                      className="status-badge"
-                     style={{
-  backgroundColor:
-    proj.status === "In Progress"
-      ? "#fef3c7"
-      : proj.status === "Pending"
-      ? "#e5e7eb"
-      : proj.status === "Completed"
-      ? "#dcfce7"
-      : "#fee2e2",
-  color:
-    proj.status === "In Progress"
-      ? "#92400e"
-      : proj.status === "Pending"
-      ? "#374151"
-      : proj.status === "Completed"
-      ? "#166534"
-      : "#991b1b",
-}}
-                    >
-                      {proj.status}
-                    </span>
-                  </div>
-                  <div className="card-info">
-                    <p>
-                      <strong>Client:</strong> {proj.client}
-                    </p>
-                  <p>
-  <strong>Site Engineer:</strong> {proj.manager}
-</p>
-                  </div>
-                  
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${proj.progress}%` }}
-                    ></div>
-                  </div>
-                  <p className="progress-text">{proj.progress}% Complete</p>
-                  <div className="card-insights">
-   
-</div>
-                </div>
-                
-              ))}
+  <ProjectCard
+    key={proj.id}
+    proj={proj}
+    isActive={selectedProject.id === proj.id}
+    onClick={() => setSelectedProject(proj)}
+  />
+))}
             </div>
-           <div className="quick-insights">
-  <h3>Quick Insights</h3>
-  <p>⚠ 2 projects delayed</p>
-  <p>💰 1 over budget</p>
-  <p>🚀 Top: 90% progress</p>
-</div>
-            
+       <div className="three-column-layout">
 
-            {/* Selected Project Details */}
-            
-          </div>
+  {/* QUICK INSIGHTS */}
+  <div className={`quick-insights ${animate ? "animate" : ""}`}>
+    <h3>Quick Insights</h3>
+    <p>⚠ 2 projects delayed</p>
+    <p>💰 1 over budget</p>
+    <p>🚀 Top: 90% progress</p>
+  </div>
+
+  {/* TIMESHEET */}
+  <div className="timesheet-section-new">
+    <h3>Timesheet Submissions</h3>
+
+    {timesheets.slice(-5).reverse().map((ts) => (
+      <div key={ts.id} className="timesheet-row">
+        <div className="ts-info">
+          <span className="ts-name">{ts.employee}</span>
+          <span className="ts-task">{ts.task}</span>
+        </div>
+
+       <div className="ts-meta">
+  <span className="ts-hours">{ts.hours}h</span>
+  <span className="ts-date">{ts.date}</span>
+</div>
+      </div>
+    ))}
+  </div>
+
+  {/* RECENT ACTIVITIES */}
+  <div className="recent-activity">
+    <h3>Recent Activities</h3>
+
+    <p>• Payment of ₹10,00,000 received for Commercial Tower  project</p>
+    <p>• ₹5,00,000 released for material procurement</p>
+    <p>• Pending payment of ₹2,50,000 awaiting client approval</p>
+    <p>• Budget updated after recent cost adjustments</p>
+  </div>
+
+</div>
+ </div>
         )}
 
         {/* WBS TAB */}

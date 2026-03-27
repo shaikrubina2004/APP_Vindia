@@ -1123,30 +1123,56 @@
   border-color: #2563eb;
 }
  
-/* ================= QUICK INSIGHTS ================= */
+ 
 
 .quick-insights {
   margin-top: 20px;
 }
 
-/* 🔥 PERFECT OVAL + ANIMATION */
+ 
 .quick-insights p {
   opacity: 0;
-  transform: translateX(-60px);
+  transform: translateX(-50px) scale(0.95);
 
   display: block;
   width: fit-content;
-
-  padding: 10px 18px;   /* 🔥 more padding = better oval */
+  padding: 10px 18px;
   margin: 10px 0;
 
-  border-radius: 999px; /* 🔥 PERFECT PILL */
+  border-radius: 999px;
   font-size: 13px;
   font-weight: 600;
+}
 
-  white-space: nowrap;
+/* 🔥 TRIGGER ANIMATION ONLY WHEN CLASS EXISTS */
+.quick-insights.animate p {
+  animation: smoothSlide 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
 
-  animation: slideFade 0.6s ease forwards;
+/* DELAYS */
+.quick-insights.animate p:nth-of-type(1) { animation-delay: 0.3s; }
+.quick-insights.animate p:nth-of-type(2) { animation-delay: 0.7s; }
+.quick-insights.animate p:nth-of-type(3) { animation-delay: 1.1s; }
+
+/* DELAYS */
+.quick-insights p:nth-of-type(1) { animation-delay: 0.3s; }
+.quick-insights p:nth-of-type(2) { animation-delay: 0.7s; }
+.quick-insights p:nth-of-type(3) { animation-delay: 1.1s; }
+
+/* 🔥 PREMIUM ANIMATION */
+@keyframes smoothSlide {
+  0% {
+    opacity: 0;
+    transform: translateX(-50px) scale(0.95);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(5px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 /* 🎯 ONE BY ONE DELAY (CLEAR DIFFERENCE) */
@@ -1161,11 +1187,17 @@
   background: #bbf7d0;
   color: #065f46;
 }
+.quick-insights {
+  margin-top: 0 !important;
+}
 
 .quick-insights p:nth-of-type(3) {
   animation-delay: 1.1s;  /* 🔥 bigger gap */
   background: #bfdbfe;
   color: #1e40af;
+}
+.quick-insights p:hover {
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
 /* 🎬 ANIMATION */
@@ -1209,4 +1241,170 @@
 
 .card-insights p {
   margin: 2px 0;
+}
+/* 🔥 CONTAINER */
+.insights-container {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+}
+
+/* QUICK INSIGHTS stays same */
+.quick-insights {
+  flex: 1;
+}
+/* 🔥 ROW LAYOUT */
+.insights-row {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+}
+
+/* LEFT */
+.quick-insights {
+  flex: 1;
+}
+
+/* RIGHT PANEL */
+.recent-activity {
+  flex: 1;
+ background: linear-gradient(135deg, #f8fbff, #eef6ff);
+  border: 1px solid #e6e8ec;
+  border-radius: 12px;
+  padding: 15px;
+}
+
+/* TITLE */
+.recent-activity h3 {
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #1a1a2e;
+}
+
+/* ITEMS */
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: #555;
+}
+
+/* DOTS */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot.blue {
+  background: #2563eb;
+}
+
+.dot.green {
+  background: #22c55e;
+}
+
+.dot.orange {
+  background: #f59e0b;
+}
+/* 🔥 FORCE SIDE BY SIDE */
+/* 🔥 SIDE BY SIDE */
+.bottom-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+/* RIGHT DESCRIPTION PANEL */
+/* 🔥 RIGHT PANEL - POINT STYLE */
+.activity-points {
+  background: linear-gradient(135deg, #f8fafc, #eef2ff);
+  border: 1px solid #e0e7ff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+/* TITLE */
+.activity-points h3 {
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #1e3a8a;
+}
+
+/* POINT TEXT */
+.activity-points p {
+  font-size: 13px;
+  margin-bottom: 8px;
+   color: #1e40af;
+  line-height: 1.5;
+}
+/* 🔥 NEW TIMESHEET SECTION */
+.timesheet-section-new {
+  background: linear-gradient(135deg, #f1f5ff, #e0ecff);
+}
+
+/* ROW */
+.timesheet-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 12px;
+  margin-bottom: 10px;
+
+  border-radius: 10px;
+  background: #ffffff;
+
+  transition: all 0.2s ease;
+}
+
+/* HOVER */
+.timesheet-row:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15);
+}
+.three-column-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+
+  align-items: start; /* 🔥 THIS FIXES IT */
+}
+.quick-insights,
+.timesheet-section-new,
+.recent-activity {
+  background: linear-gradient(135deg, #f8fbff, #eef6ff);
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  padding: 16px;
+  height: 100%;
+
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08);
+}
+/* RIGHT SIDE CONTAINER */
+.ts-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* HOURS (highlight) */
+.ts-hours {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #e0ecff;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* DATE (subtle) */
+.ts-date {
+  font-size: 11px;
+  color: #64748b;
 }
