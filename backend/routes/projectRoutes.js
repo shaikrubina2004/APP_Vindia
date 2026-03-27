@@ -3,10 +3,10 @@ const router = express.Router();
 
 const {
   createProject,
-  getProjects
+  getAllProjects,
 } = require("../controllers/projectController");
 
 router.post("/", createProject);
-router.get("/", getProjects);
+router.get("/", getAllProjects);
 
 module.exports = router;
