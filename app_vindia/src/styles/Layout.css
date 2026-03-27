@@ -30,7 +30,7 @@
   padding: 0 25px;
   z-index: 1100;
 
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 /* ============================= */
@@ -42,11 +42,13 @@
   background: white;
 
   position: fixed;
-  top: 70px;
+  top: 70px; /* below navbar */
   left: 0;
   bottom: 0;
 
   z-index: 1000;
+
+  transition: all 0.3s ease;
 }
 
 /* ============================= */
@@ -55,24 +57,91 @@
 
 .main-section {
   margin-left: 80px;
-  width: 100%;
+  width: calc(100% - 80px); /* 🔥 IMPORTANT FIX */
 }
 
 /* ============================= */
-/* PAGE CONTENT (ONLY GAP CONTROL) */
+/* PAGE CONTENT */
 /* ============================= */
 
 .page-content {
-  margin-top: 70px; /* navbar offset */
-  padding: 10px 20px 20px 20px; /* 🔥 FIXED GAP */
+  margin-top: 70px;
+  padding: 12px 20px;
+  width: 100%;
+  flex: 1;
+
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* ============================= */
-/* GLOBAL PAGE CONTAINER */
+/* PAGE CONTAINER */
 /* ============================= */
 
 .page-container {
   display: flex;
   flex-direction: column;
-  gap: 16px; /* 🔥 STANDARD SPACING */
+  gap: 16px;
+}
+
+/* ============================= */
+/* MOBILE SIDEBAR */
+/* ============================= */
+
+.sidebar-toggle {
+  display: none;
+}
+
+@media (max-width: 768px) {
+
+  .sidebar-toggle {
+    display: block;
+    position: fixed;
+    top: 80px;
+    left: 15px;
+    z-index: 1200;
+
+    background: #1e5a96;
+    color: white;
+    border: none;
+
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .sidebar {
+    width: 220px;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* overlay */
+  .sidebar::before {
+    content: "";
+    position: fixed;
+    top: 70px;
+    left: 0;
+    width: 100vw;
+    height: calc(100vh - 70px);
+    background: rgba(0, 0, 0, 0.3);
+
+    opacity: 0;
+    pointer-events: none;
+    transition: 0.3s;
+  }
+
+  .sidebar.open::before {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .main-section {
+    margin-left: 0;
+    width: 100%;
+  }
 }
