@@ -1,14 +1,6 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-
-function EmployeeToolbar() {
-
-  const [search, setSearch] = useState("");
-  const navigate = useNavigate(); 
-
+function EmployeeToolbar({ onAdd, search, setSearch }) {
   return (
     <div className="employee-toolbar">
-
       <input
         type="text"
         placeholder="Search employees..."
@@ -16,13 +8,9 @@ function EmployeeToolbar() {
         onChange={(e) => setSearch(e.target.value)}
       />
 
-      <button
-        className="add-btn"
-        onClick={() => navigate("/hr/add-employee")}
-      >
+      <button className="add-btn" onClick={onAdd}>
         + Add Employee
       </button>
-
     </div>
   );
 }

@@ -30,7 +30,6 @@ function Payroll() {
     overtime: 0,
     bonus: 0,
     tax: 0,
-    pf: 0,
     latePenalty: 0,
     leaveDeduction: 0
   });

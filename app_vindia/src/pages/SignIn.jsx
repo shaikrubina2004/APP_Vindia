@@ -42,9 +42,8 @@ function SignIn() {
       const { token, user } = res.data;
 
       localStorage.setItem("token", token);
-
-      login(user);
-
+localStorage.setItem("user", JSON.stringify(user));
+login(user);
       navigate("/dashboard");
 
     } catch (error) {

@@ -1,12 +1,13 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-// import { addEmployee } from "../api/employees"; // later
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { createEmployee, updateEmployee } from "../../services/employeeService";
 
 import "./AddEmployee.css";
 
 export default function AddEmployee() {
-
   const navigate = useNavigate();
+  const location = useLocation();
+  const editingEmployee = location.state;
 
   const [form, setForm] = useState({
     name: "",
@@ -16,16 +17,35 @@ export default function AddEmployee() {
     role: "",
     joining_date: "",
     salary: "",
-    status: "Active",
-    address: "",
+    status: "active",
+    address: ""
   });
+
+  // ✅ Prefill when editing
+  useEffect(() => {
+    if (editingEmployee) {
+      setForm({
+        name: editingEmployee.name || "",
+        email: editingEmployee.email || "",
+        phone: editingEmployee.phone || "",
+        department: editingEmployee.department || "",
+        role: editingEmployee.role || "",
+        joining_date: editingEmployee.joiningDate
+          ? editingEmployee.joiningDate.split("T")[0]
+          : "",
+        salary: editingEmployee.salary || "",
+        status: editingEmployee.status || "active",
+        address: editingEmployee.address || ""
+      });
+    }
+  }, [editingEmployee]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    setForm((prev) => ({
+    setForm(prev => ({
       ...prev,
-      [name]: value,
+      [name]: value
     }));
   };
 
@@ -33,67 +53,126 @@ export default function AddEmployee() {
     e.preventDefault();
 
     try {
-      // await addEmployee(form);
+      const payload = {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        department: form.department,
+        designation: form.role,
+        join_date: form.joining_date,
+        salary: Number(form.salary),
+        status: form.status.toLowerCase(),
+        address: form.address,
 
-      alert("Employee added successfully 🚀");
-      navigate("/employees");
+        // ✅ IMPORTANT: manager_id handled automatically later
+        manager_id: null
+      };
+
+      if (editingEmployee) {
+        await updateEmployee(editingEmployee.id, payload);
+        alert("Employee updated successfully ✏️");
+      } else {
+        await createEmployee(payload);
+        alert("Employee added successfully 🚀");
+      }
+
+      navigate("/hr/employees");
+
     } catch (err) {
-      console.error(err);
-      alert("Failed to add employee ❌");
+      console.error(err.response?.data || err);
+      alert("Operation failed ❌");
     }
   };
 
   return (
     <div className="add-employee-page">
-
-      <h2>Add Employee</h2>
+      <h2>{editingEmployee ? "Edit Employee" : "Add Employee"}</h2>
 
       <form className="employee-form" onSubmit={handleSubmit}>
-
-        {/* BASIC DETAILS */}
+        
+        {/* 🔹 BASIC DETAILS */}
         <div className="form-section">
           <h3>Basic Details</h3>
-
           <div className="grid">
-            <input name="name" placeholder="Full Name" onChange={handleChange} required />
-            <input name="email" placeholder="Email" onChange={handleChange} required />
-            <input name="phone" placeholder="Phone" onChange={handleChange} />
+            <input
+              name="name"
+              placeholder="Full Name"
+              value={form.name}
+              onChange={handleChange}
+              required
+            />
+            <input
+              name="email"
+              placeholder="Email"
+              value={form.email}
+              onChange={handleChange}
+              required
+            />
+            <input
+              name="phone"
+              placeholder="Phone"
+              value={form.phone}
+              onChange={handleChange}
+              required
+            />
           </div>
         </div>
 
-        {/* JOB DETAILS */}
+        {/* 🔹 JOB DETAILS */}
         <div className="form-section">
           <h3>Job Details</h3>
-
           <div className="grid">
-            <input name="department" placeholder="Department" onChange={handleChange} />
-            <input name="role" placeholder="Role" onChange={handleChange} />
+            <input
+              name="department"
+              placeholder="Department"
+              value={form.department}
+              onChange={handleChange}
+              required
+            />
+            <input
+              name="role"
+              placeholder="Role"
+              value={form.role}
+              onChange={handleChange}
+              required
+            />
+            <input
+              type="date"
+              name="joining_date"
+              value={form.joining_date}
+              onChange={handleChange}
+              required
+            />
+            <input
+              name="salary"
+              placeholder="Salary"
+              value={form.salary}
+              onChange={handleChange}
+              required
+            />
 
-            <input type="date" name="joining_date" onChange={handleChange} />
-
-            <input name="salary" placeholder="Salary" onChange={handleChange} />
-
-            <select name="status" onChange={handleChange}>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
+            <select name="status" value={form.status} onChange={handleChange}>
+              <option value="active">Active</option>
+              <option value="on_leave">On Leave</option>
+              <option value="inactive">Inactive</option>
             </select>
           </div>
         </div>
 
-        {/* ADDRESS */}
+        {/* 🔹 ADDRESS */}
         <div className="form-section">
           <h3>Address</h3>
-
           <textarea
             name="address"
             placeholder="Employee Address"
             rows="4"
+            value={form.address}
             onChange={handleChange}
           />
         </div>
 
         <button className="primary-btn" type="submit">
-          Save Employee
+          {editingEmployee ? "Update Employee" : "Save Employee"}
         </button>
 
       </form>

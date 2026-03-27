@@ -1,77 +1,114 @@
-const pool = require("../config/db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { createUser, getUserByEmail } = require("../models/User");
 
-// SIGNUP
-exports.signup = async (req, res) => {
-  const { name, email, password } = req.body;
+const generateToken = (user) => {
+  return jwt.sign(
+    { id: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" }
+  );
+};
+
+const allowedRoles = ["CEO", "HR"]; // add the other exact uppercase roles from your DB constraint here
+
+const signup = async (req, res) => {
+  const { name, email, password, role } = req.body;
 
   try {
-    const userExists = await pool.query(
-      "SELECT * FROM users WHERE email=$1",
-      [email]
-    );
-
-    if (userExists.rows.length > 0) {
-      return res.status(400).json({ message: "User already exists" });
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        message: "Name, email and password are required",
+      });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const trimmedName = String(name).trim();
+    const trimmedEmail = String(email).trim().toLowerCase();
+    const trimmedPassword = String(password);
 
-    const newUser = await pool.query(
-      "INSERT INTO users (name,email,password) VALUES ($1,$2,$3) RETURNING id,name,email,role",
-      [name, email, hashedPassword]
-    );
+    const existingUser = await getUserByEmail(trimmedEmail);
+    if (existingUser) {
+      return res.status(400).json({
+        message: "User already exists",
+      });
+    }
 
-    res.json(newUser.rows[0]);
+    const safeRole = allowedRoles.includes(role) ? role : "HR";
 
+    const hashedPassword = await bcrypt.hash(trimmedPassword, 10);
+
+    const user = await createUser({
+      name: trimmedName,
+      email: trimmedEmail,
+      password: hashedPassword,
+      role: safeRole,
+      status: "active",
+    });
+
+    const token = generateToken(user);
+
+    return res.status(201).json({
+      message: "User registered successfully",
+      token,
+      user,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Signup error:", error);
+    return res.status(500).json({
+      message: "Server error",
+    });
   }
 };
 
-// LOGIN
-exports.login = async (req, res) => {
+const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user = await pool.query(
-      "SELECT * FROM users WHERE email=$1",
-      [email]
-    );
-
-    if (user.rows.length === 0) {
-      return res.status(400).json({ message: "Invalid credentials" });
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
     }
 
-    const validPassword = await bcrypt.compare(
-      password,
-      user.rows[0].password
-    );
+    const trimmedEmail = String(email).trim().toLowerCase();
+    const enteredPassword = String(password);
 
-    if (!validPassword) {
-      return res.status(400).json({ message: "Invalid credentials" });
+    const user = await getUserByEmail(trimmedEmail);
+    if (!user) {
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
     }
 
-    const token = jwt.sign(
-      { id: user.rows[0].id, role: user.rows[0].role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    const isMatch = await bcrypt.compare(enteredPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
+    }
 
-    res.json({
+    const token = generateToken(user);
+
+    return res.status(200).json({
+      message: "Login successful",
       token,
       user: {
-        id: user.rows[0].id,
-        name: user.rows[0].name,
-        email: user.rows[0].email,
-        role: user.rows[0].role
-      }
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+      },
     });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Login error:", error);
+    return res.status(500).json({
+      message: "Server error",
+    });
   }
+};
+
+module.exports = {
+  signup,
+  login,
 };

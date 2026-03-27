@@ -29,38 +29,30 @@ function SignUp() {
   };
 
   const handleSignup = async () => {
+  if (formData.password !== formData.confirmPassword) {
+    alert("Passwords do not match");
+    return;
+  }
 
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match");
-      return;
-    }
+  if (!agree) {
+    alert("Please accept Terms & Conditions");
+    return;
+  }
 
-    if (!agree) {
-      alert("Please accept Terms & Conditions");
-      return;
-    }
+  try {
+    const res = await signup({
+      name: formData.firstName + " " + formData.lastName,
+      email: formData.email,
+      password: formData.password,
+    });
 
-    try {
+    alert(res.data.message);
 
-      await signup({
-
-        name: formData.firstName + " " + formData.lastName,
-        email: formData.email,
-        password: formData.password
-
-      });
-
-      alert("Account created. Waiting for CEO approval.");
-
-      navigate("/");
-
-    } catch (error) {
-
-      alert(error.response?.data?.message || "Signup failed");
-
-    }
-
-  };
+    navigate("/");
+  } catch (error) {
+    alert(error.response?.data?.message || "Signup failed");
+  }
+};
 
   return (
   <div className="login-bg signup-page">
@@ -147,7 +139,7 @@ function SignUp() {
 
   </div>
 );
-
+console.log("SIGNUP API HIT ✅");
 }
 
 export default SignUp;
