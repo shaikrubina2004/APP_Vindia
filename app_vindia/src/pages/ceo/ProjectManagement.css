@@ -632,11 +632,16 @@
   color: var(--text-primary);
   margin-bottom: 12px;
 }
-
 .cost-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  width: 100%;
+  align-items: stretch;
+}
+.cost-card.misc {
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
 .cost-card {
@@ -1408,3 +1413,229 @@
   font-size: 11px;
   color: #64748b;
 }
+.task-cost-details {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.category-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.cat-btn {
+  padding: 6px 10px;
+  border: none;
+  background: #e2e8f0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.cat-btn.active {
+  background: #2563eb;
+  color: white;
+}
+
+.cost-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  background: white;
+  margin-bottom: 5px;
+  border-radius: 5px;
+}
+
+.table-row {
+  cursor: pointer;
+}
+/* Task Details Box */
+.task-cost-details {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f1f5f9; /* light grey-blue */
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Buttons */
+.category-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cat-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  background: #e2e8f0;
+  color: #334155;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+/* Hover */
+.cat-btn:hover {
+  background: #cbd5f5;
+}
+
+/* Active */
+.cat-btn.active {
+  background: #2563eb;
+  color: white;
+}
+
+/* Cost items */
+.cost-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+/* Hover effect */
+.cost-item:hover {
+  background: #f8fafc;
+}
+
+/* Highlight selected row */
+.table-row:hover {
+  background: rgba(37, 99, 235, 0.05);
+}
+.cost-item span:last-child {
+  font-weight: 600;
+  color: #16a34a; /* green */
+}
+/* ================= COST DETAILS SECTION ================= */
+
+.task-cost-details {
+  margin-top: 20px;
+  padding: 18px;
+  background: #f8fafc;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+}
+
+/* Title */
+.task-cost-details h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: #1e293b;
+}
+
+/* ================= CATEGORY BUTTONS ================= */
+
+.category-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.cat-btn {
+  padding: 7px 14px;
+  border-radius: 10px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  background: #e2e8f0;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+/* Hover */
+.cat-btn:hover {
+  background: #c7d2fe;
+  transform: translateY(-1px);
+}
+
+/* Active */
+.cat-btn.active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.3);
+}
+
+/* ================= COST ITEMS ================= */
+
+.category-data {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cost-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+/* Hover effect */
+.cost-item:hover {
+  background: #f1f5f9;
+  transform: scale(1.01);
+}
+
+/* Cost name */
+.cost-item span:first-child {
+  color: #334155;
+}
+
+/* Amount styling */
+.cost-item span:last-child {
+  font-weight: 700;
+  color: #16a34a;
+}
+
+/* ================= TABLE ROW (CLICK EFFECT) ================= */
+
+.table-row {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.table-row:hover {
+  background: rgba(37, 99, 235, 0.06);
+  transform: scale(1.01);
+}
+
+/* ================= ANIMATION ================= */
+
+.task-cost-details {
+  animation: fadeInUp 0.3s ease-in-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* Small details text */
+.sub-text {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+ 
