@@ -13,17 +13,17 @@ exports.createProject = async (req, res) => {
       start_date,
       end_date,
       budget,
-      manager_id,
       site_engineer_id,
       status,
       progress,
     } = req.body;
 
-    // Validation
+    // 🔥 AUTO ASSIGN MANAGER
+    const manager_id = req.user?.employee_id;
+
     if (!name || !client_name || !budget) {
       return res.status(400).json({
         error: "Missing required fields",
-        required: ["name", "client_name", "budget"],
       });
     }
 
@@ -38,7 +38,7 @@ exports.createProject = async (req, res) => {
         start_date || null,
         end_date || null,
         budget,
-        manager_id || null,
+        manager_id, // ✅ from logged user
         site_engineer_id || null,
         status || "PENDING",
         progress || 0,
@@ -47,12 +47,9 @@ exports.createProject = async (req, res) => {
 
     return res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("🔥 CREATE ERROR:", err.message);
-    console.error(err.stack);
-
+    console.error(err);
     return res.status(500).json({
       error: "Failed to create project",
-      details: err.message,
     });
   }
 };
