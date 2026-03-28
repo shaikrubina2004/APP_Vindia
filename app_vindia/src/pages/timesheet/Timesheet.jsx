@@ -1,180 +1,242 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import "../../styles/timesheet.css";
 
-const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
 function Timesheet() {
-  const [rows, setRows] = useState(
-    days.map(() => ({
-      date: "",
-      start1: "",
-      end1: "",
-      start2: "",
-      end2: "",
-      wbs: "",
-      task: "",
-    }))
-  );
+  const [currentDate, setCurrentDate] = useState(new Date("2026-03-23"));
 
-  useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    handleChange(0, "date", today);
-  }, []);
+  const [rows, setRows] = useState([
+    {
+      hours: [],
+    },
+  ]);
 
-  const calcHours = (s, e) => {
-    if (!s || !e) return 0;
-    const [sh, sm] = s.split(":").map(Number);
-    const [eh, em] = e.split(":").map(Number);
-    return Math.max((eh + em / 60) - (sh + sm / 60), 0);
-  };
+  /* ============================= */
+  /* ✅ FINAL LOGIC (CORRECT) */
+  /* ============================= */
 
-  const getTotal = (r) => {
-    let t =
-      calcHours(r.start1, r.end1) +
-      calcHours(r.start2, r.end2);
+  const getWeekDates = (date) => {
+    const d = new Date(date);
 
-    if (t >= 9) t -= 1;
-    else if (t >= 5) t -= 0.5;
+    // 👉 Get Monday
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const start = new Date(d.setDate(diff));
 
-    return t;
-  };
+    // 👉 Next week Monday
+    const nextWeekStart = new Date(start);
+    nextWeekStart.setDate(start.getDate() + 7);
 
-  const totalHours = rows.reduce((s, r) => s + getTotal(r), 0);
+    // 👉 Next week Friday
+    const nextWeekFriday = new Date(nextWeekStart);
+    nextWeekFriday.setDate(nextWeekStart.getDate() + 4);
 
-  const handleChange = (i, field, val) => {
-    const updated = [...rows];
-    updated[i][field] = val;
+    // 👉 Month end
+    const lastDayOfMonth = new Date(
+      start.getFullYear(),
+      start.getMonth() + 1,
+      0
+    );
 
-    if (field === "date" && !rows[i].start1) {
-      updated[i].start1 = "09:00";
-      updated[i].end1 = "13:00";
-      updated[i].start2 = "14:00";
-      updated[i].end2 = "18:00";
+    let end;
+
+    // 🔥 CORE RULE (YOUR REQUIREMENT)
+    if (nextWeekFriday.getMonth() !== start.getMonth()) {
+      end = lastDayOfMonth; // ✅ 23 → 31
+    } else {
+      end = new Date(start);
+      end.setDate(start.getDate() + 4); // Mon–Fri
     }
 
+    // 👉 Build days (STRICT WORKING DAYS)
+    const week = [];
+    let temp = new Date(start);
+
+    while (temp <= end) {
+      const day = temp.getDay();
+
+      const isLastDay =
+        temp.getDate() === end.getDate();
+
+      // ✅ Only Mon–Fri + include last day (even if weekend)
+      if ((day !== 0 && day !== 6) || isLastDay) {
+        week.push({
+          label: temp.toLocaleDateString("en-IN", {
+            weekday: "short",
+            day: "numeric",
+          }),
+          full: new Date(temp),
+        });
+      }
+
+      temp.setDate(temp.getDate() + 1);
+    }
+
+    return week;
+  };
+
+  const weekDates = getWeekDates(currentDate);
+
+  /* ============================= */
+  /* NAVIGATION */
+  /* ============================= */
+
+  const nextWeek = () => {
+    const last = weekDates[weekDates.length - 1].full;
+    const next = new Date(last);
+    next.setDate(last.getDate() + 1);
+    setCurrentDate(next);
+  };
+
+  const prevWeek = () => {
+    const first = weekDates[0].full;
+    const prev = new Date(first);
+    prev.setDate(first.getDate() - 7);
+    setCurrentDate(prev);
+  };
+
+  /* ============================= */
+  /* HEADER */
+  /* ============================= */
+
+  const formatRange = () => {
+    const start = weekDates[0].full;
+    const end = weekDates[weekDates.length - 1].full;
+
+    return `${start.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "long",
+    })} - ${end.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })}`;
+  };
+
+  /* ============================= */
+  /* ROW HANDLING */
+  /* ============================= */
+
+  const addRow = () => {
+    setRows([
+      ...rows,
+      {
+        hours: Array(weekDates.length).fill(""),
+      },
+    ]);
+  };
+
+  const handleChange = (i, j, value) => {
+    const updated = [...rows];
+
+    if (!updated[i].hours.length) {
+      updated[i].hours = Array(weekDates.length).fill("");
+    }
+
+    updated[i].hours[j] = value;
     setRows(updated);
   };
 
+  /* ============================= */
+  /* RENDER */
+  /* ============================= */
+
   return (
     <div className="page-content">
-      <div className="page-container">
+      <div className="ts-wrapper">
 
         {/* HEADER */}
         <div className="ts-header">
-          <div>
-            <h2>Timesheet</h2>
-            <p className="ts-sub">Total: {totalHours.toFixed(1)}h</p>
-          </div>
-
-          <div className="ts-right">
-            <span className="status">Draft</span>
-            <span className={totalHours < 40 ? "warn" : "ok"}>
-              {totalHours < 40
-                ? `Missing ${40 - totalHours}h`
-                : "Complete"}
-            </span>
-          </div>
-        </div>
-
-        {/* META */}
-        <div className="ts-meta-card">
-          <div>
-            <p><strong>Employee:</strong> John Doe</p>
-            <p><strong>Role:</strong> Developer</p>
-          </div>
-
-          <div style={{ textAlign: "center" }}>
-            <p><strong>Manager:</strong> Jane Smith</p>
-          </div>
-
-          <div style={{ textAlign: "right" }}>
-            <p><strong>Week:</strong> Mar 25 - Mar 31</p>
-            <p><strong>Status:</strong> Draft</p>
+          <div className="ts-week">
+            <button onClick={prevWeek}>‹</button>
+            <span>{formatRange()}</span>
+            <button onClick={nextWeek}>›</button>
           </div>
         </div>
 
         {/* TABLE */}
-        <div className="card">
-          <table className="ts-table">
-            <thead>
-              <tr>
-                <th rowSpan="2">Day</th>
-                <th rowSpan="2">Date</th>
-                <th colSpan="2">Morning</th>
-                <th colSpan="2">Afternoon</th>
-                <th rowSpan="2">WBS</th>
-                <th rowSpan="2">Task</th>
-                <th rowSpan="2">Total</th>
-              </tr>
-              <tr>
-                <th>Start</th>
-                <th>End</th>
-                <th>Start</th>
-                <th>End</th>
-              </tr>
-            </thead>
+        <div className="ts-card">
+          <h3>Time Distribution</h3>
 
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={i}>
-                  <td>{days[i]}</td>
+          <div className="ts-table-wrapper">
+            <table className="ts-table">
 
-                  <td>
-                    <input
-                      type="date"
-                      value={row.date}
-                      onChange={(e) =>
-                        handleChange(i, "date", e.target.value)
-                      }
-                    />
-                  </td>
+              <thead>
+                <tr>
+                  <th>Task</th>
 
-                  {["start1", "end1", "start2", "end2"].map((f) => (
-                    <td key={f}>
-                      <input
-                        type="time"
-                        value={row[f]}
-                        onChange={(e) =>
-                          handleChange(i, f, e.target.value)
-                        }
-                      />
+                  {weekDates.map((d) => (
+                    <th key={d.label}>{d.label}</th>
+                  ))}
+
+                  <th>Total</th>
+                </tr>
+              </thead>
+
+              <tbody>
+
+                {rows.map((row, i) => (
+                  <tr key={i}>
+
+                    <td>
+                      <input placeholder="Task" />
+                    </td>
+
+                    {weekDates.map((_, j) => (
+                      <td key={j}>
+                        <input
+                          type="number"
+                          value={row.hours[j] || ""}
+                          onChange={(e) =>
+                            handleChange(i, j, e.target.value)
+                          }
+                        />
+                      </td>
+                    ))}
+
+                    <td>
+                      {(row.hours || [])
+                        .reduce((a, b) => a + Number(b || 0), 0)
+                        .toFixed(2)}
+                    </td>
+
+                  </tr>
+                ))}
+
+                {/* TOTAL ROW */}
+                <tr className="total-row">
+                  <td>Total</td>
+
+                  {weekDates.map((_, i) => (
+                    <td key={i}>
+                      {rows
+                        .reduce(
+                          (sum, r) => sum + Number(r.hours[i] || 0),
+                          0
+                        )
+                        .toFixed(2)}
                     </td>
                   ))}
 
                   <td>
-                    <select
-                      value={row.wbs}
-                      onChange={(e) =>
-                        handleChange(i, "wbs", e.target.value)
-                      }
-                    >
-                      <option value="">Select</option>
-                      <option>WBS-001</option>
-                      <option>WBS-002</option>
-                    </select>
-                  </td>
-
-                  <td>
-                    <input
-                      placeholder="Task"
-                      onChange={(e) =>
-                        handleChange(i, "task", e.target.value)
-                      }
-                    />
-                  </td>
-
-                  <td className="total-cell">
-                    {getTotal(row).toFixed(1)}
+                    {rows
+                      .reduce(
+                        (sum, r) =>
+                          sum +
+                          (r.hours || []).reduce(
+                            (a, b) => a + Number(b || 0),
+                            0
+                          ),
+                        0
+                      )
+                      .toFixed(2)}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
 
-        {/* ACTION */}
-        <div className="ts-actions">
-          <button className="btn-primary">Submit</button>
+              </tbody>
+            </table>
+          </div>
+
+          <button onClick={addRow}>+ Add Row</button>
         </div>
 
       </div>
