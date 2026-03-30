@@ -2,11 +2,12 @@ import React, { useState, useEffect } from "react";
 import "./ProjectManagement.css";
 import ProjectCard from "../../components/project/ProjectCard";
 import CostTracking from "../../pages/projects/CostTracking";
+import WbsPage from "../../pages/wbs/WbsPage";
 
 function ProjectManagement() {
   const [activePhase, setActivePhase] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
-  
+
   const [activeTask, setActiveTask] = useState(null);
   const [activeCategory, setActiveCategory] = useState(null);
   const [statusFilter, setStatusFilter] = useState("All");
@@ -40,37 +41,51 @@ function ProjectManagement() {
       spent: 0,
       clientPaid: 0,
       status: "Pending",
-      
+
       progress: 0,
       cost: {
-  labour: 150000,
-  material: 200000,
-  equipment: 100000,
-  budget: 500000,
-  spent: 450000
-},
-      activities: [
-  "its pending",
-],
+        labour: 150000,
+        material: 200000,
+        equipment: 100000,
+        budget: 500000,
+        spent: 450000,
+      },
+      activities: ["its pending"],
       manager: "Rajesh Kumar",
       teamSize: 0,
       wbs: [
-  {
-    id: "WBS-1",
-    name: "Planning",
-    budget: 5000000,
-    spent: 1000000,
-    labour: 300000,
-    material: 400000,
-    equipment: 300000,
-    costDetails: {
-      labour: [{ name: "Planner", amount: 50000 }],
-      material: [{ name: "Docs", amount: 20000 }],
-      equipment: [{ name: "Laptop", amount: 30000 }],
-      miscellaneous: [{ name: "Travel", amount: 10000 }]
-    }
-  }
-],
+        {
+          id: "WBS-1",
+          name: "Planning",
+          budget: 5000000,
+          spent: 1000000,
+          labour: 300000,
+          material: 400000,
+          equipment: 300000,
+
+          tasks: [
+            // ✅ ADD THIS
+            {
+              id: "T1",
+              name: "Requirement Gathering",
+              status: "Completed",
+              duration: "10 days",
+              hours: 80,
+              rate: 500,
+            },
+            {
+              id: "T2",
+              name: "Initial Design",
+              status: "In Progress",
+              duration: "15 days",
+              hours: 120,
+              rate: 600,
+            },
+          ],
+
+          costDetails: {},
+        },
+      ],
     },
     {
       id: 3,
@@ -83,29 +98,43 @@ function ProjectManagement() {
       clientPaid: 50000000,
       status: "Completed",
       progress: 100,
-      
-      activities: [
-  "its completed",
-],
+
+      activities: ["its completed"],
       manager: "Rajesh Kumar",
       teamSize: 0,
-     wbs: [
-  {
-    id: "WBS-1",
-    name: "Final Work",
-    budget: 8000000,
-    spent: 8000000,
-    labour: 3000000,
-    material: 4000000,
-    equipment: 1000000,
-    costDetails: {
-      labour: [{ name: "Workers", amount: 200000 }],
-      material: [{ name: "Cement", amount: 300000 }],
-      equipment: [{ name: "Machines", amount: 100000 }],
-      miscellaneous: [{ name: "Transport", amount: 50000 }]
-    }
-  }
-],
+      wbs: [
+        {
+          id: "WBS-1",
+          name: "Final Work",
+          budget: 8000000,
+          spent: 8000000,
+          labour: 3000000,
+          material: 4000000,
+          equipment: 1000000,
+
+          tasks: [
+            // ✅ ADD THIS
+            {
+              id: "T1",
+              name: "Final Inspection",
+              status: "Completed",
+              duration: "5 days",
+              hours: 40,
+              rate: 800,
+            },
+            {
+              id: "T2",
+              name: "Handover",
+              status: "Completed",
+              duration: "3 days",
+              hours: 24,
+              rate: 900,
+            },
+          ],
+
+          costDetails: {},
+        },
+      ],
     },
     {
       id: 4,
@@ -118,9 +147,7 @@ function ProjectManagement() {
       clientPaid: 0,
       status: "Rejected",
       progress: 0,
-      activities: [
-  "rejected",
-],
+      activities: ["rejected"],
       manager: "Rajesh Kumar",
       teamSize: 0,
       wbs: [],
@@ -137,17 +164,17 @@ function ProjectManagement() {
       status: "In Progress",
       progress: 45,
       cost: {
-  labour: 150000,
-  material: 200000,
-  equipment: 100000,
-  budget: 500000,
-  spent: 450000
-},
+        labour: 150000,
+        material: 200000,
+        equipment: 100000,
+        budget: 500000,
+        spent: 450000,
+      },
       activities: [
-  "Foundation completed",
-  "Worker checked in",
-  "Material purchased"
-],
+        "Foundation completed",
+        "Worker checked in",
+        "Material purchased",
+      ],
       manager: "Rajesh Kumar",
       teamSize: 45,
       wbs: [
@@ -679,126 +706,79 @@ function ProjectManagement() {
               )}
             </div>
             <div className="projects-grid">
-              
               {projects
-  .filter((proj) =>
-    statusFilter === "All" ? true : proj.status === statusFilter
-  )
-  .map((proj) => (
-    <ProjectCard
-      key={proj.id}
-      proj={proj}
-      isActive={selectedProject?.id === proj.id}
-      onClick={() => setSelectedProject(proj)}
-      variant="overview"
-    />
-))}
+                .filter((proj) =>
+                  statusFilter === "All" ? true : proj.status === statusFilter,
+                )
+                .map((proj) => (
+                  <ProjectCard
+                    key={proj.id}
+                    proj={proj}
+                    isActive={selectedProject?.id === proj.id}
+                    onClick={() => setSelectedProject(proj)}
+                    variant="overview"
+                  />
+                ))}
             </div>
-          <div className="three-column-layout">
+            <div className="three-column-layout">
+              {/* QUICK INSIGHTS */}
+              <ProjectCard variant="overview">
+                <div className="quick-insights animate">
+                  <h3>Quick Insights</h3>
+                  <p>⚠ 2 projects delayed</p>
+                  <p>💰 1 over budget</p>
+                  <p>🚀 Top: 90% progress</p>
+                </div>
+              </ProjectCard>
 
-  {/* QUICK INSIGHTS */}
-  <ProjectCard variant="overview">
-    <div className="quick-insights animate">
-      <h3>Quick Insights</h3>
-      <p>⚠ 2 projects delayed</p>
-      <p>💰 1 over budget</p>
-      <p>🚀 Top: 90% progress</p>
-    </div>
-  </ProjectCard>
+              {/* TIMESHEET */}
+              <ProjectCard variant="overview">
+                <div className="timesheet-section-new">
+                  <h3>Timesheet Submissions</h3>
 
-  {/* TIMESHEET */}
-  <ProjectCard variant="overview">
-    <div className="timesheet-section-new">
-      <h3>Timesheet Submissions</h3>
+                  {timesheets
+                    .slice(-5)
+                    .reverse()
+                    .map((ts) => (
+                      <div key={ts.id} className="timesheet-row">
+                        <div className="ts-info">
+                          <span className="ts-name">{ts.employee}</span>
+                          <span className="ts-task">{ts.task}</span>
+                        </div>
 
-      {timesheets.slice(-5).reverse().map((ts) => (
-        <div key={ts.id} className="timesheet-row">
-          <div className="ts-info">
-            <span className="ts-name">{ts.employee}</span>
-            <span className="ts-task">{ts.task}</span>
-          </div>
+                        <div className="ts-meta">
+                          <span className="ts-hours">{ts.hours}h</span>
+                          <span className="ts-date">{ts.date}</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </ProjectCard>
 
-          <div className="ts-meta">
-            <span className="ts-hours">{ts.hours}h</span>
-            <span className="ts-date">{ts.date}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  </ProjectCard>
+              {/* RECENT ACTIVITIES */}
+              <ProjectCard variant="overview">
+                <div className="recent-activity">
+                  <h3>
+                    {selectedProject
+                      ? `${selectedProject.name} - Recent Activities`
+                      : "Recent Activities"}
+                  </h3>
 
-  {/* RECENT ACTIVITIES */}
-  <ProjectCard variant="overview">
-    <div className="recent-activity">
-      <h3>
-        {selectedProject
-          ? `${selectedProject.name} - Recent Activities`
-          : "Recent Activities"}
-      </h3>
-
-      {selectedProject?.activities?.length > 0 ? (
-        selectedProject.activities.map((act, index) => (
-          <p key={index}>• {act}</p>
-        ))
-      ) : (
-        <p>No activities available</p>
-      )}
-    </div>
-  </ProjectCard>
-
-</div>
+                  {selectedProject?.activities?.length > 0 ? (
+                    selectedProject.activities.map((act, index) => (
+                      <p key={index}>• {act}</p>
+                    ))
+                  ) : (
+                    <p>No activities available</p>
+                  )}
+                </div>
+              </ProjectCard>
+            </div>
           </div>
         )}
 
         {/* WBS TAB */}
-        {activeTab === "wbs" && (
-          <div className="wbs-section">
-            <h2>Work Breakdown Structure (WBS)</h2>
-            <div className="wbs-tree">
-              {selectedProject.wbs.map((wbs) => (
-                <div key={wbs.id} className="wbs-item">
-                  <div className="wbs-header">
-                    <span className="code">{wbs.code}</span>
-                    <div className="wbs-info">
-                      <h4>{wbs.name}</h4>
-                      <p>
-                        Budget: ₹{(wbs.budget / 10000000).toFixed(1)}Cr | Spent:
-                        ₹{(wbs.spent / 10000000).toFixed(1)}Cr
-                      </p>
-                    </div>
-                    <div className="wbs-progress">
-                      <div className="progress-bar">
-                        <div
-                          className="progress-fill"
-                          style={{ width: `${wbs.progress}%` }}
-                        ></div>
-                      </div>
-                      <span>{wbs.progress}%</span>
-                    </div>
-                  </div>
-                  <div className="tasks-list">
-                    {wbs.tasks.map((task) => (
-                      <div key={task.id} className="task-item">
-                        <input
-                          type="checkbox"
-                          checked={task.status === "Completed"}
-                          readOnly
-                        />
-                        <span className="task-name">{task.name}</span>
-                        <span className="task-duration">{task.duration}</span>
-                        <span
-                          className={`task-status ${task.status.toLowerCase()}`}
-                        >
-                          {task.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {activeTab === "wbs" && <WbsPage selectedProject={selectedProject} />}
 
         {/* TIMESHEET TAB */}
         {activeTab === "timesheet" && (
@@ -956,24 +936,24 @@ function ProjectManagement() {
             )}
           </div>
         )}
-{activeTab === "cost" && selectedProject?.status === "Rejected" && (
-  <div style={{ padding: "20px", textAlign: "center" }}>
-    <h3>❌ No Cost Tracking for Rejected Projects</h3>
-  </div>
-)}
+        {activeTab === "cost" && selectedProject?.status === "Rejected" && (
+          <div style={{ padding: "20px", textAlign: "center" }}>
+            <h3>❌ No Cost Tracking for Rejected Projects</h3>
+          </div>
+        )}
         {/* COST TRACKING TAB */}
-     {activeTab === "cost" && (
-  <CostTracking
-    selectedProject={selectedProject}
-    activePhase={activePhase}
-    setActivePhase={setActivePhase}
-    activeCategory={activeCategory}
-    setActiveCategory={setActiveCategory}
-    costBreakdown={costBreakdown}
-    calculateRemaining={calculateRemaining}
-    calculatePercentage={calculatePercentage}
-  />
-)}
+        {activeTab === "cost" && (
+          <CostTracking
+            selectedProject={selectedProject}
+            activePhase={activePhase}
+            setActivePhase={setActivePhase}
+            activeCategory={activeCategory}
+            setActiveCategory={setActiveCategory}
+            costBreakdown={costBreakdown}
+            calculateRemaining={calculateRemaining}
+            calculatePercentage={calculatePercentage}
+          />
+        )}
 
         {/* PERFORMANCE TAB */}
         {activeTab === "performance" && (
