@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from "react";
 import "./ProjectManagement.css";
 import ProjectCard from "../../components/project/ProjectCard";
+import CostTracking from "../../pages/projects/CostTracking";
 
 
 function ProjectManagement() {
+<<<<<<< Updated upstream
   
   
+=======
+  const [activePhase, setActivePhase] = useState(null);
+>>>>>>> Stashed changes
   const [activeTab, setActiveTab] = useState("overview");
+  
   const [activeTask, setActiveTask] = useState(null);
 const [activeCategory, setActiveCategory] = useState(null);
   const [statusFilter, setStatusFilter] = useState("All");
@@ -31,6 +37,7 @@ useEffect(() => {
 }, []);
   const [projects, setProjects] = useState([
     {
+<<<<<<< Updated upstream
   id: 2,
   name: "Commercial Tower - Downtown",
   client: "ABC Developers",
@@ -75,6 +82,102 @@ useEffect(() => {
   teamSize: 0,
   wbs: [],
 },
+=======
+      id: 2,
+      name: "Commercial Tower - Downtown",
+      client: "ABC Developers",
+      startDate: "2024-01-15",
+      endDate: "2025-12-31",
+      budget: 50000000,
+      spent: 0,
+      clientPaid: 0,
+      status: "Pending",
+      
+      progress: 0,
+      cost: {
+  labour: 150000,
+  material: 200000,
+  equipment: 100000,
+  budget: 500000,
+  spent: 450000
+},
+      activities: [
+  "its pending",
+],
+      manager: "Rajesh Kumar",
+      teamSize: 0,
+      wbs: [
+  {
+    id: "WBS-1",
+    name: "Planning",
+    budget: 5000000,
+    spent: 1000000,
+    labour: 300000,
+    material: 400000,
+    equipment: 300000,
+    costDetails: {
+      labour: [{ name: "Planner", amount: 50000 }],
+      material: [{ name: "Docs", amount: 20000 }],
+      equipment: [{ name: "Laptop", amount: 30000 }],
+      miscellaneous: [{ name: "Travel", amount: 10000 }]
+    }
+  }
+],
+    },
+    {
+      id: 3,
+      name: "Commercial Tower - Downtown",
+      client: "ABC Developers",
+      startDate: "2024-01-15",
+      endDate: "2025-12-31",
+      budget: 50000000,
+      spent: 50000000,
+      clientPaid: 50000000,
+      status: "Completed",
+      progress: 100,
+      
+      activities: [
+  "its completed",
+],
+      manager: "Rajesh Kumar",
+      teamSize: 0,
+     wbs: [
+  {
+    id: "WBS-1",
+    name: "Final Work",
+    budget: 8000000,
+    spent: 8000000,
+    labour: 3000000,
+    material: 4000000,
+    equipment: 1000000,
+    costDetails: {
+      labour: [{ name: "Workers", amount: 200000 }],
+      material: [{ name: "Cement", amount: 300000 }],
+      equipment: [{ name: "Machines", amount: 100000 }],
+      miscellaneous: [{ name: "Transport", amount: 50000 }]
+    }
+  }
+],
+    },
+    {
+      id: 4,
+      name: "Commercial Tower - Downtown",
+      client: "ABC Developers",
+      startDate: "2024-01-15",
+      endDate: "2025-12-31",
+      budget: 50000000,
+      spent: 0,
+      clientPaid: 0,
+      status: "Rejected",
+      progress: 0,
+      activities: [
+  "rejected",
+],
+      manager: "Rajesh Kumar",
+      teamSize: 0,
+      wbs: [],
+    },
+>>>>>>> Stashed changes
     {
       id: 1,
       name: "Commercial Tower - Downtown",
@@ -86,6 +189,18 @@ useEffect(() => {
       clientPaid: 35000000,
       status: "In Progress",
       progress: 45,
+      cost: {
+  labour: 150000,
+  material: 200000,
+  equipment: 100000,
+  budget: 500000,
+  spent: 450000
+},
+      activities: [
+  "Foundation completed",
+  "Worker checked in",
+  "Material purchased"
+],
       manager: "Rajesh Kumar",
       teamSize: 45,
       wbs: [
@@ -621,11 +736,17 @@ useEffect(() => {
   ))}
 </div>
             <div className="projects-grid">
+<<<<<<< Updated upstream
              {projects
+=======
+              
+              {projects
+>>>>>>> Stashed changes
   .filter((proj) =>
     statusFilter === "All" ? true : proj.status === statusFilter
   )
   .map((proj) => (
+<<<<<<< Updated upstream
   <ProjectCard
     key={proj.id}
     proj={proj}
@@ -675,6 +796,71 @@ useEffect(() => {
 
 </div>
  </div>
+=======
+    <ProjectCard
+      key={proj.id}
+      proj={proj}
+      isActive={selectedProject?.id === proj.id}
+      onClick={() => setSelectedProject(proj)}
+      variant="overview"
+    />
+))}
+            </div>
+          <div className="three-column-layout">
+
+  {/* QUICK INSIGHTS */}
+  <ProjectCard variant="overview">
+    <div className="quick-insights animate">
+      <h3>Quick Insights</h3>
+      <p>⚠ 2 projects delayed</p>
+      <p>💰 1 over budget</p>
+      <p>🚀 Top: 90% progress</p>
+    </div>
+  </ProjectCard>
+
+  {/* TIMESHEET */}
+  <ProjectCard variant="overview">
+    <div className="timesheet-section-new">
+      <h3>Timesheet Submissions</h3>
+
+      {timesheets.slice(-5).reverse().map((ts) => (
+        <div key={ts.id} className="timesheet-row">
+          <div className="ts-info">
+            <span className="ts-name">{ts.employee}</span>
+            <span className="ts-task">{ts.task}</span>
+          </div>
+
+          <div className="ts-meta">
+            <span className="ts-hours">{ts.hours}h</span>
+            <span className="ts-date">{ts.date}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  </ProjectCard>
+
+  {/* RECENT ACTIVITIES */}
+  <ProjectCard variant="overview">
+    <div className="recent-activity">
+      <h3>
+        {selectedProject
+          ? `${selectedProject.name} - Recent Activities`
+          : "Recent Activities"}
+      </h3>
+
+      {selectedProject?.activities?.length > 0 ? (
+        selectedProject.activities.map((act, index) => (
+          <p key={index}>• {act}</p>
+        ))
+      ) : (
+        <p>No activities available</p>
+      )}
+    </div>
+  </ProjectCard>
+
+</div>
+          </div>
+>>>>>>> Stashed changes
         )}
 
         {/* WBS TAB */}
@@ -883,8 +1069,13 @@ useEffect(() => {
             )}
           </div>
         )}
-
+{activeTab === "cost" && selectedProject?.status === "Rejected" && (
+  <div style={{ padding: "20px", textAlign: "center" }}>
+    <h3>❌ No Cost Tracking for Rejected Projects</h3>
+  </div>
+)}
         {/* COST TRACKING TAB */}
+<<<<<<< Updated upstream
         {activeTab === "cost" && (
           <div className="cost-section">
             <h2>Cost Management</h2>
@@ -1041,6 +1232,20 @@ useEffect(() => {
             </div>
           </div>
         )}
+=======
+     {activeTab === "cost" && (
+  <CostTracking
+    selectedProject={selectedProject}
+    activePhase={activePhase}
+    setActivePhase={setActivePhase}
+    activeCategory={activeCategory}
+    setActiveCategory={setActiveCategory}
+    costBreakdown={costBreakdown}
+    calculateRemaining={calculateRemaining}
+    calculatePercentage={calculatePercentage}
+  />
+)}
+>>>>>>> Stashed changes
 
         {/* PERFORMANCE TAB */}
         {activeTab === "performance" && (

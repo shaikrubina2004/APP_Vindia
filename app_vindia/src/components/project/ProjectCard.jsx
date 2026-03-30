@@ -1,62 +1,72 @@
 import React from "react";
 
-function ProjectCard({ proj, isActive, onClick }) {
-  // 🔥 Normalize status (fixes your issue)
-  const status = proj.status?.toLowerCase();
+function ProjectCard({ proj, isActive, onClick, variant, children }) {
 
-  // ✅ Status styles mapping
-  const statusStyles = {
-    "in progress": { bg: "#fef3c7", text: "#92400e" },
-    pending: { bg: "#e5e7eb", text: "#374151" },
-    completed: { bg: "#dcfce7", text: "#166534" },
-    rejected: { bg: "#fee2e2", text: "#991b1b" },
-  };
+  // ✅ Safe check (prevents crash)
+  if (!proj && !children) return null;
 
-  const style = statusStyles[status] || statusStyles["pending"];
+ return (
+  <div
+    className={`project-card ${variant === "overview" ? "overview-card" : ""} ${isActive ? "active" : ""}`}
+    onClick={onClick}
+  >
 
-  return (
-    <div
-      className={`project-card ${isActive ? "active" : ""}`}
-      onClick={onClick}
-    >
-      {/* HEADER */}
-      <div className="card-header">
-        <h3>{proj.name}</h3>
+    {/* ✅ PROJECT CARD (top 4 cards) */}
+    {proj ? (
+      <>
+        <div className="card-header">
+          <h3>{proj.name}</h3>
 
-        <span
-          className="status-badge"
-          style={{
-            backgroundColor: style.bg,
-            color: style.text,
-          }}
-        >
-          {proj.status}
-        </span>
-      </div>
+          <span
+  className="status-badge"
+  style={{
+    backgroundColor:
+      proj?.status === "Pending"
+        ? "#fff7ed"
+        : proj?.status === "Completed"
+        ? "#ecfdf5"
+        : proj?.status === "Rejected"
+        ? "#fef2f2"
+        : "#eef4ff",
 
-      {/* INFO */}
-      <div className="card-info">
-        <p>
-          <strong>Client:</strong> {proj.client}
+    color:
+      proj?.status === "Pending"
+        ? "#92400e"
+        : proj?.status === "Completed"
+        ? "#166534"
+        : proj?.status === "Rejected"
+        ? "#991b1b"
+        : "#1e40af",
+  }}
+>
+  {proj.status}
+</span>
+        </div>
+
+        <div className="card-info">
+          <p><strong>Client:</strong> {proj.client}</p>
+          <p><strong>Site Engineer:</strong> {proj.site_engineer_name || "N/A"}</p>
+        </div>
+
+        <div className="progress-bar">
+          <div
+            className="progress-fill"
+            style={{ width: `${proj.progress || 0}%` }}
+          ></div>
+        </div>
+
+        <p className="progress-text">
+          {proj.progress || 0}% Complete
         </p>
-        <p>
-          <strong>Site Engineer:</strong> {proj.site_engineer_name || "N/A"}
-        </p>
+      </>
+    ) : (
+      /* ✅ OVERVIEW CARDS (Quick / Timesheet / Activities) */
+      <div className="card-body">
+        {children}
       </div>
-
-      {/* PROGRESS */}
-      <div className="progress-bar">
-        <div
-          className="progress-fill"
-          style={{
-            width: `${proj.progress || 0}%`,
-          }}
-        ></div>
-      </div>
-
-      <p className="progress-text">{proj.progress || 0}% Complete</p>
-    </div>
-  );
+    )}
+  </div>
+);
 }
 
 export default ProjectCard;
