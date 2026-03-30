@@ -54,12 +54,7 @@ function ProjectCard({ proj, isActive, onClick }) {
         ></div>
       </div>
 
-<<<<<<< Updated upstream
       <p className="progress-text">{proj.progress || 0}% Complete</p>
-=======
-      {/* MINI CARDS */}
-    
->>>>>>> Stashed changes
     </div>
   );
 }

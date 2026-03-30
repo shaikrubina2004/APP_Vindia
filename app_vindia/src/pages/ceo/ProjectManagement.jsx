@@ -5,7 +5,7 @@ import ProjectCard from "../../components/project/ProjectCard";
 function ProjectManagement() {
   const [activeTab, setActiveTab] = useState("overview");
   const [activeTask, setActiveTask] = useState(null);
-const [activeCategory, setActiveCategory] = useState(null);
+  const [activeCategory, setActiveCategory] = useState(null);
   const [statusFilter, setStatusFilter] = useState("All");
   const [animate, setAnimate] = useState(true);
 
@@ -26,78 +26,52 @@ const [activeCategory, setActiveCategory] = useState(null);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
-  const [projects, setProjects] = useState([]);
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  const fetchProjects = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/projects");
-      const data = await res.json();
-
-      console.log("API DATA:", data);
-
-      setProjects(data);
-    } catch (err) {
-      console.error("Error:", err);
-    }
-  };
-
-<<<<<<< Updated upstream
-=======
-  document.addEventListener("visibilitychange", handleVisibility);
-
-  return () => {
-    document.removeEventListener("visibilitychange", handleVisibility);
-  };
-}, []);
   const [projects, setProjects] = useState([
     {
-  id: 2,
-  name: "Commercial Tower - Downtown",
-  client: "ABC Developers",
-  startDate: "2024-01-15",
-  endDate: "2025-12-31",
-  budget: 50000000,
-  spent: 0,
-  clientPaid: 0,
-  status: "Pending",
-  progress: 0,
-  manager: "Rajesh Kumar",
-  teamSize: 0,
-  wbs: [],
-},
-{
-  id: 3,
-  name: "Commercial Tower - Downtown",
-  client: "ABC Developers",
-  startDate: "2024-01-15",
-  endDate: "2025-12-31",
-  budget: 50000000,
-  spent: 50000000,
-  clientPaid: 50000000,
-  status: "Completed",
-  progress: 100,
-  manager: "Rajesh Kumar",
-  teamSize: 0,
-  wbs: [],
-},
-{
-  id: 4,
-  name: "Commercial Tower - Downtown",
-  client: "ABC Developers",
-  startDate: "2024-01-15",
-  endDate: "2025-12-31",
-  budget: 50000000,
-  spent: 0,
-  clientPaid: 0,
-  status: "Rejected",
-  progress: 0,
-  manager: "Rajesh Kumar",
-  teamSize: 0,
-  wbs: [],
-},
+      id: 2,
+      name: "Commercial Tower - Downtown",
+      client: "ABC Developers",
+      startDate: "2024-01-15",
+      endDate: "2025-12-31",
+      budget: 50000000,
+      spent: 0,
+      clientPaid: 0,
+      status: "Pending",
+      progress: 0,
+      manager: "Rajesh Kumar",
+      teamSize: 0,
+      wbs: [],
+    },
+    {
+      id: 3,
+      name: "Commercial Tower - Downtown",
+      client: "ABC Developers",
+      startDate: "2024-01-15",
+      endDate: "2025-12-31",
+      budget: 50000000,
+      spent: 50000000,
+      clientPaid: 50000000,
+      status: "Completed",
+      progress: 100,
+      manager: "Rajesh Kumar",
+      teamSize: 0,
+      wbs: [],
+    },
+    {
+      id: 4,
+      name: "Commercial Tower - Downtown",
+      client: "ABC Developers",
+      startDate: "2024-01-15",
+      endDate: "2025-12-31",
+      budget: 50000000,
+      spent: 0,
+      clientPaid: 0,
+      status: "Rejected",
+      progress: 0,
+      manager: "Rajesh Kumar",
+      teamSize: 0,
+      wbs: [],
+    },
     {
       id: 1,
       name: "Commercial Tower - Downtown",
@@ -113,117 +87,116 @@ const [activeCategory, setActiveCategory] = useState(null);
       teamSize: 45,
       wbs: [
         {
-  id: "WBS-1",
-  code: "1.0",
-  name: "Site Preparation & Foundation",
-  status: "Completed",
-  progress: 100,
-  budget: 8000000,
-  spent: 8000000,
-  labour: 3000000,
-  material: 4500000,
-  equipment: 500000,
+          id: "WBS-1",
+          code: "1.0",
+          name: "Site Preparation & Foundation",
+          status: "Completed",
+          progress: 100,
+          budget: 8000000,
+          spent: 8000000,
+          labour: 3000000,
+          material: 4500000,
+          equipment: 500000,
 
-  costDetails: {
-  labour: [
-    {
-      name: "Ravi Kumar (Supervisor)",
-      work: "Site supervision & planning",
-      amount: 120000
-    },
-    {
-      name: "Arun (Skilled Worker)",
-      work: "Concrete mixing & leveling",
-      amount: 80000
-    },
-    {
-      name: "Daily Workers (10)",
-      work: "Excavation & material handling",
-      amount: 150000
-    }
-  ],
+          costDetails: {
+            labour: [
+              {
+                name: "Ravi Kumar (Supervisor)",
+                work: "Site supervision & planning",
+                amount: 120000,
+              },
+              {
+                name: "Arun (Skilled Worker)",
+                work: "Concrete mixing & leveling",
+                amount: 80000,
+              },
+              {
+                name: "Daily Workers (10)",
+                work: "Excavation & material handling",
+                amount: 150000,
+              },
+            ],
 
-  material: [
-    {
-      name: "Cement",
-      quantity: "50 bags",
-      amount: 75000
-    },
-    {
-      name: "Steel Rods",
-      quantity: "2 tons",
-      amount: 120000
-    },
-    {
-      name: "Sand",
-      quantity: "5 loads",
-      amount: 50000
-    },
-    {
-      name: "Gravel",
-      quantity: "3 loads",
-      amount: 40000
-    }
-  ],
+            material: [
+              {
+                name: "Cement",
+                quantity: "50 bags",
+                amount: 75000,
+              },
+              {
+                name: "Steel Rods",
+                quantity: "2 tons",
+                amount: 120000,
+              },
+              {
+                name: "Sand",
+                quantity: "5 loads",
+                amount: 50000,
+              },
+              {
+                name: "Gravel",
+                quantity: "3 loads",
+                amount: 40000,
+              },
+            ],
 
-  equipment: [
-    {
-      name: "Excavator",
-      usage: "Used for digging foundation",
-      amount: 100000
-    },
-    {
-      name: "Concrete Mixer",
-      usage: "Mixing cement",
-      amount: 50000
-    }
-  ],
+            equipment: [
+              {
+                name: "Excavator",
+                usage: "Used for digging foundation",
+                amount: 100000,
+              },
+              {
+                name: "Concrete Mixer",
+                usage: "Mixing cement",
+                amount: 50000,
+              },
+            ],
 
-  miscellaneous: [
-    {
-      name: "Transport",
-      details: "Material delivery",
-      amount: 50000
-    }
-  ]
-},
+            miscellaneous: [
+              {
+                name: "Transport",
+                details: "Material delivery",
+                amount: 50000,
+              },
+            ],
+          },
 
-
-  tasks: [
-    {
-      id: "T1",
-      name: "Land Clearing",
-      status: "Completed",
-      duration: "30 days",
-      hours: 240,
-      rate: 500,
-    },
-    {
-      id: "T2",
-      name: "Soil Testing",
-      status: "Completed",
-      duration: "15 days",
-      hours: 120,
-      rate: 800,
-    },
-    {
-      id: "T3",
-      name: "Foundation Excavation",
-      status: "Completed",
-      duration: "45 days",
-      hours: 360,
-      rate: 600,
-    },
-    {
-      id: "T4",
-      name: "Foundation Concrete",
-      status: "Completed",
-      duration: "20 days",
-      hours: 160,
-      rate: 700,
-    },
-  ],
-},
+          tasks: [
+            {
+              id: "T1",
+              name: "Land Clearing",
+              status: "Completed",
+              duration: "30 days",
+              hours: 240,
+              rate: 500,
+            },
+            {
+              id: "T2",
+              name: "Soil Testing",
+              status: "Completed",
+              duration: "15 days",
+              hours: 120,
+              rate: 800,
+            },
+            {
+              id: "T3",
+              name: "Foundation Excavation",
+              status: "Completed",
+              duration: "45 days",
+              hours: 360,
+              rate: 600,
+            },
+            {
+              id: "T4",
+              name: "Foundation Concrete",
+              status: "Completed",
+              duration: "20 days",
+              hours: 160,
+              rate: 700,
+            },
+          ],
+        },
         {
           id: "WBS-2",
           code: "2.0",
@@ -274,7 +247,6 @@ const [activeCategory, setActiveCategory] = useState(null);
     },
   ]);
 
->>>>>>> Stashed changes
   const [timesheets, setTimesheets] = useState([
     {
       id: 1,
@@ -314,19 +286,9 @@ const [activeCategory, setActiveCategory] = useState(null);
     },
   ]);
 
-<<<<<<< Updated upstream
-  const [selectedProject, setSelectedProject] = useState(null);
-
-  useEffect(() => {
-    if (projects.length > 0) {
-      setSelectedProject(projects[0]);
-    }
-  }, [projects]);
-=======
   const [selectedProject, setSelectedProject] = useState(
-  projects.find(p => p.wbs && p.wbs.length > 0)
-);
->>>>>>> Stashed changes
+    projects.find((p) => p.wbs && p.wbs.length > 0),
+  );
   const [showTimesheetModal, setShowTimesheetModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [newTimesheet, setNewTimesheet] = useState({
@@ -478,11 +440,9 @@ const [activeCategory, setActiveCategory] = useState(null);
 
   // Calculate project cost breakdown
   const costBreakdown = {
-    labour: selectedProject?.wbs || [].reduce((sum, w) => sum + w.labour, 0),
-    material:
-      selectedProject?.wbs || [].reduce((sum, w) => sum + w.material, 0),
-    equipment:
-      selectedProject?.wbs || [].reduce((sum, w) => sum + w.equipment, 0),
+    labour: selectedProject.wbs.reduce((sum, w) => sum + w.labour, 0),
+    material: selectedProject.wbs.reduce((sum, w) => sum + w.material, 0),
+    equipment: selectedProject.wbs.reduce((sum, w) => sum + w.equipment, 0),
   };
 
   // Calculate performance metrics
@@ -662,7 +622,7 @@ const [activeCategory, setActiveCategory] = useState(null);
                   <ProjectCard
                     key={proj.id}
                     proj={proj}
-                    isActive={selectedProject?.id === proj.id}
+                    isActive={selectedProject.id === proj.id}
                     onClick={() => setSelectedProject(proj)}
                   />
                 ))}
@@ -703,8 +663,7 @@ const [activeCategory, setActiveCategory] = useState(null);
                 <h3>Recent Activities</h3>
 
                 <p>
-                  • Payment of ₹10,00,000 received for Commercial Tower
-                  &nbsp;&nbsp;project
+                  • Payment of ₹10,00,000 received for Commercial Tower project
                 </p>
                 <p>• ₹5,00,000 released for material procurement</p>
                 <p>• Pending payment of ₹2,50,000 awaiting client approval</p>
@@ -719,48 +678,47 @@ const [activeCategory, setActiveCategory] = useState(null);
           <div className="wbs-section">
             <h2>Work Breakdown Structure (WBS)</h2>
             <div className="wbs-tree">
-              {selectedProject?.wbs ||
-                [].map((wbs) => (
-                  <div key={wbs.id} className="wbs-item">
-                    <div className="wbs-header">
-                      <span className="code">{wbs.code}</span>
-                      <div className="wbs-info">
-                        <h4>{wbs.name}</h4>
-                        <p>
-                          Budget: ₹{(wbs.budget / 10000000).toFixed(1)}Cr |
-                          Spent: ₹{(wbs.spent / 10000000).toFixed(1)}Cr
-                        </p>
-                      </div>
-                      <div className="wbs-progress">
-                        <div className="progress-bar">
-                          <div
-                            className="progress-fill"
-                            style={{ width: `${wbs.progress}%` }}
-                          ></div>
-                        </div>
-                        <span>{wbs.progress}%</span>
-                      </div>
+              {selectedProject.wbs.map((wbs) => (
+                <div key={wbs.id} className="wbs-item">
+                  <div className="wbs-header">
+                    <span className="code">{wbs.code}</span>
+                    <div className="wbs-info">
+                      <h4>{wbs.name}</h4>
+                      <p>
+                        Budget: ₹{(wbs.budget / 10000000).toFixed(1)}Cr | Spent:
+                        ₹{(wbs.spent / 10000000).toFixed(1)}Cr
+                      </p>
                     </div>
-                    <div className="tasks-list">
-                      {wbs.tasks.map((task) => (
-                        <div key={task.id} className="task-item">
-                          <input
-                            type="checkbox"
-                            checked={task.status === "Completed"}
-                            readOnly
-                          />
-                          <span className="task-name">{task.name}</span>
-                          <span className="task-duration">{task.duration}</span>
-                          <span
-                            className={`task-status ${task.status.toLowerCase()}`}
-                          >
-                            {task.status}
-                          </span>
-                        </div>
-                      ))}
+                    <div className="wbs-progress">
+                      <div className="progress-bar">
+                        <div
+                          className="progress-fill"
+                          style={{ width: `${wbs.progress}%` }}
+                        ></div>
+                      </div>
+                      <span>{wbs.progress}%</span>
                     </div>
                   </div>
-                ))}
+                  <div className="tasks-list">
+                    {wbs.tasks.map((task) => (
+                      <div key={task.id} className="task-item">
+                        <input
+                          type="checkbox"
+                          checked={task.status === "Completed"}
+                          readOnly
+                        />
+                        <span className="task-name">{task.name}</span>
+                        <span className="task-duration">{task.duration}</span>
+                        <span
+                          className={`task-status ${task.status.toLowerCase()}`}
+                        >
+                          {task.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -851,12 +809,11 @@ const [activeCategory, setActiveCategory] = useState(null);
                         }
                       >
                         <option>Select Task</option>
-                        {selectedProject?.wbs ||
-                          [].map((wbs) =>
-                            wbs.tasks.map((task) => (
-                              <option key={task.id}>{task.name}</option>
-                            )),
-                          )}
+                        {selectedProject.wbs.map((wbs) =>
+                          wbs.tasks.map((task) => (
+                            <option key={task.id}>{task.name}</option>
+                          )),
+                        )}
                       </select>
                     </div>
                     <div className="form-row">
@@ -1017,76 +974,88 @@ const [activeCategory, setActiveCategory] = useState(null);
                   <div>Remaining</div>
                   <div>% Used</div>
                 </div>
-<<<<<<< Updated upstream
-                {selectedProject?.wbs ||
-                  [].map((wbs) => (
-                    <div key={wbs.id} className="table-row">
-                      <div className="phase-name">{wbs.name}</div>
-                      <div>₹{(wbs.budget / 10000000).toFixed(1)}Cr</div>
-                      <div>₹{(wbs.spent / 10000000).toFixed(1)}Cr</div>
-                      <div>
-                        ₹{((wbs.budget - wbs.spent) / 10000000).toFixed(1)}Cr
-                      </div>
-                      <div>{calculatePercentage(wbs.spent, wbs.budget)}%</div>
-=======
                 {activeTask && (
-  <div className="task-cost-details">
-    <h3>{activeTask.name} - Cost Details</h3>
+                  <div className="task-cost-details">
+                    <h3>{activeTask.name} - Cost Details</h3>
 
-    <div className="category-buttons">
-      {["labour", "material", "equipment", "miscellaneous"].map((cat) => (
-        <button
-          key={cat}
-          className={`cat-btn ${activeCategory === cat ? "active" : ""}`}
-          onClick={() => setActiveCategory(cat)}
-        >
-          {cat === "miscellaneous" ? "MISC" : cat.toUpperCase()}
-        </button>
-      ))}
-    </div>
+                    <div className="category-buttons">
+                      {["labour", "material", "equipment", "miscellaneous"].map(
+                        (cat) => (
+                          <button
+                            key={cat}
+                            className={`cat-btn ${activeCategory === cat ? "active" : ""}`}
+                            onClick={() => setActiveCategory(cat)}
+                          >
+                            {cat === "miscellaneous"
+                              ? "MISC"
+                              : cat.toUpperCase()}
+                          </button>
+                        ),
+                      )}
+                    </div>
 
-    {activeCategory && (
-      <div className="category-data">
-        {(activeTask.costDetails?.[activeCategory] || []).length === 0 ? (
-          <p>No data available</p>
-        ) : (
-          activeTask.costDetails[activeCategory].map((item, index) => (
-            <div key={index} className="cost-item">
-  <div>
-    <strong>{item.name}</strong>
+                    {activeCategory && (
+                      <div className="category-data">
+                        {(activeTask.costDetails?.[activeCategory] || [])
+                          .length === 0 ? (
+                          <p>No data available</p>
+                        ) : (
+                          activeTask.costDetails[activeCategory].map(
+                            (item, index) => (
+                              <div key={index} className="cost-item">
+                                <div>
+                                  <strong>{item.name}</strong>
 
-    {/* 👇 Show extra details */}
-    {item.work && <div className="sub-text">Work: {item.work}</div>}
-    {item.quantity && <div className="sub-text">Qty: {item.quantity}</div>}
-    {item.usage && <div className="sub-text">Usage: {item.usage}</div>}
-    {item.details && <div className="sub-text">{item.details}</div>}
-  </div>
+                                  {/* 👇 Show extra details */}
+                                  {item.work && (
+                                    <div className="sub-text">
+                                      Work: {item.work}
+                                    </div>
+                                  )}
+                                  {item.quantity && (
+                                    <div className="sub-text">
+                                      Qty: {item.quantity}
+                                    </div>
+                                  )}
+                                  {item.usage && (
+                                    <div className="sub-text">
+                                      Usage: {item.usage}
+                                    </div>
+                                  )}
+                                  {item.details && (
+                                    <div className="sub-text">
+                                      {item.details}
+                                    </div>
+                                  )}
+                                </div>
 
-  <span>₹{item.amount}</span>
-</div>
-          ))
-        )}
-      </div>
-    )}
-  </div>
-)}
+                                <span>₹{item.amount}</span>
+                              </div>
+                            ),
+                          )
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {selectedProject.wbs.map((wbs) => (
-                 <div
-  key={wbs.id}
-  className="table-row"
-  onClick={() => {
-    setActiveTask(wbs);
-    setActiveCategory(null);
-  }}
->
+                  <div
+                    key={wbs.id}
+                    className="table-row"
+                    onClick={() => {
+                      setActiveTask(wbs);
+                      setActiveCategory(null);
+                    }}
+                  >
                     <div className="phase-name">{wbs.name}</div>
                     <div>₹{(wbs.budget / 10000000).toFixed(1)}Cr</div>
                     <div>₹{(wbs.spent / 10000000).toFixed(1)}Cr</div>
                     <div>
                       ₹{((wbs.budget - wbs.spent) / 10000000).toFixed(1)}Cr
->>>>>>> Stashed changes
                     </div>
-                  ))}
+                    <div>{calculatePercentage(wbs.spent, wbs.budget)}%</div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -1168,16 +1137,17 @@ const [activeCategory, setActiveCategory] = useState(null);
                     <div
                       className="progress-fill"
                       style={{
-                        width: `${(selectedProject?.wbs || [].filter((w) => w.status === "Completed").length / selectedProject?.wbs || [].length) * 100}%`,
+                        width: `${(selectedProject.wbs.filter((w) => w.status === "Completed").length / selectedProject.wbs.length) * 100}%`,
                       }}
                     ></div>
                   </div>
                   <span className="metric-value">
                     {Math.round(
-                      (selectedProject?.wbs ||
-                        [].filter((w) => w.status === "Completed").length /
-                          selectedProject?.wbs ||
-                        [].length) * 100,
+                      (selectedProject.wbs.filter(
+                        (w) => w.status === "Completed",
+                      ).length /
+                        selectedProject.wbs.length) *
+                        100,
                     )}
                     %
                   </span>
