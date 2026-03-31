@@ -10,7 +10,7 @@ const attendanceRoutes = require("./routes/attendanceRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 //const payrollRoutes = require("./routes/payrollRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
-
+const path = require("path");
 /* ✅ ADDED PROJECT ROUTES */
 const projectRoutes = require("./routes/projectRoutes");
 
@@ -47,7 +47,7 @@ try {
   app.use("/api/employees", employeeRoutes);
   app.use("/api/attendance", attendanceRoutes);
   app.use("/api/leaves", leaveRoutes);
-  
+  app.use("/uploads", express.static(path.join(__dirname, "uploads")));
   //app.use("/api/payroll", payrollRoutes);
 
   /* ✅ ADDED PROJECT ROUTE */
