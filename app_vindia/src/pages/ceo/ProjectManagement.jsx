@@ -737,20 +737,64 @@ function ProjectManagement() {
               {/* RECENT ACTIVITIES */}
               <ProjectCard variant="overview">
                 <div className="recent-activity">
-                  <h3>
-                    {selectedProject
-                      ? `${selectedProject.name} - Recent Activities`
-                      : "Recent Activities"}
-                  </h3>
+  <h3>
+    {selectedProject
+      ? `${selectedProject.name} - Recent Activities`
+      : "Recent Activities"}
+  </h3>
 
-                  {selectedProject?.activities?.length > 0 ? (
-                    selectedProject.activities.map((act, index) => (
-                      <p key={index}>• {act}</p>
-                    ))
-                  ) : (
-                    <p>No activities available</p>
-                  )}
-                </div>
+  {(() => {
+    if (!selectedProject) return <p>No project selected</p>;
+
+    let activities = [];
+
+    // ✅ real activities first
+    if (selectedProject.activities) {
+      activities = [...selectedProject.activities];
+    }
+
+    const status = selectedProject.status;
+
+    // ✅ add status-based meaningful activities
+    if (status === "Pending") {
+      activities.push(
+        "Planning phase started",
+        "Requirement discussion ongoing",
+        "Budget approval in progress"
+      );
+    }
+
+    else if (status === "Completed") {
+      activities.push(
+        "All work completed successfully",
+        "Final inspection completed",
+        "Project handed over"
+      );
+    }
+
+    else if (status === "In Progress") {
+      activities.push(
+        "Work currently in progress",
+        "Site activity ongoing",
+        "Materials being utilized"
+      );
+    }
+
+    else if (status === "Rejected") {
+      activities.push(
+        "Project proposal rejected",
+        "Approval not granted"
+      );
+    }
+
+    // remove duplicates
+    activities = [...new Set(activities)];
+
+    return activities.map((act, index) => (
+      <p key={index}>• {act}</p>
+    ));
+  })()}
+</div>
               </ProjectCard>
             </div>
           </div>
