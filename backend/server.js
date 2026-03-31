@@ -14,6 +14,7 @@ const employeeRoutes = require("./routes/employeeRoutes");
 /* ✅ ADDED PROJECT ROUTES */
 const projectRoutes = require("./routes/projectRoutes");
 
+
 const app = express();
 
 /* MIDDLEWARE */
@@ -46,6 +47,7 @@ try {
   app.use("/api/employees", employeeRoutes);
   app.use("/api/attendance", attendanceRoutes);
   app.use("/api/leaves", leaveRoutes);
+  
   //app.use("/api/payroll", payrollRoutes);
 
   /* ✅ ADDED PROJECT ROUTE */

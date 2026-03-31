@@ -62,12 +62,13 @@ function Employees() {
 
       {/* ✅ MODAL */}
       {selectedEmployee && (
-        <AssignEmployeeModal
-          employee={selectedEmployee}
-          employees={employees}   // 🔥 IMPORTANT
-          onClose={() => setSelectedEmployee(null)}
-        />
-      )}
+  <AssignEmployeeModal
+    employee={selectedEmployee}
+    employees={employees}
+    onClose={() => setSelectedEmployee(null)}
+    onAssignSuccess={fetchEmployees} // ✅ IMPORTANT
+  />
+)}
     </div>
   );
 }

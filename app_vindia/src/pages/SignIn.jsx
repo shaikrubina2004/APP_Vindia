@@ -25,34 +25,31 @@ function SignIn() {
     });
   };
 
-  const handleLogin = async () => {
+ const handleLogin = async () => {
+  if (!formData.email || !formData.password) {
+    alert("Please fill all fields");
+    return;
+  }
 
-    if (!formData.email || !formData.password) {
-      alert("Please fill all fields");
-      return;
-    }
+  try {
+    const res = await loginAPI({
+      email: formData.email,
+      password: formData.password,
+    });
 
-    try {
+    const { token, user } = res.data;
 
-      const res = await loginAPI({
-        email: formData.email,
-        password: formData.password
-      });
+    // store token
+    localStorage.setItem("token", token);
 
-      const { token, user } = res.data;
+    // save user in context
+    login(user);
 
-      localStorage.setItem("token", token);
-localStorage.setItem("user", JSON.stringify(user));
-login(user);
-      navigate("/dashboard");
-
-    } catch (error) {
-
-      alert(error.response?.data?.message || "Invalid credentials");
-
-    }
-  };
-
+    navigate("/dashboard");
+  } catch (error) {
+    alert(error.response?.data?.message || "Invalid credentials");
+  }
+};
   return (
 
     <div className="login-bg">
