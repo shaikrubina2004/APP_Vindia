@@ -169,7 +169,13 @@ console.log("SUMMARY STATE:", summaryData);
         <tr>
           <td className="emp">{l.name}</td>
           <td>{l.type}</td>
-          <td>{l.date}</td>
+          <td>
+          {new Date(l.date).toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })}
+        </td>
 
           <td>
             <span className={`tag ${l.status.toLowerCase()}`}>
