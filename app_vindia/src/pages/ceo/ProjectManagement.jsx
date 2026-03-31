@@ -64,9 +64,9 @@ function ProjectManagement() {
           equipment: 300000,
 
           tasks: [
-            // ✅ ADD THIS
             {
               id: "T1",
+              code: "1.1", // ✅ ADD
               name: "Requirement Gathering",
               status: "Completed",
               duration: "10 days",
@@ -75,6 +75,7 @@ function ProjectManagement() {
             },
             {
               id: "T2",
+              code: "1.2", // ✅ ADD
               name: "Initial Design",
               status: "In Progress",
               duration: "15 days",
@@ -113,9 +114,9 @@ function ProjectManagement() {
           equipment: 1000000,
 
           tasks: [
-            // ✅ ADD THIS
             {
               id: "T1",
+              code: "1.1",
               name: "Final Inspection",
               status: "Completed",
               duration: "5 days",
@@ -124,6 +125,7 @@ function ProjectManagement() {
             },
             {
               id: "T2",
+              code: "1.2",
               name: "Handover",
               status: "Completed",
               duration: "3 days",
@@ -180,7 +182,7 @@ function ProjectManagement() {
       wbs: [
         {
           id: "WBS-1",
-          code: "1.0",
+          code: "1",
           name: "Site Preparation & Foundation",
           status: "Completed",
           progress: 100,
@@ -257,41 +259,30 @@ function ProjectManagement() {
           tasks: [
             {
               id: "T1",
+              code: "1.1",
               name: "Land Clearing",
               status: "Completed",
-              duration: "30 days",
-              hours: 240,
-              rate: 500,
             },
             {
               id: "T2",
+              code: "1.2",
               name: "Soil Testing",
-              status: "Completed",
-              duration: "15 days",
-              hours: 120,
-              rate: 800,
             },
             {
               id: "T3",
+              code: "1.3",
               name: "Foundation Excavation",
-              status: "Completed",
-              duration: "45 days",
-              hours: 360,
-              rate: 600,
             },
             {
               id: "T4",
+              code: "1.4",
               name: "Foundation Concrete",
-              status: "Completed",
-              duration: "20 days",
-              hours: 160,
-              rate: 700,
             },
           ],
         },
         {
           id: "WBS-2",
-          code: "2.0",
+          code: "2",
           name: "Structural Work",
           status: "In Progress",
           progress: 60,
@@ -303,35 +294,23 @@ function ProjectManagement() {
           tasks: [
             {
               id: "T5",
+              code: "2.1",
               name: "Column Casting",
-              status: "In Progress",
-              duration: "60 days",
-              hours: 480,
-              rate: 650,
             },
             {
               id: "T6",
+              code: "2.2",
               name: "Beam Installation",
-              status: "In Progress",
-              duration: "50 days",
-              hours: 400,
-              rate: 700,
             },
             {
               id: "T7",
+              code: "2.3",
               name: "Floor Slab Casting",
-              status: "Pending",
-              duration: "45 days",
-              hours: 360,
-              rate: 600,
             },
             {
               id: "T8",
+              code: "2.4",
               name: "Structural Testing",
-              status: "Pending",
-              duration: "15 days",
-              hours: 120,
-              rate: 1000,
             },
           ],
         },
@@ -448,7 +427,7 @@ function ProjectManagement() {
         wbs: [
           {
             id: "WBS-1",
-            code: "1.0",
+            code: "1",
             name: "Planning & Design",
             status: "Pending",
             progress: 0,

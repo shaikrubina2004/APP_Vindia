@@ -11,6 +11,7 @@ import ProjectManagement from "../pages/ceo/ProjectManagement";
 import HRDashboard from "../pages/hr/HRDashboard";
 import Employees from "../pages/hr/Employees";
 import AddEmployee from "../pages/hr/AddEmployee";
+import EmployeeDetails from "../pages/hr/EmployeeDetails";
 import Attendance from "../pages/hr/Attendance";
 import Documents from "../pages/hr/Documents";
 import Leaves from "../pages/hr/Leaves";
@@ -114,7 +115,16 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
+      <Route
+  path="/hr/employee/:id"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+      <HRLayout>
+        <EmployeeDetails />
+      </HRLayout>
+    </ProtectedRoute>
+  }
+/>
       {/* ADD EMPLOYEE */}
       <Route
         path="/hr/add-employee"

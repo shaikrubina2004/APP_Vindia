@@ -2,10 +2,10 @@ import { useState } from "react";
 import { updateEmployee } from "../../services/employeeService";
 import "../../styles/employees.css";
 
-function AssignEmployeeModal({ employee, employees, onClose }) {
+function AssignEmployeeModal({ employee, employees, onClose, onAssignSuccess }) {
   const [manager, setManager] = useState("");
 
-  // ✅ Get real managers from employees list
+  // ✅ Get real managers
   const managers = employees.filter((emp) =>
     emp.designation.toLowerCase().includes("manager")
   );
@@ -22,8 +22,12 @@ function AssignEmployeeModal({ employee, employees, onClose }) {
         manager_id: Number(manager),
       });
 
-      // ✅ reload to reflect changes
-      window.location.reload();
+      // ✅ refresh UI (NO reload)
+      onAssignSuccess();
+
+      // ✅ close modal
+      onClose();
+
     } catch (err) {
       console.error(err);
       alert("Failed to assign manager");
@@ -39,21 +43,21 @@ function AssignEmployeeModal({ employee, employees, onClose }) {
           Employee : <strong>{employee.name}</strong>
         </p>
 
-        {/* 🔥 Rename label */}
         <label>Manager Role</label>
 
-<select
-  value={manager}
-  onChange={(e) => setManager(e.target.value)}
->
-  <option value="">Select Manager Role</option>
+        <select
+          value={manager}
+          onChange={(e) => setManager(e.target.value)}
+        >
+          <option value="">Select Manager</option>
 
-  {managers.map((m) => (
-    <option key={m.id} value={m.id}>
-      {m.designation} - {m.name}
-    </option>
-  ))}
-</select>
+          {managers.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.designation} - {m.name}
+            </option>
+          ))}
+        </select>
+
         <div className="modal-buttons">
           <button className="cancel-btn" onClick={onClose}>
             Cancel

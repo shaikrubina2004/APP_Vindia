@@ -1,9 +1,8 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Fuse from "fuse.js";
-import { deleteEmployee } from "../../services/employeeService";
 
-function EmployeesTable({ employees, setEmployees, search, onAssignClick }) {
+function EmployeesTable({ employees, search }) {
   const navigate = useNavigate();
 
   const isAnniversary = (date) => {
@@ -17,15 +16,6 @@ function EmployeesTable({ employees, setEmployees, search, onAssignClick }) {
   };
 
   const formatDate = (date) => new Date(date).toLocaleDateString();
-
-  const handleDelete = async (id) => {
-    try {
-      await deleteEmployee(id);
-      setEmployees((prev) => prev.filter((emp) => emp.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   // 🔍 FUZZY SEARCH
   const filteredEmployees = useMemo(() => {
@@ -43,17 +33,16 @@ function EmployeesTable({ employees, setEmployees, search, onAssignClick }) {
     <div className="employees-table">
       <table>
         <thead>
+          {/* Table Header */}
           <tr>
             <th>ID</th>
             <th>Name</th>
             <th>Email</th>
             <th>Department</th>
             <th>Role</th>
-            <th>Manager</th> {/* 🔥 renamed */}
-            <th>Address</th>
-            <th>Joining Date</th>
+            <th>Manager</th>
             <th>Status</th>
-            <th>Actions</th>
+            <th>View</th>
           </tr>
         </thead>
 
@@ -61,11 +50,8 @@ function EmployeesTable({ employees, setEmployees, search, onAssignClick }) {
           {filteredEmployees.map((emp) => {
             const formatted = {
               ...emp,
-              role: emp.designation,
-              joiningDate: emp.join_date,
               assignedTo: emp.manager_name || "Not Assigned",
               status: emp.status || "active",
-              address: emp.address || "N/A",
             };
 
             return (
@@ -74,54 +60,32 @@ function EmployeesTable({ employees, setEmployees, search, onAssignClick }) {
 
                 <td>
                   {formatted.name}
-                  {isAnniversary(formatted.joiningDate) && (
-                    <span className="anniversary"> 🎉 1 Year</span>
+                  {isAnniversary(formatted.join_date) && (
+                    <span className="anniversary">🎉</span>
                   )}
                 </td>
 
                 <td>{formatted.email}</td>
                 <td>{formatted.department}</td>
-                <td>{formatted.role}</td>
+                <td>{formatted.designation}</td>
 
-                {/* ✅ MANAGER */}
                 <td>{formatted.assignedTo}</td>
 
-                {/* ✅ ADDRESS */}
-                <td>{formatted.address}</td>
-
-                <td>{formatDate(formatted.joiningDate)}</td>
-
-                {/* ✅ STATUS */}
                 <td className={`status-${formatted.status}`}>
                   {formatted.status}
                 </td>
 
                 <td>
-                  <div className="action-buttons">
-                    <button
-                      className="edit-btn"
-                      onClick={() =>
-                        navigate("/hr/add-employee", { state: formatted })
-                      }
-                    >
-                      Edit
-                    </button>
-
-                    {/* 🔥 IMPORTANT CHANGE */}
-                    <button
-                      className="assign-btn"
-                      onClick={() => onAssignClick(formatted)}
-                    >
-                      Assign
-                    </button>
-
-                    <button
-                      className="delete-btn"
-                      onClick={() => handleDelete(formatted.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
+                  <button
+                    className="view-btn"
+                    onClick={() =>
+                      navigate(`/hr/employee/${formatted.id}`, {
+                        state: formatted,
+                      })
+                    }
+                  >
+                    View
+                  </button>
                 </td>
               </tr>
             );

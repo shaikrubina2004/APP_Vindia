@@ -1,0 +1,133 @@
+.employee-details-page {
+  padding: 32px 40px;
+  background: #f8fafc;
+  min-height: 100vh;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  color: #202124;
+}
+
+/* 🔥 TITLE */
+.employee-details-page h1 {
+  font-size: 24px;
+  font-weight: 500;
+  margin-bottom: 24px;
+  color: #202124;
+}
+
+/* 🔥 CARD */
+.employee-details-page .details-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 28px;
+  border: 1px solid #e6e8eb;
+
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px 40px;
+}
+
+/* 🔹 ROW */
+.employee-details-page .details-card p {
+  margin: 0;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 🔹 LABEL */
+.employee-details-page .details-card strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: #5f6368;
+  margin-bottom: 4px;
+}
+
+/* 🔹 VALUE */
+.employee-details-page .details-card p span,
+.employee-details-page .details-card p {
+  color: #202124;
+  font-weight: 400;
+}
+
+/* 🔥 STATUS BADGE (SCOPED ✅) */
+.employee-details-page .status-active,
+.employee-details-page .status-inactive,
+.employee-details-page .status-on_leave {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+/* COLORS */
+.employee-details-page .status-active {
+  background: #e6f4ea;
+  color: #137333;
+}
+
+.employee-details-page .status-inactive {
+  background: #fce8e6;
+  color: #c5221f;
+}
+
+.employee-details-page .status-on_leave {
+  background: #fef7e0;
+  color: #b06000;
+}
+
+/* 🔥 ACTION BUTTONS */
+.employee-details-page .action-buttons {
+  margin-top: 28px;
+  display: flex;
+  gap: 12px;
+}
+
+/* 🔥 BASE BUTTON */
+.employee-details-page .action-buttons button {
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+/* ✏️ EDIT */
+.employee-details-page .edit-btn {
+  background: #1a73e8;
+  color: white;
+}
+
+.employee-details-page .edit-btn:hover {
+  background: #1558c0;
+}
+
+/* 🗑 DELETE */
+.employee-details-page .delete-btn {
+  background: white;
+  border: 1px solid #dadce0;
+  color: #c5221f;
+}
+
+.employee-details-page .delete-btn:hover {
+  background: #fce8e6;
+}
+
+/* 📱 RESPONSIVE */
+@media (max-width: 768px) {
+  .employee-details-page {
+    padding: 20px;
+  }
+
+  .employee-details-page .details-card {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+
+  .employee-details-page .action-buttons {
+    flex-direction: column;
+  }
+}
