@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from "react";
 import "./WBSSection.css";
 
-// ── Default empty detail structure for every subtask ──────────────────────────
+const API = "http://localhost:5000/api";
+
 const emptyDetails = () => ({
-  labour: [], // { id, name, role, hours, rate, cost }
-  material: [], // { id, name, quantity, unit, price, vendor }
-  equipment: [], // { id, name, duration, unit, cost }
-  miscellaneous: [], // { id, name, cost, note }
+  labour: [],
+  material: [],
+  equipment: [],
+  miscellaneous: [],
 });
 
 function WBSSection({ selectedProject }) {
-  const [project, setProject] = useState(selectedProject);
+  const [wbsTree, setWbsTree] = useState([]);
+  const [loading, setLoading] = useState(false);
+
   const [expandedWBS, setExpandedWBS] = useState({});
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [newTask, setNewTask] = useState({
@@ -20,38 +23,48 @@ function WBSSection({ selectedProject }) {
   });
 
   // Drawer state
-  const [drawer, setDrawer] = useState(null); // { wbsId, taskId, taskName, details }
+  const [drawer, setDrawer] = useState(null);
   const [activeTab, setActiveTab] = useState("labour");
   const [showAddRowModal, setShowAddRowModal] = useState(false);
   const [addRowForm, setAddRowForm] = useState({});
 
+  // ── Fetch WBS tree whenever project changes ───────────────────────────────
   useEffect(() => {
-    setProject(selectedProject);
-  }, [selectedProject]);
+    if (!selectedProject?.id) return;
+    setLoading(true);
+    fetch(`${API}/wbs/${selectedProject.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setWbsTree(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("WBS fetch error:", err);
+        setLoading(false);
+      });
+  }, [selectedProject?.id]);
 
   // ── helpers ───────────────────────────────────────────────────────────────
-  const generateWBSCode = () => `${(project.wbs || []).length + 1}`;
+  const generateWBSCode = () => `${wbsTree.length + 1}`;
   const generateSubCode = (wbsCode, tasksCount) =>
     `${wbsCode}.${tasksCount + 1}`;
-
-  const toggleWBSExpand = (wbsId) =>
-    setExpandedWBS((prev) => ({ ...prev, [wbsId]: !prev[wbsId] }));
+  const toggleWBSExpand = (id) =>
+    setExpandedWBS((prev) => ({ ...prev, [id]: !prev[id] }));
 
   // ── open modals ───────────────────────────────────────────────────────────
   const handleAddMainTask = () => {
     setNewTask({ wbsId: null, name: "", type: "task" });
     setShowAddTaskModal(true);
   };
-
   const handleAddSubTask = (wbsId) => {
     setNewTask({ wbsId, name: "", type: "subtask" });
     setShowAddTaskModal(true);
   };
 
-  // ── open drawer when subtask is clicked ──────────────────────────────────
-  const handleSubtaskClick = (wbsId, task) => {
+  // ── open drawer ───────────────────────────────────────────────────────────
+  const handleSubtaskClick = (task) => {
     setDrawer({
-      wbsId,
+      wbsId: task.parent_id,
       taskId: task.id,
       taskName: task.name,
       taskCode: task.code,
@@ -61,46 +74,60 @@ function WBSSection({ selectedProject }) {
   };
 
   // ── save new task / subtask ───────────────────────────────────────────────
-  const handleSaveTask = () => {
+  const handleSaveTask = async () => {
     if (!newTask.name.trim()) {
       alert("Please enter a name");
       return;
     }
 
-    if (newTask.type === "task") {
-      const newWBSItem = {
-        id: Date.now(),
-        code: generateWBSCode(),
-        name: newTask.name,
-        progress: 0,
-        status: "Pending",
-        tasks: [],
-      };
-      setProject((prev) => ({ ...prev, wbs: [...prev.wbs, newWBSItem] }));
-    } else {
-      setProject((prev) => ({
-        ...prev,
-        wbs: prev.wbs.map((w) => {
-          if (w.id !== newTask.wbsId) return w;
-          const existingTasks = w.tasks || [];
-          const newChildTask = {
-            id: Date.now(),
-            code: generateSubCode(w.code, existingTasks.length),
+    try {
+      if (newTask.type === "task") {
+        // Top-level WBS item
+        const res = await fetch(`${API}/wbs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id: selectedProject.id,
+            code: generateWBSCode(),
             name: newTask.name,
-            status: "Pending",
-            subtasks: [],
-            details: emptyDetails(),
-          };
-          return { ...w, tasks: [...existingTasks, newChildTask] };
-        }),
-      }));
-      setExpandedWBS((prev) => ({ ...prev, [newTask.wbsId]: true }));
+          }),
+        });
+        const created = await res.json();
+        setWbsTree((prev) => [...prev, created]);
+      } else {
+        // Child task (subtask)
+        const parent = wbsTree.find((w) => w.id === newTask.wbsId);
+        const res = await fetch(`${API}/wbs/task`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id: selectedProject.id,
+            parent_id: newTask.wbsId,
+            code: generateSubCode(parent.code, (parent.tasks || []).length),
+            name: newTask.name,
+          }),
+        });
+        const created = await res.json();
+
+        setWbsTree((prev) =>
+          prev.map((w) =>
+            w.id !== newTask.wbsId
+              ? w
+              : { ...w, tasks: [...(w.tasks || []), created] },
+          ),
+        );
+        setExpandedWBS((prev) => ({ ...prev, [newTask.wbsId]: true }));
+      }
+    } catch (err) {
+      console.error("Save task error:", err);
+      alert("Failed to save. Check console.");
     }
+
     setShowAddTaskModal(false);
     setNewTask({ wbsId: null, name: "", type: "task" });
   };
 
-  // ── add row inside drawer ─────────────────────────────────────────────────
+  // ── add cost detail row ───────────────────────────────────────────────────
   const openAddRowModal = () => {
     const defaults = {
       labour: { name: "", role: "", hours: "", rate: "" },
@@ -112,28 +139,37 @@ function WBSSection({ selectedProject }) {
     setShowAddRowModal(true);
   };
 
-  const handleSaveRow = () => {
+  const handleSaveRow = async () => {
     const tab = activeTab;
-    let newRow = { id: Date.now(), ...addRowForm };
+    const endpointMap = {
+      labour: "labour",
+      material: "material",
+      equipment: "equipment",
+      miscellaneous: "miscellaneous",
+    };
 
-    // auto-calc cost where applicable
-    if (tab === "labour") {
-      newRow.cost =
-        (parseFloat(newRow.hours) || 0) * (parseFloat(newRow.rate) || 0);
-    }
-    if (tab === "material") {
-      newRow.total =
-        (parseFloat(newRow.quantity) || 0) * (parseFloat(newRow.price) || 0);
-    }
+    try {
+      const res = await fetch(`${API}/wbs/${endpointMap[tab]}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_id: drawer.taskId, ...addRowForm }),
+      });
+      const newRow = await res.json();
 
-    // persist into project state
-    setProject((prev) => ({
-      ...prev,
-      wbs: prev.wbs.map((w) => {
-        if (w.id !== drawer.wbsId) return w;
-        return {
+      // Update drawer live
+      setDrawer((prev) => ({
+        ...prev,
+        details: {
+          ...prev.details,
+          [tab]: [...(prev.details[tab] || []), newRow],
+        },
+      }));
+
+      // Also update wbsTree so data survives drawer close/reopen
+      setWbsTree((prev) =>
+        prev.map((w) => ({
           ...w,
-          tasks: w.tasks.map((t) => {
+          tasks: (w.tasks || []).map((t) => {
             if (t.id !== drawer.taskId) return t;
             const details = t.details || emptyDetails();
             return {
@@ -141,18 +177,12 @@ function WBSSection({ selectedProject }) {
               details: { ...details, [tab]: [...(details[tab] || []), newRow] },
             };
           }),
-        };
-      }),
-    }));
-
-    // also update drawer live
-    setDrawer((prev) => ({
-      ...prev,
-      details: {
-        ...prev.details,
-        [tab]: [...(prev.details[tab] || []), newRow],
-      },
-    }));
+        })),
+      );
+    } catch (err) {
+      console.error("Save row error:", err);
+      alert("Failed to save row.");
+    }
 
     setShowAddRowModal(false);
     setAddRowForm({});
@@ -162,9 +192,14 @@ function WBSSection({ selectedProject }) {
   const calcTotal = (tab, details) => {
     if (!details) return 0;
     if (tab === "labour")
-      return details.labour?.reduce((s, r) => s + (r.cost || 0), 0) || 0;
+      return (
+        details.labour?.reduce((s, r) => s + (parseFloat(r.cost) || 0), 0) || 0
+      );
     if (tab === "material")
-      return details.material?.reduce((s, r) => s + (r.total || 0), 0) || 0;
+      return (
+        details.material?.reduce((s, r) => s + (parseFloat(r.total) || 0), 0) ||
+        0
+      );
     if (tab === "equipment")
       return (
         details.equipment?.reduce((s, r) => s + (parseFloat(r.cost) || 0), 0) ||
@@ -189,7 +224,7 @@ function WBSSection({ selectedProject }) {
   const fmt = (n) =>
     `₹${Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
-  // ── tab config ────────────────────────────────────────────────────────────
+  // ── tab + field config ────────────────────────────────────────────────────
   const TABS = [
     { key: "labour", label: "Labour", icon: "👷" },
     { key: "material", label: "Material", icon: "🧱" },
@@ -197,7 +232,6 @@ function WBSSection({ selectedProject }) {
     { key: "miscellaneous", label: "Miscellaneous", icon: "📦" },
   ];
 
-  // ── field configs for add-row modal ──────────────────────────────────────
   const FIELDS = {
     labour: [
       { key: "name", label: "Worker Name", placeholder: "e.g. Rajan Kumar" },
@@ -259,38 +293,8 @@ function WBSSection({ selectedProject }) {
     ],
   };
 
-  // ── render subtasks ───────────────────────────────────────────────────────
-  const renderSubtasks = (parentTask, level = 1) => (
-    <>
-      {(parentTask.subtasks || []).map((subtask) => (
-        <div key={subtask.id} className={`wbs-task subtask level-${level}`}>
-          <div className="task-row">
-            <div
-              className="task-indent"
-              style={{ marginLeft: `${level * 24}px` }}
-            >
-              <span className="tree-line">└</span>
-            </div>
-            <input
-              type="checkbox"
-              checked={subtask.status === "Completed"}
-              readOnly
-            />
-            <span className="task-code">{subtask.code}</span>
-            <span className="task-name">{subtask.name}</span>
-            <span
-              className={`task-status ${subtask.status?.toLowerCase() || "pending"}`}
-            >
-              {subtask.status}
-            </span>
-          </div>
-          {subtask.subtasks?.length > 0 && renderSubtasks(subtask, level + 1)}
-        </div>
-      ))}
-    </>
-  );
-
-  if (!project?.wbs)
+  // ── guards ────────────────────────────────────────────────────────────────
+  if (!selectedProject?.id) {
     return (
       <div className="wbs-section">
         <div className="empty-state">
@@ -298,14 +302,26 @@ function WBSSection({ selectedProject }) {
         </div>
       </div>
     );
+  }
 
+  if (loading) {
+    return (
+      <div className="wbs-section">
+        <div className="empty-state">
+          <p>Loading WBS...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="wbs-section">
       {/* PAGE HEADER */}
       <div className="wbs-header-bar">
         <h2>📊 Work Breakdown Structure</h2>
         <div className="header-bar-right">
-          <span className="wbs-count">{project.wbs.length} items</span>
+          <span className="wbs-count">{wbsTree.length} items</span>
           <button className="btn-add-task-global" onClick={handleAddMainTask}>
             ➕ Add Task
           </button>
@@ -313,82 +329,88 @@ function WBSSection({ selectedProject }) {
       </div>
 
       <div className="wbs-container">
-        {project.wbs.map((wbs) => (
-          <div key={wbs.id} className="wbs-block">
-            <div className="wbs-header">
-              <button
-                className="expand-btn"
-                onClick={() => toggleWBSExpand(wbs.id)}
-              >
-                {expandedWBS[wbs.id] ? "▼" : "▶"}
-              </button>
-              <div className="wbs-info">
-                <span className="wbs-code">{wbs.code}</span>
-                <span className="wbs-name">{wbs.name}</span>
-              </div>
-              <div className="wbs-meta">
-                <div className="progress-container">
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${wbs.progress || 0}%` }}
-                    />
-                  </div>
-                  <span className="progress-text">{wbs.progress || 0}%</span>
-                </div>
-                <span
-                  className={`status-badge ${(wbs.status || "pending").toLowerCase()}`}
-                >
-                  {wbs.status}
-                </span>
-              </div>
-              <button
-                className="btn-add-subtask-header"
-                onClick={() => handleAddSubTask(wbs.id)}
-              >
-                + Sub
-              </button>
-            </div>
-
-            {expandedWBS[wbs.id] && (
-              <div className="tasks-list">
-                {(wbs.tasks || []).length > 0 ? (
-                  wbs.tasks.map((task) => (
-                    <div key={task.id} className="wbs-task main-task">
-                      {/* Clickable subtask row */}
-                      <div
-                        className="task-row clickable"
-                        onClick={() => handleSubtaskClick(wbs.id, task)}
-                        title="Click to view details"
-                      >
-                        <span className="tree-line">├</span>
-                        <input
-                          type="checkbox"
-                          checked={task.status === "Completed"}
-                          readOnly
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <span className="task-code">{task.code}</span>
-                        <span className="task-name">{task.name}</span>
-                        <span
-                          className={`task-status ${task.status?.toLowerCase() || "pending"}`}
-                        >
-                          {task.status}
-                        </span>
-                        <span className="detail-hint">View Details →</span>
-                      </div>
-                      {task.subtasks?.length > 0 && renderSubtasks(task, 1)}
-                    </div>
-                  ))
-                ) : (
-                  <div className="empty-tasks">
-                    <p>No subtasks yet. Click "+ Sub" to add one.</p>
-                  </div>
-                )}
-              </div>
-            )}
+        {wbsTree.length === 0 ? (
+          <div className="empty-state">
+            <p>
+              No WBS items yet. Click "➕ Add Task" to create your first task.
+            </p>
           </div>
-        ))}
+        ) : (
+          wbsTree.map((wbs) => (
+            <div key={wbs.id} className="wbs-block">
+              <div className="wbs-header">
+                <button
+                  className="expand-btn"
+                  onClick={() => toggleWBSExpand(wbs.id)}
+                >
+                  {expandedWBS[wbs.id] ? "▼" : "▶"}
+                </button>
+                <div className="wbs-info">
+                  <span className="wbs-code">{wbs.code}</span>
+                  <span className="wbs-name">{wbs.name}</span>
+                </div>
+                <div className="wbs-meta">
+                  <div className="progress-container">
+                    <div className="progress-bar">
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${wbs.progress || 0}%` }}
+                      />
+                    </div>
+                    <span className="progress-text">{wbs.progress || 0}%</span>
+                  </div>
+                  <span
+                    className={`status-badge ${(wbs.status || "pending").toLowerCase()}`}
+                  >
+                    {wbs.status}
+                  </span>
+                </div>
+                <button
+                  className="btn-add-subtask-header"
+                  onClick={() => handleAddSubTask(wbs.id)}
+                >
+                  + Sub
+                </button>
+              </div>
+
+              {expandedWBS[wbs.id] && (
+                <div className="tasks-list">
+                  {(wbs.tasks || []).length > 0 ? (
+                    wbs.tasks.map((task) => (
+                      <div key={task.id} className="wbs-task main-task">
+                        <div
+                          className="task-row clickable"
+                          onClick={() => handleSubtaskClick(task)}
+                          title="Click to view details"
+                        >
+                          <span className="tree-line">├</span>
+                          <input
+                            type="checkbox"
+                            checked={task.status === "Completed"}
+                            readOnly
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <span className="task-code">{task.code}</span>
+                          <span className="task-name">{task.name}</span>
+                          <span
+                            className={`task-status ${task.status?.toLowerCase() || "pending"}`}
+                          >
+                            {task.status}
+                          </span>
+                          <span className="detail-hint">View Details →</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="empty-tasks">
+                      <p>No subtasks yet. Click "+ Sub" to add one.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
       {/* ── ADD TASK MODAL ── */}
@@ -504,7 +526,7 @@ function WBSSection({ selectedProject }) {
                 </button>
               </div>
 
-              {/* LABOUR TABLE */}
+              {/* LABOUR */}
               {activeTab === "labour" && (
                 <div className="table-wrap">
                   {drawer.details.labour?.length > 0 ? (
@@ -550,7 +572,7 @@ function WBSSection({ selectedProject }) {
                 </div>
               )}
 
-              {/* MATERIAL TABLE */}
+              {/* MATERIAL */}
               {activeTab === "material" && (
                 <div className="table-wrap">
                   {drawer.details.material?.length > 0 ? (
@@ -598,7 +620,7 @@ function WBSSection({ selectedProject }) {
                 </div>
               )}
 
-              {/* EQUIPMENT TABLE */}
+              {/* EQUIPMENT */}
               {activeTab === "equipment" && (
                 <div className="table-wrap">
                   {drawer.details.equipment?.length > 0 ? (
@@ -640,7 +662,7 @@ function WBSSection({ selectedProject }) {
                 </div>
               )}
 
-              {/* MISCELLANEOUS TABLE */}
+              {/* MISCELLANEOUS */}
               {activeTab === "miscellaneous" && (
                 <div className="table-wrap">
                   {drawer.details.miscellaneous?.length > 0 ? (

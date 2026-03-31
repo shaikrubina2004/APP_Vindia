@@ -4,56 +4,67 @@ const pool = require("../config/db");
  * ✅ Create Project
  */
 exports.createProject = async (req, res) => {
-  console.log("BODY:", req.body);
-
   try {
     const {
       name,
-      client_name,
+      client,
+      budget,
       start_date,
       end_date,
-      budget,
       site_engineer_id,
-      status,
-      progress,
+      manager_id,
     } = req.body;
-
-    // 🔥 AUTO ASSIGN MANAGER
-    const manager_id = req.user?.employee_id;
-
-    if (!name || !client_name || !budget) {
-      return res.status(400).json({
-        error: "Missing required fields",
-      });
-    }
 
     const result = await pool.query(
       `INSERT INTO projects
-      (name, client_name, start_date, end_date, budget, manager_id, site_engineer_id, status, progress)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      (name, client, budget, start_date, end_date, manager_id, site_engineer_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
       RETURNING *`,
       [
         name,
-        client_name,
-        start_date || null,
-        end_date || null,
+        client,
         budget,
-        manager_id, // ✅ from logged user
-        site_engineer_id || null,
-        status || "PENDING",
-        progress || 0,
+        start_date,
+        end_date,
+        manager_id,
+        site_engineer_id,
       ],
     );
 
-    return res.status(201).json(result.rows[0]);
+    res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    return res.status(500).json({
-      error: "Failed to create project",
-    });
+    res.status(500).json({ error: err.message });
   }
 };
+exports.getManagers = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name 
+       FROM employees
+       WHERE designation = 'Project Manager'`,
+    );
 
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+exports.getSiteEngineers = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name 
+       FROM employees
+       WHERE designation = 'Site Engineer'`,
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
 /**
  * ✅ Get All Projects (for cards UI)
  */

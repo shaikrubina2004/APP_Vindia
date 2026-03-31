@@ -13,7 +13,7 @@ const employeeRoutes = require("./routes/employeeRoutes");
 const path = require("path");
 /* ✅ ADDED PROJECT ROUTES */
 const projectRoutes = require("./routes/projectRoutes");
-
+const wbsRoutes = require("./routes/wbsRoutes"); // ✅ ADD THIS
 
 const app = express();
 
@@ -48,6 +48,7 @@ try {
   app.use("/api/attendance", attendanceRoutes);
   app.use("/api/leaves", leaveRoutes);
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+  app.use("/api/wbs", wbsRoutes); // ✅ ADD THIS
   //app.use("/api/payroll", payrollRoutes);
 
   /* ✅ ADDED PROJECT ROUTE */

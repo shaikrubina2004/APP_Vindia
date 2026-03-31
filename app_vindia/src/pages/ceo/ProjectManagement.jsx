@@ -30,293 +30,43 @@ function ProjectManagement() {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
-  const [projects, setProjects] = useState([
-    {
-      id: 2,
-      name: "Commercial Tower - Downtown",
-      client: "ABC Developers",
-      startDate: "2024-01-15",
-      endDate: "2025-12-31",
-      budget: 50000000,
-      spent: 0,
-      clientPaid: 0,
-      status: "Pending",
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-      progress: 0,
-      cost: {
-        labour: 150000,
-        material: 200000,
-        equipment: 100000,
-        budget: 500000,
-        spent: 450000,
-      },
-      activities: ["its pending"],
-      manager: "Rajesh Kumar",
-      teamSize: 0,
-      wbs: [
-        {
-          id: "WBS-1",
-          name: "Planning",
-          budget: 5000000,
-          spent: 1000000,
-          labour: 300000,
-          material: 400000,
-          equipment: 300000,
+  useEffect(() => {
+    fetch("http://localhost:5000/api/projects")
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("PROJECT DATA:", data); // 👈 debug
 
-          tasks: [
-            {
-              id: "T1",
-              code: "1.1", // ✅ ADD
-              name: "Requirement Gathering",
-              status: "Completed",
-              duration: "10 days",
-              hours: 80,
-              rate: 500,
-            },
-            {
-              id: "T2",
-              code: "1.2", // ✅ ADD
-              name: "Initial Design",
-              status: "In Progress",
-              duration: "15 days",
-              hours: 120,
-              rate: 600,
-            },
-          ],
+        setProjects(data);
 
-          costDetails: {},
-        },
-      ],
-    },
-    {
-      id: 3,
-      name: "Commercial Tower - Downtown",
-      client: "ABC Developers",
-      startDate: "2024-01-15",
-      endDate: "2025-12-31",
-      budget: 50000000,
-      spent: 50000000,
-      clientPaid: 50000000,
-      status: "Completed",
-      progress: 100,
+        // auto select first project
+        if (data.length > 0) {
+          setSelectedProject(data[0]);
+        }
 
-      activities: ["its completed"],
-      manager: "Rajesh Kumar",
-      teamSize: 0,
-      wbs: [
-        {
-          id: "WBS-1",
-          name: "Final Work",
-          budget: 8000000,
-          spent: 8000000,
-          labour: 3000000,
-          material: 4000000,
-          equipment: 1000000,
-
-          tasks: [
-            {
-              id: "T1",
-              code: "1.1",
-              name: "Final Inspection",
-              status: "Completed",
-              duration: "5 days",
-              hours: 40,
-              rate: 800,
-            },
-            {
-              id: "T2",
-              code: "1.2",
-              name: "Handover",
-              status: "Completed",
-              duration: "3 days",
-              hours: 24,
-              rate: 900,
-            },
-          ],
-
-          costDetails: {},
-        },
-      ],
-    },
-    {
-      id: 4,
-      name: "Commercial Tower - Downtown",
-      client: "ABC Developers",
-      startDate: "2024-01-15",
-      endDate: "2025-12-31",
-      budget: 50000000,
-      spent: 0,
-      clientPaid: 0,
-      status: "Rejected",
-      progress: 0,
-      activities: ["rejected"],
-      manager: "Rajesh Kumar",
-      teamSize: 0,
-      wbs: [],
-    },
-    {
-      id: 1,
-      name: "Commercial Tower - Downtown",
-      client: "ABC Developers",
-      startDate: "2024-01-15",
-      endDate: "2025-12-31",
-      budget: 50000000,
-      spent: 22500000,
-      clientPaid: 35000000,
-      status: "In Progress",
-      progress: 45,
-      cost: {
-        labour: 150000,
-        material: 200000,
-        equipment: 100000,
-        budget: 500000,
-        spent: 450000,
-      },
-      activities: [
-        "Foundation completed",
-        "Worker checked in",
-        "Material purchased",
-      ],
-      manager: "Rajesh Kumar",
-      teamSize: 45,
-      wbs: [
-        {
-          id: "WBS-1",
-          code: "1",
-          name: "Site Preparation & Foundation",
-          status: "Completed",
-          progress: 100,
-          budget: 8000000,
-          spent: 8000000,
-          labour: 3000000,
-          material: 4500000,
-          equipment: 500000,
-
-          costDetails: {
-            labour: [
-              {
-                name: "Ravi Kumar (Supervisor)",
-                work: "Site supervision & planning",
-                amount: 120000,
-              },
-              {
-                name: "Arun (Skilled Worker)",
-                work: "Concrete mixing & leveling",
-                amount: 80000,
-              },
-              {
-                name: "Daily Workers (10)",
-                work: "Excavation & material handling",
-                amount: 150000,
-              },
-            ],
-
-            material: [
-              {
-                name: "Cement",
-                quantity: "50 bags",
-                amount: 75000,
-              },
-              {
-                name: "Steel Rods",
-                quantity: "2 tons",
-                amount: 120000,
-              },
-              {
-                name: "Sand",
-                quantity: "5 loads",
-                amount: 50000,
-              },
-              {
-                name: "Gravel",
-                quantity: "3 loads",
-                amount: 40000,
-              },
-            ],
-
-            equipment: [
-              {
-                name: "Excavator",
-                usage: "Used for digging foundation",
-                amount: 100000,
-              },
-              {
-                name: "Concrete Mixer",
-                usage: "Mixing cement",
-                amount: 50000,
-              },
-            ],
-
-            miscellaneous: [
-              {
-                name: "Transport",
-                details: "Material delivery",
-                amount: 50000,
-              },
-            ],
-          },
-
-          tasks: [
-            {
-              id: "T1",
-              code: "1.1",
-              name: "Land Clearing",
-              status: "Completed",
-            },
-            {
-              id: "T2",
-              code: "1.2",
-              name: "Soil Testing",
-            },
-            {
-              id: "T3",
-              code: "1.3",
-              name: "Foundation Excavation",
-            },
-            {
-              id: "T4",
-              code: "1.4",
-              name: "Foundation Concrete",
-            },
-          ],
-        },
-        {
-          id: "WBS-2",
-          code: "2",
-          name: "Structural Work",
-          status: "In Progress",
-          progress: 60,
-          budget: 18000000,
-          spent: 10800000,
-          labour: 5400000,
-          material: 4500000,
-          equipment: 900000,
-          tasks: [
-            {
-              id: "T5",
-              code: "2.1",
-              name: "Column Casting",
-            },
-            {
-              id: "T6",
-              code: "2.2",
-              name: "Beam Installation",
-            },
-            {
-              id: "T7",
-              code: "2.3",
-              name: "Floor Slab Casting",
-            },
-            {
-              id: "T8",
-              code: "2.4",
-              name: "Structural Testing",
-            },
-          ],
-        },
-      ],
-    },
-  ]);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Fetch error:", err);
+        setLoading(false);
+      });
+  }, []);
+  const [siteEngineers, setSiteEngineers] = useState([]);
+  useEffect(() => {
+    fetch("http://localhost:5000/api/projects/site-engineers")
+      .then((res) => res.json())
+      .then((data) => setSiteEngineers(data))
+      .catch((err) => console.error(err));
+  }, []);
+  const [managers, setManagers] = useState([]);
+  useEffect(() => {
+    fetch("http://localhost:5000/api/projects/managers")
+      .then((res) => res.json())
+      .then((data) => setManagers(data))
+      .catch((err) => console.error(err));
+  }, []);
 
   const [timesheets, setTimesheets] = useState([
     {
@@ -357,9 +107,7 @@ function ProjectManagement() {
     },
   ]);
 
-  const [selectedProject, setSelectedProject] = useState(
-    projects.find((p) => p.wbs && p.wbs.length > 0),
-  );
+  const [selectedProject, setSelectedProject] = useState(null);
   const [showTimesheetModal, setShowTimesheetModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [newTimesheet, setNewTimesheet] = useState({
@@ -409,49 +157,48 @@ function ProjectManagement() {
   });
 
   // Add new project
-  const handleAddProject = () => {
-    if (newProject.name && newProject.client && newProject.budget) {
-      const project = {
-        id: projects.length + 1,
-        name: newProject.name,
-        client: newProject.client,
-        startDate: newProject.startDate,
-        endDate: newProject.endDate,
-        budget: parseInt(newProject.budget),
-        spent: 0,
-        clientPaid: 0,
-        status: "Planning",
-        progress: 0,
-        manager: newProject.manager,
-        teamSize: parseInt(newProject.teamSize) || 0,
-        wbs: [
-          {
-            id: "WBS-1",
-            code: "1",
-            name: "Planning & Design",
-            status: "Pending",
-            progress: 0,
-            budget: parseInt(newProject.budget) * 0.1,
-            spent: 0,
-            labour: 0,
-            material: 0,
-            equipment: 0,
-            tasks: [],
-          },
-        ],
-      };
-      setProjects([...projects, project]);
-      setSelectedProject(project);
+  const handleAddProject = async () => {
+    try {
+      if (!newProject.name || !newProject.client || !newProject.budget) {
+        alert("Please fill required fields");
+        return;
+      }
+
+      const res = await fetch("http://localhost:5000/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newProject.name,
+          client: newProject.client,
+          budget: newProject.budget,
+          start_date: newProject.startDate,
+          end_date: newProject.endDate,
+          manager_id: newProject.manager_id, // ✅ ADD
+          site_engineer_id: newProject.site_engineer_id,
+        }),
+      });
+
+      const data = await res.json();
+
+      // ✅ Update UI instantly
+      setProjects((prev) => [data, ...prev]);
+      setSelectedProject(data);
+
+      // ✅ Reset form
       setNewProject({
         name: "",
         client: "",
         startDate: "",
         endDate: "",
         budget: "",
-        manager: "",
-        teamSize: "",
+        site_engineer_id: "",
       });
+
       setShowProjectModal(false);
+    } catch (err) {
+      console.error("Create project error:", err);
     }
   };
 
@@ -511,9 +258,11 @@ function ProjectManagement() {
 
   // Calculate project cost breakdown
   const costBreakdown = {
-    labour: selectedProject.wbs.reduce((sum, w) => sum + w.labour, 0),
-    material: selectedProject.wbs.reduce((sum, w) => sum + w.material, 0),
-    equipment: selectedProject.wbs.reduce((sum, w) => sum + w.equipment, 0),
+    labour: selectedProject?.wbs || [].reduce((sum, w) => sum + w.labour, 0),
+    material:
+      selectedProject?.wbs || [].reduce((sum, w) => sum + w.material, 0),
+    equipment:
+      selectedProject?.wbs || [].reduce((sum, w) => sum + w.equipment, 0),
   };
 
   // Calculate performance metrics
@@ -684,12 +433,11 @@ function ProjectManagement() {
                 ),
               )}
             </div>
-            <div className="projects-grid">
-              {projects
-                .filter((proj) =>
-                  statusFilter === "All" ? true : proj.status === statusFilter,
-                )
-                .map((proj) => (
+            {loading ? (
+              <p>Loading projects...</p>
+            ) : (
+              <div className="projects-grid">
+                {projects.map((proj) => (
                   <ProjectCard
                     key={proj.id}
                     proj={proj}
@@ -698,7 +446,8 @@ function ProjectManagement() {
                     variant="overview"
                   />
                 ))}
-            </div>
+              </div>
+            )}
             <div className="three-column-layout">
               {/* QUICK INSIGHTS */}
               <ProjectCard variant="overview">
@@ -737,64 +486,58 @@ function ProjectManagement() {
               {/* RECENT ACTIVITIES */}
               <ProjectCard variant="overview">
                 <div className="recent-activity">
-  <h3>
-    {selectedProject
-      ? `${selectedProject.name} - Recent Activities`
-      : "Recent Activities"}
-  </h3>
+                  <h3>
+                    {selectedProject
+                      ? `${selectedProject.name} - Recent Activities`
+                      : "Recent Activities"}
+                  </h3>
 
-  {(() => {
-    if (!selectedProject) return <p>No project selected</p>;
+                  {(() => {
+                    if (!selectedProject) return <p>No project selected</p>;
 
-    let activities = [];
+                    let activities = [];
 
-    // ✅ real activities first
-    if (selectedProject.activities) {
-      activities = [...selectedProject.activities];
-    }
+                    // ✅ real activities first
+                    if (selectedProject.activities) {
+                      activities = [...selectedProject.activities];
+                    }
 
-    const status = selectedProject.status;
+                    const status = selectedProject.status;
 
-    // ✅ add status-based meaningful activities
-    if (status === "Pending") {
-      activities.push(
-        "Planning phase started",
-        "Requirement discussion ongoing",
-        "Budget approval in progress"
-      );
-    }
+                    // ✅ add status-based meaningful activities
+                    if (status === "Pending") {
+                      activities.push(
+                        "Planning phase started",
+                        "Requirement discussion ongoing",
+                        "Budget approval in progress",
+                      );
+                    } else if (status === "Completed") {
+                      activities.push(
+                        "All work completed successfully",
+                        "Final inspection completed",
+                        "Project handed over",
+                      );
+                    } else if (status === "In Progress") {
+                      activities.push(
+                        "Work currently in progress",
+                        "Site activity ongoing",
+                        "Materials being utilized",
+                      );
+                    } else if (status === "Rejected") {
+                      activities.push(
+                        "Project proposal rejected",
+                        "Approval not granted",
+                      );
+                    }
 
-    else if (status === "Completed") {
-      activities.push(
-        "All work completed successfully",
-        "Final inspection completed",
-        "Project handed over"
-      );
-    }
+                    // remove duplicates
+                    activities = [...new Set(activities)];
 
-    else if (status === "In Progress") {
-      activities.push(
-        "Work currently in progress",
-        "Site activity ongoing",
-        "Materials being utilized"
-      );
-    }
-
-    else if (status === "Rejected") {
-      activities.push(
-        "Project proposal rejected",
-        "Approval not granted"
-      );
-    }
-
-    // remove duplicates
-    activities = [...new Set(activities)];
-
-    return activities.map((act, index) => (
-      <p key={index}>• {act}</p>
-    ));
-  })()}
-</div>
+                    return activities.map((act, index) => (
+                      <p key={index}>• {act}</p>
+                    ));
+                  })()}
+                </div>
               </ProjectCard>
             </div>
           </div>
@@ -889,11 +632,12 @@ function ProjectManagement() {
                         }
                       >
                         <option>Select Task</option>
-                        {selectedProject.wbs.map((wbs) =>
-                          wbs.tasks.map((task) => (
-                            <option key={task.id}>{task.name}</option>
-                          )),
-                        )}
+                        {selectedProject?.wbs ||
+                          [].map((wbs) =>
+                            wbs.tasks.map((task) => (
+                              <option key={task.id}>{task.name}</option>
+                            )),
+                          )}
                       </select>
                     </div>
                     <div className="form-row">
@@ -1054,17 +798,16 @@ function ProjectManagement() {
                     <div
                       className="progress-fill"
                       style={{
-                        width: `${(selectedProject.wbs.filter((w) => w.status === "Completed").length / selectedProject.wbs.length) * 100}%`,
+                        width: `${(selectedProject?.wbs || [].filter((w) => w.status === "Completed").length / selectedProject?.wbs || [].length) * 100}%`,
                       }}
                     ></div>
                   </div>
                   <span className="metric-value">
                     {Math.round(
-                      (selectedProject.wbs.filter(
-                        (w) => w.status === "Completed",
-                      ).length /
-                        selectedProject.wbs.length) *
-                        100,
+                      (selectedProject?.wbs ||
+                        [].filter((w) => w.status === "Completed").length /
+                          selectedProject?.wbs ||
+                        [].length) * 100,
                     )}
                     %
                   </span>
@@ -1384,17 +1127,43 @@ function ProjectManagement() {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Project Manager</label>
-                    <input
-                      type="text"
-                      placeholder="Manager name"
-                      value={newProject.manager}
+                    <select
+                      value={newProject.manager_id || ""}
                       onChange={(e) =>
                         setNewProject({
                           ...newProject,
-                          manager: e.target.value,
+                          manager_id: e.target.value,
                         })
                       }
-                    />
+                    >
+                      <option value="">Select Manager</option>
+
+                      {managers.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Site Engineer</label>
+                    <select
+                      value={newProject.site_engineer_id || ""}
+                      onChange={(e) =>
+                        setNewProject({
+                          ...newProject,
+                          site_engineer_id: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="">Select Site Engineer</option>
+
+                      {siteEngineers.map((eng) => (
+                        <option key={eng.id} value={eng.id}>
+                          {eng.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="form-group">
                     <label>Team Size</label>
