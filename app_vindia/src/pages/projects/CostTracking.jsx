@@ -10,17 +10,10 @@ function CostTracking({
   calculateRemaining,
   calculatePercentage,
 }) {
-  // ❌ Rejected
   if (selectedProject?.status === "Rejected") {
     return <h3 style={{ textAlign: "center" }}>❌ No Cost Tracking</h3>;
   }
 
-  // ❌ Pending
-  if (selectedProject?.status === "Pending") {
-    return <h3 style={{ textAlign: "center" }}>⏳ Not Available</h3>;
-  }
-
-  // ✅ Calculate misc total
   const miscTotal = selectedProject.wbs.reduce(
     (sum, w) =>
       sum +
@@ -40,85 +33,24 @@ function CostTracking({
         <h3>Cost Breakdown by Category</h3>
 
         <div className="cost-cards">
-
           <div className="cost-card labour">
             <div className="cost-label">LABOUR COST</div>
             <h2>₹{(costBreakdown.labour / 10000000).toFixed(1)}Cr</h2>
-            <p>
-              {selectedProject.spent > 0
-                ? ((costBreakdown.labour / selectedProject.spent) * 100).toFixed(1)
-                : 0}
-              % of total
-            </p>
           </div>
 
           <div className="cost-card material">
             <div className="cost-label">MATERIAL COST</div>
             <h2>₹{(costBreakdown.material / 10000000).toFixed(1)}Cr</h2>
-            <p>
-              {selectedProject.spent > 0
-                ? ((costBreakdown.material / selectedProject.spent) * 100).toFixed(1)
-                : 0}
-              % of total
-            </p>
           </div>
 
           <div className="cost-card equipment">
             <div className="cost-label">EQUIPMENT COST</div>
             <h2>₹{(costBreakdown.equipment / 10000000).toFixed(1)}Cr</h2>
-            <p>
-              {selectedProject.spent > 0
-                ? ((costBreakdown.equipment / selectedProject.spent) * 100).toFixed(1)
-                : 0}
-              % of total
-            </p>
           </div>
 
           <div className="cost-card misc">
-            <div className="cost-label">MISCELLANEOUS COST</div>
+            <div className="cost-label">MISC COST</div>
             <h2>₹{(miscTotal / 10000000).toFixed(1)}Cr</h2>
-            <p>
-              {selectedProject.spent > 0
-                ? ((miscTotal / selectedProject.spent) * 100).toFixed(1)
-                : 0}
-              % of total
-            </p>
-          </div>
-
-        </div>
-      </div>
-
-      {/* 🔥 BUDGET VS SPENT */}
-      <div className="budget-comparison">
-        <h3>Budget vs Actual Spending</h3>
-
-        <div className="comparison-chart">
-          <div className="chart-item">
-            <div className="chart-label">Budget</div>
-            <div className="chart-bar budget">
-              ₹{(selectedProject.budget / 10000000).toFixed(1)}Cr
-            </div>
-          </div>
-
-          <div className="chart-item">
-            <div className="chart-label">Spent</div>
-            <div className="chart-bar spent">
-              ₹{(selectedProject.spent / 10000000).toFixed(1)}Cr
-            </div>
-          </div>
-
-          <div className="chart-item">
-            <div className="chart-label">Remaining</div>
-            <div className="chart-bar remaining">
-              ₹
-              {(
-                calculateRemaining(
-                  selectedProject.budget,
-                  selectedProject.spent
-                ) / 10000000
-              ).toFixed(1)}
-              Cr
-            </div>
           </div>
         </div>
       </div>
@@ -137,7 +69,6 @@ function CostTracking({
 
         {selectedProject.wbs.map((wbs) => (
           <div key={wbs.id}>
-
             {/* ROW */}
             <div
               className="table-row"
@@ -154,11 +85,11 @@ function CostTracking({
               <div>{calculatePercentage(wbs.spent, wbs.budget)}%</div>
             </div>
 
-            {/* EXPAND */}
+            {/* 🔥 EXPAND */}
             {activePhase === wbs.id && (
               <div className="expanded-row">
 
-                {/* BUTTONS */}
+                {/* 🔥 CATEGORY BUTTONS */}
                 <div className="category-buttons">
                   {["labour", "material", "equipment", "miscellaneous"].map(
                     (cat) => (
@@ -177,31 +108,113 @@ function CostTracking({
                   )}
                 </div>
 
-                {/* TOTAL */}
-                {activeCategory && (
-                  <div className="summary-box">
+                {/* 🔥 TABLES */}
+                {activeCategory === "labour" && (
+                  <div className="table-wrapper">
+                    <table className="cost-table">
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th>Workers</th>
+                          <th>Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(wbs.costDetails?.labour || []).map((item, i) => (
+                          <tr key={i}>
+                            <td>{item.name}</td>
+                            <td>{item.workers || 0}</td>
+                            <td>₹{item.amount}</td>
+                          </tr>
+                        ))}
+                        <tr style={{ fontWeight: "bold" }}>
+                          <td>Total</td>
+                          <td>
+                            {(wbs.costDetails?.labour || []).reduce(
+                              (sum, i) => sum + (i.workers || 0),
+                              0
+                            )}
+                          </td>
+                          <td>
+                            ₹
+                            {(wbs.costDetails?.labour || []).reduce(
+                              (sum, i) => sum + (i.amount || 0),
+                              0
+                            )}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-                    {activeCategory === "labour" && <p>₹{wbs.labour}</p>}
-                    {activeCategory === "material" && <p>₹{wbs.material}</p>}
-                    {activeCategory === "equipment" && <p>₹{wbs.equipment}</p>}
+                {activeCategory === "material" && (
+                  <div className="table-wrapper">
+                    <table className="cost-table">
+                      <thead>
+                        <tr>
+                          <th>Material</th>
+                          <th>Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(wbs.costDetails?.material || []).map((item, i) => (
+                          <tr key={i}>
+                            <td>{item.name}</td>
+                            <td>₹{item.amount}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-                    {activeCategory === "miscellaneous" && (
-                      <p>
-                        ₹{
-                          (wbs.costDetails?.miscellaneous || []).reduce(
-                            (sum, i) => sum + i.amount,
-                            0
+                {activeCategory === "equipment" && (
+                  <div className="table-wrapper">
+                    <table className="cost-table">
+                      <thead>
+                        <tr>
+                          <th>Equipment</th>
+                          <th>Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(wbs.costDetails?.equipment || []).map((item, i) => (
+                          <tr key={i}>
+                            <td>{item.name}</td>
+                            <td>₹{item.amount}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {activeCategory === "miscellaneous" && (
+                  <div className="table-wrapper">
+                    <table className="cost-table">
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th>Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(wbs.costDetails?.miscellaneous || []).map(
+                          (item, i) => (
+                            <tr key={i}>
+                              <td>{item.name}</td>
+                              <td>₹{item.amount}</td>
+                            </tr>
                           )
-                        }
-                      </p>
-                    )}
-
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 )}
 
               </div>
             )}
-
           </div>
         ))}
       </div>

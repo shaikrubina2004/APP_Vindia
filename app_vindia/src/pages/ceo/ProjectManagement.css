@@ -1432,9 +1432,26 @@
   cursor: pointer;
 }
 
+ /* ORIGINAL BUTTON STYLE */
+.cat-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: none;
+  background: #e5e7eb;
+  color: #333;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* ACTIVE BUTTON (SOFT GREY LIKE BEFORE) */
 .cat-btn.active {
-  background: #2563eb;
-  color: white;
+  background: #cbd5f5;  /* soft purple/blue like your screenshot */
+  color: #1e3a8a;
+}
+
+/* HOVER */
+.cat-btn:hover {
+  background: #e2e8f0;
 }
 
 .cost-item {
@@ -1683,4 +1700,227 @@
   padding: 12px;
   border-radius: 10px;
   margin-top: 10px;
+}
+.cost-table {
+  width: auto;          /* 🔥 important */
+  min-width: 400px;     /* optional */
+
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 12px;
+  font-size: 14px;
+  background: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* HEADER */
+.cost-table th {
+  background: #f5f7fa;
+  color: #333;
+  font-weight: 600;
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* BODY */
+.cost-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  color: #444;
+}
+
+/* ROW HOVER EFFECT */
+.cost-table tbody tr:hover {
+  background: #f9fbff;
+  transition: 0.2s ease;
+}
+
+/* ALTERNATE ROW */
+.cost-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+/* TOTAL ROW */
+.cost-table tbody tr:last-child {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+
+/* ROUND CORNERS */
+.cost-table th:first-child {
+  border-top-left-radius: 10px;
+}
+.cost-table th:last-child {
+  border-top-right-radius: 10px;
+}
+/* 🔥 FIX DROPDOWN BOX */
+.expanded-row {
+  background: #f8fafc;
+  padding: 15px;
+  border-radius: 10px;
+  margin-top: 10px;
+  animation: fadeIn 0.3s ease;
+}
+
+/* 🔥 BUTTON ALIGNMENT */
+.category-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* 🔥 TABLE WRAPPER */
+.table-wrapper {
+  display: inline-block;   /* 🔥 makes table compact */
+}
+
+/* 🔥 TABLE FIX */
+.cost-table {
+  width: 100%;
+  min-width: 500px;
+}
+
+/* 🔥 SMOOTH ANIMATION */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* 🔵 CATEGORY BUTTONS */
+.cat-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: none;
+  background: #e5e7eb;
+  color: #333;
+  font-weight: 500;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.cat-btn.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.cat-btn:hover {
+  background: #dbeafe;
+}
+
+/* 📦 BOX BACKGROUND */
+.summary-box {
+  background: #f8fafc;
+  padding: 15px;
+  border-radius: 10px;
+}
+
+/* 📊 TABLE HEADER */
+.cost-table th {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+/* 🔥 TOTAL ROW */
+.cost-table tr:last-child {
+  background: #e0f2fe;
+}
+.cost-card {
+  padding: 18px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fafc, #eef2ff);
+  border: 1px solid #e5e7eb;
+  transition: 0.2s;
+}
+
+.cost-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.08);
+}
+
+/* individual soft colors */
+.cost-card.labour {
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+}
+
+.cost-card.material {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+}
+
+.cost-card.equipment {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+}
+
+.cost-card.misc {
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+}.cat-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: none;
+  background: #e5e7eb;
+  color: #374151;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cat-btn.active {
+  background: #2563eb;
+  color: white;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+}
+
+.cat-btn:hover {
+  background: #dbeafe;
+}
+.cost-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 10px;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+}
+
+.cost-table th {
+  background: #f1f5f9;
+  color: #1e293b;
+  padding: 12px;
+}
+
+.cost-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.cost-table tr:hover {
+  background: #f8fafc;
+}
+.expanded-row {
+  background: #f9fafb;
+  padding: 16px;
+  border-radius: 12px;
+  margin-top: 10px;
+  border: 1px solid #e5e7eb;
+}
+.cost-section {
+  padding: 20px;
+}
+
+.cost-section h2 {
+  margin-bottom: 10px;
+}
+
+.cost-section h3 {
+  margin: 15px 0;
 }
