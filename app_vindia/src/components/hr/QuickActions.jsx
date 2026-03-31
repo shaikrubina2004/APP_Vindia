@@ -1,27 +1,33 @@
 import { useNavigate } from "react-router-dom";
+import { FaUserPlus, FaCheckCircle, FaFileUpload } from "react-icons/fa";
 
-function QuickActions(){
+function QuickActions() {
+  const navigate = useNavigate();
 
-  const navigate = useNavigate(); 
+  return (
+    <div className="card quick-actions-card">
+      <h3>⚡ Quick Actions</h3>
 
-  return(
+      <div className="actions-grid">
 
-    <div className="quick-actions">
+        <button onClick={() => navigate("/hr/add-employee")}>
+          <FaUserPlus />
+          <span>Add Employee</span>
+        </button>
 
-      <h3>Quick Actions</h3>
+        <button onClick={() => navigate("/hr/leaves")}>
+          <FaCheckCircle />
+          <span>Approve Leave</span>
+        </button>
 
-      <button onClick={() => navigate("/hr/add-employee")}>
-        Add Employee
-      </button>
+        <button onClick={() => navigate("/hr/documents")}>
+          <FaFileUpload />
+          <span>Upload Document</span>
+        </button>
 
-      <button>Approve Leave</button>
-      <button>Upload Document</button>
-      <button>Generate HR Letter</button>
-
+      </div>
     </div>
-
-  )
-
+  );
 }
 
 export default QuickActions;

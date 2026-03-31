@@ -27,11 +27,11 @@ function HRDashboard() {
         <AttendanceChart />
         <PendingRequests />
         <Birthdays />
+        <QuickActions />
 
       </div>
 
-      {/* Quick Actions */}
-      <QuickActions />
+      
 
     </div>
 
