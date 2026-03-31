@@ -2,12 +2,47 @@ const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
-const { createEmployee, getAllEmployees, getEmployeeById, updateEmployee, deleteEmployee } = require("../controllers/employeeController");
+const upload = require("../middleware/upload");
 
-router.post("/", authMiddleware, createEmployee);
+const {
+  createEmployee,
+  getAllEmployees,
+  getEmployeeById,
+  updateEmployee,
+  deleteEmployee,
+} = require("../controllers/employeeController");
+
+// ✅ CREATE EMPLOYEE (WITH FILE UPLOAD)
+router.post(
+  "/",
+  authMiddleware,
+  upload.fields([
+    { name: "profile_photo", maxCount: 1 },
+    { name: "id_proof", maxCount: 1 },
+    { name: "offer_letter", maxCount: 1 },
+    { name: "certificates", maxCount: 1 },
+  ]),
+  createEmployee
+);
+
+// ✅ GET
 router.get("/", authMiddleware, getAllEmployees);
 router.get("/:id", authMiddleware, getEmployeeById);
-router.put("/:id", authMiddleware, updateEmployee);
+
+// ✅ UPDATE (WITH FILE UPLOAD)
+router.put(
+  "/:id",
+  authMiddleware,
+  upload.fields([
+    { name: "profile_photo", maxCount: 1 },
+    { name: "id_proof", maxCount: 1 },
+    { name: "offer_letter", maxCount: 1 },
+    { name: "certificates", maxCount: 1 },
+  ]),
+  updateEmployee
+);
+
+// ✅ DELETE
 router.delete("/:id", authMiddleware, deleteEmployee);
 
 module.exports = router;
