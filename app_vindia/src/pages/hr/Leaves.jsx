@@ -1,3 +1,5 @@
+import { API } from "../../services/authService";
+import React from "react";
 import { useState, useEffect } from "react";
 import "./Leaves.css";
 
@@ -11,99 +13,71 @@ function Leaves() {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [message, setMessage] = useState("");
+  const today = new Date().toLocaleDateString("en-CA");
+  const [summaryData, setSummaryData] = useState(null);
 
-  const today = new Date().toISOString().slice(0, 10);
-
-  const [leaves, setLeaves] = useState([
-    {
-      name: "Ravi",
-      type: "Sick Leave",
-      date: today,
-      status: "Pending",
-      joiningDate: "2026-01-01",
-    },
-    {
-      name: "Meena",
-      type: "Casual Leave",
-      date: today,
-      status: "Pending",
-      joiningDate: "2026-02-01",
-    },
-    {
-      name: "Arjun",
-      type: "Casual Leave",
-      date: today,
-      status: "Pending",
-      joiningDate: "2026-01-15",
-    },
-    {
-      name: "Anu",
-      type: "Sick Leave",
-      date: today,
-      status: "Pending",
-      joiningDate: "2025-12-01",
-    },
-    {
-      name: "Faisal",
-      type: "Casual Leave",
-      date: today,
-      status: "Pending",
-      joiningDate: "2025-11-10",
-    },
-
-    // Approved Data
-    {
-      name: "Ravi",
-      type: "Casual Leave",
-      date: "2026-02-10",
-      status: "Approved",
-      joiningDate: "2026-01-01",
-    },
-    {
-      name: "Ravi",
-      type: "Sick Leave",
-      date: "2026-02-05",
-      status: "Approved",
-      joiningDate: "2026-01-01",
-    },
-    {
-      name: "Ravi",
-      type: "Sick Leave",
-      date: "2026-03-02",
-      status: "Approved",
-      joiningDate: "2026-01-01",
-    },
-    {
-      name: "Meena",
-      type: "Casual Leave",
-      date: "2026-02-05",
-      status: "Approved",
-      joiningDate: "2026-02-01",
-    },
-    {
-      name: "Meena",
-      type: "Sick Leave",
-      date: "2026-03-08",
-      status: "Approved",
-      joiningDate: "2026-02-01",
-    },
-  ]);
+  const [leaves, setLeaves] = useState([]);
 
   useEffect(() => {
-    if (message) {
-      const t = setTimeout(() => setMessage(""), 2500);
-      return () => clearTimeout(t);
-    }
-  }, [message]);
+  fetchLeaves();
+}, []);
+
+
+  const fetchLeaves = async () => {
+  try {
+    const res = await API.get("/leaves");
+
+    console.log("LEAVES:", res.data);
+
+    // map backend → UI format
+    const formatted = res.data.map((l) => ({
+      id: l.id,
+      employee_id: l.employee_id,   // ✅ ADD THIS
+      name: l.name,
+      type: l.reason,
+      date: l.from_date,
+      status: l.status,
+    }));
+
+    setLeaves(formatted);
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   // ✅ APPROVE / REJECT FUNCTION
-  const handleAction = (index, newStatus) => {
-    const updatedLeaves = [...leaves];
-    updatedLeaves[index].status = newStatus;
-    setLeaves(updatedLeaves);
+  const handleAction = async (id, newStatus) => {
+  try {
+    await API.put(`/leaves/${id}/status`, {
+      status: newStatus,
+    });
 
+    fetchLeaves(); // reload from DB
     setMessage(`Leave ${newStatus} successfully`);
-  };
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+const fetchSummary = async (id) => {
+  try {
+    const res = await API.get(`/leaves/summary/${id}`);
+
+    console.log("SUMMARY:", res.data);
+
+    // ✅ convert to numbers
+    const formatted = {
+      total: Number(res.data.total),
+      sick: Number(res.data.sick),
+      casual: Number(res.data.casual),
+    };
+
+    setSummaryData(formatted);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
 
   // 🔥 MONTHLY FUNCTION
   const getMonthlyLeaves = (name) => {
@@ -143,7 +117,7 @@ function Leaves() {
     ).length;
 
     const totalTaken = sickTaken + casualTaken;
-    const balance = Math.max(maxTotalLeaves - totalTaken, 0);
+    const balance = maxTotalLeaves - (summaryData.total || 0);
     const extraLeaves = Math.max(totalTaken - maxTotalLeaves, 0);
 
     return {
@@ -154,8 +128,8 @@ function Leaves() {
       cut: extraLeaves * salaryPerDay,
     };
   };
+console.log("SUMMARY STATE:", summaryData);
 
-  const summary = selectedEmployee && calculateSummary(selectedEmployee);
 
   return (
     <div className="leave-page">
@@ -183,149 +157,114 @@ function Leaves() {
             </thead>
 
             <tbody>
-              {leaves
-                .sort((a, b) => new Date(a.date) - new Date(b.date))
-                .map(
-                  (l, i) =>
-                    l.date === today && (
-                      <>
-                        <tr key={i}>
-                          <td className="emp">{l.name}</td>
-                          <td>{l.type}</td>
-                          <td>{l.date}</td>
+  {leaves
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .filter((l) => {
+      const localDate = new Date(l.date).toLocaleDateString("en-CA");
+      return localDate === today;
+    })
+    .map((l, i) => (
+      <React.Fragment key={l.id}>
+        {/* MAIN ROW */}
+        <tr>
+          <td className="emp">{l.name}</td>
+          <td>{l.type}</td>
+          <td>{l.date}</td>
 
-                          <td>
-                            <span className={`tag ${l.status.toLowerCase()}`}>
-                              {l.status}
-                            </span>
-                          </td>
+          <td>
+            <span className={`tag ${l.status.toLowerCase()}`}>
+              {l.status}
+            </span>
+          </td>
 
-                          <td>
-                            {l.status === "Pending" && (
-                              <>
-                                <button
-                                  onClick={() =>
-                                    handleAction(i, "Approved")
-                                  }
-                                >
-                                  Approve
-                                </button>
+          <td>
+            {l.status === "Pending" && (
+              <>
+                <button onClick={() => handleAction(l.id, "Approved")}>
+                  Approve
+                </button>
 
-                                <button
-                                  onClick={() =>
-                                    handleAction(i, "Rejected")
-                                  }
-                                >
-                                  Reject
-                                </button>
-                              </>
-                            )}
-                          </td>
+                <button onClick={() => handleAction(l.id, "Rejected")}>
+                  Reject
+                </button>
+              </>
+            )}
+          </td>
 
-                          <td>
-                            <button
-                              className="view"
-                              onClick={() => {
-                                if (selectedIndex === i) {
-                                  setSelectedIndex(null);
-                                  setSelectedEmployee(null);
-                                } else {
-                                  setSelectedEmployee(l.name);
-                                  setSelectedIndex(i);
-                                }
-                              }}
-                            >
-                              {selectedIndex === i ? "Hide" : "View"}
-                            </button>
-                          </td>
-                        </tr>
+          <td>
+            <button
+              className="view"
+              onClick={() => {
+                if (selectedIndex === i) {
+                  setSelectedIndex(null);
+                  setSelectedEmployee(null);
+                  setSummaryData(null);
+                } else {
+                  setSelectedEmployee(l.name);
+                  setSelectedIndex(i);
+                 setSummaryData(null);  // ✅ ADD THIS
+                fetchSummary(l.employee_id); // ✅ FIXED
+                }
+              }}
+            >
+              {selectedIndex === i ? "Hide" : "View"}
+            </button>
+          </td>
+        </tr>
 
-                        {selectedIndex === i && summary && (
-                          <tr>
-                            <td colSpan="6">
-                              <div className="summary">
-                                <h3>{selectedEmployee}</h3>
+        {/* SUMMARY ROW */}
+        {selectedIndex === i && summaryData !== null && (
+          <tr>
+            <td colSpan="6">
+              <div className="summary">
+                <h3>{selectedEmployee}</h3>
 
-                                <div className="grid">
-                                  <div>
-                                    <span>Total Leave Taken</span>
-                                    <b>{summary.total}</b>
-                                  </div>
+                <div className="grid">
+                  <div>
+                    <span>Total Leave Taken</span>
+                    <b>{summaryData.total || 0}</b>
+                  </div>
 
-                                  <div>
-                                    <span>Sick Leave Taken</span>
-                                    <b>{summary.sick}</b>
-                                  </div>
+                  <div>
+                    <span>Sick Leave Taken</span>
+                    <b>{summaryData.sick || 0}</b>
+                  </div>
 
-                                  <div>
-                                    <span>Casual Leave Taken</span>
-                                    <b>{summary.casual}</b>
-                                  </div>
+                  <div>
+                    <span>Casual Leave Taken</span>
+                    <b>{summaryData.casual || 0}</b>
+                  </div>
 
-                                  <div>
-                                    <span>Balance (Till Date)</span>
-                                    <b>{summary.balance}</b>
-                                  </div>
+                  <div>
+                    <span>Balance</span>
+                    <b>{maxTotalLeaves - (summaryData.total || 0)}</b>
+                  </div>
 
-                                  <div>
-                                    <span>Salary Cut (LOP)</span>
-                                    <b
-                                      style={{
-                                        color:
-                                          summary.cut > 0 ? "red" : "green",
-                                      }}
-                                    >
-                                      ₹{summary.cut}
-                                    </b>
-                                  </div>
-                                </div>
-
-                                <div style={{ marginTop: "15px" }}>
-                                  <h4 style={{ color: "#1e3a8a" }}>
-                                    Monthly Leaves
-                                  </h4>
-
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      gap: "12px",
-                                      flexWrap: "wrap",
-                                    }}
-                                  >
-                                    {Object.entries(
-                                      getMonthlyLeaves(selectedEmployee)
-                                    ).map(([month, data]) => (
-                                      <div
-                                        key={month}
-                                        style={{
-                                          padding: "12px",
-                                          background: "#f9fbff",
-                                          border: "1px solid #e5e7eb",
-                                          borderRadius: "8px",
-                                          minWidth: "130px",
-                                        }}
-                                      >
-                                        <div style={{ fontWeight: "600" }}>
-                                          {month}
-                                        </div>
-                                        <div>
-                                          Casual: <b>{data.casual}</b>
-                                        </div>
-                                        <div>
-                                          Sick: <b>{data.sick}</b>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </>
-                    )
-                )}
-            </tbody>
+                  <div>
+                    <span>Salary Cut</span>
+                    <b
+                      style={{
+                        color:
+                          (summaryData.total || 0) > maxTotalLeaves
+                            ? "red"
+                            : "green",
+                      }}
+                    >
+                      ₹
+                      {Math.max(
+                        (summaryData.total || 0) - maxTotalLeaves,
+                        0
+                      ) * salaryPerDay}
+                    </b>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+        )}
+      </React.Fragment>
+    ))}
+</tbody>
           </table>
         </div>
       </div>

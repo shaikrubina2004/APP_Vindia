@@ -57,15 +57,46 @@ exports.getLeavesByEmployee = async (req, res) => {
  */
 exports.getAllLeaves = async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT * FROM leaves
-       ORDER BY created_at DESC`
-    );
+    const result = await pool.query(`
+      SELECT 
+        leaves.id,
+         leaves.employee_id, 
+        leaves.from_date,
+        leaves.to_date,
+        leaves.reason,
+        leaves.status,
+        employees.name   -- ✅ THIS IS IMPORTANT
+      FROM leaves
+      JOIN employees 
+      ON leaves.employee_id = employees.id
+      ORDER BY leaves.created_at DESC
+    `);
 
     res.status(200).json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch leaves" });
+  }
+};
+
+// ✅ NEW: Get summary from DB
+exports.getLeaveSummary = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE status = 'Approved') AS total,
+        COUNT(*) FILTER (WHERE reason = 'Sick Leave' AND status='Approved') AS sick,
+        COUNT(*) FILTER (WHERE reason = 'Casual Leave' AND status='Approved') AS casual
+      FROM leaves
+      WHERE employee_id = $1
+    `, [id]);
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Summary failed" });
   }
 };
 
