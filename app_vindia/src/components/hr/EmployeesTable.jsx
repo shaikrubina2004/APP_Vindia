@@ -15,19 +15,20 @@ function EmployeesTable({ employees, search }) {
     );
   };
 
-  const formatDate = (date) => new Date(date).toLocaleDateString();
+  // const formatDate = (date) => new Date(date).toLocaleDateString();
 
   // 🔍 FUZZY SEARCH
-  const filteredEmployees = useMemo(() => {
-    if (!search) return employees;
-
-    const fuse = new Fuse(employees, {
+  const fuse = useMemo(() => {
+    return new Fuse(employees, {
       keys: ["name", "email", "department", "designation"],
       threshold: 0.3,
     });
+  }, [employees]);
 
+  const filteredEmployees = useMemo(() => {
+    if (!search) return employees;
     return fuse.search(search).map((result) => result.item);
-  }, [search, employees]);
+  }, [search, fuse, employees]);
 
   return (
     <div className="employees-table">
