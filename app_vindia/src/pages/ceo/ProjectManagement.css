@@ -1992,3 +1992,26 @@
   transform: translateY(-4px);
   box-shadow: 0 6px 18px rgba(30, 90, 150, 0.12);
 }
+.table-header,
+.table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr; /* 🔥 FIX */
+  align-items: center;
+  padding: 10px 15px;
+}
+
+.table-header {
+  font-weight: bold;
+  background: #f5f7fa;
+  border-bottom: 2px solid #ddd;
+}
+
+.table-row {
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.table-row:hover {
+  background: #f9fbff;
+}
