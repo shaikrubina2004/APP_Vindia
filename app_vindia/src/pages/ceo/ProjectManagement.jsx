@@ -72,14 +72,19 @@ const [selectedProject, setSelectedProject] = useState(null);
 
 const [costSummary, setCostSummary] = useState([]);
 
+
 useEffect(() => {
-  if (!selectedProject?.id) return;
+  if (!selectedProject) return;
 
   fetch(`http://localhost:5000/api/cost-summary/${selectedProject.id}`)
-    .then(res => res.json())
-    .then(data => setCostSummary(data))
-    .catch(err => console.error(err));
+    .then((res) => res.json())
+    .then((data) => {
+      console.log("API DATA:", data); // 👈 check this
+      setCostSummary(data);
+    })
+    .catch((err) => console.error(err));
 }, [selectedProject]);
+
 
   const [timesheets, setTimesheets] = useState([
     {
@@ -269,11 +274,13 @@ useEffect(() => {
   };
 
   // Calculate project cost breakdown
-  const costBreakdown = {
-  labour: costSummary.reduce((s, w) => s + w.labour_cost, 0),
-  material: costSummary.reduce((s, w) => s + w.material_cost, 0),
-  equipment: costSummary.reduce((s, w) => s + w.equipment_cost, 0),
-  misc: costSummary.reduce((s, w) => s + w.misc_cost, 0),
+ const safeData = Array.isArray(costSummary) ? costSummary : [];
+
+const costBreakdown = {
+  labour: safeData.reduce((s, w) => s + Number(w.labour_cost || 0), 0),
+  material: safeData.reduce((s, w) => s + Number(w.material_cost || 0), 0),
+  equipment: safeData.reduce((s, w) => s + Number(w.equipment_cost || 0), 0),
+  misc: safeData.reduce((s, w) => s + Number(w.misc_cost || 0), 0),
 };
 
   // Calculate performance metrics

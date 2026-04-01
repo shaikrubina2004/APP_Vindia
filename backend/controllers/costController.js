@@ -1,22 +1,36 @@
-const pool = require("../config/db"); // your postgres connection
+const pool = require("../config/db");
 
-// 🔥 COST SUMMARY (ONLY PARENT TASKS)
+
+// 🔥 COST SUMMARY (ALL LEVELS - FIXED)
 exports.getCostSummary = async (req, res) => {
   const { projectId } = req.params;
 
   try {
     const result = await pool.query(`
+      -- 🔥 RECURSIVE TREE (ALL LEVELS)
+      WITH RECURSIVE wbs_tree AS (
+        SELECT id, parent_id
+        FROM wbs
+        WHERE project_id = $1
+
+        UNION ALL
+
+        SELECT w.id, w.parent_id
+        FROM wbs w
+        INNER JOIN wbs_tree wt ON w.parent_id = wt.id
+      )
+
       SELECT 
         w.id AS wbs_id,
         w.name,
-        w.budget,
+        COALESCE(w.budget, 0) AS budget,
 
         -- 👷 LABOUR
         COALESCE((
           SELECT SUM(cost)
           FROM wbs_labour
           WHERE task_id IN (
-            SELECT id FROM wbs WHERE parent_id = w.id OR id = w.id
+            SELECT id FROM wbs_tree WHERE parent_id = w.id OR id = w.id
           )
         ), 0) AS labour_cost,
 
@@ -25,7 +39,7 @@ exports.getCostSummary = async (req, res) => {
           SELECT SUM(total)
           FROM wbs_material
           WHERE task_id IN (
-            SELECT id FROM wbs WHERE parent_id = w.id OR id = w.id
+            SELECT id FROM wbs_tree WHERE parent_id = w.id OR id = w.id
           )
         ), 0) AS material_cost,
 
@@ -34,16 +48,16 @@ exports.getCostSummary = async (req, res) => {
           SELECT SUM(cost)
           FROM wbs_equipment
           WHERE task_id IN (
-            SELECT id FROM wbs WHERE parent_id = w.id OR id = w.id
+            SELECT id FROM wbs_tree WHERE parent_id = w.id OR id = w.id
           )
         ), 0) AS equipment_cost,
 
-        -- 📦 MISC
+        -- 📦 MISC (🔥 FIXED — NOW INCLUDES ALL LEVELS)
         COALESCE((
           SELECT SUM(cost)
           FROM wbs_miscellaneous
           WHERE task_id IN (
-            SELECT id FROM wbs WHERE parent_id = w.id OR id = w.id
+            SELECT id FROM wbs_tree WHERE parent_id = w.id OR id = w.id
           )
         ), 0) AS misc_cost
 
@@ -53,6 +67,7 @@ exports.getCostSummary = async (req, res) => {
     `, [projectId]);
 
     res.json(result.rows);
+
   } catch (err) {
     console.error("Cost Summary Error:", err);
     res.status(500).json({ error: "Server error" });
@@ -60,12 +75,12 @@ exports.getCostSummary = async (req, res) => {
 };
 
 
-// 🔥 COST DETAILS (AGGREGATED)
+
+// 🔥 COST DETAILS (ALSO FIXED FOR ALL LEVELS)
 exports.getCostDetails = async (req, res) => {
   const { wbsId } = req.params;
 
   try {
-    // 👷 LABOUR
     const labour = await pool.query(`
       SELECT 
         COUNT(*) AS total_workers,
@@ -76,7 +91,6 @@ exports.getCostDetails = async (req, res) => {
       )
     `, [wbsId]);
 
-    // 🧱 MATERIAL
     const material = await pool.query(`
       SELECT 
         LOWER(name) AS name,
@@ -89,7 +103,6 @@ exports.getCostDetails = async (req, res) => {
       GROUP BY LOWER(name)
     `, [wbsId]);
 
-    // 🏗️ EQUIPMENT
     const equipment = await pool.query(`
       SELECT 
         COALESCE(SUM(cost), 0) AS total_cost
@@ -99,7 +112,6 @@ exports.getCostDetails = async (req, res) => {
       )
     `, [wbsId]);
 
-    // 📦 MISC
     const misc = await pool.query(`
       SELECT name, cost
       FROM wbs_miscellaneous
@@ -109,10 +121,10 @@ exports.getCostDetails = async (req, res) => {
     `, [wbsId]);
 
     res.json({
-      labour: labour.rows[0],
-      material: material.rows,
-      equipment: equipment.rows[0],
-      miscellaneous: misc.rows
+      labour: labour.rows[0] || { total_workers: 0, total_cost: 0 },
+      material: material.rows || [],
+      equipment: equipment.rows[0] || { total_cost: 0 },
+      miscellaneous: misc.rows || []
     });
 
   } catch (err) {
