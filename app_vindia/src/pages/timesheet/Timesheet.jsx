@@ -1,6 +1,9 @@
 import { useState } from "react";
 import "../../styles/timesheet.css";
 import ApplyLeave from "../../SharedResourse/ApplyLeave";
+import ManagerTimesheet from "./ManagerTimesheet";
+
+
 
 function buildMonthWeeks(year, month) {
   const lastDate = new Date(year, month + 1, 0).getDate();
@@ -96,6 +99,21 @@ const WBS_TASKS = [
 ];
 
 export default function Timesheet() {
+  // 👇 ADD HERE
+const user = {
+  role: "PROJECT_MANAGER", // change to EMPLOYEE to test
+};
+
+const isManager = [
+  "PROJECT_MANAGER",
+  "OPERATIONS_MANAGER",
+  "HR_MANAGER",
+  "FINANCE_MANAGER",
+  "IT_MANAGER",
+  "BDM",
+].includes(user.role);
+
+const [view, setView] = useState("MY");
   const [currentDate, setCurrentDate] = useState(new Date("2026-03-23"));
   const [rows, setRows] = useState([
     {
@@ -282,7 +300,27 @@ export default function Timesheet() {
 
   return (
     <div className="ts-page">
-      {/* HEADER */}
+      {/* 👇 ADD HERE */}
+{isManager && (
+  <div className="ts-toggle">
+  <button
+    className={`ts-toggle-btn ${view === "MY" ? "active" : ""}`}
+    onClick={() => setView("MY")}
+  >
+    📄 My Timesheet
+  </button>
+
+  <button
+    className={`ts-toggle-btn ${view === "TEAM" ? "active" : ""}`}
+    onClick={() => setView("TEAM")}
+  >
+    👥 Team Timesheet
+  </button>
+</div>
+)}
+      {/* HEADER */}{(view === "MY" || !isManager) && (
+<>
+
       <div className="ts-header">
         <div className="ts-header-top">
           <div className="ts-title-block">
@@ -356,7 +394,7 @@ export default function Timesheet() {
           className="ts-btn-refresh"
           onClick={() => window.location.reload()}
           title="Refresh"
-        >
+          >
           ↻
         </button>
       </div>
@@ -389,7 +427,7 @@ export default function Timesheet() {
                     {d.label}
                     {d.isSunday && (
                       <div
-                        style={{
+                      style={{
                           fontSize: "8px",
                           fontWeight: 600,
                           opacity: 0.85,
@@ -416,11 +454,11 @@ export default function Timesheet() {
             <tbody>
               {rows.map((row, idx) => {
                 const isLastInGroup =
-                  idx === rows.length - 1 ||
-                  rows[idx + 1]?.groupId !== row.groupId;
+                idx === rows.length - 1 ||
+                rows[idx + 1]?.groupId !== row.groupId;
                 const isFirstInGroup =
-                  idx === 0 || rows[idx - 1]?.groupId !== row.groupId;
-
+                idx === 0 || rows[idx - 1]?.groupId !== row.groupId;
+                
                 return (
                   <tr
                     key={row.id}
@@ -434,7 +472,7 @@ export default function Timesheet() {
                           onChange={(e) =>
                             handleProjectSelect(row.id, e.target.value)
                           }
-                        >
+                          >
                           <option value="">Select Project</option>
                           {WBS_PROJECTS.map((p) => (
                             <option key={p.code} value={p.code}>
@@ -464,7 +502,7 @@ export default function Timesheet() {
                           }
                           disabled={!row.projectCode}
                           style={{ opacity: !row.projectCode ? 0.5 : 1 }}
-                        >
+                          >
                           <option value="">Select Task</option>
                           {WBS_TASKS.filter(
                             (t) => t.projectCode === row.projectCode,
@@ -501,7 +539,7 @@ export default function Timesheet() {
 
                     {weekDates.map((day, di) => (
                       <td
-                        key={di}
+                      key={di}
                         className={`td-hours ${day.isSunday ? "ts-sunday-cell" : ""}`}
                       >
                         <input
@@ -514,7 +552,7 @@ export default function Timesheet() {
                           onChange={(e) =>
                             handleHours(row.id, di, e.target.value)
                           }
-                        />
+                          />
                       </td>
                     ))}
 
@@ -574,6 +612,12 @@ export default function Timesheet() {
           />
         </div>
       </div>
-    </div>
+    </>
+    )}
+{isManager && view === "TEAM" && (
+  <div style={{ marginTop: "20px" }}>
+    <ManagerTimesheet />
+  </div>
+)}    </div>
   );
 }
