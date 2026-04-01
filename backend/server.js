@@ -14,6 +14,8 @@ const path = require("path");
 /* ✅ ADDED PROJECT ROUTES */
 const projectRoutes = require("./routes/projectRoutes");
 const wbsRoutes = require("./routes/wbsRoutes"); // ✅ ADD THIS
+const costRoutes = require("./routes/costRoutes");
+
 
 const app = express();
 
@@ -53,6 +55,7 @@ try {
 
   /* ✅ ADDED PROJECT ROUTE */
   app.use("/api/projects", projectRoutes);
+  app.use("/api/cost-summary", costRoutes);
 } catch (err) {
   console.error("❌ Route loading error:", err.message);
 }

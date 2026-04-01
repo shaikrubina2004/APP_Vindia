@@ -67,6 +67,19 @@ function ProjectManagement() {
       .then((data) => setManagers(data))
       .catch((err) => console.error(err));
   }, []);
+  // 🔥 MOVE THIS UP
+const [selectedProject, setSelectedProject] = useState(null);
+
+const [costSummary, setCostSummary] = useState([]);
+
+useEffect(() => {
+  if (!selectedProject?.id) return;
+
+  fetch(`http://localhost:5000/api/cost-summary/${selectedProject.id}`)
+    .then(res => res.json())
+    .then(data => setCostSummary(data))
+    .catch(err => console.error(err));
+}, [selectedProject]);
 
   const [timesheets, setTimesheets] = useState([
     {
@@ -107,7 +120,6 @@ function ProjectManagement() {
     },
   ]);
 
-  const [selectedProject, setSelectedProject] = useState(null);
   const [showTimesheetModal, setShowTimesheetModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [newTimesheet, setNewTimesheet] = useState({
@@ -258,12 +270,11 @@ function ProjectManagement() {
 
   // Calculate project cost breakdown
   const costBreakdown = {
-    labour: selectedProject?.wbs || [].reduce((sum, w) => sum + w.labour, 0),
-    material:
-      selectedProject?.wbs || [].reduce((sum, w) => sum + w.material, 0),
-    equipment:
-      selectedProject?.wbs || [].reduce((sum, w) => sum + w.equipment, 0),
-  };
+  labour: costSummary.reduce((s, w) => s + w.labour_cost, 0),
+  material: costSummary.reduce((s, w) => s + w.material_cost, 0),
+  equipment: costSummary.reduce((s, w) => s + w.equipment_cost, 0),
+  misc: costSummary.reduce((s, w) => s + w.misc_cost, 0),
+};
 
   // Calculate performance metrics
   const performanceMetrics = {
@@ -719,6 +730,7 @@ function ProjectManagement() {
             costBreakdown={costBreakdown}
             calculateRemaining={calculateRemaining}
             calculatePercentage={calculatePercentage}
+            costSummary={costSummary}
           />
         )}
 
