@@ -1,30 +1,27 @@
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { deleteEmployee, getEmployeeById } from "../../services/employeeService";
 import "./EmployeeDetails.css";
 
 function EmployeeDetails() {
-  const { state } = useLocation();
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [employee, setEmployee] = useState(state || null);
+  const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // ✅ ALWAYS FETCH FULL DATA FROM BACKEND
   useEffect(() => {
-    if (!state) {
-      fetchEmployee();
-    }
-  }, [state]);
+    fetchEmployee();
+  }, [id]);
 
   const fetchEmployee = async () => {
     try {
       setLoading(true);
-      const employeeId = id || state?.id;
 
-      if (!employeeId) return;
+      const res = await getEmployeeById(id);
+      console.log("FULL EMPLOYEE DATA:", res.data); // ✅ DEBUG
 
-      const res = await getEmployeeById(employeeId);
       setEmployee(res.data);
     } catch (err) {
       console.error(err);
@@ -52,7 +49,7 @@ function EmployeeDetails() {
     <div className="employee-details-page">
       <h1>Employee Details</h1>
 
-      {/* ✅ COMPACT INFO GRID */}
+      {/* ✅ INFO GRID */}
       <div className="details-card">
         <div className="details-grid">
           <p><strong>ID:</strong> {employee.id}</p>
@@ -64,26 +61,36 @@ function EmployeeDetails() {
           <p><strong>Manager:</strong> {employee.manager_name || "Not Assigned"}</p>
           <p><strong>Address:</strong> {employee.address || "N/A"}</p>
           <p><strong>Status:</strong> {employee.status}</p>
-          <p><strong>Joining Date:</strong> {employee.join_date ? new Date(employee.join_date).toLocaleDateString() : "N/A"}</p>
-          <p><strong>DOB:</strong> {employee.dob ? new Date(employee.dob).toLocaleDateString() : "N/A"}</p>
+
+          <p><strong>Joining Date:</strong> 
+            {employee.join_date ? new Date(employee.join_date).toLocaleDateString() : "N/A"}
+          </p>
+
+          <p><strong>DOB:</strong> 
+            {employee.dob ? new Date(employee.dob).toLocaleDateString() : "N/A"}
+          </p>
+
           <p><strong>Gender:</strong> {employee.gender || "N/A"}</p>
           <p><strong>Marital Status:</strong> {employee.marital_status || "N/A"}</p>
           <p><strong>Nationality:</strong> {employee.nationality || "N/A"}</p>
+
           <p><strong>Employee Code:</strong> {employee.employee_code || "N/A"}</p>
           <p><strong>Employment Type:</strong> {employee.employment_type || "N/A"}</p>
           <p><strong>Work Location:</strong> {employee.work_location || "N/A"}</p>
           <p><strong>Shift Timing:</strong> {employee.shift_timing || "N/A"}</p>
           <p><strong>Experience:</strong> {employee.experience || "N/A"}</p>
           <p><strong>Previous Company:</strong> {employee.previous_company || "N/A"}</p>
+
           <p><strong>Account Number:</strong> {employee.account_no || "N/A"}</p>
           <p><strong>IFSC Code:</strong> {employee.ifsc || "N/A"}</p>
           <p><strong>PAN:</strong> {employee.pan || "N/A"}</p>
           <p><strong>Aadhar:</strong> {employee.aadhar || "N/A"}</p>
+
           <p><strong>Salary:</strong> ₹{employee.salary?.toLocaleString() || "N/A"}</p>
         </div>
       </div>
 
-      {/* ✅ COMPACT DOCUMENTS GRID */}
+      {/* ✅ DOCUMENTS */}
       <h2>Documents</h2>
       <div className="details-card">
         <div className="document-grid">
@@ -154,7 +161,7 @@ function EmployeeDetails() {
         </div>
       </div>
 
-      {/* ✅ COMPACT ACTION BUTTONS */}
+      {/* ✅ ACTION BUTTONS */}
       <div className="action-buttons">
         <button
           className="edit-btn"
@@ -162,6 +169,7 @@ function EmployeeDetails() {
         >
           Edit
         </button>
+
         <button
           className="delete-btn"
           onClick={handleDelete}
