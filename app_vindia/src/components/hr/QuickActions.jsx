@@ -20,10 +20,7 @@ function QuickActions() {
           <span>Approve Leave</span>
         </button>
 
-        <button onClick={() => navigate("/hr/documents")}>
-          <FaFileUpload />
-          <span>Upload Document</span>
-        </button>
+       
 
       </div>
     </div>
