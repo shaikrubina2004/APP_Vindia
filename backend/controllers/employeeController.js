@@ -118,10 +118,19 @@ const createEmployee = async (req, res) => {
 const getAllEmployees = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT e.*, m.name AS manager_name
+      SELECT 
+        e.id,
+        e.name,
+        e.email,
+        e.department,
+        e.designation,
+        e.status,
+        e.join_date,
+        m.name AS manager_name
       FROM employees e
       LEFT JOIN employees m ON e.manager_id = m.id
       ORDER BY e.id ASC
+      LIMIT 50
     `);
 
     res.status(200).json(result.rows);
