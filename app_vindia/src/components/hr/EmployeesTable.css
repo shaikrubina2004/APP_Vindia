@@ -1,0 +1,95 @@
+.employees-table {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+/* Table */
+.employees-table table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Header */
+.employees-table thead {
+  background: #f9fafb;
+}
+
+.employees-table th {
+  text-align: left;
+  padding: 14px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+/* Rows */
+.employees-table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.employees-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* Cells */
+.employees-table td {
+  padding: 16px;
+  font-size: 14px;
+  color: #374151;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* Name Highlight */
+.employees-table td:nth-child(2) {
+  font-weight: 600;
+  color: #111827;
+}
+
+.status-active,
+.status-inactive,
+.status-on_leave {
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+}
+
+/* Colors only (no background box) */
+.status-active {
+  color: #059669;
+}
+
+.status-inactive {
+  color: #dc2626;
+}
+
+.status-on_leave {
+  color: #d97706;
+}
+/* Button */
+.view-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.view-btn:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+/* Anniversary */
+.anniversary {
+  margin-left: 6px;
+  font-size: 14px;
+}

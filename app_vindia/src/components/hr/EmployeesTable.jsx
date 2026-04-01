@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Fuse from "fuse.js";
-
+import "./EmployeesTable.css";
 function EmployeesTable({ employees, search }) {
   const navigate = useNavigate();
 
