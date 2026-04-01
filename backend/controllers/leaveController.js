@@ -53,24 +53,40 @@ exports.getLeavesByEmployee = async (req, res) => {
 };
 
 /**
- * HR views all leave requests
+ * HR views leave requests (ONLY PENDING)
+ * + Optional dynamic filter support
  */
 exports.getAllLeaves = async (req, res) => {
+  const { status } = req.query; // optional
+
   try {
-    const result = await pool.query(`
+    let query = `
       SELECT 
         leaves.id,
-         leaves.employee_id, 
+        leaves.employee_id, 
         leaves.from_date,
         leaves.to_date,
         leaves.reason,
         leaves.status,
-        employees.name   -- ✅ THIS IS IMPORTANT
+        employees.name
       FROM leaves
       JOIN employees 
       ON leaves.employee_id = employees.id
-      ORDER BY leaves.created_at DESC
-    `);
+    `;
+
+    let values = [];
+
+    // ✅ Default: show only Pending
+    if (status) {
+      query += ` WHERE leaves.status = $1`;
+      values.push(status);
+    } else {
+      query += ` WHERE leaves.status = 'Pending'`;
+    }
+
+    query += ` ORDER BY leaves.created_at DESC`;
+
+    const result = await pool.query(query, values);
 
     res.status(200).json(result.rows);
   } catch (err) {
@@ -79,19 +95,24 @@ exports.getAllLeaves = async (req, res) => {
   }
 };
 
-// ✅ NEW: Get summary from DB
+/**
+ * Leave summary
+ */
 exports.getLeaveSummary = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query(`
+    const result = await pool.query(
+      `
       SELECT 
         COUNT(*) FILTER (WHERE status = 'Approved') AS total,
         COUNT(*) FILTER (WHERE reason = 'Sick Leave' AND status='Approved') AS sick,
         COUNT(*) FILTER (WHERE reason = 'Casual Leave' AND status='Approved') AS casual
       FROM leaves
       WHERE employee_id = $1
-    `, [id]);
+    `,
+      [id]
+    );
 
     res.json(result.rows[0]);
   } catch (err) {

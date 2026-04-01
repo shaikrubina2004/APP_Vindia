@@ -1,21 +1,26 @@
 import { API } from "./authService";
 
-// Employee applies leave
+// Apply leave
 export const applyLeave = (data) => {
   return API.post("/leaves", data);
 };
 
-// Employee views own leaves
+// Employee leaves
 export const fetchLeavesByEmployee = (employeeId) => {
   return API.get(`/leaves/employee/${employeeId}`);
 };
 
-// HR fetch all leaves
+// ✅ Fetch pending (default)
 export const fetchAllLeaves = () => {
   return API.get("/leaves");
 };
 
-// HR approve / reject leave
+// ✅ Fetch by status (dynamic)
+export const fetchLeavesByStatus = (status) => {
+  return API.get(`/leaves?status=${status}`);
+};
+
+// Update status
 export const updateLeaveStatus = (leaveId, status) => {
   return API.put(`/leaves/${leaveId}/status`, { status });
 };

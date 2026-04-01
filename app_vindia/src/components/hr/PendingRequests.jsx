@@ -1,21 +1,36 @@
+import { useEffect, useState } from "react";
 import { FaClipboardList } from "react-icons/fa";
+import { fetchAllLeaves } from "../../services/leaveService";
 
-function PendingRequests(){
-return(
+function PendingRequests() {
+  const [count, setCount] = useState(0);
 
-<div className="dashboard-card">
+  useEffect(() => {
+    const loadPending = async () => {
+      try {
+        const res = await fetchAllLeaves(); // gets only Pending from backend
+        setCount(res.data.length);
+      } catch (err) {
+        console.error("Error fetching pending leaves", err);
+      }
+    };
 
-<h3><FaClipboardList className="card-icon"/> Pending Requests</h3>
+    loadPending();
+  }, []);
 
-<ul>
-<li>Leave Requests : 3</li>
-<li>Travel Requests : 1</li>
-<li>Document Verification : 2</li>
-</ul>
+  return (
+    <div className="dashboard-card">
+      <h3>
+        <FaClipboardList className="card-icon" /> Pending Requests
+      </h3>
 
-</div>
-
-)
+      <ul>
+        <li>Leave Requests : {count}</li>
+        <li>Travel Requests : 1</li>
+        <li>Document Verification : 2</li>
+      </ul>
+    </div>
+  );
 }
 
 export default PendingRequests;
