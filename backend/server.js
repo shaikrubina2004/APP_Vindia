@@ -15,14 +15,14 @@ const path = require("path");
 const projectRoutes = require("./routes/projectRoutes");
 const wbsRoutes = require("./routes/wbsRoutes"); // ✅ ADD THIS
 const costRoutes = require("./routes/costRoutes");
-
+const dashboardRoutes = require("./routes/dashboardRoutes");
 
 const app = express();
 
 /* MIDDLEWARE */
 app.use(cors());
 app.use(express.json());
-
+app.use("/api/dashboard", dashboardRoutes); // ✅ ADD DASHBOARD ROUTE
 /* DEBUG: Check route types */
 console.log("authRoutes:", typeof authRoutes);
 console.log("userRoutes:", typeof userRoutes);

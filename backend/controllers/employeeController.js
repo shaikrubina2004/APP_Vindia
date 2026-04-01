@@ -11,12 +11,30 @@ const DEFAULTS = {
 // ✅ CREATE EMPLOYEE
 const createEmployee = async (req, res) => {
   const {
-    name, email, phone, department, designation, salary,
-    join_date, manager_id, status, address,
-    dob, gender, marital_status, nationality,
-    employee_code, employment_type, work_location,
-    shift_timing, experience, previous_company,
-    account_no, ifsc, pan, aadhar
+    name,
+    email,
+    phone,
+    department,
+    designation,
+    salary,
+    join_date,
+    manager_id,
+    status,
+    address,
+    dob,
+    gender,
+    marital_status,
+    nationality,
+    employee_code,
+    employment_type,
+    work_location,
+    shift_timing,
+    experience,
+    previous_company,
+    account_no,
+    ifsc,
+    pan,
+    aadhar,
   } = req.body;
 
   const files = req.files || {}; // ✅ FIX
@@ -24,8 +42,7 @@ const createEmployee = async (req, res) => {
   const profile_photo =
     files.profile_photo?.[0]?.filename || DEFAULTS.profile_photo;
 
-  const id_proof =
-    files.id_proof?.[0]?.filename || DEFAULTS.id_proof;
+  const id_proof = files.id_proof?.[0]?.filename || DEFAULTS.id_proof;
 
   const offer_letter =
     files.offer_letter?.[0]?.filename || DEFAULTS.offer_letter;
@@ -34,13 +51,21 @@ const createEmployee = async (req, res) => {
     files.certificates?.[0]?.filename || DEFAULTS.certificates;
 
   try {
-    if (!name || !email || !phone || !department || !designation || salary == null || !join_date) {
+    if (
+      !name ||
+      !email ||
+      !phone ||
+      !department ||
+      !designation ||
+      salary == null ||
+      !join_date
+    ) {
       return res.status(400).json({ message: "Required fields missing" });
     }
 
     const existingEmployee = await pool.query(
       "SELECT id FROM employees WHERE email = $1",
-      [email ? email.toLowerCase() : null] // ✅ FIX
+      [email ? email.toLowerCase() : null], // ✅ FIX
     );
 
     if (existingEmployee.rows.length > 0) {
@@ -99,15 +124,14 @@ const createEmployee = async (req, res) => {
 
         id_proof,
         offer_letter,
-        certificates
-      ]
+        certificates,
+      ],
     );
 
     return res.status(201).json({
       message: "Employee created successfully",
       employee: result.rows[0],
     });
-
   } catch (error) {
     console.error("Create error:", error);
     return res.status(500).json({ message: "Server error" });
@@ -134,7 +158,6 @@ const getAllEmployees = async (req, res) => {
     `);
 
     res.status(200).json(result.rows);
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -146,19 +169,21 @@ const getEmployeeById = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query(`
+    const result = await pool.query(
+      `
       SELECT e.*, m.name AS manager_name
       FROM employees e
       LEFT JOIN employees m ON e.manager_id = m.id
       WHERE e.id = $1
-    `, [id]);
+    `,
+      [id],
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Not found" });
     }
 
     res.status(200).json(result.rows[0]);
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -170,21 +195,38 @@ const updateEmployee = async (req, res) => {
   const { id } = req.params;
 
   const {
-    name, email, phone, department, designation, salary,
-    join_date, manager_id, status, address,
-    dob, gender, marital_status, nationality,
-    employee_code, employment_type, work_location,
-    shift_timing, experience, previous_company,
-    account_no, ifsc, pan, aadhar
+    name,
+    email,
+    phone,
+    department,
+    designation,
+    salary,
+    join_date,
+    manager_id,
+    status,
+    address,
+    dob,
+    gender,
+    marital_status,
+    nationality,
+    employee_code,
+    employment_type,
+    work_location,
+    shift_timing,
+    experience,
+    previous_company,
+    account_no,
+    ifsc,
+    pan,
+    aadhar,
   } = req.body;
 
   const files = req.files || {}; // ✅ FIX
 
   try {
-    const existing = await pool.query(
-      "SELECT * FROM employees WHERE id = $1",
-      [id]
-    );
+    const existing = await pool.query("SELECT * FROM employees WHERE id = $1", [
+      id,
+    ]);
 
     if (existing.rows.length === 0) {
       return res.status(404).json({ message: "Employee not found" });
@@ -198,9 +240,7 @@ const updateEmployee = async (req, res) => {
       DEFAULTS.profile_photo;
 
     const id_proof =
-      files.id_proof?.[0]?.filename ||
-      old.id_proof ||
-      DEFAULTS.id_proof;
+      files.id_proof?.[0]?.filename || old.id_proof || DEFAULTS.id_proof;
 
     const offer_letter =
       files.offer_letter?.[0]?.filename ||
@@ -257,15 +297,14 @@ const updateEmployee = async (req, res) => {
         offer_letter,
         certificates,
 
-        id
-      ]
+        id,
+      ],
     );
 
     res.status(200).json({
       message: "Employee updated successfully",
       employee: result.rows[0],
     });
-
   } catch (error) {
     console.error("Update error:", error);
     res.status(500).json({ message: "Server error" });
@@ -279,7 +318,6 @@ const deleteEmployee = async (req, res) => {
   try {
     await pool.query("DELETE FROM employees WHERE id = $1", [id]);
     res.status(200).json({ message: "Deleted successfully" });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });

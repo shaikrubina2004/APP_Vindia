@@ -26,6 +26,7 @@ router.post(
 );
 
 // ✅ GET
+router.get("/", getAllEmployees);
 router.get("/", authMiddleware, getAllEmployees);
 router.get("/:id", authMiddleware, getEmployeeById);
 
