@@ -201,7 +201,7 @@ export default function AddEmployee() {
 
       <select name="status" value={form.status} onChange={handleChange}>
         <option value="active">Active</option>
-        <option value="on_leave">On Leave</option>
+        <option value="on_leave">OnLeave</option>
         <option value="inactive">Inactive</option>
       </select>
 

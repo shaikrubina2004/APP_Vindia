@@ -1,133 +1,190 @@
+/* EmployeeDetails.css - Compact & Space Efficient */
 .employee-details-page {
-  padding: 32px 40px;
-  background: #f8fafc;
-  min-height: 100vh;
-  font-family: "Inter", "Segoe UI", sans-serif;
-  color: #202124;
+  max-width: 100%; /* Allow full width */
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* 🔥 TITLE */
 .employee-details-page h1 {
-  font-size: 24px;
-  font-weight: 500;
-  margin-bottom: 24px;
-  color: #202124;
+  margin: 0 0 25px 0;
+  color: #1a1a1a;
+  font-size: 28px;
+  font-weight: 600;
 }
 
-/* 🔥 CARD */
-.employee-details-page .details-card {
-  background: #ffffff;
+.employee-details-page h2 {
+  margin: 35px 0 20px 0;
+  color: #333;
+  font-size: 20px;
+  font-weight: 500;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 8px;
+}
+
+/* Compact Details Card - Increased size */
+.details-card {
+  background: #fff;
   border-radius: 12px;
-  padding: 28px;
-  border: 1px solid #e6e8eb;
+  padding: 30px; /* Increased padding for more space */
+  box-shadow: 0 2px 15px rgba(0,0,0,0.1); /* Slightly stronger shadow */
+  margin-bottom: 25px;
+  border: 1px solid #f1f5f9;
+  max-width: 100%; /* Set max-width to 100% for full width */
+  width: 100%; /* Make card occupy full available width */
+}
 
+/* Super Compact Info Grid */
+.details-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 18px 40px;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); /* Increased min width of grid items */
+  gap: 20px 40px; /* Increased gap between grid items */
+  margin-top: 20px; /* Slightly larger margin between sections */
 }
 
-/* 🔹 ROW */
-.employee-details-page .details-card p {
-  margin: 0;
-  font-size: 14px;
+.details-grid p {
+  margin: 8px 0;
+  font-size: 15px;
+  line-height: 1.4;
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
-/* 🔹 LABEL */
-.employee-details-page .details-card strong {
-  font-size: 12px;
-  font-weight: 500;
-  color: #5f6368;
-  margin-bottom: 4px;
+.details-grid strong {
+  min-width: 160px; /* Increased the width for labels */
+  color: #374151;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
-/* 🔹 VALUE */
-.employee-details-page .details-card p span,
-.employee-details-page .details-card p {
-  color: #202124;
-  font-weight: 400;
+/* Document Section - Compact Cards */
+.document-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Increased min-width for documents */
+  gap: 30px; /* Increased gap between document cards */
+  margin-top: 20px; /* Larger margin for document section */
 }
 
-/* 🔥 STATUS BADGE (SCOPED ✅) */
-.employee-details-page .status-active,
-.employee-details-page .status-inactive,
-.employee-details-page .status-on_leave {
+.doc-item {
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.doc-item strong {
+  display: block;
+  margin-bottom: 10px;
+  color: #1f2937;
+  font-size: 15px;
+}
+
+.profile-img {
+  max-width: 120px; /* Increased profile image size */
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.doc-link {
   display: inline-block;
-  padding: 4px 10px;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 500;
-  width: fit-content;
-}
-
-/* COLORS */
-.employee-details-page .status-active {
-  background: #e6f4ea;
-  color: #137333;
-}
-
-.employee-details-page .status-inactive {
-  background: #fce8e6;
-  color: #c5221f;
-}
-
-.employee-details-page .status-on_leave {
-  background: #fef7e0;
-  color: #b06000;
-}
-
-/* 🔥 ACTION BUTTONS */
-.employee-details-page .action-buttons {
-  margin-top: 28px;
-  display: flex;
-  gap: 12px;
-}
-
-/* 🔥 BASE BUTTON */
-.employee-details-page .action-buttons button {
-  padding: 9px 16px;
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  text-decoration: none;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
   transition: all 0.2s ease;
 }
 
-/* ✏️ EDIT */
-.employee-details-page .edit-btn {
-  background: #1a73e8;
+.doc-link:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.no-doc {
+  color: #6b7280;
+  font-style: italic;
+  font-size: 14px;
+}
+
+/* Action Buttons - Tight Layout */
+.action-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.edit-btn, .delete-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.edit-btn {
+  background: #10b981;
   color: white;
 }
 
-.employee-details-page .edit-btn:hover {
-  background: #1558c0;
+.edit-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
 }
 
-/* 🗑 DELETE */
-.employee-details-page .delete-btn {
-  background: white;
-  border: 1px solid #dadce0;
-  color: #c5221f;
+.delete-btn {
+  background: #ef4444;
+  color: white;
 }
 
-.employee-details-page .delete-btn:hover {
-  background: #fce8e6;
+.delete-btn:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
 }
 
-/* 📱 RESPONSIVE */
+/* Loading & Empty States */
+.loading, .not-found {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+  font-size: 18px;
+}
+
+/* Responsive */
 @media (max-width: 768px) {
   .employee-details-page {
-    padding: 20px;
+    padding: 15px;
   }
 
-  .employee-details-page .details-card {
+  .details-card {
+    padding: 18px; /* Reduced padding for mobile */
+  }
+
+  .details-grid {
     grid-template-columns: 1fr;
-    padding: 20px;
+    gap: 12px;
   }
 
-  .employee-details-page .action-buttons {
+  .document-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .details-grid strong {
+    min-width: auto;
+  }
+
+  .action-buttons {
     flex-direction: column;
   }
 }
