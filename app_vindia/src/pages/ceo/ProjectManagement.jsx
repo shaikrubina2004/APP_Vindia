@@ -72,14 +72,19 @@ const [selectedProject, setSelectedProject] = useState(null);
 
 const [costSummary, setCostSummary] = useState([]);
 
+
 useEffect(() => {
-  if (!selectedProject?.id) return;
+  if (!selectedProject) return;
 
   fetch(`http://localhost:5000/api/cost-summary/${selectedProject.id}`)
-    .then(res => res.json())
-    .then(data => setCostSummary(data))
-    .catch(err => console.error(err));
+    .then((res) => res.json())
+    .then((data) => {
+      console.log("API DATA:", data); // 👈 check this
+      setCostSummary(data);
+    })
+    .catch((err) => console.error(err));
 }, [selectedProject]);
+
 
   const [timesheets, setTimesheets] = useState([
     {
@@ -269,11 +274,13 @@ useEffect(() => {
   };
 
   // Calculate project cost breakdown
-  const costBreakdown = {
-  labour: costSummary.reduce((s, w) => s + w.labour_cost, 0),
-  material: costSummary.reduce((s, w) => s + w.material_cost, 0),
-  equipment: costSummary.reduce((s, w) => s + w.equipment_cost, 0),
-  misc: costSummary.reduce((s, w) => s + w.misc_cost, 0),
+ const safeData = Array.isArray(costSummary) ? costSummary : [];
+
+const costBreakdown = {
+  labour: safeData.reduce((s, w) => s + Number(w.labour_cost || 0), 0),
+  material: safeData.reduce((s, w) => s + Number(w.material_cost || 0), 0),
+  equipment: safeData.reduce((s, w) => s + Number(w.equipment_cost || 0), 0),
+  misc: safeData.reduce((s, w) => s + Number(w.misc_cost || 0), 0),
 };
 
   // Calculate performance metrics
@@ -294,9 +301,7 @@ useEffect(() => {
       <div className="pm-header">
         <div>
           <h1>Project Management System</h1>
-          <p>
-            Enterprise Level - Projects → Tasks → Timesheet → Cost → Performance
-          </p>
+          
         </div>
         <button
           className="btn-primary"
@@ -389,23 +394,7 @@ useEffect(() => {
           </svg>
           Cost Tracking
         </button>
-        <button
-          className={`tab-btn ${activeTab === "performance" ? "active" : ""}`}
-          onClick={() => setActiveTab("performance")}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <polyline points="23 6 13.5 15.5 8.5 10.5 1 17"></polyline>
-            <polyline points="17 6 23 6 23 12"></polyline>
-          </svg>
-          Performance
-        </button>
+      
         <button
           className={`tab-btn ${activeTab === "payments" ? "active" : ""}`}
           onClick={() => setActiveTab("payments")}
@@ -734,129 +723,8 @@ useEffect(() => {
           />
         )}
 
-        {/* PERFORMANCE TAB */}
-        {activeTab === "performance" && (
-          <div className="performance-section">
-            <h2>Performance Dashboard</h2>
-
-            <div className="performance-cards">
-              <div className="perf-card">
-                <div className="perf-label">Total Hours Logged</div>
-                <div className="perf-value">
-                  {performanceMetrics.totalHours}
-                </div>
-                <div className="perf-unit">hours</div>
-              </div>
-              <div className="perf-card">
-                <div className="perf-label">Approved Hours</div>
-                <div className="perf-value">
-                  {performanceMetrics.approvedHours}
-                </div>
-                <div className="perf-unit">hours</div>
-              </div>
-              <div className="perf-card">
-                <div className="perf-label">Pending Approval</div>
-                <div className="perf-value">
-                  {performanceMetrics.pendingHours}
-                </div>
-                <div className="perf-unit">hours</div>
-              </div>
-              <div className="perf-card">
-                <div className="perf-label">Labour Cost</div>
-                <div className="perf-value">
-                  ₹{(performanceMetrics.totalCost / 100000).toFixed(1)}L
-                </div>
-                <div className="perf-unit">total</div>
-              </div>
-            </div>
-
-            {/* Project Performance */}
-            <div className="project-performance">
-              <h3>Project Performance Metrics</h3>
-              <div className="metrics-grid">
-                <div className="metric">
-                  <span className="metric-label">Progress</span>
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${selectedProject.progress}%` }}
-                    ></div>
-                  </div>
-                  <span className="metric-value">
-                    {selectedProject.progress}%
-                  </span>
-                </div>
-                <div className="metric">
-                  <span className="metric-label">Budget Utilization</span>
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{
-                        width: `${calculatePercentage(selectedProject.spent, selectedProject.budget)}%`,
-                      }}
-                    ></div>
-                  </div>
-                  <span className="metric-value">
-                    {calculatePercentage(
-                      selectedProject.spent,
-                      selectedProject.budget,
-                    )}
-                    %
-                  </span>
-                </div>
-                <div className="metric">
-                  <span className="metric-label">Task Completion</span>
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{
-                        width: `${(selectedProject?.wbs || [].filter((w) => w.status === "Completed").length / selectedProject?.wbs || [].length) * 100}%`,
-                      }}
-                    ></div>
-                  </div>
-                  <span className="metric-value">
-                    {Math.round(
-                      (selectedProject?.wbs ||
-                        [].filter((w) => w.status === "Completed").length /
-                          selectedProject?.wbs ||
-                        [].length) * 100,
-                    )}
-                    %
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Employee Performance */}
-            <div className="employee-performance">
-              <h3>Employee Performance Summary</h3>
-              <div className="emp-perf-list">
-                {[...new Set(timesheets.map((t) => t.employee))].map((emp) => {
-                  const empData = timesheets.filter((t) => t.employee === emp);
-                  const empHours = empData.reduce((sum, t) => sum + t.hours, 0);
-                  const empCost = empData.reduce(
-                    (sum, t) => sum + t.hours * t.rate,
-                    0,
-                  );
-                  return (
-                    <div key={emp} className="emp-perf-item">
-                      <div className="emp-info">
-                        <span className="emp-name">{emp}</span>
-                        <span className="emp-stats">
-                          {empHours}h | ₹{(empCost / 100000).toFixed(1)}L
-                        </span>
-                      </div>
-                      <div className="emp-status">
-                        {empData.filter((t) => t.status === "Approved").length}/
-                        {empData.length} Approved
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
+   
+        
 
         {/* PAYMENTS TAB */}
         {activeTab === "payments" && (

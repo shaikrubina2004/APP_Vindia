@@ -1,95 +1,126 @@
+/* 🔥 REMOVE ALL PURPLE / FOCUS */
+
+* {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+td,
+td:focus,
+td:active,
+td:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+::selection {
+  background: transparent;
+}
+
+
+/* CONTAINER */
+
 .employees-table {
   background: #ffffff;
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
 
-/* Table */
+
+/* TABLE */
+
 .employees-table table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+  border-collapse: collapse;
 }
 
-/* Header */
+
+/* HEADER */
+
 .employees-table thead {
-  background: #f9fafb;
+  background: #0A4174;
 }
 
 .employees-table th {
-  text-align: left;
-  padding: 14px 16px;
+  padding: 12px;
   font-size: 12px;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
+  color: white;
+  font-weight: 500;
+  text-align: left;
 }
 
-/* Rows */
+
+/* ROWS */
+
 .employees-table tbody tr {
-  transition: all 0.2s ease;
+  border-bottom: 1px solid #f1f5f9;
+  transition: 0.2s;
 }
 
 .employees-table tbody tr:hover {
   background: #f8fafc;
+  cursor: pointer;
 }
 
-/* Cells */
+
+/* CELLS */
+
 .employees-table td {
-  padding: 16px;
-  font-size: 14px;
+  padding: 12px;
+  font-size: 13px;
   color: #374151;
-  border-top: 1px solid #f1f5f9;
 }
 
-/* Name Highlight */
+
+/* NAME */
+
 .employees-table td:nth-child(2) {
   font-weight: 600;
   color: #111827;
 }
 
-.status-active,
-.status-inactive,
-.status-on_leave {
-  padding: 4px 0;
-  font-size: 13px;
-  font-weight: 500;
-  background: transparent;
-  border: none;
-}
 
-/* Colors only (no background box) */
+/* ✅ STATUS (FIXED 🔥) */
+
 .status-active {
   color: #059669;
+  font-weight: 500;
 }
 
 .status-inactive {
   color: #dc2626;
+  font-weight: 500;
 }
 
 .status-on_leave {
-  color: #d97706;
+  color: #64748b;
+  font-weight: 500;
 }
-/* Button */
+
+
+/* VIEW BUTTON */
+
 .view-btn {
   background: #2563eb;
-  color: white;
+  color: white !important;
   border: none;
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
   cursor: pointer;
   transition: 0.2s;
 }
 
 .view-btn:hover {
-  background: #1d4ed8;
-  transform: translateY(-1px);
+  background: #1e40af;
 }
 
-/* Anniversary */
+
+/* ANNIVERSARY */
+
 .anniversary {
   margin-left: 6px;
-  font-size: 14px;
+  font-size: 13px;
 }

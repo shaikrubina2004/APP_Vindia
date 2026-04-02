@@ -571,7 +571,7 @@
   padding: 5px;
   border-radius: 12px;
   gap: 5px;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 /* BUTTON BASE */
@@ -674,5 +674,71 @@
   .ts-table th,
   .ts-table td {
     padding: 8px 4px;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
+   ADD THESE STYLES TO YOUR EXISTING timesheet.css
+   ───────────────────────────────────────────────────────────────── */
+
+  /* Header cell highlight when that column has a leave day */
+  .ts-leave-header {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #fca5a5 !important;
+  }
+
+  /* Project row — blocked cell (leave day) */
+  .ts-leave-blocked-cell {
+    background: rgba(239, 68, 68, 0.07) !important;
+    pointer-events: none;
+    border-color: rgba(239, 68, 68, 0.2) !important;
+  }
+
+  /* ── Time Off row ── */
+  .ts-time-off-row {
+    background: rgba(251, 191, 36, 0.06);
+    border-top: 2px solid rgba(251, 191, 36, 0.3);
+    border-bottom: 2px solid rgba(251, 191, 36, 0.3);
+  }
+
+  .ts-time-off-row td {
+    padding: 10px 8px;
+    vertical-align: middle;
+    color: #fbbf24;
+  }
+
+  /* A cell that has auto-filled leave hours */
+  .ts-time-off-active {
+    background: rgba(251, 191, 36, 0.12) !important;
+  }
+
+  /* The value + badge inside an active time-off cell */
+  .ts-time-off-value {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-weight: 700;
+    font-size: 14px;
+    color: #fbbf24;
+  }
+
+  /* Small leave type badge (CL / SL / EL …) */
+  .ts-leave-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    background: rgba(251, 191, 36, 0.25);
+    color: #fde68a;
+    padding: 1px 5px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  /* Total chip variant for leave row */
+  .ts-total-chip.ts-leave-total {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.35);
   }
 }
