@@ -52,38 +52,47 @@
 /* Tabs */
 .pm-tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-  border-bottom: 2px solid var(--border-color);
-  overflow-x: auto;
-  padding-bottom: 0;
+  gap: 25px;
+  margin-top: 15px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
 }
 
-.tab-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
+/* buttons */
+.pm-tabs button {
   background: none;
   border: none;
-  color: var(--text-secondary);
+  font-size: 14px;
+  color: #6b7280;
   cursor: pointer;
-  font-size: 13px;
+  padding: 8px 0;
+  position: relative;
+  font-weight: 500;
+  transition: all 0.25s ease;
+}
+
+/* hover */
+.pm-tabs button:hover {
+  color: #2563eb;
+}
+
+/* active tab */
+.pm-tabs button.active {
+  color: #2563eb;
   font-weight: 600;
-  transition: all 0.3s ease;
-  border-bottom: 2px solid transparent;
-  white-space: nowrap;
 }
 
-.tab-btn:hover {
-  color: var(--primary-blue);
+/* underline */
+.pm-tabs button.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -10px;
+  width: 100%;
+  height: 2px;
+  background: #2563eb;
+  border-radius: 2px;
 }
-
-.tab-btn.active {
-  color: var(--primary-blue);
-  border-bottom-color: var(--primary-blue);
-}
-
 /* Content */
 .pm-content {
   display: flex;
@@ -2014,4 +2023,34 @@
 
 .table-row:hover {
   background: #f9fbff;
+}
+.pm-tabs {
+  display: flex;
+  gap: 12px;
+  margin-top: 15px;
+  padding: 10px;
+ 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.pm-tabs button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  color: #444;
+}
+
+.pm-tabs button:hover {
+  background: #e0e7ff;
+  color: #1d4ed8;
+}
+
+.pm-tabs button.active {
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  color: white;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
 }

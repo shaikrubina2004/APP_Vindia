@@ -1,25 +1,14 @@
 const pool = require("../config/db");
 
-
-// 🔥 COST SUMMARY (ALL LEVELS - FIXED)
+// ==========================================
+// 🔥 COST SUMMARY (ALL LEVELS - FINAL)
+// ==========================================
 exports.getCostSummary = async (req, res) => {
   const { projectId } = req.params;
 
   try {
-    const result = await pool.query(`
-      -- 🔥 RECURSIVE TREE (ALL LEVELS)
-      WITH RECURSIVE wbs_tree AS (
-        SELECT id, parent_id
-        FROM wbs
-        WHERE project_id = $1
-
-        UNION ALL
-
-        SELECT w.id, w.parent_id
-        FROM wbs w
-        INNER JOIN wbs_tree wt ON w.parent_id = wt.id
-      )
-
+    const result = await pool.query(
+      `
       SELECT 
         w.id AS wbs_id,
         w.name,
@@ -27,106 +16,170 @@ exports.getCostSummary = async (req, res) => {
 
         -- 👷 LABOUR
         COALESCE((
-          SELECT SUM(cost)
-          FROM wbs_labour
-          WHERE task_id IN (
-            SELECT id FROM wbs_tree WHERE parent_id = w.id OR id = w.id
+          SELECT SUM(l.cost)
+          FROM wbs_labour l
+          WHERE l.task_id IN (
+            WITH RECURSIVE tree AS (
+              SELECT id FROM wbs WHERE id = w.id
+              UNION ALL
+              SELECT w2.id
+              FROM wbs w2
+              INNER JOIN tree t ON w2.parent_id = t.id
+            )
+            SELECT id FROM tree
           )
         ), 0) AS labour_cost,
 
         -- 🧱 MATERIAL
         COALESCE((
-          SELECT SUM(total)
-          FROM wbs_material
-          WHERE task_id IN (
-            SELECT id FROM wbs_tree WHERE parent_id = w.id OR id = w.id
+          SELECT SUM(m.total)
+          FROM wbs_material m
+          WHERE m.task_id IN (
+            WITH RECURSIVE tree AS (
+              SELECT id FROM wbs WHERE id = w.id
+              UNION ALL
+              SELECT w2.id
+              FROM wbs w2
+              INNER JOIN tree t ON w2.parent_id = t.id
+            )
+            SELECT id FROM tree
           )
         ), 0) AS material_cost,
 
         -- 🏗️ EQUIPMENT
         COALESCE((
-          SELECT SUM(cost)
-          FROM wbs_equipment
-          WHERE task_id IN (
-            SELECT id FROM wbs_tree WHERE parent_id = w.id OR id = w.id
+          SELECT SUM(e.cost)
+          FROM wbs_equipment e
+          WHERE e.task_id IN (
+            WITH RECURSIVE tree AS (
+              SELECT id FROM wbs WHERE id = w.id
+              UNION ALL
+              SELECT w2.id
+              FROM wbs w2
+              INNER JOIN tree t ON w2.parent_id = t.id
+            )
+            SELECT id FROM tree
           )
         ), 0) AS equipment_cost,
 
-        -- 📦 MISC (🔥 FIXED — NOW INCLUDES ALL LEVELS)
+        -- 📦 MISC
         COALESCE((
-          SELECT SUM(cost)
-          FROM wbs_miscellaneous
-          WHERE task_id IN (
-            SELECT id FROM wbs_tree WHERE parent_id = w.id OR id = w.id
+          SELECT SUM(ms.cost)
+          FROM wbs_miscellaneous ms
+          WHERE ms.task_id IN (
+            WITH RECURSIVE tree AS (
+              SELECT id FROM wbs WHERE id = w.id
+              UNION ALL
+              SELECT w2.id
+              FROM wbs w2
+              INNER JOIN tree t ON w2.parent_id = t.id
+            )
+            SELECT id FROM tree
           )
         ), 0) AS misc_cost
 
       FROM wbs w
       WHERE w.project_id = $1
       AND w.parent_id IS NULL;
-    `, [projectId]);
+      `,
+      [projectId]
+    );
 
     res.json(result.rows);
-
   } catch (err) {
     console.error("Cost Summary Error:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
 
-
-
-// 🔥 COST DETAILS (ALSO FIXED FOR ALL LEVELS)
+// ==========================================
+// 🔥 COST DETAILS (EXPAND ROW - FINAL)
+// ==========================================
 exports.getCostDetails = async (req, res) => {
   const { wbsId } = req.params;
 
   try {
-    const labour = await pool.query(`
+    // 👷 LABOUR
+    const labour = await pool.query(
+      `
+      WITH RECURSIVE tree AS (
+        SELECT id FROM wbs WHERE id = $1
+        UNION ALL
+        SELECT w.id
+        FROM wbs w
+        INNER JOIN tree t ON w.parent_id = t.id
+      )
       SELECT 
         COUNT(*) AS total_workers,
         COALESCE(SUM(cost), 0) AS total_cost
       FROM wbs_labour
-      WHERE task_id IN (
-        SELECT id FROM wbs WHERE parent_id = $1 OR id = $1
-      )
-    `, [wbsId]);
+      WHERE task_id IN (SELECT id FROM tree);
+      `,
+      [wbsId]
+    );
 
-    const material = await pool.query(`
+    // 🧱 MATERIAL
+    const material = await pool.query(
+      `
+      WITH RECURSIVE tree AS (
+        SELECT id FROM wbs WHERE id = $1
+        UNION ALL
+        SELECT w.id
+        FROM wbs w
+        INNER JOIN tree t ON w.parent_id = t.id
+      )
       SELECT 
         LOWER(name) AS name,
         SUM(quantity) AS total_qty,
         SUM(total) AS total_cost
       FROM wbs_material
-      WHERE task_id IN (
-        SELECT id FROM wbs WHERE parent_id = $1 OR id = $1
-      )
-      GROUP BY LOWER(name)
-    `, [wbsId]);
+      WHERE task_id IN (SELECT id FROM tree)
+      GROUP BY LOWER(name);
+      `,
+      [wbsId]
+    );
 
-    const equipment = await pool.query(`
+    // 🏗️ EQUIPMENT
+    const equipment = await pool.query(
+      `
+      WITH RECURSIVE tree AS (
+        SELECT id FROM wbs WHERE id = $1
+        UNION ALL
+        SELECT w.id
+        FROM wbs w
+        INNER JOIN tree t ON w.parent_id = t.id
+      )
       SELECT 
         COALESCE(SUM(cost), 0) AS total_cost
       FROM wbs_equipment
-      WHERE task_id IN (
-        SELECT id FROM wbs WHERE parent_id = $1 OR id = $1
-      )
-    `, [wbsId]);
+      WHERE task_id IN (SELECT id FROM tree);
+      `,
+      [wbsId]
+    );
 
-    const misc = await pool.query(`
+    // 📦 MISC
+    const misc = await pool.query(
+      `
+      WITH RECURSIVE tree AS (
+        SELECT id FROM wbs WHERE id = $1
+        UNION ALL
+        SELECT w.id
+        FROM wbs w
+        INNER JOIN tree t ON w.parent_id = t.id
+      )
       SELECT name, cost
       FROM wbs_miscellaneous
-      WHERE task_id IN (
-        SELECT id FROM wbs WHERE parent_id = $1 OR id = $1
-      )
-    `, [wbsId]);
+      WHERE task_id IN (SELECT id FROM tree);
+      `,
+      [wbsId]
+    );
 
     res.json({
       labour: labour.rows[0] || { total_workers: 0, total_cost: 0 },
       material: material.rows || [],
       equipment: equipment.rows[0] || { total_cost: 0 },
-      miscellaneous: misc.rows || []
+      miscellaneous: misc.rows || [],
     });
-
   } catch (err) {
     console.error("Cost Details Error:", err);
     res.status(500).json({ error: "Error fetching details" });

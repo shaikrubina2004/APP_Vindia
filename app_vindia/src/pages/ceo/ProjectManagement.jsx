@@ -277,10 +277,10 @@ useEffect(() => {
  const safeData = Array.isArray(costSummary) ? costSummary : [];
 
 const costBreakdown = {
-  labour: safeData.reduce((s, w) => s + Number(w.labour_cost || 0), 0),
-  material: safeData.reduce((s, w) => s + Number(w.material_cost || 0), 0),
-  equipment: safeData.reduce((s, w) => s + Number(w.equipment_cost || 0), 0),
-  misc: safeData.reduce((s, w) => s + Number(w.misc_cost || 0), 0),
+  labour: costSummary.reduce((s, w) => s + Number(w.labour_cost || 0), 0),
+  material: costSummary.reduce((s, w) => s + Number(w.material_cost || 0), 0),
+  equipment: costSummary.reduce((s, w) => s + Number(w.equipment_cost || 0), 0),
+  misc: costSummary.reduce((s, w) => s + Number(w.misc_cost || 0), 0),
 };
 
   // Calculate performance metrics
@@ -322,609 +322,160 @@ const costBreakdown = {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="pm-tabs">
-        <button
-          className={`tab-btn ${activeTab === "overview" ? "active" : ""}`}
-          onClick={() => setActiveTab("overview")}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M3 12h18M3 6h18M3 18h18"></path>
-          </svg>
-          Project Overview
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "wbs" ? "active" : ""}`}
-          onClick={() => setActiveTab("wbs")}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
-          </svg>
-          WBS & Tasks
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "timesheet" ? "active" : ""}`}
-          onClick={() => setActiveTab("timesheet")}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"></path>
-          </svg>
-          Timesheet
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "cost" ? "active" : ""}`}
-          onClick={() => setActiveTab("cost")}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="12" cy="12" r="1"></circle>
-            <circle cx="19" cy="12" r="1"></circle>
-            <circle cx="5" cy="12" r="1"></circle>
-            <path d="M12 1v6m0 6v6"></path>
-          </svg>
-          Cost Tracking
-        </button>
-      
-        <button
-          className={`tab-btn ${activeTab === "payments" ? "active" : ""}`}
-          onClick={() => setActiveTab("payments")}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="12" cy="12" r="1"></circle>
-            <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m4.24 4.24l4.24 4.24M1.5 12h6m6 0h6M4.22 19.78l4.24-4.24m4.24-4.24l4.24-4.24"></path>
-          </svg>
-          Payments
-        </button>
-      </div>
-
       {/* Content */}
       <div className="pm-content">
         {/* OVERVIEW TAB */}
-        {activeTab === "overview" && (
-          <div className="overview-section">
-            {/* Project Cards */}
-            <div className="filter-buttons">
-              {["All", "In Progress", "Pending", "Completed", "Rejected"].map(
-                (status) => (
-                  <button
-                    key={status}
-                    className={`filter-btn ${statusFilter === status ? "active" : ""}`}
-                    onClick={() => setStatusFilter(status)}
-                  >
-                    {status}
-                  </button>
-                ),
-              )}
-            </div>
-            {loading ? (
-              <p>Loading projects...</p>
-            ) : (
-              <div className="projects-grid">
-                {projects.map((proj) => (
-                  <ProjectCard
-                    key={proj.id}
-                    proj={proj}
-                    isActive={selectedProject?.id === proj.id}
-                    onClick={() => setSelectedProject(proj)}
-                    variant="overview"
-                  />
-                ))}
+      <div className="overview-section">
+
+  {/* FILTER BUTTONS */}
+  <div className="filter-buttons">
+    {["All", "In Progress", "Pending", "Completed", "Rejected"].map(
+      (status) => (
+        <button
+          key={status}
+          className={`filter-btn ${statusFilter === status ? "active" : ""}`}
+          onClick={() => setStatusFilter(status)}
+        >
+          {status}
+        </button>
+      )
+    )}
+  </div>
+
+  {/* PROJECT CARDS */}
+  {loading ? (
+    <p>Loading projects...</p>
+  ) : (
+    <div className="projects-grid">
+      {projects.map((proj) => (
+        <ProjectCard
+          key={proj.id}
+          proj={proj}
+          isActive={selectedProject?.id === proj.id}
+          onClick={() => setSelectedProject(proj)}
+          variant="overview"
+        />
+      ))}
+    </div>
+  )}
+
+  {/* ✅ TABS (ONLY BUTTONS HERE) */}
+ <div className="pm-tabs">
+  <button
+    className={activeTab === "overview" ? "active" : ""}
+    onClick={() => setActiveTab("overview")}
+  >
+    ≡ Project Overview
+  </button>
+
+  <button
+    className={activeTab === "wbs" ? "active" : ""}
+    onClick={() => setActiveTab("wbs")}
+  >
+    ⬚ WBS & Tasks
+  </button>
+
+  <button
+    className={activeTab === "timesheet" ? "active" : ""}
+    onClick={() => setActiveTab("timesheet")}
+  >
+    🗂 Timesheet
+  </button>
+
+  <button
+    className={activeTab === "cost" ? "active" : ""}
+    onClick={() => setActiveTab("cost")}
+  >
+    📊 Cost Tracking
+  </button>
+
+  <button
+    className={activeTab === "payments" ? "active" : ""}
+    onClick={() => setActiveTab("payments")}
+  >
+    ✳ Payments
+  </button>
+</div>
+
+  {/* 🔥 TAB CONTENT (SEPARATE) */}
+
+  {activeTab === "overview" && (
+    <div className="three-column-layout">
+      
+      {/* QUICK INSIGHTS */}
+      <ProjectCard variant="overview">
+        <div className="quick-insights animate">
+          <h3>Quick Insights</h3>
+          <p>⚠ 2 projects delayed</p>
+          <p>💰 1 over budget</p>
+          <p>🚀 Top: 90% progress</p>
+        </div>
+      </ProjectCard>
+
+      {/* TIMESHEET */}
+      <ProjectCard variant="overview">
+        <div className="timesheet-section-new">
+          <h3>Timesheet Submissions</h3>
+          {timesheets.slice(-5).reverse().map((ts) => (
+            <div key={ts.id} className="timesheet-row">
+              <div className="ts-info">
+                <span className="ts-name">{ts.employee}</span>
+                <span className="ts-task">{ts.task}</span>
               </div>
-            )}
-            <div className="three-column-layout">
-              {/* QUICK INSIGHTS */}
-              <ProjectCard variant="overview">
-                <div className="quick-insights animate">
-                  <h3>Quick Insights</h3>
-                  <p>⚠ 2 projects delayed</p>
-                  <p>💰 1 over budget</p>
-                  <p>🚀 Top: 90% progress</p>
-                </div>
-              </ProjectCard>
-
-              {/* TIMESHEET */}
-              <ProjectCard variant="overview">
-                <div className="timesheet-section-new">
-                  <h3>Timesheet Submissions</h3>
-
-                  {timesheets
-                    .slice(-5)
-                    .reverse()
-                    .map((ts) => (
-                      <div key={ts.id} className="timesheet-row">
-                        <div className="ts-info">
-                          <span className="ts-name">{ts.employee}</span>
-                          <span className="ts-task">{ts.task}</span>
-                        </div>
-
-                        <div className="ts-meta">
-                          <span className="ts-hours">{ts.hours}h</span>
-                          <span className="ts-date">{ts.date}</span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </ProjectCard>
-
-              {/* RECENT ACTIVITIES */}
-              <ProjectCard variant="overview">
-                <div className="recent-activity">
-                  <h3>
-                    {selectedProject
-                      ? `${selectedProject.name} - Recent Activities`
-                      : "Recent Activities"}
-                  </h3>
-
-                  {(() => {
-                    if (!selectedProject) return <p>No project selected</p>;
-
-                    let activities = [];
-
-                    // ✅ real activities first
-                    if (selectedProject.activities) {
-                      activities = [...selectedProject.activities];
-                    }
-
-                    const status = selectedProject.status;
-
-                    // ✅ add status-based meaningful activities
-                    if (status === "Pending") {
-                      activities.push(
-                        "Planning phase started",
-                        "Requirement discussion ongoing",
-                        "Budget approval in progress",
-                      );
-                    } else if (status === "Completed") {
-                      activities.push(
-                        "All work completed successfully",
-                        "Final inspection completed",
-                        "Project handed over",
-                      );
-                    } else if (status === "In Progress") {
-                      activities.push(
-                        "Work currently in progress",
-                        "Site activity ongoing",
-                        "Materials being utilized",
-                      );
-                    } else if (status === "Rejected") {
-                      activities.push(
-                        "Project proposal rejected",
-                        "Approval not granted",
-                      );
-                    }
-
-                    // remove duplicates
-                    activities = [...new Set(activities)];
-
-                    return activities.map((act, index) => (
-                      <p key={index}>• {act}</p>
-                    ));
-                  })()}
-                </div>
-              </ProjectCard>
-            </div>
-          </div>
-        )}
-
-        {/* WBS TAB */}
-        {activeTab === "wbs" && <WbsPage selectedProject={selectedProject} />}
-
-        {/* TIMESHEET TAB */}
-        {activeTab === "timesheet" && (
-          <div className="timesheet-section">
-            <div className="timesheet-header">
-              <h2>Employee Timesheet</h2>
-              <button
-                className="btn-primary"
-                onClick={() => setShowTimesheetModal(true)}
-              >
-                + Log Hours
-              </button>
-            </div>
-
-            <div className="timesheet-table">
-              <div className="table-header">
-                <div>Employee</div>
-                <div>Task</div>
-                <div>Hours</div>
-                <div>Rate/Hr</div>
-                <div>Cost</div>
-                <div>Date</div>
-                <div>Status</div>
+              <div className="ts-meta">
+                <span className="ts-hours">{ts.hours}h</span>
+                <span className="ts-date">{ts.date}</span>
               </div>
-              {timesheets.map((ts) => (
-                <div key={ts.id} className="table-row">
-                  <div>{ts.employee}</div>
-                  <div>{ts.task}</div>
-                  <div>{ts.hours}</div>
-                  <div>₹{ts.rate}</div>
-                  <div>₹{ts.hours * ts.rate}</div>
-                  <div>{ts.date}</div>
-                  <div>
-                    <span className={`status ${ts.status.toLowerCase()}`}>
-                      {ts.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
             </div>
+          ))}
+        </div>
+      </ProjectCard>
 
-            {/* Timesheet Modal */}
-            {showTimesheetModal && (
-              <div
-                className="modal-overlay"
-                onClick={() => setShowTimesheetModal(false)}
-              >
-                <div
-                  className="modal-content"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="modal-header">
-                    <h2>Log Working Hours</h2>
-                    <button
-                      className="close-btn"
-                      onClick={() => setShowTimesheetModal(false)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <div className="modal-body">
-                    <div className="form-group">
-                      <label>Employee Name</label>
-                      <input
-                        type="text"
-                        placeholder="Enter employee name"
-                        value={newTimesheet.employee}
-                        onChange={(e) =>
-                          setNewTimesheet({
-                            ...newTimesheet,
-                            employee: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Task</label>
-                      <select
-                        value={newTimesheet.task}
-                        onChange={(e) =>
-                          setNewTimesheet({
-                            ...newTimesheet,
-                            task: e.target.value,
-                          })
-                        }
-                      >
-                        <option>Select Task</option>
-                        {selectedProject?.wbs ||
-                          [].map((wbs) =>
-                            wbs.tasks.map((task) => (
-                              <option key={task.id}>{task.name}</option>
-                            )),
-                          )}
-                      </select>
-                    </div>
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Hours</label>
-                        <input
-                          type="number"
-                          placeholder="8"
-                          value={newTimesheet.hours}
-                          onChange={(e) =>
-                            setNewTimesheet({
-                              ...newTimesheet,
-                              hours: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Rate/Hour (₹)</label>
-                        <input
-                          type="number"
-                          placeholder="500"
-                          value={newTimesheet.rate}
-                          onChange={(e) =>
-                            setNewTimesheet({
-                              ...newTimesheet,
-                              rate: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className="form-group">
-                      <label>Date</label>
-                      <input
-                        type="date"
-                        value={newTimesheet.date}
-                        onChange={(e) =>
-                          setNewTimesheet({
-                            ...newTimesheet,
-                            date: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="modal-footer">
-                    <button
-                      className="btn-secondary"
-                      onClick={() => setShowTimesheetModal(false)}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      className="btn-primary"
-                      onClick={handleAddTimesheet}
-                    >
-                      Log Hours
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        {activeTab === "cost" && selectedProject?.status === "Rejected" && (
-          <div style={{ padding: "20px", textAlign: "center" }}>
-            <h3>❌ No Cost Tracking for Rejected Projects</h3>
-          </div>
-        )}
-        {/* COST TRACKING TAB */}
-        {activeTab === "cost" && (
-          <CostTracking
-            selectedProject={selectedProject}
-            activePhase={activePhase}
-            setActivePhase={setActivePhase}
-            activeCategory={activeCategory}
-            setActiveCategory={setActiveCategory}
-            costBreakdown={costBreakdown}
-            calculateRemaining={calculateRemaining}
-            calculatePercentage={calculatePercentage}
-            costSummary={costSummary}
-          />
-        )}
+      {/* RECENT ACTIVITIES */}
+      <ProjectCard variant="overview">
+        <div className="recent-activity">
+          <h3>
+            {selectedProject
+              ? `${selectedProject.name} - Recent Activities`
+              : "Recent Activities"}
+          </h3>
+          <p>• Sample activity</p>
+        </div>
+      </ProjectCard>
 
-   
+    </div>
+  )}
+
+  {activeTab === "wbs" && (
+    <WbsPage selectedProject={selectedProject} />
+  )}
+
+  {activeTab === "timesheet" && (
+    <div className="timesheet-section">Timesheet content</div>
+  )}
+
+  {activeTab === "cost" && (
+    <CostTracking
+      selectedProject={selectedProject}
+      activePhase={activePhase}
+      setActivePhase={setActivePhase}
+      activeCategory={activeCategory}
+      setActiveCategory={setActiveCategory}
+      costBreakdown={costBreakdown}
+      calculateRemaining={calculateRemaining}
+      calculatePercentage={calculatePercentage}
+      costSummary={costSummary}
+    />
+  )}
+
+  {activeTab === "payments" && (
+    <div className="payments-section">Payments content</div>
+  )}
+
+</div>
         
 
-        {/* PAYMENTS TAB */}
-        {activeTab === "payments" && (
-          <div className="payments-section">
-            <div className="payments-header">
-              <h2>Payment Tracking</h2>
-              <button
-                className="btn-primary"
-                onClick={() => setShowPaymentModal(true)}
-              >
-                + Record Payment
-              </button>
-            </div>
-
-            {/* Payment Overview */}
-            <div className="payment-overview">
-              <div className="payment-card">
-                <div className="card-label">Total Budget</div>
-                <div className="card-value">
-                  ₹{(selectedProject.budget / 10000000).toFixed(1)}Cr
-                </div>
-              </div>
-              <div className="payment-card">
-                <div className="card-label">Total Spent</div>
-                <div className="card-value">
-                  ₹{(selectedProject.spent / 10000000).toFixed(1)}Cr
-                </div>
-              </div>
-              <div className="payment-card green">
-                <div className="card-label">Client Paid</div>
-                <div className="card-value">
-                  ₹{((selectedProject.clientPaid || 0) / 10000000).toFixed(1)}Cr
-                </div>
-              </div>
-              <div className="payment-card yellow">
-                <div className="card-label">Pending Payment</div>
-                <div className="card-value">
-                  ₹
-                  {(
-                    (selectedProject.spent -
-                      (selectedProject.clientPaid || 0)) /
-                    10000000
-                  ).toFixed(1)}
-                  Cr
-                </div>
-              </div>
-            </div>
-
-            {/* Payment Progress */}
-            <div className="payment-progress">
-              <h3>Payment Status</h3>
-              <div className="progress-item">
-                <div className="progress-header">
-                  <span>Paid vs Total Spent</span>
-                  <span className="percentage">
-                    {selectedProject.spent > 0
-                      ? (
-                          ((selectedProject.clientPaid || 0) /
-                            selectedProject.spent) *
-                          100
-                        ).toFixed(1)
-                      : 0}
-                    %
-                  </span>
-                </div>
-                <div className="progress-bar large">
-                  <div
-                    className="progress-fill"
-                    style={{
-                      width: `${selectedProject.spent > 0 ? ((selectedProject.clientPaid || 0) / selectedProject.spent) * 100 : 0}%`,
-                      backgroundColor: "#22c55e",
-                    }}
-                  ></div>
-                </div>
-                <div className="progress-labels">
-                  <span>
-                    Paid: ₹
-                    {((selectedProject.clientPaid || 0) / 10000000).toFixed(1)}
-                    Cr
-                  </span>
-                  <span>
-                    Spent: ₹{(selectedProject.spent / 10000000).toFixed(1)}Cr
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Payment History */}
-            <div className="payment-history">
-              <h3>Payment History</h3>
-              <div className="payments-table">
-                <div className="table-header">
-                  <div>Date</div>
-                  <div>Amount</div>
-                  <div>Reference</div>
-                  <div>Status</div>
-                </div>
-                {payments.map((payment) => (
-                  <div key={payment.id} className="table-row">
-                    <div>{new Date(payment.date).toLocaleDateString()}</div>
-                    <div className="amount">
-                      ₹{(payment.amount / 10000000).toFixed(1)}Cr
-                    </div>
-                    <div>{payment.reference}</div>
-                    <div>
-                      <span
-                        className={`status ${payment.status.toLowerCase()}`}
-                      >
-                        {payment.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Payment Modal */}
-            {showPaymentModal && (
-              <div
-                className="modal-overlay"
-                onClick={() => setShowPaymentModal(false)}
-              >
-                <div
-                  className="modal-content"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="modal-header">
-                    <h2>Record Client Payment</h2>
-                    <button
-                      className="close-btn"
-                      onClick={() => setShowPaymentModal(false)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <div className="modal-body">
-                    <div className="form-group">
-                      <label>Payment Date *</label>
-                      <input
-                        type="date"
-                        value={newPayment.date}
-                        onChange={(e) =>
-                          setNewPayment({ ...newPayment, date: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Amount (₹) *</label>
-                      <input
-                        type="number"
-                        placeholder="e.g., 10000000"
-                        value={newPayment.amount}
-                        onChange={(e) =>
-                          setNewPayment({
-                            ...newPayment,
-                            amount: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Reference / Invoice #</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., INV-001"
-                        value={newPayment.reference}
-                        onChange={(e) =>
-                          setNewPayment({
-                            ...newPayment,
-                            reference: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="info-box">
-                      <strong>Total Pending:</strong> ₹
-                      {(
-                        (selectedProject.spent -
-                          (selectedProject.clientPaid || 0)) /
-                        10000000
-                      ).toFixed(1)}
-                      Cr
-                    </div>
-                  </div>
-                  <div className="modal-footer">
-                    <button
-                      className="btn-secondary"
-                      onClick={() => setShowPaymentModal(false)}
-                    >
-                      Cancel
-                    </button>
-                    <button className="btn-primary" onClick={handleAddPayment}>
-                      Record Payment
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+       
 
         {/* NEW PROJECT MODAL */}
         {showProjectModal && (

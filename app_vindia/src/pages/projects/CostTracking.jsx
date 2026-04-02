@@ -7,7 +7,7 @@ function CostTracking({
   costSummary = [],
   activeCategory,
   setActiveCategory,
-  costBreakdown,
+  costBreakdown = {},
 }) {
   const [details, setDetails] = useState({});
 
@@ -15,14 +15,24 @@ function CostTracking({
     return <h3 style={{ textAlign: "center" }}>❌ No Cost Tracking</h3>;
   }
 
-  // ✅ Safe percentage (no Infinity%)
-  const safePercentage = (spent, budget) => {
-    if (!budget || budget === 0) return 0;
-    return ((spent / budget) * 100).toFixed(1);
+  // ✅ Safe percentage (no Infinity / NaN)
+ const safePercentage = (spent, budget) => {
+  if (!budget || budget === 0) return "0.0";
+  return ((spent / budget) * 100).toFixed(1);
+};
+
+  // ✅ Safe number formatter (Cr)
+  const formatCr = (value) => {
+    return (value / 10000000).toFixed(2);
   };
 
+  // ✅ Safe totals
+  const labour = costBreakdown?.labour || 0;
+  const material = costBreakdown?.material || 0;
+  const equipment = costBreakdown?.equipment || 0;
+
   const miscTotal = costSummary.reduce(
-    (s, w) => s + (w.misc_cost || 0),
+    (s, w) => s + Number(w.misc_cost || 0),
     0
   );
 
@@ -37,22 +47,22 @@ function CostTracking({
         <div className="cost-cards">
           <div className="cost-card labour">
             <div className="cost-label">LABOUR COST</div>
-            <h2>₹{(costBreakdown.labour / 10000000).toFixed(1)}Cr</h2>
+            <h2>₹{formatCr(labour)} Cr</h2>
           </div>
 
           <div className="cost-card material">
             <div className="cost-label">MATERIAL COST</div>
-            <h2>₹{(costBreakdown.material / 10000000).toFixed(1)}Cr</h2>
+            <h2>₹{formatCr(material)} Cr</h2>
           </div>
 
           <div className="cost-card equipment">
             <div className="cost-label">EQUIPMENT COST</div>
-            <h2>₹{(costBreakdown.equipment / 10000000).toFixed(1)}Cr</h2>
+            <h2>₹{formatCr(equipment)} Cr</h2>
           </div>
 
           <div className="cost-card misc">
             <div className="cost-label">MISC COST</div>
-            <h2>₹{(miscTotal / 10000000).toFixed(1)}Cr</h2>
+            <h2>₹{formatCr(miscTotal)} Cr</h2>
           </div>
         </div>
       </div>
@@ -70,12 +80,14 @@ function CostTracking({
         </div>
 
         {costSummary.map((wbs) => {
-          
           const totalSpent =
-            (wbs.labour_cost || 0) +
-            (wbs.material_cost || 0) +
-            (wbs.equipment_cost || 0) +
-            (wbs.misc_cost || 0);
+            Number(wbs.labour_cost || 0) +
+            Number(wbs.material_cost || 0) +
+            Number(wbs.equipment_cost || 0) +
+            Number(wbs.misc_cost || 0);
+
+          const budget = Number(wbs.budget || 0);
+const remaining = Math.max(budget - totalSpent, 0);
 
           return (
             <div key={wbs.wbs_id}>
@@ -100,30 +112,19 @@ function CostTracking({
               >
                 <div>{wbs.name}</div>
 
-                <div>
-                  ₹{((wbs.budget || 0) / 10000000).toFixed(1)}Cr
-                </div>
+                <div>₹{formatCr(wbs.budget || 0)} Cr</div>
 
-                <div>
-                  ₹{(totalSpent / 10000000).toFixed(1)}Cr
-                </div>
+                <div>₹{formatCr(totalSpent)} Cr</div>
 
-                <div>
-                  ₹
-                  {(
-                    ((wbs.budget || 0) - totalSpent) /
-                    10000000
-                  ).toFixed(1)}
-                  Cr
-                </div>
+                <div>₹{formatCr(remaining)} Cr</div>
 
                 <div>{safePercentage(totalSpent, wbs.budget)}%</div>
               </div>
 
-              {/* 🔥 EXPAND */}
+              {/* 🔥 EXPANDED DETAILS */}
               {activePhase === wbs.wbs_id && (
                 <div className="expanded-row">
-
+                  
                   {/* CATEGORY BUTTONS */}
                   <div className="category-buttons">
                     {["labour", "material", "equipment", "miscellaneous"].map(
@@ -143,16 +144,10 @@ function CostTracking({
                     )}
                   </div>
 
-                  {/* 🔥 LABOUR TABLE */}
+                  {/* LABOUR */}
                   {activeCategory === "labour" && (
                     <div className="table-wrapper">
                       <table className="cost-table">
-                        <thead>
-                          <tr>
-                            <th>Type</th>
-                            <th>Value</th>
-                          </tr>
-                        </thead>
                         <tbody>
                           <tr>
                             <td>Total Workers</td>
@@ -167,7 +162,7 @@ function CostTracking({
                     </div>
                   )}
 
-                  {/* 🔥 MATERIAL TABLE */}
+                  {/* MATERIAL */}
                   {activeCategory === "material" && (
                     <div className="table-wrapper">
                       <table className="cost-table">
@@ -191,16 +186,10 @@ function CostTracking({
                     </div>
                   )}
 
-                  {/* 🔥 EQUIPMENT TABLE */}
+                  {/* EQUIPMENT */}
                   {activeCategory === "equipment" && (
                     <div className="table-wrapper">
                       <table className="cost-table">
-                        <thead>
-                          <tr>
-                            <th>Type</th>
-                            <th>Cost</th>
-                          </tr>
-                        </thead>
                         <tbody>
                           <tr>
                             <td>Total Equipment Cost</td>
@@ -211,7 +200,7 @@ function CostTracking({
                     </div>
                   )}
 
-                  {/* 🔥 MISC TABLE */}
+                  {/* MISC */}
                   {activeCategory === "miscellaneous" && (
                     <div className="table-wrapper">
                       <table className="cost-table">
@@ -232,7 +221,6 @@ function CostTracking({
                       </table>
                     </div>
                   )}
-
                 </div>
               )}
             </div>
