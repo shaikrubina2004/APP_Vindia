@@ -31,13 +31,14 @@ function Leaves() {
 
     // map backend → UI format
     const formatted = res.data.map((l) => ({
-      id: l.id,
-      employee_id: l.employee_id,   // ✅ ADD THIS
-      name: l.name,
-      type: l.reason,
-      date: l.from_date,
-      status: l.status,
-    }));
+    id: l.id,
+    employee_id: l.employee_id,
+    name: l.name,
+    type: l.reason,
+    from_date: l.from_date,   // ✅ ADD
+    to_date: l.to_date,       // ✅ ADD
+    status: l.status,
+  }));
 
     setLeaves(formatted);
   } catch (err) {
@@ -149,7 +150,8 @@ console.log("SUMMARY STATE:", summaryData);
               <tr>
                 <th>Employee</th>
                 <th>Type</th>
-                <th>Date</th>
+                <th>From</th>
+                <th>To</th>
                 <th>Status</th>
                 <th>Action</th>
                 <th>Summary</th>
@@ -158,25 +160,36 @@ console.log("SUMMARY STATE:", summaryData);
 
             <tbody>
   {leaves
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .sort((a, b) => new Date(a.from_date) - new Date(b.from_date))
     .filter((l) => {
-      const localDate = new Date(l.date).toLocaleDateString("en-CA");
-      return localDate === today;
+      const todayDate = new Date(today);
+      const from = new Date(l.from_date);
+      const to = new Date(l.to_date);
+      return todayDate >= from && todayDate <= to;
     })
     .map((l, i) => (
       <React.Fragment key={l.id}>
-        {/* MAIN ROW */}
+        
+        {/* ✅ MAIN ROW */}
         <tr>
           <td className="emp">{l.name}</td>
           <td>{l.type}</td>
+
           <td>
-          {new Date(l.date).toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })}
-        </td>
-        
+            {new Date(l.from_date).toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })}
+          </td>
+
+          <td>
+            {new Date(l.to_date).toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })}
+          </td>
 
           <td>
             <span className={`tag ${l.status.toLowerCase()}`}>
@@ -190,7 +203,6 @@ console.log("SUMMARY STATE:", summaryData);
                 <button onClick={() => handleAction(l.id, "Approved")}>
                   Approve
                 </button>
-
                 <button onClick={() => handleAction(l.id, "Rejected")}>
                   Reject
                 </button>
@@ -209,8 +221,8 @@ console.log("SUMMARY STATE:", summaryData);
                 } else {
                   setSelectedEmployee(l.name);
                   setSelectedIndex(i);
-                 setSummaryData(null);  // ✅ ADD THIS
-                fetchSummary(l.employee_id); // ✅ FIXED
+                  setSummaryData(null);
+                  fetchSummary(l.employee_id);
                 }
               }}
             >
@@ -219,10 +231,10 @@ console.log("SUMMARY STATE:", summaryData);
           </td>
         </tr>
 
-        {/* SUMMARY ROW */}
+        {/* ✅ SUMMARY ROW */}
         {selectedIndex === i && summaryData !== null && (
           <tr>
-            <td colSpan="6">
+            <td colSpan="7">  {/* 🔥 IMPORTANT: updated colspan */}
               <div className="summary">
                 <h3>{selectedEmployee}</h3>
 
@@ -269,6 +281,7 @@ console.log("SUMMARY STATE:", summaryData);
             </td>
           </tr>
         )}
+
       </React.Fragment>
     ))}
 </tbody>
