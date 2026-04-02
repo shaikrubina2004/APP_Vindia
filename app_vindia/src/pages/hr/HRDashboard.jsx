@@ -13,34 +13,54 @@ import "../../styles/HRDashboard.css";
 
 function HRDashboard() {
   const [employees, setEmployees] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
 
   useEffect(() => {
-    const fetchEmployees = async () => {
+    const fetchData = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/employees");
-        setEmployees(res.data);
+        // 👇 1. Employees
+        const empRes = await axios.get("http://localhost:5000/api/employees");
+        setEmployees(empRes.data);
+
+        // 👇 2. Dashboard (attendance + birthdays + pending)
+        const dashRes = await axios.get("http://localhost:5000/api/dashboard");
+        setDashboard(dashRes.data);
+
       } catch (err) {
-        console.error("Error fetching employees:", err);
+        console.error("Dashboard error:", err);
       }
     };
 
-    fetchEmployees();
+    fetchData();
   }, []);
 
   return (
     <div className="hr-dashboard">
       <h1>HR Dashboard</h1>
 
-      {/* 🔥 REAL DATA HERE */}
+      {/* ✅ Employee Stats */}
       <EmployeeStats employees={employees} />
 
       <div className="dashboard-grid">
-        <AttendanceOverview employees={employees} />
+
+        {/* ✅ Attendance Overview */}
+        <AttendanceOverview data={dashboard?.attendance} />
+
+        {/* ✅ New Joiners (from employees) */}
         <NewJoiners employees={employees} />
-        <AttendanceChart employees={employees} />
-        <PendingRequests />
-        <Birthdays employees={employees} />
+
+        {/* ✅ Chart */}
+        <AttendanceChart data={dashboard?.attendance} />
+
+        {/* ✅ Pending Requests */}
+        <PendingRequests data={dashboard?.pending} />
+
+        {/* ✅ Birthdays */}
+        <Birthdays data={dashboard?.birthdays} />
+
+        {/* ✅ Quick Actions */}
         <QuickActions />
+
       </div>
     </div>
   );

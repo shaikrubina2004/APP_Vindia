@@ -4,48 +4,45 @@ import {
   Tooltip,
   Legend
 } from "chart.js";
-
 import { Doughnut } from "react-chartjs-2";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-function AttendanceChart() {
+function AttendanceChart({ data }) {
 
-  const data = {
+  // ✅ Prevent crash when data is not loaded
+  if (!data) {
+    return (
+      <div className="dashboard-card">
+        <h3>Attendance Distribution</h3>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  const chartData = {
     labels: ["Present", "Absent", "Late", "WFH"],
     datasets: [
       {
-        data: [32, 4, 2, 3],
-        backgroundColor: [
-          "#22c55e",
-          "#ef4444",
-          "#f59e0b",
-          "#3b82f6"
+        data: [
+          data.present || 0,
+          data.absent || 0,
+          data.late || 0,
+          data.wfh || 0
         ],
-        borderWidth: 0
-      }
-    ]
-  };
-
-  const options = {
-    plugins: {
-      legend: {
-        position: "bottom"
-      }
-    },
-    maintainAspectRatio: false
+        backgroundColor: ["#22c55e", "#ef4444", "#f59e0b", "#3b82f6"],
+      },
+    ],
   };
 
   return (
     <div className="dashboard-card">
       <h3>Attendance Distribution</h3>
-
       <div className="chart-container">
-        <Doughnut data={data} options={options} />
+        <Doughnut data={chartData} />
       </div>
-
     </div>
   );
 }
 
-export default AttendanceChart;
+export default AttendanceChart;''

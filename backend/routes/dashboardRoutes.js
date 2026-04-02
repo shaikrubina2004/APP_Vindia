@@ -2,25 +2,85 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/db");
 
-// GET DASHBOARD DATA
 router.get("/", async (req, res) => {
   try {
-    const totalEmployees = await pool.query(
+    // ✅ Total Employees
+    const totalEmployeesRes = await pool.query(
       "SELECT COUNT(*) FROM employees"
     );
+    const totalEmployees = parseInt(totalEmployeesRes.rows[0].count);
 
-    const presentToday = await pool.query(
-      "SELECT COUNT(*) FROM attendance WHERE status='Present' AND date=CURRENT_DATE"
-    );
+    // ✅ On Leave (real-time)
+    let onLeave = 0;
 
-    const onLeave = await pool.query(
-      "SELECT COUNT(*) FROM leave_requests WHERE status='Approved' AND CURRENT_DATE BETWEEN from_date AND to_date"
-    );
+    try {
+      const leaveRes = await pool.query(`
+        SELECT COUNT(DISTINCT employee_id) 
+        FROM leave_requests
+        WHERE status = 'Approved'
+        AND CURRENT_DATE BETWEEN from_date AND to_date
+      `);
+      onLeave = parseInt(leaveRes.rows[0].count);
+    } catch (err) {
+      console.log("⚠️ leave_requests table missing");
+    }
+
+    // ✅ Active Employees (REAL LOGIC)
+    const active = totalEmployees - onLeave;
+
+    // ✅ Attendance Distribution (latest date)
+    const attendanceRes = await pool.query(`
+      SELECT status, COUNT(*) 
+      FROM attendance 
+      WHERE date = (SELECT MAX(date) FROM attendance)
+      GROUP BY status
+    `);
+
+    let present = 0,
+      absent = 0,
+      late = 0,
+      wfh = 0;
+
+    attendanceRes.rows.forEach((row) => {
+      const status = row.status.toLowerCase();
+
+      if (status === "present") present = parseInt(row.count);
+      if (status === "absent") absent = parseInt(row.count);
+      if (status === "late") late = parseInt(row.count);
+      if (status === "wfh") wfh = parseInt(row.count);
+    });
+
+    // ✅ Birthdays
+    const birthdays = await pool.query(`
+      SELECT name, dob 
+      FROM employees
+      WHERE EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM CURRENT_DATE)
+      AND EXTRACT(DAY FROM dob) >= EXTRACT(DAY FROM CURRENT_DATE)
+      ORDER BY dob ASC
+      LIMIT 5
+    `);
+
+    // ✅ Pending Requests (safe)
+    let pending = { rows: [] };
+
+    try {
+      pending = await pool.query(`
+        SELECT type, COUNT(*) 
+        FROM leave_requests
+        WHERE status = 'Pending'
+        GROUP BY type
+      `);
+    } catch (err) {
+      console.log("⚠️ pending skipped");
+    }
 
     res.json({
-      totalEmployees: parseInt(totalEmployees.rows[0].count),
-      presentToday: parseInt(presentToday.rows[0].count),
-      onLeave: parseInt(onLeave.rows[0].count),
+      totalEmployees,
+      active,        // ⭐ NEW
+      onLeave,       // ⭐ REAL VALUE
+      attendance: { present, absent, late, wfh },
+      birthdays: birthdays.rows,
+      pending: pending.rows,
     });
 
   } catch (err) {
