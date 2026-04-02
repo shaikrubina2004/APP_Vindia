@@ -24,11 +24,11 @@ import { ROLES } from "../roles";
 import CEOLayout from "../layouts/CEOLayout";
 import HRLayout from "../layouts/HRLayout";
 import Timesheet from "../pages/timesheet/Timesheet";
+import ProjectManagerLayout from "../layouts/ProjectManagerLayout";
 
 const AppRoutes = () => {
   return (
     <Routes>
-
       {/* PUBLIC */}
       <Route path="/" element={<SignIn />} />
       <Route path="/signup" element={<SignUp />} />
@@ -74,23 +74,23 @@ const AppRoutes = () => {
         path="/projects"
         element={
           <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-            <CEOLayout>
+            <ProjectManagerLayout>
               <ProjectManagement />
-            </CEOLayout>
+            </ProjectManagerLayout>
           </ProtectedRoute>
         }
       />
       {/* TIMESHEET */}
-<Route
-  path="/timesheet"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
-      <CEOLayout>
-        <Timesheet />
-      </CEOLayout>
-    </ProtectedRoute>
-  }
-/>
+      <Route
+        path="/timesheet"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
+            <CEOLayout>
+              <Timesheet />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* HR DASHBOARD */}
       <Route
@@ -127,15 +127,15 @@ const AppRoutes = () => {
       />
 
       <Route
-  path="/hr/employee/:id"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
-      <HRLayout>
-        <EmployeeDetails />
-      </HRLayout>
-    </ProtectedRoute>
-  }
-/>
+        path="/hr/employee/:id"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <EmployeeDetails />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
       {/* ADD EMPLOYEE */}
       <Route
         path="/hr/add-employee"
@@ -234,7 +234,6 @@ const AppRoutes = () => {
 
       {/* FALLBACK */}
       <Route path="*" element={<h2>Page Not Found</h2>} />
-
     </Routes>
   );
 };

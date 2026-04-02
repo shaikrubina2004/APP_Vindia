@@ -1,16 +1,13 @@
-import { LayoutDashboard, Users, Clock, FileText, Wallet } from "lucide-react";
-
 export const ProjectManagerMenu = [
-  {
-    name: "PM Dashboard",
-    path: "/ProjectManager/Dashboard",
-    icon: LayoutDashboard,
-  },
-  { name: "WBS", path: "/ProjectManager/WBS", icon: Users },
-  {
-    name: "Cost Tracking",
-    path: "/ProjectManager/CostTracking",
-    icon: FileText,
-  },
-  { name: "Payment", path: "/ProjectManager/payment", icon: Wallet },
+  { name: "Dashboard", path: "/pm/dashboard", icon: "home" },
+
+  { name: "Incidents", path: "/pm/incidents", icon: "alert-triangle" },
+
+  { name: "Daily Updates", path: "/pm/daily-updates", icon: "calendar" },
+
+  { name: "Team Management", path: "/pm/team", icon: "users" },
+
+  { name: "Reports", path: "/pm/reports", icon: "bar-chart-2" },
+
+  { name: "Settings", path: "/pm/settings", icon: "settings" },
 ];

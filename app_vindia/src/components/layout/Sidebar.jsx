@@ -13,19 +13,13 @@ function Sidebar({ menuItems }) {
   return (
     <>
       {/* ================= TOGGLE BUTTON ================= */}
-      <button
-        className="sidebar-toggle"
-        onClick={() => setOpen(!open)}
-      >
+      <button className="sidebar-toggle" onClick={() => setOpen(!open)}>
         ☰
       </button>
 
       {/* ================= OVERLAY ================= */}
       {open && (
-        <div
-          className="sidebar-backdrop"
-          onClick={() => setOpen(false)}
-        ></div>
+        <div className="sidebar-backdrop" onClick={() => setOpen(false)}></div>
       )}
 
       {/* ================= SIDEBAR ================= */}
@@ -37,9 +31,7 @@ function Sidebar({ menuItems }) {
                 to={item.path}
                 onClick={() => setOpen(false)} // ✅ closes on click
                 className={({ isActive }) =>
-                  isActive
-                    ? "sidebar__link active"
-                    : "sidebar__link"
+                  isActive ? "sidebar__link active" : "sidebar__link"
                 }
               >
                 <i data-feather={item.icon}></i>
