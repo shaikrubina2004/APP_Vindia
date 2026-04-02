@@ -18,14 +18,13 @@ function HRDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 👇 1. Employees
-        const empRes = await axios.get("http://localhost:5000/api/employees");
+        const [empRes, dashRes] = await Promise.all([
+          axios.get("http://localhost:5000/api/employees"),
+          axios.get("http://localhost:5000/api/dashboard"),
+        ]);
+
         setEmployees(empRes.data);
-
-        // 👇 2. Dashboard (attendance + birthdays + pending)
-        const dashRes = await axios.get("http://localhost:5000/api/dashboard");
         setDashboard(dashRes.data);
-
       } catch (err) {
         console.error("Dashboard error:", err);
       }
@@ -42,7 +41,6 @@ function HRDashboard() {
       <EmployeeStats employees={employees} />
 
       <div className="dashboard-grid">
-
         {/* ✅ Attendance Overview */}
         <AttendanceOverview data={dashboard?.attendance} />
 
@@ -60,7 +58,6 @@ function HRDashboard() {
 
         {/* ✅ Quick Actions */}
         <QuickActions />
-
       </div>
     </div>
   );
