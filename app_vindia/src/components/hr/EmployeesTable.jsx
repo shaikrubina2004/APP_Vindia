@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Fuse from "fuse.js";
 import "./EmployeesTable.css";
+
 function EmployeesTable({ employees, search }) {
   const navigate = useNavigate();
 
@@ -14,8 +15,6 @@ function EmployeesTable({ employees, search }) {
       today.getFullYear() - join.getFullYear() >= 1
     );
   };
-
-  // const formatDate = (date) => new Date(date).toLocaleDateString();
 
   // 🔍 FUZZY SEARCH
   const fuse = useMemo(() => {
@@ -34,7 +33,6 @@ function EmployeesTable({ employees, search }) {
     <div className="employees-table">
       <table>
         <thead>
-          {/* Table Header */}
           <tr>
             <th>ID</th>
             <th>Name</th>
@@ -55,6 +53,12 @@ function EmployeesTable({ employees, search }) {
               status: emp.status || "active",
             };
 
+            // ✅ FIXED STATUS
+            const statusKey = formatted.status; // 🔥 DO NOT MODIFY
+            const statusText = formatted.status
+              .replace("_", " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase());
+
             return (
               <tr key={formatted.id}>
                 <td>{formatted.id}</td>
@@ -72,10 +76,12 @@ function EmployeesTable({ employees, search }) {
 
                 <td>{formatted.assignedTo}</td>
 
-                <td className={`status-${formatted.status}`}>
-                  {formatted.status}
+                {/* ✅ CLEAN STATUS */}
+                <td className={`status-${statusKey}`}>
+                  {statusText}
                 </td>
 
+                {/* ✅ ALWAYS VISIBLE BUTTON */}
                 <td>
                   <button
                     className="view-btn"
