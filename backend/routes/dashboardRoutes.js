@@ -6,7 +6,7 @@ router.get("/", async (req, res) => {
   try {
     // ✅ Total Employees
     const totalEmployeesRes = await pool.query(
-      "SELECT COUNT(*) FROM employees"
+      "SELECT COUNT(*) FROM employees",
     );
     const totalEmployees = parseInt(totalEmployeesRes.rows[0].count);
 
@@ -28,13 +28,12 @@ router.get("/", async (req, res) => {
     // ✅ Active Employees (REAL LOGIC)
     const active = totalEmployees - onLeave;
 
-    // ✅ Attendance Distribution (latest date)
+    // 📊 Attendance (REAL LOGIC - per employee latest status)
     const attendanceRes = await pool.query(`
-      SELECT status, COUNT(*) 
-      FROM attendance 
-      WHERE date = (SELECT MAX(date) FROM attendance)
-      GROUP BY status
-    `);
+  SELECT DISTINCT ON (employee_id) employee_id, status
+  FROM attendance
+  ORDER BY employee_id, date DESC
+`);
 
     let present = 0,
       absent = 0,
@@ -44,10 +43,10 @@ router.get("/", async (req, res) => {
     attendanceRes.rows.forEach((row) => {
       const status = row.status.toLowerCase();
 
-      if (status === "present") present = parseInt(row.count);
-      if (status === "absent") absent = parseInt(row.count);
-      if (status === "late") late = parseInt(row.count);
-      if (status === "wfh") wfh = parseInt(row.count);
+      if (status === "present") present++;
+      else if (status === "absent") absent++;
+      else if (status === "late") late++;
+      else if (status === "wfh") wfh++;
     });
 
     // ✅ Birthdays
@@ -76,13 +75,12 @@ router.get("/", async (req, res) => {
 
     res.json({
       totalEmployees,
-      active,        // ⭐ NEW
-      onLeave,       // ⭐ REAL VALUE
+      active, // ⭐ NEW
+      onLeave, // ⭐ REAL VALUE
       attendance: { present, absent, late, wfh },
       birthdays: birthdays.rows,
       pending: pending.rows,
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).send("Error fetching dashboard data");

@@ -1,17 +1,17 @@
 import { FaUserCheck } from "react-icons/fa";
 
 function AttendanceOverview({ data }) {
-  if (!data) return <div className="dashboard-card">Loading...</div>;
-
+ if (!data) {
   return (
     <div className="dashboard-card">
       <h3>Attendance Overview</h3>
-      <p>Present: {data.present}</p>
-      <p>Absent: {data.absent}</p>
-      <p>Late: {data.late}</p>
-      <p>Work From Home: {data.wfh}</p>
+      <p>Present: 0</p>
+      <p>Absent: 0</p>
+      <p>Late: 0</p>
+      <p>Work From Home: 0</p>
     </div>
   );
+}
 }
 
 export default AttendanceOverview;
