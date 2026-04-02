@@ -91,8 +91,8 @@ function EmployeeDetails() {
           <p><strong>Salary:</strong> ₹{employee.salary}</p>
           <p><strong>Account No:</strong> {employee.account_no}</p>
           <p><strong>IFSC:</strong> {employee.ifsc}</p>
-          <p><strong>PAN:</strong> {employee.pan}</p>
-          <p><strong>Aadhar:</strong> {employee.aadhar}</p>
+          <p><strong>ID Type:</strong> {employee.gov_id_type || "N/A"}</p>
+          <p><strong>ID Number:</strong> {employee.gov_id_number || "N/A"}</p>
         </div>
       </div>
 

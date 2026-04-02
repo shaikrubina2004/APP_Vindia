@@ -12,6 +12,7 @@ function Travel() {
   });
 
   const [trip, setTrip] = useState({
+    project: "",
     purpose: "",
     startDate: "",
     endDate: "",
@@ -27,7 +28,7 @@ function Travel() {
   });
 
   const [notes, setNotes] = useState("");
-  const [approved, setApproved] = useState(false); // HR approval state
+  const [approved, setApproved] = useState(false);
 
   const employees = {
     EMP001: {
@@ -35,13 +36,13 @@ function Travel() {
       dept: "Finance",
       designation: "Analyst",
       trip: {
+        project: "Financial Audit",
         purpose: "Client Meeting",
         startDate: "2026-03-20",
         endDate: "2026-03-23",
         origin: "Bengaluru",
         destination: "Mumbai"
       },
-      cost: { airfare: 8500, accommodation: 12000, meals: 3000 },
       notes: "Met client for quarterly financial review."
     },
     EMP002: {
@@ -49,13 +50,13 @@ function Travel() {
       dept: "HR",
       designation: "Manager",
       trip: {
+        project: "Campus Recruitment",
         purpose: "Recruitment Drive",
         startDate: "2026-04-02",
         endDate: "2026-04-05",
         origin: "Delhi",
         destination: "Hyderabad"
       },
-      cost: { airfare: 9500, accommodation: 15000, meals: 4000 },
       notes: "Campus hiring and onboarding sessions."
     },
     EMP003: {
@@ -63,13 +64,13 @@ function Travel() {
       dept: "IT",
       designation: "Developer",
       trip: {
+        project: "Tech Conference 2026",
         purpose: "Tech Conference",
         startDate: "2026-05-10",
         endDate: "2026-05-12",
         origin: "Pune",
         destination: "Chennai"
       },
-      cost: { airfare: 7000, accommodation: 9000, meals: 2500 },
       notes: "Attended React & AI conference."
     }
   };
@@ -86,16 +87,30 @@ function Travel() {
     });
 
     setTrip(emp.trip);
-    setCost({ ...emp.cost, total: emp.cost.airfare + emp.cost.accommodation + emp.cost.meals });
+
+    setCost({
+      airfare: "",
+      accommodation: "",
+      meals: "",
+      total: 0
+    });
+
     setNotes(emp.notes);
-    setApproved(false); // Reset approval on new search
+    setApproved(false);
   };
 
-  const handleTripChange = (e) => setTrip({ ...trip, [e.target.name]: e.target.value });
+  const handleTripChange = (e) =>
+    setTrip({ ...trip, [e.target.name]: e.target.value });
 
   const handleCostChange = (e) => {
-    const updated = { ...cost, [e.target.name]: e.target.value };
-    updated.total = (Number(updated.airfare) || 0) + (Number(updated.accommodation) || 0) + (Number(updated.meals) || 0);
+    const { name, value } = e.target;
+    if (Number(value) < 0) return;
+
+    const updated = { ...cost, [name]: value };
+    updated.total =
+      (Number(updated.airfare) || 0) +
+      (Number(updated.accommodation) || 0) +
+      (Number(updated.meals) || 0);
     setCost(updated);
   };
 
@@ -112,7 +127,9 @@ function Travel() {
           {/* HEADER */}
           <div className="travel-app__header">
             <h1 className="travel-app__header-title">Travel Dashboard</h1>
-            <p className="travel-app__header-subtitle">Search employee trips, edit travel details & track costs.</p>
+            <p className="travel-app__header-subtitle">
+              Search employee trips, edit travel details & track costs.
+            </p>
           </div>
 
           {/* SEARCH */}
@@ -124,15 +141,21 @@ function Travel() {
               value={empId}
               onChange={(e) => setEmpId(e.target.value)}
             />
-            <button className="travel-app__search-button" onClick={searchEmployee}>Search</button>
+            <button
+              className="travel-app__search-button"
+              onClick={searchEmployee}
+            >
+              Search
+            </button>
           </div>
 
           {/* DASHBOARD */}
-          <div className="travel-app__dashboard">
+          <div className="travel-app__dashboard travel-app__dashboard--two-column">
 
-            {/* LEFT CARD */}
-            <div className="travel-app__card">
-              <div className="travel-app__title">Employee Details</div>
+            {/* LEFT CARD: Employee + Trip Info */}
+            <div className="travel-app__card travel-app__card--left">
+              <div className="travel-app__title">Employee & Trip Details</div>
+
               <div className="travel-app__employee-card">
                 <div className="travel-app__employee-row"><span>Name</span><strong>{employee.name || "-"}</strong></div>
                 <div className="travel-app__employee-row"><span>ID</span><strong>{employee.id || "-"}</strong></div>
@@ -140,65 +163,26 @@ function Travel() {
                 <div className="travel-app__employee-row"><span>Designation</span><strong>{employee.designation || "-"}</strong></div>
               </div>
 
-              <div className="travel-app__section-title">Travel Information</div>
-              
               <div className="travel-app__trip-section">
-                <div className="travel-app__purpose-long">
-                  <input
-                    className="travel-app__input travel-app__input--fullheight"
-                    type="text"
-                    name="purpose"
-                    value={trip.purpose}
-                    onChange={handleTripChange}
-                    placeholder="Purpose of Travel"
-                  />
+                <input className="travel-app__input" type="text" name="project" value={trip.project} onChange={handleTripChange} placeholder="Project Name" />
+                <input className="travel-app__input" type="text" name="purpose" value={trip.purpose} onChange={handleTripChange} placeholder="Purpose / Reason for Travel" />
+
+                <div className="travel-app__grid">
+                  <input className="travel-app__input" type="date" name="startDate" value={trip.startDate} onChange={handleTripChange} />
+                  <input className="travel-app__input" type="date" name="endDate" value={trip.endDate} onChange={handleTripChange} />
                 </div>
 
-                {/* Start & End Dates */}
                 <div className="travel-app__grid">
-                  <input
-                    className="travel-app__input"
-                    type="date"
-                    name="startDate"
-                    value={trip.startDate}
-                    onChange={handleTripChange}
-                    placeholder="Start Date"
-                  />
-                  <input
-                    className="travel-app__input"
-                    type="date"
-                    name="endDate"
-                    value={trip.endDate}
-                    onChange={handleTripChange}
-                    placeholder="End Date"
-                  />
-                </div>
-
-                {/* Origin & Destination */}
-                <div className="travel-app__grid">
-                  <input
-                    className="travel-app__input"
-                    type="text"
-                    name="origin"
-                    value={trip.origin}
-                    onChange={handleTripChange}
-                    placeholder="Origin"
-                  />
-                  <input
-                    className="travel-app__input"
-                    type="text"
-                    name="destination"
-                    value={trip.destination}
-                    onChange={handleTripChange}
-                    placeholder="Destination"
-                  />
+                  <input className="travel-app__input" type="text" name="origin" value={trip.origin} onChange={handleTripChange} placeholder="Origin" />
+                  <input className="travel-app__input" type="text" name="destination" value={trip.destination} onChange={handleTripChange} placeholder="Destination" />
                 </div>
               </div>
             </div>
 
-            {/* RIGHT CARD */}
-            <div className="travel-app__card travel-app__sticky-card">
-              <div className="travel-app__title">Cost</div>
+            {/* RIGHT CARD: Cost + Notes */}
+            <div className="travel-app__card travel-app__card--right">
+              <div className="travel-app__title">Cost & Approval</div>
+
               <div className="travel-app__payroll-breakdown">
                 <input className="travel-app__input" type="number" name="airfare" value={cost.airfare} onChange={handleCostChange} placeholder="Airfare / Transport" />
                 <input className="travel-app__input" type="number" name="accommodation" value={cost.accommodation} onChange={handleCostChange} placeholder="Accommodation" />
@@ -211,13 +195,8 @@ function Travel() {
 
                 <textarea className="travel-app__textarea" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" />
 
-                {/* Approve Button */}
-                <button
-                  className={`travel-app__search-button ${approved ? "approved" : ""}`}
-                  onClick={handleApprove}
-                  disabled={approved}
-                >
-                  {approved ? "Approved " : "Approve"}
+                <button className={`travel-app__search-button ${approved ? "approved" : ""}`} onClick={handleApprove} disabled={approved}>
+                  {approved ? "Approved" : "Approve"}
                 </button>
               </div>
             </div>
