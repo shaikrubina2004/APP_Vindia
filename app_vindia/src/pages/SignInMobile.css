@@ -46,10 +46,23 @@
 
 .mobile-subtitle{
   font-size:16px;
-  color:#001D39;
+  color:#013667;
   margin-bottom:28px;
   text-align:center;
   font-weight:500;
+}
+
+.mobile-title{
+  font-size:16px;
+  color:#001D39;
+  text-align:center;
+  margin-bottom:28px;
+  font-weight:500;
+}
+
+.mobile-title span{
+  color:#0A4174;
+  font-weight:700;
 }
 
 .mobile-subtitle span{

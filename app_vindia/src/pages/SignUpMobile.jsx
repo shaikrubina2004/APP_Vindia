@@ -45,7 +45,9 @@ function SignUpMobile() {
       <img src={logo} alt="Logo" className="mobile-logo" />
 
       {/* 🔥 TITLE */}
-      <h2 className="mobile-title">Create Account</h2>
+      <p className="mobile-title">
+   <span>Create Account</span>
+</p>
 
 
       {/* INPUTS */}
