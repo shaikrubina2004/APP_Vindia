@@ -22,8 +22,6 @@ export default function AddEmployee() {
     profile_photo: "",
     account_no: "",
     ifsc: "",
-    pan: "",
-    aadhar: "",
     id_proof: "",
     offer_letter: "",
     certificates: "",
@@ -119,21 +117,23 @@ gov_id_number: editingEmployee.gov_id_number || "",
 
     // ✅ IFSC Code validation (real-time)
     if (name === "ifsc") {
-      // IFSC format: [A-Z]{4}0[A-Z]{1} (exactly 11 chars)
-      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-      
-      if (value.length > 11) return;
-      
-      if (value.length === 11 && ifscRegex.test(value)) {
-        setErrors((prev) => ({ ...prev, ifsc: "" }));
-      } else if (value.length === 11) {
-        setErrors((prev) => ({ ...prev, ifsc: "Invalid IFSC format (ABCD0EFG)" }));
-      } else if (value.length > 0) {
-        setErrors((prev) => ({ ...prev, ifsc: "IFSC must be 11 characters" }));
-      }
-    }
+  const upperValue = value.toUpperCase();
+
+  const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+
+  if (upperValue.length > 11) return;
+
+  if (upperValue.length === 11 && ifscRegex.test(upperValue)) {
+    setErrors((prev) => ({ ...prev, ifsc: "" }));
+  } else if (upperValue.length === 11) {
+    setErrors((prev) => ({ ...prev, ifsc: "Invalid IFSC format (SBIN0001234)" }));
+  } else if (upperValue.length > 0) {
+    setErrors((prev) => ({ ...prev, ifsc: "IFSC must be 11 characters" }));
+  }
+}
     if (name === "gov_id_number") {
-  const type = form.gov_id_type;
+  const type =
+  name === "gov_id_type" ? value : form.gov_id_type;
   let error = "";
 
   if (type === "pan") {
@@ -176,13 +176,19 @@ gov_id_number: editingEmployee.gov_id_number || "",
 const finalValue =
   name === "gov_id_number" || name === "ifsc"
     ? value.toUpperCase().trim()
-    : value.trimStart(); // only trim start for normal fields
+    : value.trimStart();// only trim start for normal fields
 setForm((prev) => ({ ...prev, [name]: finalValue }));
   };
+  const managerRoles = ["manager", "ceo", "design lead", "bdm"];
 
-  const managers = employees.filter((emp) =>
-    emp.designation?.toLowerCase().includes("manager")
+  const managers = employees.filter((emp) => {
+  const role = emp.designation?.toLowerCase() || "";
+
+  return (
+    managerRoles.some((r) => role.includes(r)) &&
+    emp.id !== editingEmployee?.id // 🚫 prevent self
   );
+});
 
   const handleFileChange = (e, fieldName) => {
   // 🚫 Block ID proof upload without ID details
@@ -214,13 +220,15 @@ setForm((prev) => ({ ...prev, [name]: finalValue }));
 }
 
   const file = e.target.files[0];
-  if (file) {
-    setForm((prev) => ({
-      ...prev,
-      [fieldName]: file,
-      [`${fieldName}_name`]: file.name,
-    }));
-  }
+if (file) {
+  setForm((prev) => ({
+    ...prev,
+    [fieldName]: file,
+    [`${fieldName}_name`]: file.name,
+  }));
+
+  e.target.value = null; // 🔥 fix
+}
 };
 
   const validateForm = () => {
@@ -233,11 +241,17 @@ setForm((prev) => ({ ...prev, [name]: finalValue }));
 
     // Required fields
     if (!form.name) newErrors.name = "Name is required";
-    if (!form.email) newErrors.email = "Email is required";
+    if (!form.email) {
+  newErrors.email = "Email is required";
+} else if (!/^\S+@\S+\.\S+$/.test(form.email)) {
+  newErrors.email = "Invalid email format";
+}
     if (!form.department) newErrors.department = "Department is required";
     if (!form.role) newErrors.role = "Designation is required";
     if (!form.joining_date) newErrors.joining_date = "Joining date is required";
-    if (!form.salary) newErrors.salary = "Salary is required";
+    if (!form.salary || isNaN(Number(form.salary))) {
+  newErrors.salary = "Enter valid salary";
+}
 
     // ✅ Bank Account validation
     if (form.account_no && !/^\d{9,18}$/.test(form.account_no)) {
@@ -249,9 +263,9 @@ setForm((prev) => ({ ...prev, [name]: finalValue }));
       newErrors.ifsc = "Invalid IFSC format (e.g., SBIN0001234)";
     }
 
-    if (editingEmployee && !managerId) {
-      newErrors.managerId = "Manager is required";
-    }
+    if (!managerId && form.role.toLowerCase() !== "ceo") {
+  newErrors.managerId = "Manager is required";
+}
     if (form.gov_id_type && form.gov_id_number) {
   if (form.gov_id_type === "pan" && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(form.gov_id_number)) {
     newErrors.gov_id_number = "Invalid PAN format";
@@ -259,7 +273,7 @@ setForm((prev) => ({ ...prev, [name]: finalValue }));
   // ✅ UNIQUE GOV ID CHECK
 const duplicate = employees.find(
   (emp) =>
-    emp.gov_id_number === form.gov_id_number &&
+    emp.gov_id_number?.toUpperCase() === form.gov_id_number.toUpperCase() &&
     emp.id !== editingEmployee?.id
 );
 
@@ -312,10 +326,13 @@ if (form.id_proof && (!form.gov_id_type || !form.gov_id_number)) {
       formData.append("department", form.department);
       formData.append("designation", form.role);
       formData.append("join_date", form.joining_date);
-      formData.append("salary", Number(form.salary));
+      formData.append("salary", form.salary ? Number(form.salary) : "");
       formData.append("status", form.status.toLowerCase());
       formData.append("address", form.address);
-      formData.append("manager_id", editingEmployee ? Number(managerId) : "");
+      formData.append(
+  "manager_id",
+  managerId ? Number(managerId) : ""
+);
 
       formData.append("dob", form.dob || "");
       formData.append("gender", form.gender || "");
@@ -460,27 +477,28 @@ formData.append("gov_id_number", form.gov_id_number || "");
             <select name="status" value={form.status} onChange={handleChange}>
               <option value="active">Active</option>
               <option value="on_leave">OnLeave</option>
-              <option value="inactive">Inactive</option>
+              
             </select>
 
-            {editingEmployee && (
+            
               <div>
-                <select 
-                  value={managerId} 
-                  onChange={(e) => setManagerId(e.target.value)} 
-                  className={errors.managerId ? "error" : ""}
-                  required
-                >
-                  <option value="">Select Manager</option>
-                  {managers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.designation} - {m.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.managerId && <span className="error-text">{errors.managerId}</span>}
-              </div>
-            )}
+  <select 
+    value={managerId} 
+    onChange={(e) => setManagerId(e.target.value)} 
+    className={errors.managerId ? "error" : ""}
+  >
+    <option value="">Select Reporting Manager</option>
+    {managers.map((m) => (
+      <option key={m.id} value={m.id}>
+        {m.name} ({m.designation})
+      </option>
+    ))}
+  </select>
+  {errors.managerId && (
+    <span className="error-text">{errors.managerId}</span>
+  )}
+</div>
+            
           </div>
         </div>
 
@@ -543,18 +561,24 @@ formData.append("gov_id_number", form.gov_id_number || "");
   <h3>Government ID</h3>
   <div className="grid">
     
-    <select
-      name="gov_id_type"
-      value={form.gov_id_type}
-      onChange={handleChange}
-    >
-      <option value="">Select ID Type</option>
-      <option value="pan">PAN Card</option>
-      <option value="aadhar">Aadhaar Card</option>
-      <option value="passport">Passport</option>
-      <option value="driving">Driving License</option>
-      <option value="voter">Voter ID</option>
-    </select>
+   <select
+  name="gov_id_type"
+  value={form.gov_id_type || ""}
+  onChange={(e) => {
+    console.log("Selected:", e.target.value);
+    setForm((prev) => ({
+      ...prev,
+      gov_id_type: e.target.value,
+    }));
+  }}
+>
+  <option value="">Select ID Type</option>
+  <option value="pan">PAN Card</option>
+  <option value="aadhar">Aadhaar Card</option>
+  <option value="passport">Passport</option>
+  <option value="driving">Driving License</option>
+  <option value="voter">Voter ID</option>
+</select>
 
     <div>
       <input
@@ -578,31 +602,38 @@ formData.append("gov_id_number", form.gov_id_number || "");
           <div className="document-grid">
             {/* Profile Photo, ID Proof, Offer Letter, Certificates - unchanged */}
             <div className="doc-card">
-              <p className="doc-title">Profile Photo</p>
-              <label className="upload-btn">
-                + Upload Image
-                <input
-                  type="file"
-                  onChange={(e) => handleFileChange(e, "profile_photo")}
-                  accept="image/*"
-                  hidden
-                />
-              </label>
-              {form.profile_photo_name || form.profile_photo ? (
-  <p className="file-name">
-    {form.profile_photo_name || ""}
-  </p>
-) : (
-  <p className="empty-text">No file selected</p>
-)}
-              {editingEmployee && form.profile_photo && typeof form.profile_photo === "string" && (
-                <img
-                  src={`http://localhost:5000/uploads/${form.profile_photo}`}
-                  alt="Profile"
-                  className="doc-image"
-                />
-              )}
-            </div>
+  <p className="doc-title">Profile Photo</p>
+
+  <label className="upload-btn">
+    + Upload File
+    <input
+      type="file"
+      onChange={(e) => handleFileChange(e, "profile_photo")}
+      accept="application/pdf,image/*"
+      hidden
+    />
+  </label>
+
+  {form.profile_photo_name || form.profile_photo ? (
+    <p className="file-name">
+      {form.profile_photo_name || ""}
+    </p>
+  ) : (
+    <p className="empty-text">No file selected</p>
+  )}
+
+  {/* ✅ SAME AS OFFER LETTER */}
+  {editingEmployee && form.profile_photo && typeof form.profile_photo === "string" && (
+    <a
+      href={`http://localhost:5000/uploads/${form.profile_photo}`}
+      target="_blank"
+      rel="noreferrer"
+      className="view-btn"
+    >
+      View Document
+    </a>
+  )}
+</div>
 
             <div className="doc-card">
               <p className="doc-title">ID Proof</p>
