@@ -5,28 +5,34 @@
   font-family:"Segoe UI",sans-serif;
 }
 
-/* Background */
+/* ============================= */
+/* BACKGROUND */
+/* ============================= */
+
 .login-bg{
-  height:100vh;
+  min-height:100vh;
   display:flex;
-  align-items:center;
   justify-content:center;
+  align-items:center;
   background:#f2f2f2;
+  padding:20px;
 }
 
-/* Card */
+/* ============================= */
+/* CARD */
+/* ============================= */
+
 .login-card{
   width:900px;
-  height:450px;
   display:flex;
   border-radius:25px;
   background:white;
   box-shadow:0 15px 40px rgba(0,0,0,0.2);
   position:relative;
-  overflow:hidden;
+  /* ❌ REMOVED overflow:hidden */
 }
 
-/* Blue section */
+/* Blue skew (desktop only) */
 .login-card::before{
   content:"";
   position:absolute;
@@ -37,24 +43,27 @@
   background:#1f57a4;
   transform:skewX(-15deg);
   transform-origin:top;
-  z-index:0;
+  z-index:1;
 }
 
+/* ============================= */
 /* LEFT */
+/* ============================= */
+
 .login-left{
   width:58%;
   padding:60px;
-  z-index:1;
-
+  position:relative;
+  z-index:2; /* 🔥 FIX */
   display:flex;
   flex-direction:column;
   justify-content:center;
   align-items:center;
+  text-align:center;
 }
 
-/* Logo */
 .login-logo{
-  width:350px;
+  width:260px;
   margin-bottom:20px;
 }
 
@@ -63,42 +72,28 @@
   font-weight:600;
 }
 
-/* Tagline animation */
 .login-left p{
   font-size:18px;
   font-weight:500;
-  text-align:center;
-  overflow:hidden;
-  white-space:nowrap;
-  border-right:3px solid #1f57a4;
-
-  width:0;
-  animation:typing 3s steps(30,end) forwards, blink 0.7s infinite;
 }
 
-@keyframes typing{
-  from{width:0}
-  to{width:240px}
-}
+/* ============================= */
+/* RIGHT */
+/* ============================= */
 
-@keyframes blink{
-  50%{border-color:transparent}
-}
-
-/* RIGHT SIDE */
 .login-right{
   width:42%;
   padding:60px;
-  z-index:1;
+  position:relative;
+  z-index:2; /* 🔥 FIX */
   color:white;
 }
 
-/* Labels */
 .login-right label{
   font-size:13px;
+  display:block;
 }
 
-/* Inputs */
 .login-right input{
   width:100%;
   padding:10px;
@@ -106,56 +101,32 @@
   border-radius:4px;
   border:none;
   outline:none;
+  background:#fff;
+  color:#000;
 }
 
-/* Login options */
 .login-options{
   display:flex;
-  justify-content:space-between;
-  align-items:center;
+  justify-content:flex-end;
   font-size:13px;
   margin-bottom:25px;
-}
-
-/* Checkbox */
-.remember{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  white-space:nowrap;
-}
-
-.remember input{
-  margin:0;
 }
 
 .recover{
   color:#dbe7ff;
   cursor:pointer;
-  text-decoration:none;
 }
 
-.recover:hover{
-  text-decoration:underline;
-}
-
-/* Button */
 .login-right button{
   width:100%;
-  padding:10px;
+  padding:12px;
   background:#4f7df3;
   border:none;
   color:white;
+  border-radius:6px;
   cursor:pointer;
-  border-radius:4px;
-  transition:0.3s;
 }
 
-.login-right button:hover{
-  background:#3b66d6;
-}
-
-/* Signup text */
 .signup-text{
   margin-top:15px;
   font-size:13px;
@@ -168,90 +139,158 @@
   font-weight:500;
 }
 
-.signup-link:hover{
-  text-decoration:underline;
+/* ============================= */
+/* 📱 MOBILE RESPONSIVE */
+/* ============================= */
+
+@media (max-width: 768px){
+
+  .login-bg{
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:12px;
+  }
+
+  .login-card{
+    width:100%;
+    max-width:460px;   /* 🔥 more breathing space */
+    display:flex;
+    flex-direction:row;
+    border-radius:20px;
+  }
+
+  /* ✅ FIX SKEW POSITION */
+  .login-card::before{
+    left:60%;              /* 🔥 push right */
+    transform:skewX(-8deg); /* softer skew */
+  }
+
+  /* ================= LEFT ================= */
+
+  .login-left{
+    width:40%;   /* 🔥 smaller left */
+    padding:15px;
+  }
+
+  .login-logo{
+    width:110px;
+  }
+
+  .login-left p{
+    font-size:11px;
+    line-height:1.3;
+  }
+
+  /* ================= RIGHT ================= */
+
+  .login-right{
+    width:60%;   /* 🔥 more space for form */
+    padding:20px;
+  }
+
+  .login-right label{
+    font-size:12px;
+  }
+
+  .login-right input{
+    width:100%;
+    padding:12px;
+    font-size:14px;
+    margin-bottom:14px;
+    border-radius:6px;
+  }
+
+  .login-options{
+    margin-bottom:14px;
+  }
+
+  .login-right button{
+    width:100%;
+    padding:12px;
+    font-size:14px;
+    border-radius:8px;
+  }
+
+  .signup-text{
+    font-size:12px;
+    text-align:center;
+  }
 }
 
-/* ---------------- */
-/* SIGNUP PAGE FIX */
-/* ---------------- */
+/* ============================= */
+/* 🔥 MODAL OVERLAY */
+/* ============================= */
 
-/* Signup page adjustments */
-
-.signup-page .login-right{
-  padding:25px 35px;
-}
-
-.signup-page .login-right input{
-  padding:7px;
-  margin:4px 0 10px;
-}
-
-.signup-page h2{
-  margin-bottom:10px;
-  font-size:22px;
-}
-
-.signup-page .remember{
-  margin-bottom:6px;
-}
-
-.signup-page button{
-  margin-top:4px;
-  padding:9px;
-}
-/* MODAL OVERLAY */
-/* MODAL OVERLAY */
 .modal-overlay{
   position:fixed;
   top:0;
   left:0;
   width:100%;
   height:100%;
-
+  background:rgba(0,0,0,0.6);
   display:flex;
   justify-content:center;
   align-items:center;
+  z-index:999;
 
-  background:rgba(0,0,0,0.35);
-  backdrop-filter:blur(6px);   /* THIS BLURS THE BACKGROUND */
-  z-index:1000;
+  /* smooth fade */
+  animation:fadeIn 0.3s ease;
 }
-  
-/* MODAL BOX */
+
+/* ============================= */
+/* 🔥 MODAL BOX */
+/* ============================= */
+
 .modal-box{
-  width:360px;
+  width:350px;
   background:white;
-  padding:30px;
-  border-radius:10px;
-  box-shadow:0 15px 40px rgba(0,0,0,0.25);
+  padding:25px;
+  border-radius:15px;
   text-align:center;
+  box-shadow:0 15px 40px rgba(0,0,0,0.3);
+
+  animation:scaleUp 0.3s ease;
 }
 
+/* ============================= */
 /* TITLE */
+/* ============================= */
+
 .modal-box h3{
-  color:#1f57a4;
   margin-bottom:10px;
+  color:#001D39;
+  font-size:18px;
 }
 
-/* DESCRIPTION */
+/* ============================= */
+/* TEXT */
+/* ============================= */
+
 .modal-box p{
   font-size:14px;
   color:#555;
-  margin-bottom:20px;
+  margin-bottom:15px;
 }
 
+/* ============================= */
 /* INPUT */
+/* ============================= */
+
 .modal-box input{
   width:100%;
-  padding:10px;
+  padding:12px;
+  border-radius:8px;
   border:1px solid #ccc;
-  border-radius:5px;
-  margin-bottom:20px;
-  outline:none;
+  margin-bottom:18px;
+  font-size:14px;
 }
 
-/* BUTTON GROUP */
+/* ============================= */
+/* BUTTONS */
+/* ============================= */
+
 .modal-buttons{
   display:flex;
   gap:10px;
@@ -260,24 +299,45 @@
 /* SEND BUTTON */
 .send-btn{
   flex:1;
-  background:#4f7df3;
-  border:none;
-  color:white;
   padding:10px;
-  border-radius:5px;
+  background:#1f57a4;
+  color:white;
+  border:none;
+  border-radius:8px;
   cursor:pointer;
+  transition:0.2s;
 }
 
 .send-btn:hover{
-  background:#3b66d6;
+  background:#174b90;
 }
 
 /* CANCEL BUTTON */
 .cancel-btn{
   flex:1;
-  background:#e0e0e0;
-  border:none;
   padding:10px;
-  border-radius:5px;
+  background:#ddd;
+  border:none;
+  border-radius:8px;
   cursor:pointer;
+  transition:0.2s;
+}
+
+.cancel-btn:hover{
+  background:#bbb;
+}
+
+/* ============================= */
+/* ANIMATIONS */
+/* ============================= */
+
+@keyframes scaleUp{
+  from{
+    transform:scale(0.8);
+    opacity:0;
+  }
+  to{
+    transform:scale(1);
+    opacity:1;
+  }
 }

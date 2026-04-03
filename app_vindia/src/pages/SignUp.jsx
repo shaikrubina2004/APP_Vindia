@@ -20,126 +20,87 @@ function SignUp() {
   const [agree, setAgree] = useState(false);
 
   const handleChange = (e) => {
-
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
-
   };
 
   const handleSignup = async () => {
-  if (formData.password !== formData.confirmPassword) {
-    alert("Passwords do not match");
-    return;
-  }
 
-  if (!agree) {
-    alert("Please accept Terms & Conditions");
-    return;
-  }
+    console.log("SIGNUP API HIT ✅"); // ✅ MOVE HERE
 
-  try {
-    const res = await signup({
-      name: formData.firstName + " " + formData.lastName,
-      email: formData.email,
-      password: formData.password,
-    });
+    if (formData.password !== formData.confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
 
-    alert(res.data.message);
+    if (!agree) {
+      alert("Please accept Terms & Conditions");
+      return;
+    }
 
-    navigate("/");
-  } catch (error) {
-    alert(error.response?.data?.message || "Signup failed");
-  }
-};
+    try {
+      const res = await signup({
+        name: formData.firstName + " " + formData.lastName,
+        email: formData.email,
+        password: formData.password,
+      });
+
+      alert(res.data.message);
+      navigate("/");
+
+    } catch (error) {
+      alert(error.response?.data?.message || "Signup failed");
+    }
+  };
 
   return (
-  <div className="login-bg signup-page">
+    <div className="login-bg signup-page">
+      <div className="login-card">
 
-    <div className="login-card">
-
-      {/* LEFT SIDE */}
-      <div className="login-left">
-        <img src={logo} alt="Vindia Logo" className="login-logo" />
+        <div className="login-left">
+          <img src={logo} alt="Vindia Logo" className="login-logo" />
           <p>
-          You Dream It. <span className="build-text">We Build It.</span>
-        </p>
-      </div>
+            You Dream It. <span className="build-text">We Build It.</span>
+          </p>
+        </div>
 
-      {/* RIGHT SIDE */}
-      <div className="login-right">
+        <div className="login-right">
 
-        <h2 style={{marginBottom:"20px"}}>Create Account</h2>
+          <h2 style={{ marginBottom: "20px" }}>Create Account</h2>
 
-        <label>First Name</label>
-        <input
-          type="text"
-          name="firstName"
-          value={formData.firstName}
-          onChange={handleChange}
-          placeholder="First name"
-        />
+          <label>First Name</label>
+          <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} />
 
-        <label>Last Name</label>
-        <input
-          type="text"
-          name="lastName"
-          value={formData.lastName}
-          onChange={handleChange}
-          placeholder="Last name"
-        />
+          <label>Last Name</label>
+          <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} />
 
-        <label>Email</label>
-        <input
-          type="email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-          placeholder="Enter email"
-        />
+          <label>Email</label>
+          <input type="email" name="email" value={formData.email} onChange={handleChange} />
 
-        <label>Password</label>
-        <input
-          type={showPassword ? "text" : "password"}
-          name="password"
-          value={formData.password}
-          onChange={handleChange}
-          placeholder="Password"
-        />
+          <label>Password</label>
+          <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} />
 
-        <label>Confirm Password</label>
-        <input
-          type="password"
-          name="confirmPassword"
-          value={formData.confirmPassword}
-          onChange={handleChange}
-          placeholder="Confirm password"
-        />
+          <label>Confirm Password</label>
+          <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} />
 
-        <label className="remember">
-          <input
-            type="checkbox"
-            checked={agree}
-            onChange={() => setAgree(!agree)}
-          />
-          I agree to Terms & Conditions
-        </label>
+          <label className="remember">
+            <input type="checkbox" checked={agree} onChange={() => setAgree(!agree)} />
+            I agree to Terms & Conditions
+          </label>
 
-        <button onClick={handleSignup}>Sign Up</button>
+          <button onClick={handleSignup}>Sign Up</button>
 
-        <p className="signup-text">
-          Already have an account?{" "}
-          <Link to="/" className="signup-link">Sign In</Link>
-        </p>
+          <p className="signup-text">
+            Already have an account? <Link to="/" className="signup-link">Sign In</Link>
+          </p>
+
+        </div>
 
       </div>
-
     </div>
-
-  </div>
-);
-console.log("SIGNUP API HIT ✅");
+  );
 }
 
 export default SignUp;

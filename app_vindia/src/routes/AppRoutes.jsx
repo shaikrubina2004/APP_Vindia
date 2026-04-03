@@ -1,4 +1,5 @@
 import { Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
 
 import SignIn from "../pages/SignIn";
 import SignUp from "../pages/SignUp";
@@ -17,6 +18,8 @@ import Documents from "../pages/hr/Documents";
 import Leaves from "../pages/hr/Leaves";
 import Payroll from "../pages/hr/Payroll";
 import Travel from "../pages/hr/Travel";
+import SignInMobile from "../pages/SignInMobile";
+import SignUpMobile from "../pages/SignUpMobile";
 
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
@@ -29,12 +32,32 @@ import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
 import Incidents from "../pages/projects/projectmanager/Incidents";
 import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";import Reports from "../pages/projects/projectmanager/Reports";
 const AppRoutes = () => {
+  const useIsMobile = () => {
+  const [mobile, setMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return mobile;
+};
+
+const SignInWrapper = () => {
+  const isMobile = useIsMobile();
+  return isMobile ? <SignInMobile /> : <SignIn />;
+};
+
+const SignUpWrapper = () => {
+  const isMobile = useIsMobile();
+  return isMobile ? <SignUpMobile /> : <SignUp />;
+};
   return (
     <Routes>
       {/* PUBLIC */}
-      <Route path="/" element={<SignIn />} />
-      <Route path="/signup" element={<SignUp />} />
-
+     <Route path="/" element={<SignInWrapper />} />
+<Route path="/signup" element={<SignUpWrapper />} />
       {/* DASHBOARD */}
       <Route
         path="/dashboard"
