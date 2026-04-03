@@ -8,17 +8,7 @@ import { Doughnut } from "react-chartjs-2";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-function AttendanceChart({ data }) {
-
-  // ✅ Prevent crash when data is not loaded
-  if (!data) {
-    return (
-      <div className="dashboard-card">
-        <h3>Attendance Distribution</h3>
-        <p>Loading...</p>
-      </div>
-    );
-  }
+function AttendanceChart({ data = {} }) {
 
   const chartData = {
     labels: ["Present", "Absent", "Late", "WFH"],
@@ -38,6 +28,7 @@ function AttendanceChart({ data }) {
   return (
     <div className="dashboard-card">
       <h3>Attendance Distribution</h3>
+
       <div className="chart-container">
         <Doughnut data={chartData} />
       </div>
@@ -45,4 +36,4 @@ function AttendanceChart({ data }) {
   );
 }
 
-export default AttendanceChart;''
+export default AttendanceChart;

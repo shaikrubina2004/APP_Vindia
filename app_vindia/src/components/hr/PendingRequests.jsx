@@ -1,33 +1,22 @@
 import { FaClipboardList } from "react-icons/fa";
 
-function PendingRequests({ data }) {
-  if (!data) {
-    return (
-      <div className="dashboard-card">
-        <h3>
-          <FaClipboardList className="card-icon" /> Pending Requests
-        </h3>
-        <p>Loading...</p>
-      </div>
-    );
-  }
+function PendingRequests({ data = [] }) {
+  console.log("Pending Requests Data:", data);
 
-  // Convert array → object for easy access
   const counts = {
     leave: 0,
     travel: 0,
     document: 0,
   };
 
-  data.forEach(item => {
-    if (item.type?.toLowerCase() === "leave") {
-      counts.leave = parseInt(item.count);
-    }
-    if (item.type?.toLowerCase() === "travel") {
-      counts.travel = parseInt(item.count);
-    }
-    if (item.type?.toLowerCase() === "document") {
-      counts.document = parseInt(item.count);
+  (data || []).forEach((item) => {
+    const type = item.type?.toLowerCase();
+    const status = item.status?.toLowerCase();
+
+    if (status === "pending") {
+      if (type?.includes("leave")) counts.leave += 1;
+      if (type?.includes("travel")) counts.travel += 1;
+      if (type?.includes("document")) counts.document += 1;
     }
   });
 
