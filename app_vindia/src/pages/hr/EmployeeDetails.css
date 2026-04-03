@@ -132,3 +132,76 @@
 .delete-btn:hover {
   background: #e2e8f0;
 }
+/* ============================= */
+/* 📱 MOBILE RESPONSIVE */
+/* ============================= */
+
+@media (max-width: 768px){
+
+  .employee-details-page{
+    padding: 14px;
+  }
+
+  /* 🔥 PROFILE HEADER */
+  .profile-header{
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .profile-avatar{
+    width: 60px;
+    height: 60px;
+  }
+
+  .profile-header h2{
+    font-size: 18px;
+  }
+
+  .profile-header p{
+    font-size: 13px;
+  }
+
+  /* 🔥 CARDS */
+  .details-card{
+    padding: 14px;
+  }
+
+  .details-card h3{
+    font-size: 14px;
+  }
+
+  /* 🔥 GRID → STACK (IMPORTANT FIX) */
+  .details-grid{
+    grid-template-columns: 1fr;   /* 🔥 single column */
+    gap: 10px;
+  }
+
+  .details-grid p{
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  /* 🔥 DOCUMENTS */
+  .document-grid{
+    grid-template-columns: 1fr;   /* 🔥 stack documents */
+  }
+
+  .doc-item{
+    padding: 10px;
+  }
+
+  /* 🔥 BUTTONS */
+  .action-buttons{
+    flex-direction: column;       /* 🔥 stack buttons */
+    align-items: stretch;
+  }
+
+  .edit-btn,
+  .delete-btn{
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+  }
+}
