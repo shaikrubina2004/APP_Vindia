@@ -1,92 +1,528 @@
+/* ═══════════════════════════════════════════════════
+   DailyUpdates.css  — Construction PM Report Module
+   ═══════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,600&display=swap');
+
+/* ── Page ── */
 .du-page {
-  padding: 20px;
-  color: white;
+  padding: 24px;
+  background: linear-gradient(160deg, #f0f4ff 0%, #f8f6f0 100%);
+  min-height: 100vh;
+  font-family: 'DM Mono', 'Courier New', monospace;
 }
 
-/* HEADER */
+/* ── Header ── */
 .du-header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-end;
   margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #1a1a2e;
+}
+.du-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8888aa;
+  margin-bottom: 4px;
+}
+.du-title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 30px;
+  font-weight: 600;
+  color: #1a1a2e;
+  font-style: italic;
+  margin: 0;
 }
 
-/* LIST */
-.du-list {
+/* ── Buttons ── */
+.btn-primary {
+  background: #1a1a2e;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: #2563eb; }
+.btn-cancel {
+  background: none;
+  border: 1px solid #d4d0c8;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  cursor: pointer;
+  color: #4a4a6a;
+}
+.btn-cancel:hover { background: #f4f3f0; }
+.btn-view {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #1e40af;
+  padding: 0;
+}
+
+/* ── Stats Grid ── */
+.du-stats-grid {
   display: grid;
-  gap: 15px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.du-stat-card {
+  background: #fff;
+  border: 0.5px solid #d4d0c8;
+  border-radius: 8px;
+  padding: 16px 18px;
+}
+.du-stat-val {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 28px;
+  font-weight: 600;
+  color: #1a1a2e;
+  font-style: italic;
+}
+.du-stat-lbl {
+  font-size: 11px;
+  color: #8888aa;
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-/* CARD */
-.du-card {
-  background: #111827;
-  padding: 15px;
-  border-radius: 10px;
+/* ── Empty State ── */
+.du-empty {
+  text-align: center;
+  padding: 80px 0;
+  color: #8888aa;
 }
+.du-empty-icon { font-size: 36px; margin-bottom: 12px; }
+.du-empty-msg {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 20px;
+  font-style: italic;
+  color: #4a4a6a;
+}
+.du-empty-sub { font-size: 12px; margin-top: 6px; }
 
-/* TOP */
-.du-top {
+/* ── Report Cards ── */
+.du-report-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.du-report-card {
+  background: #fff;
+  border: 0.5px solid #d4d0c8;
+  border-left: 4px solid #1a1a2e;
+  border-radius: 8px;
+  padding: 16px 20px;
+  transition: box-shadow 0.15s;
+}
+.du-report-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+.du-rc-top {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 10px;
 }
-
-.du-date {
-  color: #9ca3af;
+.du-rc-project {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a2e;
+  font-style: italic;
 }
-
-.du-progress {
-  font-weight: bold;
-  color: #22c55e;
+.du-rc-meta { font-size: 12px; color: #8888aa; margin-top: 2px; }
+.du-status-badge {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
 }
-
-/* BODY */
-.du-body p {
-  margin: 5px 0;
-}
-
-/* PROGRESS BAR */
-.du-bar {
-  height: 6px;
-  background: #374151;
-  border-radius: 10px;
-  margin-top: 10px;
-}
-
-.du-fill {
-  height: 100%;
-  background: #22c55e;
-  border-radius: 10px;
-}
-
-/* MODAL same reuse */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.6);
+.du-rc-stats {
   display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.du-rc-stat { font-size: 12px; color: #4a4a6a; }
+.du-rc-stat.issue { color: #dc2626; }
+.du-rc-remarks {
+  font-size: 12px;
+  color: #64748b;
+  font-style: italic;
+  padding: 8px 12px;
+  background: #f8f7f4;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+.du-rc-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 0.5px solid #eceae4;
+}
+.du-rc-by { font-size: 11px; color: #94a3b8; }
+
+/* ── Modal Overlay ── */
+.du-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 26, 46, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
   justify-content: center;
+  z-index: 1000;
+}
+.du-modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 92%;
+  max-width: 700px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #1a1a2e;
+}
+.du-modal.wide { max-width: 780px; }
+
+/* ── Modal Header ── */
+.du-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 22px;
+  border-bottom: 0.5px solid #d4d0c8;
+  flex-shrink: 0;
+}
+.du-modal-title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 20px;
+  font-weight: 600;
+  font-style: italic;
+  color: #1a1a2e;
+}
+.du-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: #8888aa;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.du-close-btn:hover { background: #f4f3f0; }
+
+/* ── Meta Bar ── */
+.du-meta-bar {
+  padding: 16px 22px;
+  border-bottom: 0.5px solid #eceae4;
+  background: #f8f7f4;
+  flex-shrink: 0;
+}
+.du-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+/* ── Tabs ── */
+.du-tab-bar {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 0.5px solid #d4d0c8;
+  flex-shrink: 0;
+  padding: 0 22px;
+}
+.du-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #8888aa;
+  white-space: nowrap;
+  font-family: 'DM Mono', monospace;
+  transition: color 0.12s, border-color 0.12s;
+}
+.du-tab.active {
+  border-bottom-color: #1a1a2e;
+  color: #1a1a2e;
+}
+
+/* ── Tab Body ── */
+.du-tab-body {
+  padding: 18px 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Modal Footer ── */
+.du-modal-footer {
+  display: flex;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 0.5px solid #eceae4;
+  flex-shrink: 0;
+}
+
+/* ── Form Elements ── */
+.du-section { margin-bottom: 20px; }
+.du-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #4a4a6a;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 0.5px solid #eceae4;
+}
+.du-field { margin-bottom: 12px; }
+.du-field-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #8888aa;
+  margin-bottom: 5px;
+  display: block;
+}
+.du-input {
+  background: #f4f3f0;
+  border: 0.5px solid #d4d0c8;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: #1a1a2e;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.du-input:focus { border-color: #2563eb; }
+
+/* ── Table Rows ── */
+.du-table-head {
+  display: flex;
+  gap: 6px;
+  padding: 6px 0;
+  margin-bottom: 4px;
+}
+.du-th-cell {
+  flex: 1;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #94a3b8;
+}
+.du-table-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
   align-items: center;
 }
-
-.modal-content {
-  background: #1f2937;
-  padding: 20px;
-  border-radius: 10px;
-  width: 350px;
+.du-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #dc2626;
+  font-size: 14px;
+  padding: 0 4px;
+  flex-shrink: 0;
 }
-
-.form-group {
-  margin-bottom: 10px;
+.du-add-row-btn {
+  background: none;
+  border: 1px dashed #d4d0c8;
+  border-radius: 4px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #4a4a6a;
+  margin-top: 6px;
+  font-family: 'DM Mono', monospace;
 }
+.du-add-row-btn:hover { border-color: #2563eb; color: #2563eb; }
 
-textarea {
-  width: 100%;
-  padding: 8px;
-  background: #111827;
-  border: 1px solid #374151;
-  color: white;
+/* ── Issues ── */
+.du-issue-block {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  background: #fff9f9;
+  border: 0.5px solid #fca5a5;
   border-radius: 6px;
+}
+.du-issue-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: #dc2626;
+  min-width: 24px;
+}
+.du-issue-fields { flex: 1; }
+.du-issue-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* ── Progress Bars ── */
+.du-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.du-prog-label {
+  width: 140px;
+  font-size: 12px;
+  color: #4a4a6a;
+  flex-shrink: 0;
+}
+.du-prog-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+.du-prog-track {
+  flex: 1;
+  height: 8px;
+  background: #eceae4;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.du-prog-bar {
+  height: 100%;
+  background: #1a1a2e;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+.du-prog-pct {
+  font-size: 12px;
+  color: #1a1a2e;
+  font-weight: 600;
+  min-width: 36px;
+}
+
+/* ── Upload ── */
+.du-upload-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.du-upload-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 14px;
+  border: 1.5px dashed #d4d0c8;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #4a4a6a;
+  text-align: center;
+  margin-top: 6px;
+  transition: border-color 0.15s;
+}
+.du-upload-box:hover { border-color: #2563eb; color: #2563eb; }
+.du-file-list { list-style: none; padding: 0; margin-top: 8px; }
+.du-file-list li { font-size: 11px; color: #64748b; padding: 2px 0; }
+
+/* ── Report View ── */
+.du-rv-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1.5px solid #1a1a2e;
+}
+.du-rv-project {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 20px;
+  font-weight: 600;
+  font-style: italic;
+  color: #1a1a2e;
+}
+.du-rv-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #4a4a6a;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 0.5px solid #eceae4;
+}
+.du-rv-row {
+  display: flex;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 0.5px solid #f1f5f9;
+  font-size: 12px;
+}
+.du-issue-card {
+  padding: 10px 12px;
+  background: #fff9f9;
+  border: 0.5px solid #fca5a5;
+  border-radius: 5px;
+  margin-bottom: 8px;
+}
+.du-issue-card-title {
+  font-weight: 600;
+  color: #dc2626;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.du-rv-remarks {
+  font-style: italic;
+  color: #4a4a6a;
+  font-size: 13px;
+  padding: 10px 14px;
+  background: #f8f7f4;
+  border-radius: 5px;
+  line-height: 1.6;
+  border-left: 3px solid #1a1a2e;
+}
+.du-rv-footer {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid #d4d0c8;
+  font-size: 12px;
+  color: #4a4a6a;
+}
+.du-rv-nil {
+  color: #94a3b8;
+  font-size: 12px;
+  font-style: italic;
+  padding: 6px 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .du-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .du-meta-grid { grid-template-columns: 1fr 1fr; }
+  .du-upload-grid { grid-template-columns: 1fr; }
+  .du-tab-bar { gap: 0; }
+  .du-modal { border-radius: 8px; }
 }
