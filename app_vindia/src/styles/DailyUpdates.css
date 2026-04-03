@@ -1,0 +1,92 @@
+.du-page {
+  padding: 20px;
+  color: white;
+}
+
+/* HEADER */
+.du-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+/* LIST */
+.du-list {
+  display: grid;
+  gap: 15px;
+}
+
+/* CARD */
+.du-card {
+  background: #111827;
+  padding: 15px;
+  border-radius: 10px;
+}
+
+/* TOP */
+.du-top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.du-date {
+  color: #9ca3af;
+}
+
+.du-progress {
+  font-weight: bold;
+  color: #22c55e;
+}
+
+/* BODY */
+.du-body p {
+  margin: 5px 0;
+}
+
+/* PROGRESS BAR */
+.du-bar {
+  height: 6px;
+  background: #374151;
+  border-radius: 10px;
+  margin-top: 10px;
+}
+
+.du-fill {
+  height: 100%;
+  background: #22c55e;
+  border-radius: 10px;
+}
+
+/* MODAL same reuse */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: #1f2937;
+  padding: 20px;
+  border-radius: 10px;
+  width: 350px;
+}
+
+.form-group {
+  margin-bottom: 10px;
+}
+
+textarea {
+  width: 100%;
+  padding: 8px;
+  background: #111827;
+  border: 1px solid #374151;
+  color: white;
+  border-radius: 6px;
+}

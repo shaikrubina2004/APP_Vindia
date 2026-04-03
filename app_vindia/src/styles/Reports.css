@@ -1,0 +1,61 @@
+.rp-page {
+  padding: 20px;
+  color: white;
+}
+
+/* CARDS */
+.rp-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.rp-card {
+  background: #111827;
+  padding: 15px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.rp-card p {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.rp-card.danger {
+  border: 1px solid red;
+}
+
+/* SECTION */
+.rp-section {
+  margin-top: 20px;
+}
+
+/* PROGRESS */
+.rp-bar {
+  height: 10px;
+  background: #374151;
+  border-radius: 10px;
+  margin-top: 10px;
+}
+
+.rp-fill {
+  height: 100%;
+  background: #22c55e;
+  border-radius: 10px;
+}
+
+/* TABLE */
+.rp-table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+}
+
+.rp-table th,
+.rp-table td {
+  padding: 10px;
+  border-bottom: 1px solid #374151;
+  text-align: left;
+}
