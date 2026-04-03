@@ -25,7 +25,9 @@ import CEOLayout from "../layouts/CEOLayout";
 import HRLayout from "../layouts/HRLayout";
 import Timesheet from "../pages/timesheet/Timesheet";
 import ProjectManagerLayout from "../layouts/ProjectManagerLayout";
-
+import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
+import Incidents from "../pages/projects/projectmanager/Incidents";
+import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";import Reports from "../pages/projects/projectmanager/Reports";
 const AppRoutes = () => {
   return (
     <Routes>
@@ -92,6 +94,46 @@ const AppRoutes = () => {
         }
       />
 
+      <Route
+  path="/pm/team"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+      <ProjectManagerLayout>
+        <TeamManagement />
+      </ProjectManagerLayout>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/pm/incidents"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+      <ProjectManagerLayout>
+        <Incidents />
+      </ProjectManagerLayout>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/pm/daily-updates"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+      <ProjectManagerLayout>
+        <DailyUpdates />
+      </ProjectManagerLayout>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/pm/reports"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+      <ProjectManagerLayout>
+        <Reports />
+      </ProjectManagerLayout>
+    </ProtectedRoute>
+  }
+/>
       {/* HR DASHBOARD */}
       <Route
         path="/hr"

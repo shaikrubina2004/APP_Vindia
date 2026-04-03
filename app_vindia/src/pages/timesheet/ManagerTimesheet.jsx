@@ -1,57 +1,62 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "../../styles/timesheet.css";
 
 export default function ManagerTimesheet() {
-  const [teamData, setTeamData] = useState([
-    {
-      id: 1,
-      name: "Ravi Kumar",
-      email: "ravi@gmail.com",
-      period: "23 Mar - 31 Mar",
+  const [teamData, setTeamData] = useState([]);
 
-      workHours: 48,
-      leaveHours: 9,
+  // ✅ Load timesheets from localStorage
+  useEffect(() => {
+    const stored =
+      JSON.parse(localStorage.getItem("timesheets")) || [];
 
-      type: "Labour",
-      workingDays: 6,
+    const formatted = stored.map((t) => {
+      const workHours = t.rows.reduce(
+        (sum, r) =>
+          sum +
+          (r.hours || []).reduce((a, b) => a + Number(b || 0), 0),
+        0
+      );
 
-      status: "Pending",
-    },
-    {
-      id: 2,
-      name: "Meena Sharma",
-      email: "meena@gmail.com",
-      period: "23 Mar - 31 Mar",
+      return {
+        id: t.id,
+        name: "Employee",
+        email: "employee@mail.com",
+        period: t.week,
+        workHours,
+        leaveHours: 0,
+        type: "Labour",
+        workingDays: 6,
+        status: t.status || "Pending",
+      };
+    });
 
-      workHours: 42,
-      leaveHours: 0,
+    setTeamData(formatted);
+  }, []);
 
-      type: "Non-Labour",
-      workingDays: 6,
-
-      status: "Pending",
-    },
-  ]);
-
-  // 🔹 Break = 1 hr per working day
-  const getBreak = (days) => days * 1;
-
-  // 🔹 Work + Time Off
+  // 🔹 Calculations
+  const getBreak = (days) => days * 1; // 1 hr per day
   const getTotal = (work, leave) => work + leave;
-
-  // 🔹 ✅ FINAL FIXED FORMULA
-  // Regular = Work - Break
-  const getRegular = (work, days) =>
-    work - getBreak(days);
-
-  // 🔹 Overtime = Break
+  const getRegular = (work, days) => work - getBreak(days);
   const getOvertime = (days) => getBreak(days);
 
+  // ✅ Approve / Reject
   const updateStatus = (id, status) => {
-    setTeamData((prev) =>
-      prev.map((t) =>
-        t.id === id ? { ...t, status } : t
-      )
+    const updated = teamData.map((t) =>
+      t.id === id ? { ...t, status } : t
+    );
+    setTeamData(updated);
+
+    // update localStorage also
+    const stored =
+      JSON.parse(localStorage.getItem("timesheets")) || [];
+
+    const updatedStorage = stored.map((t) =>
+      t.id === id ? { ...t, status } : t
+    );
+
+    localStorage.setItem(
+      "timesheets",
+      JSON.stringify(updatedStorage)
     );
   };
 
@@ -67,7 +72,7 @@ export default function ManagerTimesheet() {
                 <th>User</th>
                 <th>Timesheet Period</th>
                 <th>Time Off</th>
-                <th>Work + Time Off</th>
+                <th>Total Hours</th>
                 <th>Type</th>
                 <th>Regular</th>
                 <th>Overtime</th>
@@ -78,12 +83,17 @@ export default function ManagerTimesheet() {
 
             <tbody>
               {teamData.map((t) => {
-                const total = getTotal(t.workHours, t.leaveHours);
+                const total = getTotal(
+                  t.workHours,
+                  t.leaveHours
+                );
                 const regular = getRegular(
                   t.workHours,
                   t.workingDays
                 );
-                const overtime = getOvertime(t.workingDays);
+                const overtime = getOvertime(
+                  t.workingDays
+                );
 
                 return (
                   <tr key={t.id}>
@@ -92,7 +102,12 @@ export default function ManagerTimesheet() {
                       <div style={{ fontWeight: 600 }}>
                         {t.name}
                       </div>
-                      <div style={{ fontSize: 11, color: "#888" }}>
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "#888",
+                        }}
+                      >
                         {t.email}
                       </div>
                     </td>
@@ -103,7 +118,7 @@ export default function ManagerTimesheet() {
                     {/* TIME OFF */}
                     <td>{t.leaveHours} hrs</td>
 
-                    {/* WORK + TIME OFF */}
+                    {/* TOTAL */}
                     <td>
                       <b>{total} hrs</b>
                     </td>
@@ -137,11 +152,19 @@ export default function ManagerTimesheet() {
                     {/* ACTION */}
                     <td>
                       {t.status === "Pending" && (
-                        <div style={{ display: "flex", gap: "6px" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "6px",
+                          }}
+                        >
                           <button
                             className="ts-btn-submit"
                             onClick={() =>
-                              updateStatus(t.id, "Approved")
+                              updateStatus(
+                                t.id,
+                                "Approved"
+                              )
                             }
                           >
                             Approve
@@ -154,7 +177,10 @@ export default function ManagerTimesheet() {
                               borderColor: "red",
                             }}
                             onClick={() =>
-                              updateStatus(t.id, "Rejected")
+                              updateStatus(
+                                t.id,
+                                "Rejected"
+                              )
                             }
                           >
                             Reject
