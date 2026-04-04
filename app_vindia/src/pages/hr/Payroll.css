@@ -1,11 +1,12 @@
-
+/* --- 1. CORE LAYOUT & CONTAINER --- */
 .container {
   flex: 1;
   padding: 8px 20px 16px 20px;
-  height: 100%;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  background-color: #f4f7f9;
+  overflow-y: auto;
 }
 
 /* Header */
@@ -17,7 +18,7 @@
   font-weight: 700;
 }
 
-/* Search Section - YOUR EXACT */
+/* --- 2. SEARCH SECTION --- */
 .search-section {
   background: rgba(255,255,255,0.98);
   backdrop-filter: blur(20px);
@@ -26,13 +27,13 @@
   margin-bottom: 20px;
   box-shadow: 
     0 20px 40px rgba(0,29,57,0.12),
-    0 0 0 1px rgba(78,142,162,0.08),
-    inset 0 1px 0 rgba(255,255,255,0.9);
+    0 0 0 1px rgba(78,142,162,0.08);
   border: 1px solid rgba(78,142,162,0.15);
   position: relative;
   overflow: hidden;
 }
 
+/* Top accent bar for search section only */
 .search-section::before {
   content: '';
   position: absolute;
@@ -43,7 +44,6 @@
   background: linear-gradient(90deg, #7BBDE8, #4E8EA2, #0A4174);
 }
 
-/* BETTER ALIGNMENT */
 .search-grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr 1fr 0.9fr;
@@ -51,7 +51,6 @@
   align-items: center;
 }
 
-/* INPUTS */
 .search-grid input {
   padding: 14px 18px;
   border: 2px solid rgba(78,142,162,0.25);
@@ -61,84 +60,48 @@
   background: rgba(255,255,255,0.9);
   color: #001D39;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(0,29,57,0.08);
   height: 48px;
+  width: 100%;
 }
 
 .search-grid input:focus {
   outline: none;
   border-color: #4E8EA2;
-  box-shadow: 
-    0 0 0 4px rgba(78,142,162,0.15),
-    0 8px 25px rgba(0,29,57,0.15);
-  transform: translateY(-1px);
+  box-shadow: 0 0 0 4px rgba(78,142,162,0.15);
   background: white;
 }
 
-.search-grid input::placeholder {
-  color: #5a8999;
-  font-weight: 500;
-}
-/* Make date input text same color as placeholders */
-.search-grid input[type="date"] {
-  color: #5a8999;
-}
-
-/* When user selects a date, change to normal text color */
-.search-grid input[type="date"]:focus,
-.search-grid input[type="date"]:valid {
-  color: #001D39;
-}
-/* SEARCH BUTTON */
 .search-grid button {
   height: 48px;
-  padding: 0 20px;
   border: none;
   border-radius: 14px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   color: white;
-
   background: linear-gradient(135deg,#4E8EA2,#0A4174);
-
   transition: all 0.3s ease;
   box-shadow: 0 8px 20px rgba(10,65,116,0.25);
 }
 
-.search-grid button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 30px rgba(10,65,116,0.35);
-  background: linear-gradient(135deg,#0A4174,#001D39);
-}
-
-/* YOUR EXACT DASHBOARD */
+/* --- 3. DASHBOARD STRUCTURE --- */
 .dashboard {
   display: grid;
   grid-template-columns: 1fr 1.3fr;
   gap: 16px;
   flex: 1;
-  overflow: hidden;
 }
 
-/* ONLY CHANGE: Remove scroll from card */
 .card {
   background: rgba(255,255,255,0.97);
   padding: 16px;
   border-radius: 20px;
   border: 1px solid rgba(189,216,233,0.4);
   box-shadow: 0 12px 40px rgba(0,29,57,0.08);
-  height: 100%;
-  
+  height: auto;
   overflow-x: hidden;
 }
 
-.card:first-child {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-/* Rest of your exact code unchanged */
 .employee-card {
   margin-bottom: 12px;
   background: linear-gradient(135deg, rgba(123,189,232,0.08), rgba(189,216,233,0.16));
@@ -159,117 +122,79 @@
   font-size: 0.9rem;
 }
 
-/* Attendance stats container: wrap items instead of stretching */
+/* --- 4. ATTENDANCE STATS (CLEAN SOLID BLOCKS) --- */
 .attendance-stats {
-  display: flex;           /* switch from grid to flex */
-  flex-wrap: wrap;         /* wrap to next line if needed */
-  gap: 6px;                /* spacing between cards */
-  margin-bottom: 10px;
-  margin-top: 10px;
-  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 12px;
   border-radius: 12px;
   border: 1px solid rgba(78,142,162,0.15);
   background: linear-gradient(135deg, rgba(123,189,232,0.06), rgba(189,216,233,0.12));
 }
 
-/* Stat cards: width only as needed, like legend */
 .stat-card {
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
   text-align: center;
   font-size: 0.85rem;
-  font-weight: 600;
-  white-space: nowrap;     /* prevent text wrapping */
-  flex: 0 0 auto;          /* do not stretch */
-}
-
-/* Match exact legend colors from your screenshot */
-.stat-card.present  { background: #7EBCE2; color: #001D39; } /* light blue */
-.stat-card.late     { background: #49769F; color: white; }    /* medium blue */
-.stat-card.leave    { background: #0A4174; color: white; }    /* dark blue */
-.stat-card.halfday  { background: #001D39; color: white; }    /* very dark blue */
-.stat-card.holiday  { background: #4E8EA2; color: white; }    /* teal-ish blue */
-
-.leave-box {
-  display: flex;
-  justify-content: space-between;
-  background: linear-gradient(135deg, rgba(123,189,232,0.08), rgba(189,216,233,0.16));
-  padding: 15px;
-  border-radius: 12px;
-  border: 1px solid rgba(78,142,162,0.15);
-  margin-bottom: 12px;
-}
-
-.payroll-breakdown {
-  margin-bottom: 16px;
-  background: rgba(255,255,255,0.9);
-  padding: 16px 18px;
-  border-radius: 12px;
-  border: 1px solid rgba(78,142,162,0.12);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* Each row inside salary breakdown */
-.payroll-breakdown div {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.95rem;
-  padding: 4px 0;
-}
-
-/* Separator line */
-.payroll-breakdown hr {
-  border: none;
-  border-top: 1px solid rgba(78,142,162,0.2);
-  margin: 8px 0;
-}
-
-/* Salary highlight */
-.amount {
   font-weight: 700;
-  font-size: 1rem;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  border: none !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  position: relative;
 }
 
-.amount.salary {
-  color: #001D39;
-  font-size: 1.15rem;
+/* STRIPE REMOVAL: Ensures no side-lines appear on any card */
+.stat-card::before, 
+.stat-card::after,
+
+.employee-card::before {
+  display: none !important;
+  content: none !important;
 }
 
-.amount.deduction {
-  color: #49769F;
+.stat-card.present { 
+  background: #001D39;  /* was halfday */
+  color: white; 
 }
 
-.amount { font-weight: 700; }
-.amount.deduction { color: #49769F; }
-.amount.salary { color: #001D39; font-size: 1.1rem; }
-
-.approve-btn {
-  margin-top: 10px;
-  padding: 12px;
-  background: linear-gradient(135deg, #0A4174, #001D39);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  width: 100%;
+.stat-card.late { 
+  background: #0A4174;  /* was leave */
+  color: white; 
 }
 
+.stat-card.leave { 
+  background: #7EBCE2;  /* was present */
+  color: #001D39; 
+}
+
+.stat-card.halfday { 
+  background: #49769F;  /* was late */
+  color: white; 
+}
+
+.stat-card.holiday { 
+  background: #FFFFFF !important; 
+  color: #4E8EA2 !important; 
+  border: 1.5px solid rgba(78,142,162,0.3) !important; 
+}
+
+/* --- 5. CALENDAR SECTION --- */
 .calendar {
   margin-top: 12px;
-  background: linear-gradient(135deg, rgba(123,189,232,0.08), rgba(189,216,233,0.16));
+  background: white;
   padding: 15px;
   border-radius: 20px;
   border: 1px solid rgba(78,142,162,0.15);
-  flex: 1;
 }
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7,1fr);
-  gap: 4px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
 }
 
 .calendar-header {
@@ -285,40 +210,117 @@
 
 .calendar-day {
   text-align: center;
-  padding: 8px;
-  border: 1px solid rgba(78,142,162,0.2);
-  border-radius: 6px;
-  font-size: 0.8rem;
-  transition: all 0.2s ease;
-}
-
-.calendar-day.present { background: #7BBDE8; }
-.calendar-day.late { background: #49769F; color: white; }
-.calendar-day.leave { background: #0A4174; color: white; }
-.calendar-day.holiday { background: #4E8EA2; color: white; }
-.calendar-day.halfday { background: #001D39; color: white; }
-
-.legend {
-  display: flex;
-  gap: 10px;
-  margin-top: 12px;
-  margin-left: 20px; 
-  flex-wrap: wrap;
-}
-
-.legend-item {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 13px;
+  padding: 10px 5px;
+  border-radius: 8px;
+  font-size: 0.85rem;
   font-weight: 600;
+  border: none !important;
 }
 
-.legend-item.present { background: #7BBDE8; color: #001D39; }
-.legend-item.late { background: #49769F; color: white; }
-.legend-item.leave { background: #0A4174; color: white; }
-.legend-item.holiday { background: #4E8EA2; color: white; }
-.legend-item.halfday { background: #001D39; color: white; }
+.calendar-day.present { 
+  background: #001D39; 
+  color: white; 
+}
 
-@media (max-width: 1200px) {
-  .dashboard { grid-template-columns: 1fr; }
+.calendar-day.late { 
+  background: #0A4174; 
+  color: white; 
+}
+
+.calendar-day.leave { 
+  background: #7BBDE8; 
+  color: #001D39; 
+}
+
+.calendar-day.halfday { 
+  background: #49769F; 
+  color: white; 
+}
+
+.calendar-day.holiday { 
+  background: #FFFFFF !important; 
+  color: #4E8EA2 !important; 
+  border: 1.5px solid #4E8EA2 !important; 
+}
+
+
+
+/* --- 7. PAYROLL BREAKDOWN --- */
+.payroll-breakdown {
+  margin-bottom: 16px;
+  background: rgba(255,255,255,0.9);
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(78,142,162,0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.payroll-breakdown div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.amount { font-weight: 700; font-size: 1rem; }
+.amount.salary { color: #001D39; font-size: 1.1rem; }
+.amount.deduction { color: #49769F; }
+
+.approve-btn {
+  margin-top: 10px;
+  padding: 14px;
+  background: linear-gradient(135deg, #0A4174, #001D39);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* --- 8. MOBILE VIEW: ONE ROW, NO SCROLLING --- */
+@media (max-width: 850px) {
+  
+  .attendance-stats {
+    display: flex !important;
+    flex-wrap: nowrap !important; 
+    justify-content: space-between !important; 
+    gap: 4px !important; 
+    padding: 8px !important;
+    overflow-x: hidden !important; 
+  }
+
+  .stat-card {
+    flex: 1 1 0 !important; 
+    min-width: 0 !important; 
+    padding: 6px 2px !important; 
+    font-size: 0.65rem !important; 
+    border-radius: 6px !important;
+    display: flex;
+    flex-direction: column; 
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Extra protection to keep stripes removed on mobile */
+  .stat-card::before, .stat-card::after {
+    display: none !important;
+  }
+
+  .search-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .dashboard {
+    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .container {
+    padding: 10px;
+  }
 }

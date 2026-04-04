@@ -4,8 +4,7 @@ import "./Payroll.css";
 function Payroll() {
 
   const [empId, setEmpId] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
 
   const [employee, setEmployee] = useState({
     name: "",
@@ -15,7 +14,18 @@ function Payroll() {
   });
 
   const [calendar, setCalendar] = useState([]);
-
+  const holidays2026 = [
+  "2026-01-01", // New Year
+  "2026-01-26", // Republic Day
+  "2026-01-15", // Makar Sankranti
+  "2026-03-19", // Ugadi
+  "2026-04-15", // Vishu
+  "2026-05-01", // May Day
+  "2026-08-26", // Onam
+  "2026-09-14", // Ganesh Chaturthi
+  "2026-10-20", // Dussehra
+  "2026-12-25", // Christmas
+];
   const [stats, setStats] = useState({
     present: 0,
     late: 0,
@@ -114,78 +124,98 @@ function Payroll() {
     }
 
   };
+const searchEmployee = () => {
 
-  const searchEmployee = () => {
+  if (!employees[empId]) {
+    alert("Employee not found");
+    return;
+  }
 
-    if (!employees[empId]) {
-      alert("Employee not found");
-      return;
-    }
+  if (!selectedMonth) {
+    alert("Please select a month");
+    return;
+  }
 
-    if (!startDate || !endDate) {
-      alert("Please select start and end date");
-      return;
-    }
+  const [year, month] = selectedMonth.split("-");
 
-    const emp = employees[empId];
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);
 
-    setEmployee({
-      id: empId,
-      name: emp.name,
-      dept: emp.dept,
-      designation: emp.designation
-    });
+  const emp = employees[empId];
 
-    setSalary(emp.salary);
+  setEmployee({
+    id: empId,
+    name: emp.name,
+    dept: emp.dept,
+    designation: emp.designation
+  });
 
-    generateMiniCalendar(emp.attendance);
-  };
+  setSalary(emp.salary);
 
-  const generateMiniCalendar = (attendanceData) => {
+  generateMiniCalendar(emp.attendance, firstDay, lastDay);
+};
+const generateMiniCalendar = (attendanceData, start, end) => {
+  let days = [];
+  let statusPool = [];
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-
-    let days = [];
-    let counts = { ...attendanceData };
-
-    let startWeekDay = start.getDay();
-    startWeekDay = startWeekDay === 0 ? 6 : startWeekDay - 1;
-
-    for (let i = 0; i < startWeekDay; i++) {
-      days.push({ label: "", status: "empty" });
-    }
-
-    let statusPool = [];
-
-    Object.keys(attendanceData).forEach(status => {
+  // Create a pool of statuses based on the employee's data
+  Object.keys(attendanceData).forEach((status) => {
+    if (status !== "holiday") {
       for (let i = 0; i < attendanceData[status]; i++) {
         statusPool.push(status);
       }
-    });
+    }
+  });
 
-    let index = 0;
-    let current = new Date(start);
+  // Monday-start logic
+  let startWeekDay = start.getDay(); 
+  startWeekDay = startWeekDay === 0 ? 6 : startWeekDay - 1;
 
-    while (current <= end) {
+  for (let i = 0; i < startWeekDay; i++) {
+    days.push({ label: "", status: "empty" });
+  }
 
-      const dayNum = current.getDate();
-      let status = statusPool[index] || "present";
+  let index = 0;
+  let holidayCount = 0;
+  let current = new Date(start);
 
-      days.push({
-        label: dayNum,
-        status
-      });
+  while (current <= end) {
+    // Format: YYYY-MM-DD manually to avoid timezone shifts
+    const y = current.getFullYear();
+    const m = String(current.getMonth() + 1).padStart(2, '0');
+    const d = String(current.getDate()).padStart(2, '0');
+    const dateStr = `${y}-${m}-${d}`;
 
+    let status;
+
+    // CHECK HOLIDAY LIST
+    if (holidays2026.includes(dateStr)) {
+      status = "holiday";
+      holidayCount++;
+    } else {
+      status = statusPool[index] || "present";
       index++;
-
-      current.setDate(current.getDate() + 1);
     }
 
-    setCalendar(days);
-    setStats(counts);
-  };
+    days.push({
+      label: current.getDate(),
+      status: status
+    });
 
+    current.setDate(current.getDate() + 1);
+  }
+
+  setCalendar(days);
+
+  // Recalculate stats based on what we actually put in the calendar
+  let newStats = { present: 0, late: 0, leave: 0, halfday: 0, holiday: holidayCount };
+  days.forEach(day => {
+    if (day.status !== "empty" && day.status !== "holiday") {
+      newStats[day.status]++;
+    }
+  });
+  setStats(newStats);
+};
   const approvePayment = () => {
     alert("Payslip Approved & Sent to Employee");
   };
@@ -227,16 +257,10 @@ function Payroll() {
               onChange={(e) => setEmpId(e.target.value)}
             />
 
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+           <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
             />
 
             <button onClick={searchEmployee}>
@@ -281,30 +305,32 @@ function Payroll() {
 
             <div className="attendance-stats">
 
-              <div className="stat-card present">
-                <span>Present</span>
-                <strong>{stats.present}</strong>
-              </div>
+  <div className="stat-card present">
+    <span>Present</span>
+    <strong>{stats.present}</strong>
+  </div>
 
-              <div className="stat-card late">
-                <span>Late</span>
-                <strong>{stats.late}</strong>
-              </div>
+  <div className="stat-card late">
+    <span>Late</span>
+    <strong>{stats.late}</strong>
+  </div>
 
-              <div className="stat-card leave">
-                <span>Leaves</span>
-                <strong>{stats.leave}</strong>
-              </div>
+  <div className="stat-card halfday">
+    <span>Half Days</span>
+    <strong>{stats.halfday}</strong>
+  </div>
 
-              <div className="stat-card halfday">
-                <span>Half Days</span>
-                <strong>{stats.halfday}</strong>
-              </div>
-               <div className="stat-card holiday">
-                <span>Holidays </span>
-                <strong>{stats.holiday}</strong>
-              </div>
-            </div>
+  <div className="stat-card leave">
+    <span>Leaves</span>
+    <strong>{stats.leave}</strong>
+  </div>
+
+  <div className="stat-card holiday">
+    <span>Holidays</span>
+    <strong>{stats.holiday}</strong>
+  </div>
+
+</div>
 
             {calendar.length > 0 && (
 
@@ -334,15 +360,7 @@ function Payroll() {
 
                 </div>
 
-                <div className="legend">
-
-                  <span className="legend-item present">Present</span>
-                  <span className="legend-item late">Late</span>
-                  <span className="legend-item leave">Leave</span>
-                  <span className="legend-item holiday">Holiday</span>
-                  <span className="legend-item halfday">Half Day</span>
-
-                </div>
+                
 
               </>
             )}
