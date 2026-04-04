@@ -742,3 +742,15 @@
     border: 1px solid rgba(251, 191, 36, 0.35);
   }
 }
+/* 🔥 Fix delete button click issue */
+.td-action {
+  position: relative;
+  z-index: 5;
+}
+
+.ts-btn-delete {
+  pointer-events: all;
+  position: relative;
+  z-index: 10;
+  cursor: pointer;
+}

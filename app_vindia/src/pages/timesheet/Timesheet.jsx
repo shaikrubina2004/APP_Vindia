@@ -81,9 +81,7 @@ function isUploadAllowed(weekDates) {
   return today >= lastDay;
 }
 
-// ─── Helper: normalize a Date to "YYYY-MM-DD" using LOCAL time (not UTC) ────
-// Using toISOString() would shift IST (UTC+5:30) dates to the previous day.
-// We read year/month/date from the local clock to avoid that bug.
+// ─── Normalize a Date to "YYYY-MM-DD" using LOCAL time ──────────────────────
 function toDateStr(date) {
   const d = new Date(date);
   const yyyy = d.getFullYear();
@@ -92,7 +90,7 @@ function toDateStr(date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// ─── Helper: check if a weekday column falls within any applied leave range ──
+// ─── Check if a weekday column falls within any applied leave range ──────────
 function isDateOnLeave(dayFull, appliedLeaves) {
   const dayStr = toDateStr(dayFull);
   return appliedLeaves.some(
@@ -100,7 +98,7 @@ function isDateOnLeave(dayFull, appliedLeaves) {
   );
 }
 
-// ─── Helper: get leave type label for a date ────────────────────────────────
+// ─── Get leave type label for a date ────────────────────────────────────────
 function getLeaveTypeForDate(dayFull, appliedLeaves) {
   const dayStr = toDateStr(dayFull);
   const leave = appliedLeaves.find(
@@ -125,9 +123,7 @@ const WBS_TASKS = [
 ];
 
 export default function Timesheet() {
-  const user = {
-    role: "PROJECT_MANAGER",
-  };
+  const user = { role: "PROJECT_MANAGER" };
 
   const isManager = [
     "PROJECT_MANAGER",
@@ -139,39 +135,29 @@ export default function Timesheet() {
   ].includes(user.role);
 
   const [view, setView] = useState("MY");
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const currentDate = new Date();
   const [rows, setRows] = useState([
     {
       id: 1,
       projectCode: "",
       taskCode: "",
       employeeType: "Labour",
-      hours: [],
+      hours: {}, // ← keyed by "YYYY-MM-DD" instead of array index
       groupId: 1,
     },
   ]);
   const [submissionStatus, setSubmissionStatus] = useState("NOT SUBMITTED");
-
-  // ── Applied leaves state ──────────────────────────────────────────────────
   const [appliedLeaves, setAppliedLeaves] = useState([]);
 
   const weekDates = getWeekDates(currentDate);
   const canSubmit = isUploadAllowed(weekDates);
 
-  // ── For each weekday column, pre-compute whether it's a leave day ─────────
+  // Pre-compute leave flags for current week
   const leaveDayFlags = weekDates.map((day) =>
     isDateOnLeave(day.full, appliedLeaves),
   );
 
-  const nextWeek = () => {
-    setCurrentDate(getNextWeekAnchor(weekDates));
-    setSubmissionStatus("NOT SUBMITTED");
-  };
-
-  const prevWeek = () => {
-    setCurrentDate(getPrevWeekAnchor(weekDates));
-    setSubmissionStatus("NOT SUBMITTED");
-  };
+  // ── Navigation ─────────────────────────────────────────────────────────────
 
   const formatRange = () => {
     const s = weekDates[0]?.full;
@@ -191,6 +177,71 @@ export default function Timesheet() {
     );
   };
 
+  // ── Hours helpers — date-keyed ─────────────────────────────────────────────
+  // Get the hour value for a specific row + week column index
+  const getHourVal = (row, idx) => {
+    const dateKey = toDateStr(weekDates[idx].full);
+    return (row.hours || {})[dateKey] || "";
+  };
+
+  // Set hour value keyed by date string (not array index)
+  const handleHours = (id, idx, val) => {
+    if (leaveDayFlags[idx]) return;
+    const dateKey = toDateStr(weekDates[idx].full);
+    setRows(
+      rows.map((r) => {
+        if (r.id !== id) return r;
+        return { ...r, hours: { ...(r.hours || {}), [dateKey]: val } };
+      }),
+    );
+  };
+
+  // ── Totals — only current week's dates ────────────────────────────────────
+  const rowTotal = (row) =>
+    weekDates
+      .reduce((a, _, idx) => {
+        if (leaveDayFlags[idx]) return a;
+        return a + Number(getHourVal(row, idx) || 0);
+      }, 0)
+      .toFixed(2);
+
+  const dayTotal = (idx) =>
+    leaveDayFlags[idx]
+      ? "—"
+      : rows
+          .reduce((s, r) => s + Number(getHourVal(r, idx) || 0), 0)
+          .toFixed(2);
+
+  const grandTotal = () =>
+    rows
+      .reduce(
+        (s, r) =>
+          s +
+          weekDates.reduce(
+            (a, _, idx) =>
+              leaveDayFlags[idx] ? a : a + Number(getHourVal(r, idx) || 0),
+            0,
+          ),
+        0,
+      )
+      .toFixed(2);
+
+  const entryCount = () =>
+    rows.reduce(
+      (c, r) =>
+        c +
+        weekDates.filter(
+          (_, idx) => !leaveDayFlags[idx] && Number(getHourVal(r, idx)) > 0,
+        ).length,
+      0,
+    );
+
+  // ── Time-off row ──────────────────────────────────────────────────────────
+  const timeOffDayValue = (idx) => (leaveDayFlags[idx] ? 9 : "");
+  const timeOffTotal = () =>
+    weekDates.reduce((s, _, idx) => s + (leaveDayFlags[idx] ? 9 : 0), 0);
+
+  // ── Row actions ───────────────────────────────────────────────────────────
   const handleProjectSelect = (id, projectCode) => {
     setRows(
       rows.map((r) => (r.id === id ? { ...r, projectCode, taskCode: "" } : r)),
@@ -205,36 +256,20 @@ export default function Timesheet() {
     setRows(rows.map((r) => (r.id === id ? { ...r, employeeType: val } : r)));
   };
 
-  const handleHours = (id, idx, val) => {
-    // Block entry if that column is a leave day
-    if (leaveDayFlags[idx]) return;
-
-    setRows(
-      rows.map((r) => {
-        if (r.id !== id) return r;
-        const h = [...(r.hours || [])];
-        h[idx] = val;
-        return { ...r, hours: h };
-      }),
-    );
-  };
-
   const addTaskToGroup = (groupId) => {
     const lastGroupRow = rows.filter((r) => r.groupId === groupId).pop();
     if (!lastGroupRow || !lastGroupRow.projectCode) {
       alert("Please select a project first");
       return;
     }
-
     const newRow = {
       id: Date.now(),
       projectCode: lastGroupRow.projectCode,
       taskCode: "",
       employeeType: "Labour",
-      hours: Array(weekDates.length).fill(""),
-      groupId: groupId,
+      hours: {},
+      groupId,
     };
-
     const insertIndex = rows.findIndex((r) => r.id === lastGroupRow.id) + 1;
     setRows([
       ...rows.slice(0, insertIndex),
@@ -252,57 +287,54 @@ export default function Timesheet() {
         projectCode: "",
         taskCode: "",
         employeeType: "Labour",
-        hours: Array(weekDates.length).fill(""),
+        hours: {},
         groupId: newGroupId,
       },
     ]);
   };
 
   const deleteRow = (id) => {
-    if (rows.length > 1) setRows(rows.filter((r) => r.id !== id));
+    // Never delete the very first row (id === 1)
+    if (id === 1) return;
+    setRows(rows.filter((r) => r.id !== id));
   };
 
-  // ── Totals — exclude leave columns from project totals ────────────────────
-  const rowTotal = (h) =>
-    (h || [])
-      .reduce((a, b, idx) => (leaveDayFlags[idx] ? a : a + Number(b || 0)), 0)
-      .toFixed(2);
+  // ── Quick fill — only fills current week's dates ──────────────────────────
+  const handleQuickFill = () => {
+    const h = prompt("Enter hours for all working days:", "8");
+    if (h && !isNaN(h) && Number(h) > 0) {
+      setRows(
+        rows.map((r) => ({
+          ...r,
+          hours: {
+            ...(r.hours || {}),
+            ...Object.fromEntries(
+              weekDates
+                .filter((_, idx) => !leaveDayFlags[idx])
+                .map((d) => [toDateStr(d.full), h]),
+            ),
+          },
+        })),
+      );
+    }
+  };
 
-  const dayTotal = (idx) =>
-    leaveDayFlags[idx]
-      ? "—"
-      : rows
-          .reduce((s, r) => s + Number((r.hours || [])[idx] || 0), 0)
-          .toFixed(2);
+  // ── Clear all — only clears current week's dates ──────────────────────────
+  const handleClearAll = () => {
+    if (confirm("Clear all time entries for this week?")) {
+      setRows(
+        rows.map((r) => {
+          const updatedHours = { ...(r.hours || {}) };
+          weekDates.forEach((d) => {
+            delete updatedHours[toDateStr(d.full)];
+          });
+          return { ...r, hours: updatedHours };
+        }),
+      );
+    }
+  };
 
-  const grandTotal = () =>
-    rows
-      .reduce(
-        (s, r) =>
-          s +
-          (r.hours || []).reduce(
-            (a, b, idx) => (leaveDayFlags[idx] ? a : a + Number(b || 0)),
-            0,
-          ),
-        0,
-      )
-      .toFixed(2);
-
-  const entryCount = () =>
-    rows.reduce(
-      (c, r) =>
-        c +
-        (r.hours || []).filter(
-          (h, idx) => !leaveDayFlags[idx] && h !== "" && Number(h) > 0,
-        ).length,
-      0,
-    );
-
-  // ── Time-off row totals ───────────────────────────────────────────────────
-  const timeOffDayValue = (idx) => (leaveDayFlags[idx] ? 9 : "");
-  const timeOffTotal = () =>
-    weekDates.reduce((s, _, idx) => s + (leaveDayFlags[idx] ? 9 : 0), 0);
-
+  // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = () => {
     if (!canSubmit) {
       alert(
@@ -322,14 +354,6 @@ export default function Timesheet() {
     alert(`Timesheet submitted with ${grandTotal()} hours!`);
   };
 
-  const handleClearAll = () => {
-    if (confirm("Clear all time entries?")) {
-      setRows(
-        rows.map((r) => ({ ...r, hours: Array(weekDates.length).fill("") })),
-      );
-    }
-  };
-
   // ── Leave submitted callback ──────────────────────────────────────────────
   const handleLeaveSubmitted = (leaveData) => {
     setAppliedLeaves((prev) => [
@@ -338,25 +362,13 @@ export default function Timesheet() {
         id: Date.now(),
         employeeName: leaveData.employeeName || leaveData.name,
         leaveType: leaveData.leaveType,
-        fromDate: leaveData.fromDate, // "YYYY-MM-DD"
-        toDate: leaveData.toDate, // "YYYY-MM-DD"
+        fromDate: leaveData.fromDate,
+        toDate: leaveData.toDate,
         reason: leaveData.reason,
         status: leaveData.status,
         appliedOn: leaveData.appliedOn,
       },
     ]);
-  };
-
-  const handleQuickFill = () => {
-    const h = prompt("Enter hours for all working days:", "8");
-    if (h && !isNaN(h) && Number(h) > 0) {
-      setRows(
-        rows.map((r) => ({
-          ...r,
-          hours: weekDates.map((_, idx) => (leaveDayFlags[idx] ? "" : h)),
-        })),
-      );
-    }
   };
 
   // ── Leave type display label ──────────────────────────────────────────────
@@ -373,6 +385,9 @@ export default function Timesheet() {
     return map[type] || type?.toUpperCase() || "LV";
   };
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="ts-page">
       {isManager && (
@@ -394,7 +409,7 @@ export default function Timesheet() {
 
       {(view === "MY" || !isManager) && (
         <>
-          {/* HEADER */}
+          {/* ── HEADER ── */}
           <div className="ts-header">
             <div className="ts-header-top">
               <div className="ts-title-block">
@@ -402,21 +417,7 @@ export default function Timesheet() {
                 <span className="ts-badge">{entryCount()}</span>
               </div>
               <div className="ts-week-nav">
-                <button
-                  className="ts-nav-btn"
-                  onClick={prevWeek}
-                  title="Previous week"
-                >
-                  ‹
-                </button>
                 <div className="ts-date-range">{formatRange()}</div>
-                <button
-                  className="ts-nav-btn"
-                  onClick={nextWeek}
-                  title="Next week"
-                >
-                  ›
-                </button>
               </div>
             </div>
             <div className="ts-info-row">
@@ -426,18 +427,10 @@ export default function Timesheet() {
                 {submissionStatus}
               </span>
               <span className="ts-due">📅 Due: {getDueDate()}</span>
-              <div className="ts-links">
-                <a href="#approvers" className="ts-link">
-                  See all approvers
-                </a>
-                <a href="#timesheets" className="ts-link">
-                  See all timesheets
-                </a>
-              </div>
             </div>
           </div>
 
-          {/* LOCK BANNER */}
+          {/* ── LOCK BANNER ── */}
           {!canSubmit && (
             <div className="ts-lock-banner">
               <span className="ts-lock-icon">🔒</span>
@@ -449,7 +442,7 @@ export default function Timesheet() {
             </div>
           )}
 
-          {/* ACTION BAR */}
+          {/* ── ACTION BAR ── */}
           <div className="ts-action-bar">
             <button className="ts-btn-count">
               {entryCount()} TIME ENTRY(IES)
@@ -479,7 +472,7 @@ export default function Timesheet() {
             </button>
           </div>
 
-          {/* TABLE */}
+          {/* ── TABLE ── */}
           <div className="ts-card">
             <div className="ts-card-title">
               <span>⏱ Time Distribution</span>
@@ -642,7 +635,6 @@ export default function Timesheet() {
                               className={`td-hours ${day.isSunday ? "ts-sunday-cell" : ""} ${isLeaveDay ? "ts-leave-blocked-cell" : ""}`}
                             >
                               {isLeaveDay ? (
-                                /* Blocked cell — show lock icon, no input */
                                 <div
                                   title="On leave — entry blocked"
                                   style={{
@@ -665,7 +657,7 @@ export default function Timesheet() {
                                   placeholder="0"
                                   min="0"
                                   max="24"
-                                  value={(row.hours || [])[di] || ""}
+                                  value={getHourVal(row, di)}
                                   onChange={(e) =>
                                     handleHours(row.id, di, e.target.value)
                                   }
@@ -675,19 +667,20 @@ export default function Timesheet() {
                           );
                         })}
 
+                        {/* ── Row total — only current week ── */}
                         <td className="td-total">
-                          <span className="ts-total-chip">
-                            {rowTotal(row.hours)}
-                          </span>
+                          <span className="ts-total-chip">{rowTotal(row)}</span>
                         </td>
                         <td className="td-action">
-                          <button
-                            className="ts-btn-delete"
-                            onClick={() => deleteRow(row.id)}
-                            title="Delete row"
-                          >
-                            ✕
-                          </button>
+                          {row.id !== 1 && (
+                            <button
+                              className="ts-btn-delete"
+                              onClick={() => deleteRow(row.id)}
+                              title="Delete row"
+                            >
+                              ✕
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -757,7 +750,7 @@ export default function Timesheet() {
                     <td style={{ borderRight: "none" }} />
                   </tr>
 
-                  {/* ── GRAND TOTAL ROW ── */}
+                  {/* ── GRAND TOTAL ROW — only current week ── */}
                   <tr className="ts-total-row">
                     <td
                       colSpan={3}
@@ -783,7 +776,7 @@ export default function Timesheet() {
             </button>
           </div>
 
-          {/* TIME OFF SECTION — Apply Leave Form */}
+          {/* ── TIME OFF SECTION — Apply Leave Form ── */}
           <div className="ts-card">
             <h3 className="ts-card-title">🏖 Time Off</h3>
             <div className="leave-form-wrapper">
