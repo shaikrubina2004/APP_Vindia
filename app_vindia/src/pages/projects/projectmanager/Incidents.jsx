@@ -272,27 +272,42 @@ export default function Incidents() {
 
   return (
     <div className="inc-page">
-      {/* ── Header ── */}
-      <div className="inc-header">
-        <div>
-          <h1>Incident Management</h1>
-          <p>Track, assign and resolve project issues</p>
-        </div>
-        <button className="inc-create-btn" onClick={() => setShowCreate(true)}>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          New Incident
-        </button>
-      </div>
+     {/* ── Header ── */}
+<div className="inc-header">
+
+  {/* LEFT SIDE */}
+  <div className="inc-header-left">
+
+    {/* MENU BUTTON (SAFE POSITION) */}
+    <button className="menu-btn">
+      ☰
+    </button>
+
+    {/* TITLE */}
+    <div>
+      <h1>Incident Management</h1>
+      <p>Track, assign and resolve project issues</p>
+    </div>
+
+  </div>
+
+  {/* RIGHT SIDE BUTTON */}
+  <button className="inc-create-btn" onClick={() => setShowCreate(true)}>
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+    >
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+    New Incident
+  </button>
+
+</div>
 
       {/* ── Stats ── */}
       <div className="inc-stats">
