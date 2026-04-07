@@ -14,4 +14,5 @@ export const ROLES = {
   PLANNING_ENGINEER: "planning_engineer",
   SAFETY_OFFICER: "safety_officer",
   QC_ENGINEER: "qc_engineer",
+  ARCHITECT: "architect",
 };

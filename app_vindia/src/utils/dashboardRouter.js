@@ -37,6 +37,9 @@ export const getDashboardRoute = (role) => {
     case ROLES.QC_ENGINEER:
       return "/qc/dashboard";
 
+    case ROLES.ARCHITECT:
+      return "/architect/dashboard";
+
     default:
       return "/";
   }
