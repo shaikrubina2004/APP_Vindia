@@ -1,0 +1,129 @@
+.pc-dashboard {
+  padding: 20px;
+  background: #f4f7fb;
+}
+
+/* HEADER */
+.pc-header h1 {
+  color: #001D39;
+  font-size: 26px;
+}
+
+.pc-header p {
+  color: #6EA2B3;
+}
+
+/* PROJECTS */
+.pc-projects {
+  display: flex;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+/* TABS */
+.pc-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.pc-tabs button {
+  padding: 8px 16px;
+  border: none;
+  background: #e5ecf5;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.pc-tabs .active {
+  background: #0A4174;
+  color: white;
+}
+
+/* CARDS */
+.pc-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.pc-card {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  border-left: 4px solid #0A4174;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.pc-card h4 {
+  font-size: 14px;
+  color: #6B7280;
+}
+
+.pc-card p {
+  font-size: 20px;
+  font-weight: bold;
+  color: #001D39;
+}
+
+.pc-card.highlight {
+  border-left: 4px solid #4E8EA2;
+}
+
+/* GRID */
+.pc-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+/* BOX */
+.pc-box {
+  background: white;
+  padding: 18px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+/* DAILY */
+.pc-daily textarea {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  min-height: 80px;
+}
+
+/* BUTTON */
+.pc-btn {
+  margin-top: 10px;
+  padding: 10px 16px;
+  background: #0A4174;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.pc-btn:hover {
+  background: #4E8EA2;
+}
+
+/* PAYMENTS */
+.payment-card {
+  background: white;
+  padding: 16px;
+  border-radius: 10px;
+}
+
+.pending {
+  color: red;
+  font-weight: bold;
+}
+
+.completed {
+  color: green;
+  font-weight: bold;
+}

@@ -1,0 +1,76 @@
+.page-container {
+  padding: 20px;
+}
+
+/* BUTTON */
+.btn {
+  background: #0A4174;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  margin-top: 10px;
+}
+
+.btn-small {
+  background: #0A4174;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+}
+
+/* TEXTAREA */
+textarea {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+/* MILESTONE */
+.milestone-card {
+  background: white;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-left: 4px solid #0A4174;
+}
+
+.next {
+  border-left: 4px solid #4E8EA2;
+}
+
+/* INCIDENT */
+.incident-card {
+  background: white;
+  padding: 12px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.p1 { color: red; }
+.p2 { color: orange; }
+
+/* PAYMENT */
+.payment-card {
+  background: white;
+  padding: 15px;
+  margin-bottom: 10px;
+}
+
+.pending {
+  color: red;
+}
+
+.completed {
+  color: green;
+}
+
+/* TEAM */
+.team-card {
+  background: white;
+  padding: 15px;
+  margin-bottom: 10px;
+}

@@ -30,6 +30,7 @@ import SafetyOfficerDashboard from "../pages/Safety Officer/SafetyOfficerDashboa
 import StructuralEngineerDashboard from "../pages/Structural Engineer/StructuralEngineerDashboard";
 import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
+import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
 
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
@@ -309,15 +310,15 @@ const AppRoutes = () => {
       />
 
       <Route
-        path="/project-coordinator/dashboard"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
-            <ProjectManagerLayout>
-              <ProjectCoordinatorDashboard />
-            </ProjectManagerLayout>
-          </ProtectedRoute>
-        }
-      />
+      path="/project-coordinator/dashboard"
+      element={
+        <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
+          <ProjectCoordinatorLayout>
+            <ProjectCoordinatorDashboard />
+          </ProjectCoordinatorLayout>
+        </ProtectedRoute>
+      }
+    />
 
       <Route
         path="/site-engineer/dashboard"
