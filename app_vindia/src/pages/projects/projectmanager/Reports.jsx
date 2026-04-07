@@ -399,35 +399,67 @@ function WeekSelector({ weekIndex, setWeekIndex }) {
   }, [weekIndex]);
 
   const canPrev = weekIndex > 0;
-  const canNext = weekIndex < WEEKS_CONFIG.findIndex(w => w.startDate > TODAY) - 1 + 1;
+
+  // find last unlocked week safely
+  const nextLockedIndex = WEEKS_CONFIG.findIndex(w => w.startDate > TODAY);
+  const maxIndex = nextLockedIndex === -1 ? WEEKS_CONFIG.length - 1 : nextLockedIndex - 1;
+
+  const canNext = weekIndex < maxIndex;
 
   return (
     <div className="rpt-wc">
-      <button className="rpt-wc-arrow" onClick={() => canPrev && setWeekIndex(i => i - 1)} disabled={!canPrev}>‹</button>
+      
+      {/* ◀ PREVIOUS */}
+      <button
+        className="rpt-wc-arrow"
+        onClick={() => canPrev && setWeekIndex(i => i - 1)}
+        disabled={!canPrev}
+      >
+        ‹
+      </button>
+
+      {/* ▶ NEXT (ONLY ONE BUTTON — FIXED) */}
+      <button
+        className="rpt-wc-arrow"
+        onClick={() => canNext && setWeekIndex(i => i + 1)}
+        disabled={!canNext}
+      >
+        ›
+      </button>
+
+      {/* WEEK TRACK */}
       <div className="rpt-wc-track" ref={trackRef}>
         {WEEKS_CONFIG.map((w, i) => {
           const isFuture = w.startDate > TODAY;
           const isActive = weekIndex === i && !isFuture;
+
           return (
-            <button key={w.id}
+            <button
+              key={w.id}
               className={`rpt-wc-chip${isActive ? " rpt-wc-chip-active" : ""}${isFuture ? " rpt-wc-chip-locked" : ""}`}
               onClick={() => !isFuture && setWeekIndex(i)}
               disabled={isFuture}
-              title={isFuture ? "Not yet available" : w.id}>
-              {isFuture
-                ? <><span className="rpt-wc-lock">🔒</span><span className="rpt-wc-id">{w.id}</span></>
-                : <><span className="rpt-wc-id">{w.id}</span><span className="rpt-wc-dates">{w.short}</span></>
-              }
+              title={isFuture ? "Not yet available" : w.id}
+            >
+              {isFuture ? (
+                <>
+                  <span className="rpt-wc-lock">🔒</span>
+                  <span className="rpt-wc-id">{w.id}</span>
+                </>
+              ) : (
+                <>
+                  <span className="rpt-wc-id">{w.id}</span>
+                  <span className="rpt-wc-dates">{w.short}</span>
+                </>
+              )}
             </button>
           );
         })}
       </div>
-      <button className="rpt-wc-arrow" onClick={() => setWeekIndex(i => Math.min(i + 1, WEEKS_CONFIG.length - 1))}
-        disabled={weekIndex >= WEEKS_CONFIG.findIndex(w => w.startDate > TODAY) - 1}>›</button>
+
     </div>
   );
 }
-
 // ── Main ──────────────────────────────────────────────────────
 export default function Reports() {
   const [activeReport, setActiveReport] = useState("project");
