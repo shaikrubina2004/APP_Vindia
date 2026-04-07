@@ -28,6 +28,7 @@ import QCDashboard from "../pages/QC Engineer/QCDashboard";
 import QuantitySurveyorDashboard from "../pages/Quality Surveyor/QuantitySurveyorDashboard";
 import SafetyOfficerDashboard from "../pages/Safety Officer/SafetyOfficerDashboard";
 import StructuralEngineerDashboard from "../pages/Structural Engineer/StructuralEngineerDashboard";
+import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
 
 import ProtectedRoute from "./ProtectedRoute";
@@ -123,17 +124,6 @@ const AppRoutes = () => {
             <ProjectManagerLayout>
               <ProjectManagement />
             </ProjectManagerLayout>
-          </ProtectedRoute>
-        }
-      />
-      {/* TIMESHEET */}
-      <Route
-        path="/timesheet"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
-            <CEOLayout>
-              <Timesheet />
-            </CEOLayout>
           </ProtectedRoute>
         }
       />
@@ -369,6 +359,14 @@ const AppRoutes = () => {
               <StructuralEngineerDashboard />
             </ProjectManagerLayout>
           </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/structural-engineer/dashboard"
+        element={
+          <StructuralEngineerLayout>
+            <StructuralEngineerDashboard />
+          </StructuralEngineerLayout>
         }
       />
       <Route

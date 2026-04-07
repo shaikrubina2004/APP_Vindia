@@ -1,0 +1,164 @@
+/* Base Layout */
+.se-main {
+  padding: 20px;
+  background: #f1f5f9;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+/* Header */
+.se-header {
+  margin-bottom: 20px;
+}
+
+.se-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.se-subtitle {
+  color: #64748b;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+/* Grid Layout */
+.se-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+/* Cards */
+.se-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease;
+}
+
+.se-card:hover {
+  transform: translateY(-3px);
+}
+
+.se-card h3 {
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.se-card p {
+  font-size: 22px;
+  font-weight: bold;
+}
+
+/* Section */
+.se-section {
+  margin-top: 30px;
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+}
+
+/* Activity */
+.se-activity p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+/* Table */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+th {
+  text-align: left;
+  font-size: 13px;
+  color: #64748b;
+}
+
+th, td {
+  padding: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Incident */
+.se-incident {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  margin-top: 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+}
+
+.pending {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.approved {
+  color: #16a34a;
+  font-weight: 500;
+}
+
+/* ========================= */
+/* 📱 MOBILE (up to 480px) */
+/* ========================= */
+@media (max-width: 480px) {
+  .se-main {
+    padding: 12px;
+  }
+
+  .se-header h1 {
+    font-size: 18px;
+  }
+
+  .se-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .se-card {
+    padding: 16px;
+  }
+
+  .se-card p {
+    font-size: 18px;
+  }
+}
+
+/* ========================= */
+/* 📱 TABLET (481px - 768px) */
+/* ========================= */
+@media (min-width: 481px) and (max-width: 768px) {
+  .se-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .se-card p {
+    font-size: 20px;
+  }
+}
+
+/* ========================= */
+/* 💻 SMALL LAPTOP (769px - 1024px) */
+/* ========================= */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .se-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ========================= */
+/* 🖥️ DESKTOP (1025px+) */
+/* ========================= */
+@media (min-width: 1025px) {
+  .se-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
