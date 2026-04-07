@@ -28,7 +28,7 @@ import QCDashboard from "../pages/QC Engineer/QCDashboard";
 import QuantitySurveyorDashboard from "../pages/Quality Surveyor/QuantitySurveyorDashboard";
 import SafetyOfficerDashboard from "../pages/Safety Officer/SafetyOfficerDashboard";
 import StructuralEngineerDashboard from "../pages/Structural Engineer/StructuralEngineerDashboard";
-import ArchitectDashboard from "../pages/projects/architect/ArchitectDashboard";
+import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
 
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
