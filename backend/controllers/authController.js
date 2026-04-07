@@ -2,18 +2,18 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { createUser, getUserByEmail } = require("../models/User");
 
+/* GENERATE TOKEN */
 const generateToken = (user) => {
   return jwt.sign(
-    { id: user.id, role: user.role },
+    { id: user.id, role: user.role_code },
     process.env.JWT_SECRET,
-    { expiresIn: "1d" }
+    { expiresIn: "1d" },
   );
 };
 
-const allowedRoles = ["CEO", "HR"]; // add the other exact uppercase roles from your DB constraint here
-
+/* SIGNUP (PUBLIC USER REGISTRATION) */
 const signup = async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password } = req.body;
 
   try {
     if (!name || !email || !password) {
@@ -26,6 +26,7 @@ const signup = async (req, res) => {
     const trimmedEmail = String(email).trim().toLowerCase();
     const trimmedPassword = String(password);
 
+    // 🔥 Check existing user
     const existingUser = await getUserByEmail(trimmedEmail);
     if (existingUser) {
       return res.status(400).json({
@@ -33,23 +34,20 @@ const signup = async (req, res) => {
       });
     }
 
-    const safeRole = allowedRoles.includes(role) ? role : "HR";
-
+    // 🔐 Hash password
     const hashedPassword = await bcrypt.hash(trimmedPassword, 10);
 
+    // 🔥 Create user WITHOUT role
     const user = await createUser({
       name: trimmedName,
       email: trimmedEmail,
       password: hashedPassword,
-      role: safeRole,
-      status: "active",
+      role_id: null, // ❗ No role assigned
+      status: "pending", // ❗ Waiting for CEO approval
     });
 
-    const token = generateToken(user);
-
     return res.status(201).json({
-      message: "User registered successfully",
-      token,
+      message: "Signup successful. Wait for admin approval.",
       user,
     });
   } catch (error) {
@@ -60,6 +58,7 @@ const signup = async (req, res) => {
   }
 };
 
+/* LOGIN */
 const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -71,19 +70,28 @@ const login = async (req, res) => {
     }
 
     const trimmedEmail = String(email).trim().toLowerCase();
-    const enteredPassword = String(password);
 
     const user = await getUserByEmail(trimmedEmail);
+    console.log("USER:", user); // 🔥 DEBUG
+
     if (!user) {
       return res.status(400).json({
         message: "Invalid credentials",
       });
     }
 
-    const isMatch = await bcrypt.compare(enteredPassword, user.password);
+    // 🔐 Check password
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({
         message: "Invalid credentials",
+      });
+    }
+
+    // 🔥 BLOCK LOGIN IF NOT APPROVED
+    if (!user.role_id) {
+      return res.status(403).json({
+        message: "Your account is not approved yet. Please wait for admin.",
       });
     }
 
@@ -96,7 +104,7 @@ const login = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: user.role_code, // comes from roles table
         status: user.status,
       },
     });

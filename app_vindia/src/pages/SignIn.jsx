@@ -4,6 +4,7 @@ import { login as loginAPI } from "../services/authService";
 import { useAuth } from "../context/useAuth";
 import logo from "../assets/logo.png.png";
 import "./Login.css";
+import { getDashboardRoute } from "../utils/dashboardRouter";
 
 /* ✅ IMPORT MOBILE COMPONENT */
 import SignInMobile from "./SignInMobile";
@@ -60,10 +61,17 @@ function SignIn() {
       const res = await loginAPI(formData);
       const { token, user } = res.data;
 
+      console.log("USER:", user); // 🔥 ADD THIS LINE
+
       localStorage.setItem("token", token);
       login(user);
 
-      navigate("/dashboard");
+      if (!user.role) {
+        alert("Your account is not approved yet. Please wait for admin.");
+        return;
+      }
+
+      navigate(getDashboardRoute(user.role));
     } catch (error) {
       alert(error.response?.data?.message || "Invalid credentials");
     }
@@ -84,13 +92,11 @@ function SignIn() {
   return (
     <div className="login-bg">
       <div className="login-card">
-        
         {/* LEFT */}
         <div className="login-left">
           <img src={logo} alt="Logo" className="login-logo" />
           <p>
-            You Dream It.{" "}
-            <span className="build-text">We Build It.</span>
+            You Dream It. <span className="build-text">We Build It.</span>
           </p>
         </div>
 
@@ -115,10 +121,7 @@ function SignIn() {
           />
 
           <div className="login-options">
-            <span
-              className="recover"
-              onClick={() => setShowForgot(true)}
-            >
+            <span className="recover" onClick={() => setShowForgot(true)}>
               Forgot password?
             </span>
           </div>
@@ -150,9 +153,7 @@ function SignIn() {
             />
 
             <div className="modal-buttons">
-              <button className="send-btn">
-                Send Link
-              </button>
+              <button className="send-btn">Send Link</button>
 
               <button
                 className="cancel-btn"

@@ -5,7 +5,6 @@ import logo from "../assets/logo.png.png";
 import "./SignUp.css";
 
 function SignUp() {
-
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -13,7 +12,7 @@ function SignUp() {
     lastName: "",
     email: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -22,12 +21,11 @@ function SignUp() {
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
   const handleSignup = async () => {
-
     console.log("SIGNUP API HIT ✅"); // ✅ MOVE HERE
 
     if (formData.password !== formData.confirmPassword) {
@@ -49,7 +47,6 @@ function SignUp() {
 
       alert(res.data.message);
       navigate("/");
-
     } catch (error) {
       alert(error.response?.data?.message || "Signup failed");
     }
@@ -58,7 +55,6 @@ function SignUp() {
   return (
     <div className="login-bg signup-page">
       <div className="login-card">
-
         <div className="login-left">
           <img src={logo} alt="Vindia Logo" className="login-logo" />
           <p>
@@ -67,37 +63,66 @@ function SignUp() {
         </div>
 
         <div className="login-right">
-
           <h2 style={{ marginBottom: "20px" }}>Create Account</h2>
 
           <label>First Name</label>
-          <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} />
+          <input
+            type="text"
+            name="firstName"
+            value={formData.firstName}
+            onChange={handleChange}
+          />
 
           <label>Last Name</label>
-          <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} />
+          <input
+            type="text"
+            name="lastName"
+            value={formData.lastName}
+            onChange={handleChange}
+          />
 
           <label>Email</label>
-          <input type="email" name="email" value={formData.email} onChange={handleChange} />
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+          />
 
           <label>Password</label>
-          <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} />
+          <input
+            type={showPassword ? "text" : "password"}
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+          />
 
           <label>Confirm Password</label>
-          <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} />
+          <input
+            type="password"
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+          />
 
           <label className="remember">
-            <input type="checkbox" checked={agree} onChange={() => setAgree(!agree)} />
+            <input
+              type="checkbox"
+              checked={agree}
+              onChange={() => setAgree(!agree)}
+            />
             I agree to Terms & Conditions
           </label>
 
           <button onClick={handleSignup}>Sign Up</button>
 
           <p className="signup-text">
-            Already have an account? <Link to="/" className="signup-link">Sign In</Link>
+            Already have an account?{" "}
+            <Link to="/" className="signup-link">
+              Sign In
+            </Link>
           </p>
-
         </div>
-
       </div>
     </div>
   );

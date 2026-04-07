@@ -12,7 +12,6 @@ import FinanceChart from "../../components/ceo/FinanceChart";
 import WbsCostTable from "../../components/ceo/WbsCostTable";
 
 function Dashboard() {
-
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -25,13 +24,13 @@ function Dashboard() {
   else greeting = "Good Evening";
 
   return (
-
     <div className="dashboard-container">
-
       {/* HEADER */}
 
       <div className="dashboard-header">
-        <h1>{greeting}, {user?.name}</h1>
+        <h1>
+          {greeting}, {user?.name}
+        </h1>
         <p>Role: {user?.role}</p>
       </div>
 
@@ -42,33 +41,25 @@ function Dashboard() {
       </h2>
 
       <div className="snapshot-grid">
-
         <KpiCard title="Monthly Revenue" value="₹45L" />
         <KpiCard title="Monthly Expenses" value="₹30L" />
         <KpiCard title="Net Profit" value="₹15L" />
         <KpiCard title="Active Clients" value="8" />
-
       </div>
 
       {/* OPERATIONS TODAY */}
 
-      <h2 className="dashboard-section-title">
-        Operations Today
-      </h2>
+      <h2 className="dashboard-section-title">Operations Today</h2>
 
       <div className="kpi-grid">
-
         <KpiCard title="Active Projects" value="12" />
         <KpiCard title="Employees Present Today" value="32" />
         <KpiCard title="New Leads Today" value="4" />
-
       </div>
 
       {/* FINANCE OVERVIEW */}
 
-      <h2 className="dashboard-section-title">
-        Finance Overview
-      </h2>
+      <h2 className="dashboard-section-title">Finance Overview</h2>
 
       <FinanceChart />
 
@@ -87,9 +78,7 @@ function Dashboard() {
       {/* LEAD + HR SECTION */}
 
       <div className="dual-section">
-
         <div className="info-card">
-
           <h3>Lead Pipeline</h3>
 
           <ul>
@@ -98,11 +87,9 @@ function Dashboard() {
             <li>Proposal Sent: 5</li>
             <li>Converted: 3</li>
           </ul>
-
         </div>
 
         <div className="info-card">
-
           <h3>HR Overview</h3>
 
           <ul>
@@ -110,20 +97,17 @@ function Dashboard() {
             <li>Present Today: 32</li>
             <li>On Leave: 4</li>
           </ul>
-
         </div>
-
       </div>
 
       {/* QUICK MODULES */}
 
       <div className="quick-modules">
-
         <h2>Quick Modules</h2>
 
         <div className="module-grid">
-
-          {(user?.role === ROLES.CEO || user?.role === ROLES.EMPLOYEE) && (
+          {(user?.role?.toLowerCase() === ROLES.CEO ||
+            user?.role?.toLowerCase() === ROLES.EMPLOYEE) && (
             <QuickModuleCard
               title="HR Management"
               onClick={() => navigate("/hr")}
@@ -147,7 +131,8 @@ function Dashboard() {
             onClick={() => navigate("/attendance")}
           />
 
-          {(user?.role === ROLES.CEO || user?.role === ROLES.EMPLOYEE) && (
+          {(user?.role?.toLowerCase() === ROLES.CEO ||
+            user?.role?.toLowerCase() === ROLES.EMPLOYEE) && (
             <QuickModuleCard
               title="Payroll"
               onClick={() => navigate("/payroll")}
@@ -160,13 +145,9 @@ function Dashboard() {
               onClick={() => navigate("/reports")}
             />
           )}
-
         </div>
-
       </div>
-
     </div>
-
   );
 }
 
