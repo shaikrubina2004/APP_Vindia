@@ -354,16 +354,6 @@ const AppRoutes = () => {
       <Route
         path="/structural-engineer/dashboard"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.STRUCTURAL_ENGINEER]}>
-            <ProjectManagerLayout>
-              <StructuralEngineerDashboard />
-            </ProjectManagerLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/structural-engineer/dashboard"
-        element={
           <StructuralEngineerLayout>
             <StructuralEngineerDashboard />
           </StructuralEngineerLayout>
