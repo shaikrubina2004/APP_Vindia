@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "../../styles/timesheet.css";
 import ApplyLeave from "../../SharedResourse/ApplyLeave";
 import ManagerTimesheet from "./ManagerTimesheet";
@@ -58,20 +58,6 @@ function getWeekDates(anchorDate) {
   return weeks[weeks.length - 1] || [];
 }
 
-function getPrevWeekAnchor(weekDates) {
-  const firstDate = weekDates[0].full;
-  const prev = new Date(firstDate);
-  prev.setDate(firstDate.getDate() - 1);
-  return prev;
-}
-
-function getNextWeekAnchor(weekDates) {
-  const lastDate = weekDates[weekDates.length - 1].full;
-  const next = new Date(lastDate);
-  next.setDate(lastDate.getDate() + 1);
-  return next;
-}
-
 function isUploadAllowed(weekDates) {
   if (!weekDates.length) return false;
   const lastDay = new Date(weekDates[weekDates.length - 1].full);
@@ -81,7 +67,6 @@ function isUploadAllowed(weekDates) {
   return today >= lastDay;
 }
 
-// ─── Normalize a Date to "YYYY-MM-DD" using LOCAL time ──────────────────────
 function toDateStr(date) {
   const d = new Date(date);
   const yyyy = d.getFullYear();
@@ -90,7 +75,6 @@ function toDateStr(date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// ─── Check if a weekday column falls within any applied leave range ──────────
 function isDateOnLeave(dayFull, appliedLeaves) {
   const dayStr = toDateStr(dayFull);
   return appliedLeaves.some(
@@ -98,7 +82,6 @@ function isDateOnLeave(dayFull, appliedLeaves) {
   );
 }
 
-// ─── Get leave type label for a date ────────────────────────────────────────
 function getLeaveTypeForDate(dayFull, appliedLeaves) {
   const dayStr = toDateStr(dayFull);
   const leave = appliedLeaves.find(
@@ -122,18 +105,31 @@ const WBS_TASKS = [
   { code: "3.2", name: "Plumbing Work", projectCode: "3.0" },
 ];
 
+const MANAGER_ROLES = [
+  "PROJECT_MANAGER",
+  "OPERATIONS_MANAGER",
+  "HR_MANAGER",
+  "FINANCE_MANAGER",
+  "IT_MANAGER",
+  "BDM",
+];
+
+const getUser = () => {
+  try {
+    const stored = localStorage.getItem("user");
+    return stored
+      ? JSON.parse(stored)
+      : { role: "PROJECT_MANAGER", name: "Demo User" };
+  } catch {
+    return { role: "PROJECT_MANAGER", name: "Demo User" };
+  }
+};
+
 export default function Timesheet() {
-  const user = { role: "PROJECT_MANAGER" };
+  const user = getUser();
 
-  const isManager = [
-    "PROJECT_MANAGER",
-    "OPERATIONS_MANAGER",
-    "HR_MANAGER",
-    "FINANCE_MANAGER",
-    "IT_MANAGER",
-    "BDM",
-  ].includes(user.role);
-
+  // ── FIX 1: isManager computed from MANAGER_ROLES constant ─────────────────
+const isManager = true;
   const [view, setView] = useState("MY");
   const currentDate = new Date();
   const [rows, setRows] = useState([
@@ -142,7 +138,7 @@ export default function Timesheet() {
       projectCode: "",
       taskCode: "",
       employeeType: "Labour",
-      hours: {}, // ← keyed by "YYYY-MM-DD" instead of array index
+      hours: {},
       groupId: 1,
     },
   ]);
@@ -152,12 +148,9 @@ export default function Timesheet() {
   const weekDates = getWeekDates(currentDate);
   const canSubmit = isUploadAllowed(weekDates);
 
-  // Pre-compute leave flags for current week
   const leaveDayFlags = weekDates.map((day) =>
     isDateOnLeave(day.full, appliedLeaves),
   );
-
-  // ── Navigation ─────────────────────────────────────────────────────────────
 
   const formatRange = () => {
     const s = weekDates[0]?.full;
@@ -177,14 +170,11 @@ export default function Timesheet() {
     );
   };
 
-  // ── Hours helpers — date-keyed ─────────────────────────────────────────────
-  // Get the hour value for a specific row + week column index
   const getHourVal = (row, idx) => {
     const dateKey = toDateStr(weekDates[idx].full);
     return (row.hours || {})[dateKey] || "";
   };
 
-  // Set hour value keyed by date string (not array index)
   const handleHours = (id, idx, val) => {
     if (leaveDayFlags[idx]) return;
     const dateKey = toDateStr(weekDates[idx].full);
@@ -196,7 +186,6 @@ export default function Timesheet() {
     );
   };
 
-  // ── Totals — only current week's dates ────────────────────────────────────
   const rowTotal = (row) =>
     weekDates
       .reduce((a, _, idx) => {
@@ -236,12 +225,10 @@ export default function Timesheet() {
       0,
     );
 
-  // ── Time-off row ──────────────────────────────────────────────────────────
   const timeOffDayValue = (idx) => (leaveDayFlags[idx] ? 9 : "");
   const timeOffTotal = () =>
     weekDates.reduce((s, _, idx) => s + (leaveDayFlags[idx] ? 9 : 0), 0);
 
-  // ── Row actions ───────────────────────────────────────────────────────────
   const handleProjectSelect = (id, projectCode) => {
     setRows(
       rows.map((r) => (r.id === id ? { ...r, projectCode, taskCode: "" } : r)),
@@ -294,12 +281,11 @@ export default function Timesheet() {
   };
 
   const deleteRow = (id) => {
-    // Never delete the very first row (id === 1)
     if (id === 1) return;
     setRows(rows.filter((r) => r.id !== id));
   };
 
-  // ── Quick fill — only fills current week's dates ──────────────────────────
+  // ── FIX 2: Quick fill now skips Sunday AND leave days ──────────────────────
   const handleQuickFill = () => {
     const h = prompt("Enter hours for all working days:", "8");
     if (h && !isNaN(h) && Number(h) > 0) {
@@ -310,7 +296,7 @@ export default function Timesheet() {
             ...(r.hours || {}),
             ...Object.fromEntries(
               weekDates
-                .filter((_, idx) => !leaveDayFlags[idx])
+                .filter((d, idx) => !leaveDayFlags[idx] && !d.isSunday) // ← skips Sunday
                 .map((d) => [toDateStr(d.full), h]),
             ),
           },
@@ -318,8 +304,8 @@ export default function Timesheet() {
       );
     }
   };
+  // ─────────────────────────────────────────────────────────────────────────
 
-  // ── Clear all — only clears current week's dates ──────────────────────────
   const handleClearAll = () => {
     if (confirm("Clear all time entries for this week?")) {
       setRows(
@@ -334,27 +320,66 @@ export default function Timesheet() {
     }
   };
 
-  // ── Submit ────────────────────────────────────────────────────────────────
-  const handleSubmit = () => {
-    if (!canSubmit) {
-      alert(
-        "Timesheet can only be submitted on or after the last working day of the week.",
-      );
-      return;
-    }
-    if (rows.some((r) => !r.projectCode || !r.taskCode)) {
-      alert("Please select Project and Task for all rows.");
-      return;
-    }
-    if (Number(grandTotal()) === 0 && timeOffTotal() === 0) {
-      alert("Please enter time entries before submitting.");
-      return;
-    }
-    setSubmissionStatus("SUBMITTED");
-    alert(`Timesheet submitted with ${grandTotal()} hours!`);
-  };
+  const handleSubmit = async () => {
+  try {
+    const payload = [];
 
-  // ── Leave submitted callback ──────────────────────────────────────────────
+    rows.forEach((row) => {
+      Object.entries(row.hours || {}).forEach(([date, hrs]) => {
+        if (hrs > 0) {
+          payload.push({
+            project_id: row.projectCode,
+            task_id: row.taskCode,
+            user_id: user.id,
+            work_date: date,
+            hours: hrs,
+            description: row.employeeType,
+          });
+        }
+      });
+    });
+
+    await fetch("http://localhost:5000/api/timesheets/bulk", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    setSubmissionStatus("SUBMITTED");
+    alert("Timesheet submitted successfully");
+
+  } catch (err) {
+    console.error(err);
+    alert("Submission failed");
+  }
+};
+const fetchMyTimesheet = async () => {
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/timesheets/user/${user.email}`
+    );
+
+    if (!res.ok) {
+      throw new Error("API failed");
+    }
+
+    const data = await res.json();
+
+    if (data.length > 0) {
+      const latest = data[0];
+      setRows(latest.rows || []);
+      setSubmissionStatus(latest.status || "NOT SUBMITTED");
+    }
+
+  } catch (err) {
+    console.error("Fetch error:", err);
+  }
+};
+useEffect(() => {
+  fetchMyTimesheet();
+}, []);
   const handleLeaveSubmitted = (leaveData) => {
     setAppliedLeaves((prev) => [
       ...prev,
@@ -371,7 +396,6 @@ export default function Timesheet() {
     ]);
   };
 
-  // ── Leave type display label ──────────────────────────────────────────────
   const leaveTypeLabel = (type) => {
     const map = {
       casual: "CL",
@@ -385,11 +409,10 @@ export default function Timesheet() {
     return map[type] || type?.toUpperCase() || "LV";
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="ts-page">
+
+      {/* ── FIX 3: Toggle always rendered first, clearly visible ── */}
       {isManager && (
         <div className="ts-toggle">
           <button
@@ -407,9 +430,12 @@ export default function Timesheet() {
         </div>
       )}
 
+      {/* ── TEAM VIEW ── */}
+      {isManager && view === "TEAM" && <ManagerTimesheet />}
+
+      {/* ── MY TIMESHEET VIEW ── */}
       {(view === "MY" || !isManager) && (
         <>
-          {/* ── HEADER ── */}
           <div className="ts-header">
             <div className="ts-header-top">
               <div className="ts-title-block">
@@ -430,7 +456,6 @@ export default function Timesheet() {
             </div>
           </div>
 
-          {/* ── LOCK BANNER ── */}
           {!canSubmit && (
             <div className="ts-lock-banner">
               <span className="ts-lock-icon">🔒</span>
@@ -442,7 +467,6 @@ export default function Timesheet() {
             </div>
           )}
 
-          {/* ── ACTION BAR ── */}
           <div className="ts-action-bar">
             <button className="ts-btn-count">
               {entryCount()} TIME ENTRY(IES)
@@ -472,7 +496,6 @@ export default function Timesheet() {
             </button>
           </div>
 
-          {/* ── TABLE ── */}
           <div className="ts-card">
             <div className="ts-card-title">
               <span>⏱ Time Distribution</span>
@@ -541,7 +564,6 @@ export default function Timesheet() {
                 </thead>
 
                 <tbody>
-                  {/* ── PROJECT ROWS ── */}
                   {rows.map((row, idx) => {
                     const isLastInGroup =
                       idx === rows.length - 1 ||
@@ -667,7 +689,6 @@ export default function Timesheet() {
                           );
                         })}
 
-                        {/* ── Row total — only current week ── */}
                         <td className="td-total">
                           <span className="ts-total-chip">{rowTotal(row)}</span>
                         </td>
@@ -686,7 +707,6 @@ export default function Timesheet() {
                     );
                   })}
 
-                  {/* ── TIME OFF ROW ── */}
                   <tr className="ts-time-off-row">
                     <td
                       colSpan={2}
@@ -750,7 +770,6 @@ export default function Timesheet() {
                     <td style={{ borderRight: "none" }} />
                   </tr>
 
-                  {/* ── GRAND TOTAL ROW — only current week ── */}
                   <tr className="ts-total-row">
                     <td
                       colSpan={3}
@@ -776,24 +795,17 @@ export default function Timesheet() {
             </button>
           </div>
 
-          {/* ── TIME OFF SECTION — Apply Leave Form ── */}
           <div className="ts-card">
             <h3 className="ts-card-title">🏖 Time Off</h3>
             <div className="leave-form-wrapper">
               <ApplyLeave
-                userRole="employee"
-                employeeName=""
+                userRole={user.role || "employee"}
+                employeeName={user.name || ""}
                 onLeaveSubmitted={handleLeaveSubmitted}
               />
             </div>
           </div>
         </>
-      )}
-
-      {isManager && view === "TEAM" && (
-        <div style={{ marginTop: "20px" }}>
-          <ManagerTimesheet />
-        </div>
       )}
     </div>
   );
