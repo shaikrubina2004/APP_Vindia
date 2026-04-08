@@ -16,7 +16,11 @@ const projectRoutes = require("./routes/projectRoutes");
 const wbsRoutes = require("./routes/wbsRoutes"); // ✅ ADD THIS
 const costRoutes = require("./routes/costRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+<<<<<<< HEAD
 const structuralRoutes = require("./routes/structuralRoutes");
+=======
+const timesheetRoutes = require("./routes/timesheetRoutes");
+>>>>>>> 872900848d6a2e27cee8841d4ace3c1d23616074
 
 const app = express();
 
@@ -58,6 +62,7 @@ try {
   /* ✅ ADDED PROJECT ROUTE */
   app.use("/api/projects", projectRoutes);
   app.use("/api/cost-summary", costRoutes);
+  app.use("/api/timesheets", timesheetRoutes);
 } catch (err) {
   console.error("❌ Route loading error:", err.message);
 }
