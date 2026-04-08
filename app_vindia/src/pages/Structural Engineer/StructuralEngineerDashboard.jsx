@@ -1,14 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import "./StructuralEngineerDashboard.css";
 
 const StructuralEngineerDashboard = () => {
   // ✅ Direct initialization (no useEffect needed)
-  const [stats] = useState({
-    totalDrawings: 24,
-    latestVersion: "v3.0",
-    pendingIncidents: 5,
-    notifications: 3,
-  });
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    axios
+      .get("http://localhost:5000/api/structural/dashboard")
+      .then((res) => {
+        setStats(res.data);
+      })
+      .catch((err) => {
+        console.error("Error fetching dashboard:", err);
+      });
+  }, []);
+
+    if (!stats) return <p>Loading dashboard...</p>;
 
   return (
     <div className="se-main">
@@ -24,22 +33,22 @@ const StructuralEngineerDashboard = () => {
       <div className="se-grid">
         <div className="se-card">
           <h3>Total Drawings</h3>
-          <p>{stats.totalDrawings}</p>
+          <p>{stats?.totalDrawings}</p>
         </div>
 
         <div className="se-card">
           <h3>Latest Version</h3>
-          <p>{stats.latestVersion}</p>
+          <p>{stats?.latestVersion}</p>
         </div>
 
         <div className="se-card">
           <h3>Pending Incidents</h3>
-          <p>{stats.pendingIncidents}</p>
+          <p>{stats?.pendingIncidents}</p>
         </div>
 
         <div className="se-card">
           <h3>Team Updates</h3>
-          <p>{stats.notifications} New Alerts</p>
+          <p>{stats?.notifications} New Alerts</p>
         </div>
       </div>
 
