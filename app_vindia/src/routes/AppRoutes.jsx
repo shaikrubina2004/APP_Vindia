@@ -43,6 +43,13 @@ import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
 import Incidents from "../pages/projects/projectmanager/Incidents";
 import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
 import Reports from "../pages/projects/projectmanager/Reports";
+import SiteEngineerLayout from "../layouts/SiteEngineerLayout"; // ADD THIS
+import DailyDiary from "../pages/Site Engineer/DailyDiary";
+import RFI from "../pages/Site Engineer/RFI";
+import NCR from "../pages/Site Engineer/NCR";
+
+
+
 const AppRoutes = () => {
   const useIsMobile = () => {
     const [mobile, setMobile] = useState(window.innerWidth <= 768);
@@ -321,15 +328,48 @@ const AppRoutes = () => {
     />
 
       <Route
-        path="/site-engineer/dashboard"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
-            <ProjectManagerLayout>
-              <SiteEngineerDashboard />
-            </ProjectManagerLayout>
-          </ProtectedRoute>
-        }
-      />
+  path="/site-engineer/dashboard"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+      <SiteEngineerLayout>
+        <SiteEngineerDashboard />
+      </SiteEngineerLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/site-engineer/daily-diary"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+      <SiteEngineerLayout>
+        <DailyDiary />
+      </SiteEngineerLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/site-engineer/rfi"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+      <SiteEngineerLayout>
+        <RFI />
+      </SiteEngineerLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/site-engineer/ncr"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+      <SiteEngineerLayout>
+        <NCR />
+      </SiteEngineerLayout>
+    </ProtectedRoute>
+  }
+/>
 
       <Route
         path="/mep/dashboard"
