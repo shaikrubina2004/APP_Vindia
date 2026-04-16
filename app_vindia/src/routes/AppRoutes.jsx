@@ -41,6 +41,7 @@ import Timesheet from "../pages/timesheet/Timesheet";
 import ProjectManagerLayout from "../layouts/ProjectManagerLayout";
 import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
 import Incidents from "../pages/projects/projectmanager/Incidents";
+import AppShell from "../components/incidents/AppShell";
 import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
 import Reports from "../pages/projects/projectmanager/Reports";
 import SiteEngineerLayout from "../layouts/SiteEngineerLayout"; // ADD THIS
@@ -149,7 +150,7 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute allowedRoles={[ROLES.CEO]}>
             <ProjectManagerLayout>
-              <Incidents />
+              <AppShell /> {/* ← was <IncidentManagement /> */}
             </ProjectManagerLayout>
           </ProtectedRoute>
         }
@@ -392,7 +393,6 @@ const AppRoutes = () => {
       />
 
       <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
-
 
       <Route
         path="/planning-engineer/dashboard"
