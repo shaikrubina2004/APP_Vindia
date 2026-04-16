@@ -1,0 +1,146 @@
+:root {
+  --primary: #4f46e5;
+  --bg: #f4f7fb;
+  --card: #ffffff;
+}
+
+/* PAGE */
+.qs-page {
+  padding: 25px;
+  background: var(--bg);
+  min-height: 100vh;
+}
+
+/* HEADER */
+.qs-header {
+  display: flex;
+  justify-content: space-between;
+  background: var(--card);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.qs-header-left {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.qs-role {
+  width: 50px;
+  height: 50px;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+
+/* STATS */
+.qs-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.qs-stat {
+  text-align: center;
+}
+
+.highlight h3 {
+  color: green;
+}
+
+/* BUTTON */
+.qs-add-btn {
+  background: var(--primary);
+  color: white;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* FORM */
+.qs-form-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.qs-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.qs-form-grid input {
+  padding: 10px;
+  border: 1px solid #ccc;
+}
+
+/* GRID */
+.qs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+/* CARD */
+.qs-item-card {
+  background: white;
+  padding: 18px;
+  border-radius: 12px;
+  border-left: 4px solid var(--primary);
+}
+
+/* CARD CONTENT */
+.qs-item-top {
+  display: flex;
+  justify-content: space-between;
+}
+
+.qs-item-middle {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0;
+}
+
+.qs-item-bottom {
+  font-weight: bold;
+  color: green;
+}
+
+/* BADGE */
+.qs-badge {
+  background: #eef2ff;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+/* MESSAGE */
+.qs-msg-btn {
+  margin-top: 10px;
+  background: orange;
+  border: none;
+  padding: 6px;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+}
+
+.qs-message-card {
+  background: #fff7ed;
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+/* TEXTAREA */
+.qs-textarea {
+  width: 100%;
+  height: 80px;
+  padding: 10px;
+}

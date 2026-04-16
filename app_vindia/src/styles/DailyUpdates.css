@@ -4,12 +4,24 @@
 
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,600&display=swap');
 
+
 /* ── Page ── */
 .du-page {
-  padding: 24px;
-  background: linear-gradient(160deg, #f0f4ff 0%, #f8f6f0 100%);
-  min-height: 100vh;
-  font-family: 'DM Mono', 'Courier New', monospace;
+  width: 100%;
+  max-width: 100%;
+  padding: 16px;
+  box-sizing: border-box;
+}
+@media (max-width: 600px) {
+  .du-page {
+    padding: 10px;
+  }
+}
+.du-report-card {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* ── Header ── */
@@ -20,6 +32,18 @@
   margin-bottom: 20px;
   padding-bottom: 16px;
   border-bottom: 2px solid #1a1a2e;
+}
+@media (max-width: 600px) {
+  .du-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .btn-primary {
+    width: 100%;
+    text-align: center;
+  }
 }
 .du-eyebrow {
   font-size: 11px;
@@ -74,10 +98,10 @@
 /* ── Stats Grid ── */
 .du-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* 🔥 FIX */
+  gap: 10px; /* slightly reduce gap */
 }
+
 .du-stat-card {
   background: #fff;
   border: 0.5px solid #d4d0c8;
@@ -121,12 +145,8 @@
   gap: 14px;
 }
 .du-report-card {
-  background: #fff;
-  border: 0.5px solid #d4d0c8;
-  border-left: 4px solid #1a1a2e;
-  border-radius: 8px;
-  padding: 16px 20px;
-  transition: box-shadow 0.15s;
+  width: 100%;
+  overflow: hidden;
 }
 .du-report-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
 .du-rc-top {
@@ -172,9 +192,24 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 0.5px solid #eceae4;
+  flex-wrap: wrap; /* 🔥 IMPORTANT */
+  gap: 8px;
+}
+@media (max-width: 600px) {
+  .du-rc-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .du-rc-footer div {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+  }
+}
+body {
+  overflow-x: hidden;
 }
 .du-rc-by { font-size: 11px; color: #94a3b8; }
 
@@ -525,4 +560,254 @@
   .du-upload-grid { grid-template-columns: 1fr; }
   .du-tab-bar { gap: 0; }
   .du-modal { border-radius: 8px; }
+}
+/* ── Edit Button (Modern UI) ── */
+.btn-edit {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 1px solid #facc15;
+  color: #92400e;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+/* Hover effect */
+.btn-edit:hover {
+  background: linear-gradient(135deg, #fde68a, #facc15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+/* Active click */
+.btn-edit:active {
+  transform: scale(0.97);
+  box-shadow: none;
+}
+.btn-edit {
+  background: #fff;
+  border: 1px solid #eab308;
+  color: #b45309;
+}
+
+.btn-edit:hover {
+  background: #fef9c3;
+}
+/* ✏ Stylish Curved Edit Button */
+.btn-edit {
+  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  color: #fff;
+  border: none;
+  padding: 7px 16px;
+  border-radius: 999px; /* FULL CURVE 🔥 */
+  font-size: 12px;
+  font-family: 'DM Mono', monospace;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+/* Hover effect */
+.btn-edit:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, #4f46e5, #2563eb);
+}
+
+/* Click effect */
+.btn-edit:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* Icon style */
+.btn-edit span {
+  font-size: 13px;
+}
+/* 🔥 FORCE FULL WIDTH (FIX MAIN ISSUE) */
+.page-content,
+.main-section,
+.app-layout,
+#root {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: left !important;
+}
+/* 🚨 REMOVE BIG CENTER PADDING */
+.page-content {
+  padding: 20px 12px !important;
+}
+.du-rc-footer > div {
+  display: flex;
+  flex-wrap: wrap; /* 🔥 prevents overflow */
+  gap: 8px;
+}
+/* ================= FINAL RESPONSIVE + OVERFLOW FIX ================= */
+
+/* Force full width layout */
+#root,
+.app-layout,
+.main-section,
+.page-content {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: left !important;
+}
+
+/* Fix page padding */
+.page-content {
+  padding: 16px !important;
+}
+
+/* Fix main page */
+.du-page {
+  width: 100%;
+  max-width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+/* Prevent any overflow */
+body {
+  overflow-x: hidden;
+}
+
+/* Fix report card */
+.du-report-card {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* 🔥 MAIN FIX (footer overflow issue) */
+.du-rc-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;   /* KEY FIX */
+  gap: 8px;
+}
+
+/* Fix buttons container */
+.du-rc-footer > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Fix long text overflow */
+.du-rc-project,
+.du-rc-meta,
+.du-rc-by {
+  word-break: break-word;
+}
+
+/* Mobile fix */
+@media (max-width: 600px) {
+  .du-rc-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .du-rc-footer > div {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .du-title {
+    font-size: 22px;
+  }
+
+  .btn-primary {
+    width: 100%;
+  }
+}
+/* 🔥 FIX GRID OVERFLOW PROPERLY */
+.du-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+/* 🔥 CRITICAL FIX */
+.du-stat-card {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;   /* reduce from 16px */
+}
+/* Better mobile button layout */
+@media (max-width: 600px) {
+  .du-rc-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .du-rc-footer > div {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  button {
+    width: auto;
+  }
+}
+.du-report-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 15px;
+  border-left: 5px solid #4f46e5;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: 0.2s;
+}
+
+.du-report-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+}
+.view-btn {
+  background: linear-gradient(135deg, #4f46e5, #2563eb);
+  color: white;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Hover effect */
+.view-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, #4338ca, #1e40af);
+}
+
+/* Click effect */
+.view-btn:active {
+  transform: scale(0.97);
+}
+.du-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
 }

@@ -31,20 +31,90 @@ const STATUS_COLORS = {
   "ahead": { bg: "#dbeafe", text: "#1e40af", label: "Ahead" },
 };
 
-const WORK_STATUS = { done: "✅ Done", "in-progress": "🔄 In Progress", pending: "⏳ Pending" };
-const EQUIP_STATUS = { operational: "✅ Operational", maintenance: "🔧 Maintenance", idle: "⏸ Idle" };
-const QC_STATUS = { passed: "✅ Passed", failed: "❌ Failed", pending: "⏳ Pending" };
+const WORK_STATUS = { done: "Done", "in-progress": "In Progress", pending: "Pending" };
+const EQUIP_STATUS = { operational: "Operational", maintenance: "Maintenance", idle: "Idle" };
+const QC_STATUS = { passed: "Passed", failed: "Failed", pending: "Pending" };
 
 export default function DailyUpdates() {
-  const [updates, setUpdates] = useState([]);
+  const [updates, setUpdates] = useState([
+  {
+    id: 1,
+    projectName: "Tower A",
+    date: "2026-04-08",
+    phase: "Structure",
+    overallStatus: "on-track",
+    workItems: [{ activity: "Column casting", location: "Level 3" }],
+    manpower: [{ trade: "Mason", planned: 10, present: 9 }],
+    issues: [],
+    pmRemarks: "Work going smooth",
+    submittedBy: "Rahul (Site Engineer)",
+    submissionTime: "18:00",
+  },
+
+  {
+    id: 2,
+    projectName: "Mall Project",
+    date: "2026-04-08",
+    phase: "MEP",
+    overallStatus: "delayed",
+    workItems: [{ activity: "Cable laying", location: "Basement" }],
+    manpower: [{ trade: "Electrician", planned: 8, present: 6 }],
+    issues: [{ issue: "Material shortage" }],
+    pmRemarks: "Need urgent supply",
+    submittedBy: "Anil (MEP Engineer)",
+    submissionTime: "17:30",
+  },
+
+  {
+    id: 3,
+    projectName: "Hospital Block",
+    date: "2026-04-08",
+    phase: "Planning",
+    overallStatus: "ahead",
+    workItems: [{ activity: "Schedule planning", location: "Office" }],
+    manpower: [{ trade: "Planner", planned: 3, present: 3 }],
+    issues: [],
+    pmRemarks: "Ahead of schedule",
+    submittedBy: "Priya (Planning Engineer)",
+    submissionTime: "16:45",
+  },
+
+  {
+    id: 4,
+    projectName: "Residential Villa",
+    date: "2026-04-08",
+    phase: "Architecture",
+    overallStatus: "on-track",
+    workItems: [{ activity: "Elevation design", location: "Studio" }],
+    manpower: [{ trade: "Architect", planned: 2, present: 2 }],
+    issues: [],
+    pmRemarks: "Design finalized",
+    submittedBy: "Arjun (Architect)",
+    submissionTime: "15:20",
+  },
+
+  {
+    id: 5,
+    projectName: "Bridge Project",
+    date: "2026-04-08",
+    phase: "Safety",
+    overallStatus: "critical",
+    workItems: [{ activity: "Safety inspection", location: "Site" }],
+    manpower: [{ trade: "Safety Officer", planned: 2, present: 1 }],
+    issues: [{ issue: "Unsafe scaffolding" }],
+    pmRemarks: "Immediate correction required",
+    submittedBy: "Kiran (Safety Officer)",
+    submissionTime: "14:30",
+  },
+]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [activeTab, setActiveTab] = useState("work");
   const [viewReport, setViewReport] = useState(null);
   const [photoNames, setPhotoNames] = useState([]);
   const [videoNames, setVideoNames] = useState([]);
+  const [editingId, setEditingId] = useState(null);
 
-  // ── helpers ──
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const setArrayRow = (key, idx, field, val) => {
@@ -60,15 +130,61 @@ export default function DailyUpdates() {
     setField(key, arr.length ? arr : form[key]);
   };
 
+  const handleEdit = (u) => {
+    setForm({
+      date: u.date,
+      reportNo: u.reportNo,
+      projectName: u.projectName,
+      phase: u.phase,
+      weather: u.weather,
+      weatherTemp: u.weatherTemp,
+      overallStatus: u.overallStatus,
+      workItems: u.workItems,
+      manpower: u.manpower,
+      equipment: u.equipment,
+      materials: u.materials,
+      issues: u.issues,
+      progress: u.progress,
+      safetyObs: u.safetyObs,
+      tomorrowPlan: u.tomorrowPlan,
+      pmRemarks: u.pmRemarks,
+      submittedBy: u.submittedBy,
+      submissionTime: u.submissionTime,
+      photos: u.photos || [],
+      videos: u.videos || [],
+    });
+    setPhotoNames(u.photoNames || []);
+    setVideoNames(u.videoNames || []);
+    setEditingId(u.id);
+    setActiveTab("work");
+    setShowModal(true);
+  };
+
   const handleSave = () => {
     if (!form.date || !form.projectName) {
       alert("Date and Project Name are required.");
       return;
     }
-    setUpdates(prev => [{ id: Date.now(), ...form, photoNames, videoNames }, ...prev]);
+    if (editingId) {
+      setUpdates(prev =>
+        prev.map(u => u.id === editingId ? { ...u, ...form, photoNames, videoNames } : u)
+      );
+    } else {
+      setUpdates(prev => [{ id: Date.now(), ...form, photoNames, videoNames }, ...prev]);
+    }
     setForm(EMPTY_FORM);
     setPhotoNames([]);
     setVideoNames([]);
+    setEditingId(null);
+    setShowModal(false);
+    setActiveTab("work");
+  };
+
+  const handleCloseModal = () => {
+    setForm(EMPTY_FORM);
+    setPhotoNames([]);
+    setVideoNames([]);
+    setEditingId(null);
     setShowModal(false);
     setActiveTab("work");
   };
@@ -88,7 +204,6 @@ export default function DailyUpdates() {
 
   return (
     <div style={styles.page}>
-      {/* ── PAGE HEADER ── */}
       <div style={styles.pageHeader}>
         <div>
           <div style={styles.eyebrow}>Construction Management</div>
@@ -97,7 +212,6 @@ export default function DailyUpdates() {
         <button style={styles.btnPrimary} onClick={() => setShowModal(true)}>+ New Report</button>
       </div>
 
-      {/* ── STATS ── */}
       <div style={styles.statsGrid}>
         {[
           { label: "Total Reports", val: updates.length },
@@ -112,7 +226,6 @@ export default function DailyUpdates() {
         ))}
       </div>
 
-      {/* ── REPORT LIST ── */}
       {updates.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>📋</div>
@@ -148,7 +261,30 @@ export default function DailyUpdates() {
                 {u.pmRemarks && <div style={styles.rcRemarks}>"{u.pmRemarks.slice(0, 120)}{u.pmRemarks.length > 120 ? "…" : ""}"</div>}
                 <div style={styles.rcFooter}>
                   <span style={styles.rcBy}>{u.submittedBy || "Project Manager"} · {u.submissionTime || u.date}</span>
-                  <button style={styles.btnView} onClick={() => setViewReport(u)}>View Full Report →</button>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    
+    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      
+
+{u.submittedBy?.includes("Project Manager") && (
+  <button
+    className="edit-btn"
+    onClick={() => handleEdit(u)}
+  >
+    ✏ Edit
+  </button>
+)} 
+  {/* View button (for everyone) */}
+  <button
+    className="view-btn"
+    onClick={() => setViewReport(u)}
+  >
+    View Report →
+  </button>
+
+</div>
+                    
+                  </div>
                 </div>
               </div>
             );
@@ -156,18 +292,14 @@ export default function DailyUpdates() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════
-          ADD REPORT MODAL
-      ══════════════════════════════════════════ */}
       {showModal && (
-        <div style={styles.overlay} onClick={() => setShowModal(false)}>
+        <div style={styles.overlay} onClick={handleCloseModal}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <div style={styles.modalTitle}>New Daily Site Report</div>
-              <button style={styles.closeBtn} onClick={() => setShowModal(false)}>✕</button>
+              <div style={styles.modalTitle}>{editingId ? "✏ Edit Report" : "New Daily Site Report"}</div>
+              <button style={styles.closeBtn} onClick={handleCloseModal}>✕</button>
             </div>
 
-            {/* TOP META */}
             <div style={styles.metaBar}>
               <div style={styles.metaGrid}>
                 <Field label="Date *">
@@ -180,12 +312,12 @@ export default function DailyUpdates() {
                   <input style={styles.input} placeholder="e.g. Greenfield Tower" value={form.projectName} onChange={e => setField("projectName", e.target.value)} />
                 </Field>
                 <Field label="Phase">
-                  <input style={styles.input} placeholder="e.g. Phase 2 – Structure" value={form.phase} onChange={e => setField("phase", e.target.value)} />
+                  <input style={styles.input} placeholder="e.g. Phase 2 - Structure" value={form.phase} onChange={e => setField("phase", e.target.value)} />
                 </Field>
                 <Field label="Weather">
                   <input style={styles.input} placeholder="Clear / Rainy / Cloudy" value={form.weather} onChange={e => setField("weather", e.target.value)} />
                 </Field>
-                <Field label="Temp (°C)">
+                <Field label="Temp (C)">
                   <input style={styles.input} placeholder="32" value={form.weatherTemp} onChange={e => setField("weatherTemp", e.target.value)} />
                 </Field>
                 <Field label="Overall Status">
@@ -199,7 +331,6 @@ export default function DailyUpdates() {
               </div>
             </div>
 
-            {/* TABS */}
             <div style={styles.tabBar}>
               {tabs.map(t => (
                 <button key={t.id} style={{ ...styles.tab, ...(activeTab === t.id ? styles.tabActive : {}) }} onClick={() => setActiveTab(t.id)}>
@@ -209,7 +340,6 @@ export default function DailyUpdates() {
             </div>
 
             <div style={styles.tabBody}>
-              {/* ── WORK DONE ── */}
               {activeTab === "work" && (
                 <Section title="Work Completed Today">
                   <TableHead cols={["Activity", "Location", "Qty", "Unit", "Status", ""]} />
@@ -224,14 +354,13 @@ export default function DailyUpdates() {
                         <option value="in-progress">In Progress</option>
                         <option value="pending">Pending</option>
                       </select>
-                      <button style={styles.removeBtn} onClick={() => removeRow("workItems", i)}>✕</button>
+                      <button style={styles.removeBtn} onClick={() => removeRow("workItems", i)}>X</button>
                     </div>
                   ))}
                   <button style={styles.addRowBtn} onClick={() => addRow("workItems", { activity: "", location: "", quantity: "", unit: "", status: "done" })}>+ Add Row</button>
                 </Section>
               )}
 
-              {/* ── MANPOWER ── */}
               {activeTab === "manpower" && (
                 <Section title="Manpower on Site">
                   <TableHead cols={["Trade", "Planned", "Present", "Remark", ""]} />
@@ -241,16 +370,15 @@ export default function DailyUpdates() {
                       <input style={{ ...styles.input, ...styles.tdFlex1 }} placeholder="12" value={row.planned} onChange={e => setArrayRow("manpower", i, "planned", e.target.value)} />
                       <input style={{ ...styles.input, ...styles.tdFlex1 }} placeholder="10" value={row.present} onChange={e => setArrayRow("manpower", i, "present", e.target.value)} />
                       <input style={{ ...styles.input, ...styles.tdFlex3 }} placeholder="2 absent" value={row.remark} onChange={e => setArrayRow("manpower", i, "remark", e.target.value)} />
-                      <button style={styles.removeBtn} onClick={() => removeRow("manpower", i)}>✕</button>
+                      <button style={styles.removeBtn} onClick={() => removeRow("manpower", i)}>X</button>
                     </div>
                   ))}
                   <button style={styles.addRowBtn} onClick={() => addRow("manpower", { trade: "", planned: "", present: "", remark: "" })}>+ Add Row</button>
                 </Section>
               )}
 
-              {/* ── EQUIPMENT ── */}
               {activeTab === "equipment" && (
-                <Section title="Equipment & Machinery">
+                <Section title="Equipment and Machinery">
                   <TableHead cols={["Equipment", "Nos.", "Status", "Hours Worked", ""]} />
                   {form.equipment.map((row, i) => (
                     <div key={i} style={styles.tableRow}>
@@ -262,14 +390,13 @@ export default function DailyUpdates() {
                         <option value="idle">Idle</option>
                       </select>
                       <input style={{ ...styles.input, ...styles.tdFlex1 }} placeholder="7" value={row.hours} onChange={e => setArrayRow("equipment", i, "hours", e.target.value)} />
-                      <button style={styles.removeBtn} onClick={() => removeRow("equipment", i)}>✕</button>
+                      <button style={styles.removeBtn} onClick={() => removeRow("equipment", i)}>X</button>
                     </div>
                   ))}
                   <button style={styles.addRowBtn} onClick={() => addRow("equipment", { name: "", nos: "", status: "operational", hours: "" })}>+ Add Row</button>
                 </Section>
               )}
 
-              {/* ── MATERIAL ── */}
               {activeTab === "material" && (
                 <Section title="Material Received Today">
                   <TableHead cols={["Material", "Quantity", "Supplier", "Challan No.", "QC", ""]} />
@@ -284,14 +411,13 @@ export default function DailyUpdates() {
                         <option value="failed">Failed</option>
                         <option value="pending">Pending</option>
                       </select>
-                      <button style={styles.removeBtn} onClick={() => removeRow("materials", i)}>✕</button>
+                      <button style={styles.removeBtn} onClick={() => removeRow("materials", i)}>X</button>
                     </div>
                   ))}
                   <button style={styles.addRowBtn} onClick={() => addRow("materials", { material: "", quantity: "", supplier: "", challan: "", qc: "passed" })}>+ Add Row</button>
                 </Section>
               )}
 
-              {/* ── ISSUES ── */}
               {activeTab === "issues" && (
                 <Section title="Issues / Problems Faced">
                   {form.issues.map((row, i) => (
@@ -318,21 +444,20 @@ export default function DailyUpdates() {
                           </Field>
                         </div>
                       </div>
-                      <button style={styles.removeBtn} onClick={() => removeRow("issues", i)}>✕</button>
+                      <button style={styles.removeBtn} onClick={() => removeRow("issues", i)}>X</button>
                     </div>
                   ))}
                   <button style={styles.addRowBtn} onClick={() => addRow("issues", { issue: "", impact: "", action: "", responsible: "", targetDate: "" })}>+ Add Issue</button>
                 </Section>
               )}
 
-              {/* ── PROGRESS ── */}
               {activeTab === "progress" && (
                 <Section title="Overall Project Progress (%)">
                   {[
                     { key: "structural", label: "Structural Work" },
                     { key: "finishing", label: "Finishing Work" },
-                    { key: "mepElec", label: "MEP – Electrical" },
-                    { key: "mepPlumb", label: "MEP – Plumbing" },
+                    { key: "mepElec", label: "MEP - Electrical" },
+                    { key: "mepPlumb", label: "MEP - Plumbing" },
                     { key: "overall", label: "Overall Project" },
                   ].map(({ key, label }) => (
                     <div key={key} style={styles.progressRow}>
@@ -356,13 +481,12 @@ export default function DailyUpdates() {
                 </Section>
               )}
 
-              {/* ── SAFETY ── */}
               {activeTab === "safety" && (
                 <Section title="Safety Observations">
                   <Field label="Safety Notes (one per line)">
                     <textarea
                       style={{ ...styles.input, minHeight: 160, resize: "vertical" }}
-                      placeholder={"✅ Toolbox talk conducted at 8:00 AM — Topic: Working at Height\n✅ All workers wearing PPE\n⚠️ 1 worker found without harness at Level 4 — Warning issued\n✅ No Lost Time Injury (LTI) today"}
+                      placeholder="Toolbox talk conducted at 8:00 AM"
                       value={form.safetyObs}
                       onChange={e => setField("safetyObs", e.target.value)}
                     />
@@ -370,7 +494,6 @@ export default function DailyUpdates() {
                 </Section>
               )}
 
-              {/* ── TOMORROW ── */}
               {activeTab === "tomorrow" && (
                 <Section title="Tomorrow's Work Plan">
                   <TableHead cols={["Planned Activity", "Location", "Target", ""]} />
@@ -379,21 +502,20 @@ export default function DailyUpdates() {
                       <input style={{ ...styles.input, ...styles.tdFlex3 }} placeholder="Continue slab shuttering" value={row.activity} onChange={e => setArrayRow("tomorrowPlan", i, "activity", e.target.value)} />
                       <input style={{ ...styles.input, ...styles.tdFlex2 }} placeholder="Level 4, Zone C" value={row.location} onChange={e => setArrayRow("tomorrowPlan", i, "location", e.target.value)} />
                       <input style={{ ...styles.input, ...styles.tdFlex2 }} placeholder="200 Sqm" value={row.target} onChange={e => setArrayRow("tomorrowPlan", i, "target", e.target.value)} />
-                      <button style={styles.removeBtn} onClick={() => removeRow("tomorrowPlan", i)}>✕</button>
+                      <button style={styles.removeBtn} onClick={() => removeRow("tomorrowPlan", i)}>X</button>
                     </div>
                   ))}
                   <button style={styles.addRowBtn} onClick={() => addRow("tomorrowPlan", { activity: "", location: "", target: "" })}>+ Add Row</button>
                 </Section>
               )}
 
-              {/* ── MEDIA ── */}
               {activeTab === "media" && (
-                <Section title="Photos & Videos">
+                <Section title="Photos and Videos">
                   <div style={styles.uploadGrid}>
                     <div>
                       <div style={styles.fieldLabel}>Photos</div>
                       <label style={styles.uploadBox}>
-                        📸 Upload Photos
+                        Upload Photos
                         <input type="file" multiple accept="image/*" style={{ display: "none" }}
                           onChange={e => setPhotoNames(Array.from(e.target.files).map(f => f.name))} />
                       </label>
@@ -404,7 +526,7 @@ export default function DailyUpdates() {
                     <div>
                       <div style={styles.fieldLabel}>Videos</div>
                       <label style={styles.uploadBox}>
-                        🎥 Upload Videos
+                        Upload Videos
                         <input type="file" multiple accept="video/*" style={{ display: "none" }}
                           onChange={e => setVideoNames(Array.from(e.target.files).map(f => f.name))} />
                       </label>
@@ -416,9 +538,8 @@ export default function DailyUpdates() {
                 </Section>
               )}
 
-              {/* ── REMARKS ── */}
               {activeTab === "remarks" && (
-                <Section title="PM Remarks & Submission">
+                <Section title="PM Remarks and Submission">
                   <Field label="PM Remarks">
                     <textarea
                       style={{ ...styles.input, minHeight: 100, resize: "vertical" }}
@@ -440,22 +561,21 @@ export default function DailyUpdates() {
             </div>
 
             <div style={styles.modalFooter}>
-              <button style={styles.btnCancel} onClick={() => setShowModal(false)}>Cancel</button>
-              <button style={styles.btnPrimary} onClick={handleSave}>Save Report</button>
+              <button style={styles.btnCancel} onClick={handleCloseModal}>Cancel</button>
+              <button style={styles.btnPrimary} onClick={handleSave}>
+                {editingId ? "Update Report" : "Save Report"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══════════════════════════════════════════
-          VIEW FULL REPORT MODAL
-      ══════════════════════════════════════════ */}
       {viewReport && (
         <div style={styles.overlay} onClick={() => setViewReport(null)}>
           <div style={{ ...styles.modal, maxWidth: 780 }} onClick={e => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <div style={styles.modalTitle}>📋 Daily Site Report</div>
-              <button style={styles.closeBtn} onClick={() => setViewReport(null)}>✕</button>
+              <div style={styles.modalTitle}>Daily Site Report</div>
+              <button style={styles.closeBtn} onClick={() => setViewReport(null)}>X</button>
             </div>
             <div style={{ ...styles.tabBody, maxHeight: "75vh" }}>
               <ReportView r={viewReport} />
@@ -466,8 +586,6 @@ export default function DailyUpdates() {
     </div>
   );
 }
-
-// ── Sub-components ──
 
 function Field({ label, children }) {
   return (
@@ -499,7 +617,6 @@ function ReportView({ r }) {
   const sc = STATUS_COLORS[r.overallStatus] || STATUS_COLORS["on-track"];
   return (
     <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
-      {/* Header */}
       <div style={styles.rvHeader}>
         <div>
           <div style={styles.rvProject}>{r.projectName}</div>
@@ -510,7 +627,7 @@ function ReportView({ r }) {
           <div style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>
             {r.date}{r.reportNo ? ` · #${r.reportNo}` : ""}
           </div>
-          <div style={{ color: "#64748b", fontSize: 12 }}>{r.weather} {r.weatherTemp && `· ${r.weatherTemp}°C`}</div>
+          <div style={{ color: "#64748b", fontSize: 12 }}>{r.weather} {r.weatherTemp && `· ${r.weatherTemp}C`}</div>
         </div>
       </div>
 
@@ -538,7 +655,7 @@ function ReportView({ r }) {
           ))}
       </RvSection>
 
-      <RvSection title="3. Equipment & Machinery">
+      <RvSection title="3. Equipment and Machinery">
         {r.equipment.filter(e => e.name).length === 0
           ? <Nil /> : r.equipment.filter(e => e.name).map((e, i) => (
             <div key={i} style={styles.rvRow}>
@@ -567,7 +684,7 @@ function ReportView({ r }) {
         {r.issues.filter(i => i.issue).length === 0
           ? <Nil text="No issues logged" /> : r.issues.filter(i => i.issue).map((issue, i) => (
             <div key={i} style={styles.issueCard}>
-              <div style={styles.issueCardTitle}>⚠️ {issue.issue}</div>
+              <div style={styles.issueCardTitle}>!! {issue.issue}</div>
               {issue.impact && <div style={{ color: "#dc2626", fontSize: 12 }}>Impact: {issue.impact}</div>}
               {issue.action && <div style={{ color: "#0369a1", fontSize: 12 }}>Action: {issue.action}</div>}
               <div style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>
@@ -617,8 +734,8 @@ function ReportView({ r }) {
 
       {(r.photoNames?.length > 0 || r.videoNames?.length > 0) && (
         <RvSection title="9. Media">
-          {r.photoNames?.map((n, i) => <div key={i} style={{ fontSize: 12, color: "#64748b" }}>📸 {n}</div>)}
-          {r.videoNames?.map((n, i) => <div key={i} style={{ fontSize: 12, color: "#64748b" }}>🎥 {n}</div>)}
+          {r.photoNames?.map((n, i) => <div key={i} style={{ fontSize: 12, color: "#64748b" }}>Photo: {n}</div>)}
+          {r.videoNames?.map((n, i) => <div key={i} style={{ fontSize: 12, color: "#64748b" }}>Video: {n}</div>)}
         </RvSection>
       )}
 
@@ -650,7 +767,6 @@ function Nil({ text = "No entries" }) {
   return <div style={{ color: "#94a3b8", fontSize: 12, fontStyle: "italic", padding: "6px 0" }}>{text}</div>;
 }
 
-// ── Styles ──
 const styles = {
   page: { padding: 24, background: "linear-gradient(160deg, #f0f4ff 0%, #f8f6f0 100%)", minHeight: "100vh", fontFamily: "'DM Mono', 'Courier New', monospace" },
   pageHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20, paddingBottom: 16, borderBottom: "2px solid #1a1a2e" },
@@ -658,6 +774,7 @@ const styles = {
   pageTitle: { fontFamily: "'Georgia', serif", fontSize: 30, fontWeight: 700, color: "#1a1a2e", fontStyle: "italic", margin: 0 },
   btnPrimary: { background: "#1a1a2e", color: "#fff", border: "none", padding: "10px 20px", borderRadius: 4, fontFamily: "'DM Mono', monospace", fontSize: 13, cursor: "pointer", letterSpacing: "0.04em" },
   btnCancel: { background: "none", border: "1px solid #d4d0c8", borderRadius: 4, padding: "10px 20px", fontFamily: "'DM Mono', monospace", fontSize: 13, cursor: "pointer", color: "#4a4a6a" },
+  btnEdit: { background: "none", border: "0.5px solid #d4d0c8", borderRadius: 4, cursor: "pointer", fontSize: 12, color: "#4a4a6a", padding: "4px 10px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.03em" },
   statsGrid: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 },
   statCard: { background: "#fff", border: "0.5px solid #d4d0c8", borderRadius: 8, padding: "16px 18px" },
   statVal: { fontFamily: "'Georgia', serif", fontSize: 28, fontWeight: 700, color: "#1a1a2e", fontStyle: "italic" },
