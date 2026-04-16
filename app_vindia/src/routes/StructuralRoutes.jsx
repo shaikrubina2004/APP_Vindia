@@ -3,15 +3,15 @@
 import { Routes, Route } from "react-router-dom";
 import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
 
-import Dashboard from "../pages/structural/Dashboard";
-import Projects from "../pages/structural/Projects";
-import Drawings from "../pages/structural/Drawings";
-import Analysis from "../pages/structural/Analysis";
-import BOQ from "../pages/structural/BOQ";
-import RFI from "../pages/structural/RFI";
-import Approvals from "../pages/structural/Approvals";
-import Reports from "../pages/structural/Reports";
-import Coordination from "../pages/structural/Coordination";
+import Dashboard from "../pages/Structural Engineer/StructuralEngineerDashboard";
+import Projects from "../pages/Structural Engineer/Projects";
+import Drawings from "../pages/Structural Engineer/Drawings";
+import Analysis from "../pages/Structural Engineer/Analysis";
+import BOQ from "../pages/Structural Engineer/BOQ";
+import RFI from "../pages/Structural Engineer/RFI";
+import Approvals from "../pages/Structural Engineer/Approvals";
+import Reports from "../pages/Structural Engineer/Reports";
+import Coordination from "../pages/Structural Engineer/Coordination";
 
 function StructuralRoutes() {
   return (

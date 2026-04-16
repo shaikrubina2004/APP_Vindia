@@ -31,27 +31,40 @@ router.get("/dashboard", async (req, res) => {
       "SELECT version FROM drawings ORDER BY created_at DESC LIMIT 1"
     );
 
-    const incidentsResult = await pool.query(
-      "SELECT COUNT(*) FROM incidents WHERE status = 'pending'"
-    );
+    // ✅ SAFE FALLBACK (no table crash)
+    let incidentsCount = 0;
+    let notificationsCount = 0;
 
-    const notificationsResult = await pool.query(
-      "SELECT COUNT(*) FROM notifications"
-    );
+    try {
+      const incidentsResult = await pool.query(
+        "SELECT COUNT(*) FROM incidents WHERE status='pending'"
+      );
+      incidentsCount = parseInt(incidentsResult.rows[0].count);
+    } catch (err) {
+      console.log("⚠️ incidents table missing");
+    }
+
+    try {
+      const notificationsResult = await pool.query(
+        "SELECT COUNT(*) FROM notifications"
+      );
+      notificationsCount = parseInt(notificationsResult.rows[0].count);
+    } catch (err) {
+      console.log("⚠️ notifications table missing");
+    }
 
     res.json({
       totalDrawings: parseInt(drawingsResult.rows[0].count),
       latestVersion: latestVersionResult.rows[0]?.version || "N/A",
-      pendingIncidents: parseInt(incidentsResult.rows[0].count),
-      notifications: parseInt(notificationsResult.rows[0].count),
+      pendingIncidents: incidentsCount,
+      notifications: notificationsCount,
     });
 
   } catch (err) {
     console.error("Dashboard Error:", err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: err.message });
   }
 });
-
 
 // ==============================
 // 📤 UPLOAD DRAWING API
@@ -92,5 +105,33 @@ router.get("/drawings", async (req, res) => {
   }
 });
 
+router.delete("/drawings/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await pool.query("DELETE FROM drawings WHERE id=$1", [id]);
+    res.json({ message: "Deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Delete failed" });
+  }
+});
+
+router.put("/drawings/:id/status", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    await pool.query(
+      "UPDATE drawings SET status=$1, updated_at=NOW() WHERE id=$2",
+      [status, id]
+    );
+
+    res.json({ message: "Status updated" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Update failed" });
+  }
+});
 
 module.exports = router;

@@ -6,9 +6,11 @@ import "../../styles/layout/Sidebar.css";
 function Sidebar({ menuItems }) {
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
+ useEffect(() => {
+  setTimeout(() => {
     feather.replace();
-  }, []);
+  }, 100);
+}, [menuItems]);
 
   return (
     <>

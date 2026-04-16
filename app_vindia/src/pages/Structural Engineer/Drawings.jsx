@@ -1,36 +1,53 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import "./Drawings.css";
 
 const Drawings = () => {
   const [drawings, setDrawings] = useState([]);
+  const [filtered, setFiltered] = useState([]);
+  const [search, setSearch] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
   const [form, setForm] = useState({
     name: "",
     version: "",
     file: null,
   });
 
-  // 📥 Fetch drawings
-  useEffect(() => {
-    fetchDrawings();
-  }, []);
-
+  // FETCH
   const fetchDrawings = async () => {
     try {
       const res = await axios.get(
         "http://localhost:5000/api/structural/drawings"
       );
       setDrawings(res.data);
+      setFiltered(res.data);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 📤 Upload drawing
+  useEffect(() => {
+    fetchDrawings();
+  }, []);
+
+  // SEARCH
+  useEffect(() => {
+    const result = drawings.filter((d) =>
+      d.name.toLowerCase().includes(search.toLowerCase())
+    );
+    setFiltered(result);
+  }, [search, drawings]);
+
+  // UPLOAD
   const handleUpload = async (e) => {
     e.preventDefault();
 
     if (!form.name || !form.version || !form.file) {
-      alert("Please fill all fields");
+      alert("Fill all fields");
       return;
     }
 
@@ -45,74 +62,155 @@ const Drawings = () => {
         "http://localhost:5000/api/structural/upload-drawing",
         formData
       );
-
-      alert("Uploaded successfully ✅");
-
       setForm({ name: "", version: "", file: null });
-      fetchDrawings(); // refresh
+      fetchDrawings();
     } catch (err) {
       console.error(err);
-      alert("Upload failed ❌");
     }
   };
 
+  // DELETE
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this drawing?")) return;
+    await axios.delete(
+      `http://localhost:5000/api/structural/drawings/${id}`
+    );
+    fetchDrawings();
+  };
+
+  const updateStatus = async (id, status) => {
+    await axios.put(
+      `http://localhost:5000/api/structural/drawings/${id}/status`,
+      { status }
+    );
+    fetchDrawings();
+  };
+
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>📄 Drawings Module</h2>
+    <div className="drawings-container">
+      {/* HEADER */}
+      <div className="drawings-header">
+        <div>
+          <h1>📄 Drawings Management</h1>
+          <p>Upload, manage and approve structural drawings</p>
+        </div>
 
-      {/* Upload Form */}
-      <form onSubmit={handleUpload} style={{ marginBottom: "20px" }}>
         <input
-          placeholder="Drawing Name"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          className="search-box"
+          placeholder="🔍 Search drawings..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
-        <input
-          placeholder="Version (v1.0)"
-          value={form.version}
-          onChange={(e) => setForm({ ...form, version: e.target.value })}
-        />
-        <input
-          type="file"
-          onChange={(e) => setForm({ ...form, file: e.target.files[0] })}
-        />
-        <button type="submit">Upload</button>
-      </form>
+      </div>
 
-      {/* Drawings Table */}
-      <table border="1" cellPadding="10">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Version</th>
-            <th>Uploaded By</th>
-            <th>File</th>
-          </tr>
-        </thead>
-        <tbody>
-          {drawings.length === 0 ? (
-            <tr>
-              <td colSpan="4">No drawings available</td>
-            </tr>
-          ) : (
-            drawings.map((d) => (
-              <tr key={d.id}>
-                <td>{d.name}</td>
-                <td>{d.version}</td>
-                <td>{d.uploaded_by}</td>
-                <td>
-                  <a
-                    href={`http://localhost:5000/uploads/${d.file_url}`}
-                    target="_blank"
-                  >
-                    View
-                  </a>
-                </td>
+      {/* UPLOAD CARD */}
+      <div className="drawings-upload-card">
+        <form onSubmit={handleUpload}>
+          <input
+            placeholder="Drawing Name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+
+          <input
+            placeholder="Version (v1.0)"
+            value={form.version}
+            onChange={(e) => setForm({ ...form, version: e.target.value })}
+          />
+
+          <input
+            type="file"
+            onChange={(e) => setForm({ ...form, file: e.target.files[0] })}
+          />
+
+          <button type="submit">Upload</button>
+        </form>
+      </div>
+
+      {/* TABLE */}
+      <div className="drawings-table-card">
+        {loading ? (
+          <div className="loader"></div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Version</th>
+                <th>Status</th>
+                <th>Preview</th>
+                <th>Actions</th>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            </thead>
+
+            <tbody>
+              {filtered.map((d) => (
+                <tr key={d.id}>
+                  <td>{d.name}</td>
+                  <td>{d.version}</td>
+
+                  <td>
+                    <span className={`status ${d.status?.toLowerCase()}`}>
+                      {d.status || "Draft"}
+                    </span>
+                  </td>
+
+                  {/* FIXED PREVIEW */}
+                  <td>
+                    <button
+                      className="btn view"
+                      onClick={() => {
+                        if (!d.file_url) {
+                          alert("No file available");
+                          return;
+                        }
+                        setSelectedFile(
+                          `http://localhost:5000/uploads/${d.file_url}`
+                        );
+                      }}
+                    >
+                      View
+                    </button>
+                  </td>
+
+                  <td className="actions">
+                    <button
+                      className="btn approve"
+                      onClick={() => updateStatus(d.id, "Approved")}
+                    >
+                      ✔
+                    </button>
+
+                    <button
+                      className="btn reject"
+                      onClick={() => updateStatus(d.id, "Rejected")}
+                    >
+                      ✖
+                    </button>
+
+                    <button
+                      className="btn delete"
+                      onClick={() => handleDelete(d.id)}
+                    >
+                      🗑
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* MODAL */}
+      {selectedFile && (
+        <div className="modal">
+          <div className="modal-content">
+            <button onClick={() => setSelectedFile(null)}>✖</button>
+            <iframe src={selectedFile} title="Preview"></iframe>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

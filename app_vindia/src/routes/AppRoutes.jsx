@@ -47,9 +47,7 @@ import SiteEngineerLayout from "../layouts/SiteEngineerLayout"; // ADD THIS
 import DailyDiary from "../pages/Site Engineer/DailyDiary";
 import RFI from "../pages/Site Engineer/RFI";
 import NCR from "../pages/Site Engineer/NCR";
-
-
-
+import StructuralRoutes from "./StructuralRoutes";
 const AppRoutes = () => {
   const useIsMobile = () => {
     const [mobile, setMobile] = useState(window.innerWidth <= 768);
@@ -317,59 +315,59 @@ const AppRoutes = () => {
       />
 
       <Route
-      path="/project-coordinator/dashboard"
-      element={
-        <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
-          <ProjectCoordinatorLayout>
-            <ProjectCoordinatorDashboard />
-          </ProjectCoordinatorLayout>
-        </ProtectedRoute>
-      }
-    />
+        path="/project-coordinator/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
+            <ProjectCoordinatorLayout>
+              <ProjectCoordinatorDashboard />
+            </ProjectCoordinatorLayout>
+          </ProtectedRoute>
+        }
+      />
 
       <Route
-  path="/site-engineer/dashboard"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
-      <SiteEngineerLayout>
-        <SiteEngineerDashboard />
-      </SiteEngineerLayout>
-    </ProtectedRoute>
-  }
-/>
+        path="/site-engineer/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout>
+              <SiteEngineerDashboard />
+            </SiteEngineerLayout>
+          </ProtectedRoute>
+        }
+      />
 
-<Route
-  path="/site-engineer/daily-diary"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
-      <SiteEngineerLayout>
-        <DailyDiary />
-      </SiteEngineerLayout>
-    </ProtectedRoute>
-  }
-/>
+      <Route
+        path="/site-engineer/daily-diary"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout>
+              <DailyDiary />
+            </SiteEngineerLayout>
+          </ProtectedRoute>
+        }
+      />
 
-<Route
-  path="/site-engineer/rfi"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
-      <SiteEngineerLayout>
-        <RFI />
-      </SiteEngineerLayout>
-    </ProtectedRoute>
-  }
-/>
+      <Route
+        path="/site-engineer/rfi"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout>
+              <RFI />
+            </SiteEngineerLayout>
+          </ProtectedRoute>
+        }
+      />
 
-<Route
-  path="/site-engineer/ncr"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
-      <SiteEngineerLayout>
-        <NCR />
-      </SiteEngineerLayout>
-    </ProtectedRoute>
-  }
-/>
+      <Route
+        path="/site-engineer/ncr"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout>
+              <NCR />
+            </SiteEngineerLayout>
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/mep/dashboard"
@@ -392,14 +390,10 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/structural-engineer/dashboard"
-        element={
-          <StructuralEngineerLayout>
-            <StructuralEngineerDashboard />
-          </StructuralEngineerLayout>
-        }
-      />
+
+      <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
+
+
       <Route
         path="/planning-engineer/dashboard"
         element={
@@ -433,12 +427,14 @@ const AppRoutes = () => {
         }
       />
 
-<Route path="/architect/dashboard" element={
-  <ArchitectLayout>
-    <ArchitectDashboard />
-  </ArchitectLayout>
-  
-} />
+      <Route
+        path="/architect/dashboard"
+        element={
+          <ArchitectLayout>
+            <ArchitectDashboard />
+          </ArchitectLayout>
+        }
+      />
       <Route
         path="/timesheet"
         element={

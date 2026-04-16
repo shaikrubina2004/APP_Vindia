@@ -1,164 +1,140 @@
-/* Base Layout */
-.se-main {
+/* Container */
+.se-container {
   padding: 20px;
-  background: #f1f5f9;
+  background: linear-gradient(to right, #BDD8E9, #f5f7fb);
   min-height: 100vh;
   font-family: Arial, sans-serif;
-  box-sizing: border-box;
 }
 
-/* Header */
-.se-header {
+/* Title */
+.se-title {
+  font-size: 26px;
+  font-weight: 600;
   margin-bottom: 20px;
 }
 
-.se-header h1 {
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.se-subtitle {
-  color: #64748b;
-  font-size: 14px;
-  margin-top: 4px;
-}
-
-/* Grid Layout */
-.se-grid {
+/* Cards Layout */
+.se-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 20px;
 }
 
-/* Cards */
+/* Card Design (FINAL VERSION ONLY) */
 .se-card {
-  background: white;
   padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: transform 0.2s ease;
+  border-radius: 14px;
+  color: white;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  transition: 0.3s;
+  cursor: pointer;
 }
 
 .se-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-6px) scale(1.02);
 }
+
+/* Card Theme Colors */
+.card-1 { background: #0A4174; }
+.card-2 { background: #49769F; }
+.card-3 { background: #4E8EA2; }
+.card-4 { background: #6EA2B3; }
+
 
 .se-card h3 {
   font-size: 14px;
-  color: #64748b;
-  margin-bottom: 8px;
+  opacity: 0.9;
 }
 
 .se-card p {
-  font-size: 22px;
+  font-size: 28px;
   font-weight: bold;
+  margin-top: 10px;
 }
 
-/* Section */
-.se-section {
+/* Activity Box */
+.se-activity-box {
   margin-top: 30px;
   background: white;
   padding: 20px;
   border-radius: 12px;
 }
 
-/* Activity */
-.se-activity p {
+.se-activity-box ul {
+  margin-top: 10px;
+  padding-left: 20px;
+}
+
+.se-activity-box li {
   margin: 8px 0;
-  font-size: 14px;
 }
 
-/* Table */
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
-
-th {
-  text-align: left;
-  font-size: 13px;
-  color: #64748b;
-}
-
-th, td {
-  padding: 10px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-/* Incident */
-.se-incident {
+/* 🔥 LOADER */
+.se-loading {
   display: flex;
-  justify-content: space-between;
-  padding: 12px;
-  margin-top: 10px;
-  background: #f8fafc;
-  border-radius: 6px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 80vh;
 }
 
-.pending {
-  color: #dc2626;
-  font-weight: 500;
+.loader {
+  width: 40px;
+  height: 40px;
+  border: 5px solid #e5e7eb;
+  border-top: 5px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
 }
-
-.approved {
-  color: #16a34a;
-  font-weight: 500;
+/* Charts */
+.se-charts {
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: 2fr 1fr; /* better proportion */
+  gap: 20px;
 }
-
-/* ========================= */
-/* 📱 MOBILE (up to 480px) */
-/* ========================= */
-@media (max-width: 480px) {
-  .se-main {
-    padding: 12px;
-  }
-
-  .se-header h1 {
-    font-size: 18px;
-  }
-
-  .se-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .se-card {
-    padding: 16px;
-  }
-
-  .se-card p {
-    font-size: 18px;
+.chart-box {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  height: 300px; /* ✅ FIX HEIGHT */
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
-/* ========================= */
-/* 📱 TABLET (481px - 768px) */
-/* ========================= */
-@media (min-width: 481px) and (max-width: 768px) {
-  .se-grid {
+/* Responsive */
+@media (max-width: 1024px) {
+  .se-cards {
     grid-template-columns: repeat(2, 1fr);
   }
+}
 
-  .se-card p {
+@media (max-width: 480px) {
+  .se-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ================= MOBILE FIX ================= */
+
+@media (max-width: 768px) {
+  .se-cards {
+    grid-template-columns: 1fr; /* stack cards */
+  }
+
+  .se-charts {
+    grid-template-columns: 1fr; /* stack charts */
+  }
+
+  .chart-box {
+    height: 250px;
+  }
+
+  .se-title {
     font-size: 20px;
-  }
-}
-
-/* ========================= */
-/* 💻 SMALL LAPTOP (769px - 1024px) */
-/* ========================= */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .se-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-/* ========================= */
-/* 🖥️ DESKTOP (1025px+) */
-/* ========================= */
-@media (min-width: 1025px) {
-  .se-grid {
-    grid-template-columns: repeat(4, 1fr);
   }
 }
