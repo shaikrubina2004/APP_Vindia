@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "./DailyUpdates.css";
+import "../../../styles/DailyUpdates.css";
 
 // ─── Constants ───────────────────────────────────────────────
 const STATUS_COLORS = {
