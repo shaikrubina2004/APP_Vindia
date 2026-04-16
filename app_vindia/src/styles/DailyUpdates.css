@@ -715,4 +715,4 @@ body { overflow-x: hidden; margin: 0; background: var(--bg); }
   .du-progress-row { flex-wrap: wrap; }
   .du-prog-label   { width: 100%; }
   .du-two-col      { grid-template-columns: 1fr; }
-}
+}    
