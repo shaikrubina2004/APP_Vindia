@@ -9,6 +9,8 @@ const Drawings = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const userRole = "architect";
+  // later this will come from login
   const [form, setForm] = useState({
     name: "",
     version: "",
@@ -19,7 +21,7 @@ const Drawings = () => {
   const fetchDrawings = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:5000/api/structural/drawings"
+        "http://localhost:5000/api/structural/drawings",
       );
       setDrawings(res.data);
       setFiltered(res.data);
@@ -37,7 +39,7 @@ const Drawings = () => {
   // SEARCH
   useEffect(() => {
     const result = drawings.filter((d) =>
-      d.name.toLowerCase().includes(search.toLowerCase())
+      d.name.toLowerCase().includes(search.toLowerCase()),
     );
     setFiltered(result);
   }, [search, drawings]);
@@ -60,7 +62,7 @@ const Drawings = () => {
     try {
       await axios.post(
         "http://localhost:5000/api/structural/upload-drawing",
-        formData
+        formData,
       );
       setForm({ name: "", version: "", file: null });
       fetchDrawings();
@@ -69,21 +71,24 @@ const Drawings = () => {
     }
   };
 
-  // DELETE
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this drawing?")) return;
-    await axios.delete(
-      `http://localhost:5000/api/structural/drawings/${id}`
-    );
-    fetchDrawings();
-  };
+  // // DELETE
+  // const handleDelete = async (id) => {
+  //   if (!window.confirm("Delete this drawing?")) return;
+  //   await axios.delete(`http://localhost:5000/api/structural/drawings/${id}`);
+  //   fetchDrawings();
+  // };
 
-  const updateStatus = async (id, status) => {
-    await axios.put(
-      `http://localhost:5000/api/structural/drawings/${id}/status`,
-      { status }
-    );
-    fetchDrawings();
+  const updateStatus = async (id, role, status) => {
+    try {
+      await axios.put(
+        `http://localhost:5000/api/structural/drawings/${id}/status`,
+        { role, status },
+      );
+
+      fetchDrawings(); // refresh table
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -150,9 +155,34 @@ const Drawings = () => {
                   <td>{d.version}</td>
 
                   <td>
-                    <span className={`status ${d.status?.toLowerCase()}`}>
-                      {d.status || "Draft"}
-                    </span>
+                    <div className="status-stack">
+                      <div className="status-row">
+                        <span>Architect</span>
+                        <span
+                          className={`badge ${d.architect_status?.toLowerCase()}`}
+                        >
+                          {d.architect_status}
+                        </span>
+                      </div>
+
+                      <div className="status-row">
+                        <span>MEP</span>
+                        <span
+                          className={`badge ${d.mep_status?.toLowerCase()}`}
+                        >
+                          {d.mep_status}
+                        </span>
+                      </div>
+
+                      <div className="status-row">
+                        <span>PM</span>
+                        <span
+                          className={`badge ${d.manager_status?.toLowerCase()}`}
+                        >
+                          {d.manager_status}
+                        </span>
+                      </div>
+                    </div>
                   </td>
 
                   {/* FIXED PREVIEW */}
@@ -165,7 +195,7 @@ const Drawings = () => {
                           return;
                         }
                         setSelectedFile(
-                          `http://localhost:5000/uploads/${d.file_url}`
+                          `http://localhost:5000/uploads/${d.file_url}`,
                         );
                       }}
                     >
@@ -174,26 +204,66 @@ const Drawings = () => {
                   </td>
 
                   <td className="actions">
-                    <button
-                      className="btn approve"
-                      onClick={() => updateStatus(d.id, "Approved")}
-                    >
-                      ✔
-                    </button>
+                    {/* Architect */}
+                    {userRole === "architect" && (
+                      <>
+                        <button
+                          className="btn approve"
+                          onClick={() =>
+                            updateStatus(d.id, "architect", "Approved")
+                          }
+                        >
+                          Approve
+                        </button>
 
-                    <button
-                      className="btn reject"
-                      onClick={() => updateStatus(d.id, "Rejected")}
-                    >
-                      ✖
-                    </button>
+                        <button
+                          className="btn reject"
+                          onClick={() =>
+                            updateStatus(d.id, "architect", "Rejected")
+                          }
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
 
-                    <button
-                      className="btn delete"
-                      onClick={() => handleDelete(d.id)}
-                    >
-                      🗑
-                    </button>
+                    {/* MEP */}
+                    {userRole === "mep" && (
+                      <>
+                        <button
+                          className="btn approve"
+                          onClick={() => updateStatus(d.id, "mep", "Approved")}
+                        >
+                          Approve
+                        </button>
+
+                        <button
+                          className="btn reject"
+                          onClick={() => updateStatus(d.id, "mep", "Rejected")}
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+
+                    {/* PM */}
+                    {userRole === "manager" && (
+                      <>
+                        <button
+                          className="btn approve"
+                          onClick={() =>
+                            updateStatus(d.id, "manager", "Approved")
+                          }
+                        >
+                          Final Approve
+                        </button>
+                      </>
+                    )}
+
+                    {/* Delete (only structural) */}
+                    {userRole === "structural" && (
+                      <button className="btn delete">Delete</button>
+                    )}
                   </td>
                 </tr>
               ))}
