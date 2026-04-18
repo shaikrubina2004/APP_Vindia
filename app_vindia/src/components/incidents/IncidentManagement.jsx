@@ -1,37 +1,56 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import ConvertToTasksModal from "./ConvertToTasksModal";
+import "../../styles/IncidentManagement.css";
+import { API } from "../../services/authService";
+
 import {
   PRIORITY_CONFIG,
   STATUS_FLOW,
   STATUS_CONFIG,
   TASK_STATUS_CONFIG,
-  ASSIGNEE_ROLES,
 } from "./incidentConfig";
 import { timeAgo, isOverdue, getDeadlineText } from "./incidentHelpers";
 
 export default function IncidentManagement({
   incidents,
   setIncidents,
+  users = [],
+  refreshIncident,
   onNavigateToQueue,
 }) {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedIncidentData, setSelectedIncidentData] = useState(null);
   const [convertingId, setConvertingId] = useState(null);
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterPriority, setFilterPriority] = useState("All");
   const [searchText, setSearchText] = useState("");
   const [commentText, setCommentText] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef(null);
+
   const [form, setForm] = useState({
     title: "",
     description: "",
     priority: "P2",
-    assignedTo: "Site Engineer",
-    assignedName: "",
+    assignedId: "",
+    roleName: "",
   });
 
-  const selectedIncident = incidents.find((i) => i.id === selectedId);
+  // Unique roles derived from the users prop
+  const roles = useMemo(
+    () => [...new Set(users.map((u) => u.roleName).filter(Boolean))].sort(),
+    [users],
+  );
+  const usersForRole = (roleName) =>
+    users.filter((u) => u.roleName === roleName);
+
+  // ✅ FIX: use selectedIncidentData (fresh) when available, otherwise fall back
+  //         to list item — but always read tasks from the fresh copy
+  const selectedIncident =
+    selectedIncidentData ?? incidents.find((i) => i.id === selectedId) ?? null;
+
   const convertingIncident = incidents.find((i) => i.id === convertingId);
 
   const filtered = incidents.filter((inc) => {
@@ -39,8 +58,8 @@ export default function IncidentManagement({
     const matchPriority =
       filterPriority === "All" || inc.priority === filterPriority;
     const matchSearch =
-      inc.title.toLowerCase().includes(searchText.toLowerCase()) ||
-      inc.id.toLowerCase().includes(searchText.toLowerCase());
+      (inc.title ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
+      (inc.incidentNo ?? "").toLowerCase().includes(searchText.toLowerCase());
     return matchStatus && matchPriority && matchSearch;
   });
 
@@ -54,88 +73,137 @@ export default function IncidentManagement({
     p1: incidents.filter((i) => i.priority === "P1").length,
   };
 
-  const handleCreate = () => {
-    if (!form.title.trim()) return;
-    const newInc = {
-      id: `INC-${String(incidents.length + 1).padStart(3, "0")}`,
-      title: form.title,
-      description: form.description,
-      priority: form.priority,
-      status: "Created",
-      assignedTo: form.assignedTo,
-      assignedName: form.assignedName || form.assignedTo,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      photo: photoPreview,
-      comments: [],
-      tasks: [],
-    };
-    setIncidents((prev) => [newInc, ...prev]);
-    setForm({
-      title: "",
-      description: "",
-      priority: "P2",
-      assignedTo: "Site Engineer",
-      assignedName: "",
-    });
-    setPhotoPreview(null);
-    setShowCreate(false);
+  /* ── Create incident ────────────────────────────────────── */
+  const handleCreate = async () => {
+    if (!form.title.trim() || !form.assignedId) return;
+    setSaving(true);
+    try {
+      const res = await API.post("/incidents", {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        priority: form.priority,
+        assigned_to_user_id: form.assignedId,
+      });
+      // Refresh to get full server-side shape (with incidentNo, deadlineAt, etc.)
+      await refreshIncident(res.data.data.id);
+      setForm({
+        title: "",
+        description: "",
+        priority: "P2",
+        assignedId: "",
+        roleName: "",
+      });
+      setPhotoPreview(null);
+      setShowCreate(false);
+    } catch (err) {
+      console.error("createIncident:", err);
+      alert(
+        "Failed to create incident: " +
+          (err.response?.data?.message ?? err.message),
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const advanceStatus = (id) => {
-    setIncidents((prev) =>
-      prev.map((inc) => {
-        if (inc.id !== id) return inc;
-        const idx = STATUS_FLOW.indexOf(inc.status);
-        if (idx >= STATUS_FLOW.length - 1) return inc;
-        return { ...inc, status: STATUS_FLOW[idx + 1], updatedAt: new Date() };
-      }),
-    );
+  /* ── Advance status ─────────────────────────────────────── */
+  const advanceStatus = async (inc) => {
+    const idx = STATUS_FLOW.indexOf(inc.status);
+    if (idx >= STATUS_FLOW.length - 1) return;
+    const newStatus = STATUS_FLOW[idx + 1];
+
+    // Optimistic
+    const patch = (list) =>
+      list.map((i) =>
+        i.id === inc.id
+          ? { ...i, status: newStatus, updatedAt: new Date() }
+          : i,
+      );
+    setIncidents((prev) => patch(prev));
+    if (selectedIncidentData?.id === inc.id)
+      setSelectedIncidentData((prev) => ({
+        ...prev,
+        status: newStatus,
+        updatedAt: new Date(),
+      }));
+
+    try {
+      await API.patch(`/incidents/${inc.id}/status`, { status: newStatus });
+    } catch (err) {
+      console.error("advanceStatus:", err);
+      // Rollback
+      setIncidents((prev) =>
+        prev.map((i) => (i.id === inc.id ? { ...i, status: inc.status } : i)),
+      );
+      if (selectedIncidentData?.id === inc.id)
+        setSelectedIncidentData((prev) => ({ ...prev, status: inc.status }));
+    }
   };
 
-  const addComment = (id) => {
+  /* ── Add incident comment ───────────────────────────────── */
+  const addComment = async (incidentId) => {
     if (!commentText.trim()) return;
-    setIncidents((prev) =>
-      prev.map((inc) => {
-        if (inc.id !== id) return inc;
-        return {
-          ...inc,
-          comments: [
-            ...inc.comments,
-            { author: "You", text: commentText, time: new Date() },
-          ],
-          updatedAt: new Date(),
-        };
-      }),
-    );
+    const text = commentText.trim();
     setCommentText("");
+
+    const tempComment = { author: "You", text, time: new Date() };
+
+    // Optimistic — update both list and detail panel
+    const addToComments = (inc) =>
+      inc.id !== incidentId
+        ? inc
+        : {
+            ...inc,
+            comments: [...(inc.comments ?? []), tempComment],
+          };
+    setIncidents((prev) => prev.map(addToComments));
+    setSelectedIncidentData((prev) => (prev ? addToComments(prev) : prev));
+
+    try {
+      // ✅ FIX: was referencing undefined `json` variable
+      await API.post(`/incidents/${incidentId}/comments`, { body: text });
+      // Refresh to get server-generated author name
+      const fresh = await refreshIncident(incidentId);
+      if (fresh) setSelectedIncidentData(fresh);
+    } catch (err) {
+      console.error("addComment:", err);
+      // Rollback optimistic comment
+      const remove = (inc) =>
+        inc.id !== incidentId
+          ? inc
+          : {
+              ...inc,
+              comments: (inc.comments ?? []).filter((c) => c !== tempComment),
+            };
+      setIncidents((prev) => prev.map(remove));
+      setSelectedIncidentData((prev) => (prev ? remove(prev) : prev));
+    }
   };
 
-  const handleConvertToTasks = (incidentId, newTasks) => {
-    const taskObjects = newTasks.map((t, i) => ({
-      id: `TASK-${Date.now()}-${i}`,
-      incidentId,
-      title: t.title,
-      assignedTo: t.assignedTo,
-      assignedName: t.assignedName || t.assignedTo,
-      priority: t.priority,
-      note: t.note,
-      status: "Pending",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }));
-    setIncidents((prev) =>
-      prev.map((inc) => {
-        if (inc.id !== incidentId) return inc;
-        return {
-          ...inc,
-          tasks: [...(inc.tasks || []), ...taskObjects],
-          updatedAt: new Date(),
-        };
-      }),
-    );
+  /* ── Convert to tasks ───────────────────────────────────── */
+  const handleConvertToTasks = async (incidentId, newTasks) => {
+    try {
+      await API.post(`/incidents/${incidentId}/tasks`, {
+        tasks: newTasks.map((t) => ({
+          title: t.title,
+          note: t.note,
+          priority: t.priority,
+          assigned_to_user_id: t.assignedId,
+        })),
+      });
+      // ✅ FIX: refresh returns the updated incident; update detail panel too
+      const fresh = await refreshIncident(incidentId);
+      if (fresh && selectedId === incidentId) setSelectedIncidentData(fresh);
+    } catch (err) {
+      console.error("convertToTasks:", err);
+      alert(
+        "Failed to create tasks: " +
+          (err.response?.data?.message ?? err.message),
+      );
+    }
   };
 
+  /* ── Photo ──────────────────────────────────────────────── */
   const handlePhoto = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -145,13 +213,22 @@ export default function IncidentManagement({
   };
 
   const allTaskCount = incidents.reduce(
-    (s, i) => s + (i.tasks?.length || 0),
+    (s, i) => s + (i.taskCount ?? i.tasks?.length ?? 0),
     0,
   );
   const pendingTaskCount = incidents.reduce(
-    (s, i) => s + (i.tasks?.filter((t) => t.status === "Pending").length || 0),
+    (s, i) => s + (i.tasks?.filter((t) => t.status === "Pending").length ?? 0),
     0,
   );
+
+  /* ── Card click handler ─────────────────────────────────── */
+  const handleCardClick = async (inc) => {
+    setSelectedId(inc.id);
+    setSelectedIncidentData(null); // show list version instantly while fetching
+    // ✅ FIX: refreshIncident now returns the updated object
+    const fresh = await refreshIncident(inc.id);
+    if (fresh) setSelectedIncidentData(fresh);
+  };
 
   return (
     <div className="inc-page">
@@ -361,6 +438,7 @@ export default function IncidentManagement({
 
       {/* Main */}
       <div className="inc-main">
+        {/* List */}
         <div className="inc-list">
           {filtered.length === 0 && (
             <div className="inc-empty">
@@ -383,19 +461,20 @@ export default function IncidentManagement({
             const pcfg = PRIORITY_CONFIG[inc.priority];
             const scfg = STATUS_CONFIG[inc.status];
             const active = selectedId === inc.id;
-            const taskCount = inc.tasks?.length || 0;
+            // ✅ FIX: use taskCount (from overview) OR tasks array length
+            const taskCount = inc.taskCount ?? inc.tasks?.length ?? 0;
             return (
               <div
                 key={inc.id}
                 className={`inc-card ${pcfg.color} ${active ? "inc-card-active" : ""} ${overdue ? "inc-card-overdue" : ""}`}
-                onClick={() => setSelectedId(inc.id)}
+                onClick={() => handleCardClick(inc)}
               >
                 <div className="inc-card-top">
                   <div className="inc-card-left">
                     <span className={`inc-priority-badge ${pcfg.color}`}>
                       {pcfg.icon} {inc.priority}
                     </span>
-                    <span className="inc-id">{inc.id}</span>
+                    <span className="inc-id">{inc.incidentNo}</span>
                     {taskCount > 0 && (
                       <span className="inc-task-count-badge">
                         {taskCount} task{taskCount > 1 ? "s" : ""}
@@ -408,7 +487,8 @@ export default function IncidentManagement({
                 </div>
                 <h3 className="inc-card-title">{inc.title}</h3>
                 <p className="inc-card-desc">
-                  {inc.description.substring(0, 80)}...
+                  {(inc.description ?? "").substring(0, 80)}
+                  {(inc.description?.length ?? 0) > 80 ? "..." : ""}
                 </p>
                 <div className="inc-card-meta">
                   <span className="inc-assignee">
@@ -423,7 +503,8 @@ export default function IncidentManagement({
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                       <circle cx="12" cy="7" r="4" />
                     </svg>
-                    {inc.assignedName}
+                    {/* ✅ FIX: was inc.assignee_name (raw) — should be inc.assignedName (normalised) */}
+                    {inc.assignedName || "—"}
                   </span>
                   <span className={`inc-deadline ${overdue ? "overdue" : ""}`}>
                     {["Resolved", "Closed"].includes(inc.status)
@@ -448,7 +529,9 @@ export default function IncidentManagement({
             <div className="inc-detail-header">
               <div>
                 <div className="inc-detail-id-row">
-                  <span className="inc-detail-id">{selectedIncident.id}</span>
+                  <span className="inc-detail-id">
+                    {selectedIncident.incidentNo}
+                  </span>
                   <span
                     className={`inc-priority-badge ${PRIORITY_CONFIG[selectedIncident.priority].color}`}
                   >
@@ -464,13 +547,16 @@ export default function IncidentManagement({
               </div>
               <button
                 className="inc-close-btn"
-                onClick={() => setSelectedId(null)}
+                onClick={() => {
+                  setSelectedId(null);
+                  setSelectedIncidentData(null);
+                }}
               >
                 ×
               </button>
             </div>
 
-            {/* Workflow stepper */}
+            {/* Stepper */}
             <div className="inc-workflow">
               {STATUS_FLOW.map((s, i) => {
                 const currentIdx = STATUS_FLOW.indexOf(selectedIncident.status);
@@ -508,8 +594,15 @@ export default function IncidentManagement({
                     </span>
                   ),
                 },
-                { label: "Assigned Role", val: selectedIncident.assignedTo },
-                { label: "Assigned To", val: selectedIncident.assignedName },
+                // ✅ FIX: was selectedIncident.role_name / assignee_name (raw snake_case)
+                {
+                  label: "Assigned Role",
+                  val: selectedIncident.assignedTo || "—",
+                },
+                {
+                  label: "Assigned To",
+                  val: selectedIncident.assignedName || "—",
+                },
                 {
                   label: "Deadline",
                   val: (
@@ -535,14 +628,13 @@ export default function IncidentManagement({
               ))}
             </div>
 
-            {/* Description */}
             <div className="inc-detail-section">
               <span className="inc-section-title">Description</span>
               <p className="inc-detail-desc">{selectedIncident.description}</p>
             </div>
 
-            {/* Tasks spawned */}
-            {selectedIncident.tasks?.length > 0 && (
+            {/* Tasks */}
+            {(selectedIncident.tasks?.length ?? 0) > 0 && (
               <div className="inc-detail-section">
                 <span className="inc-section-title">
                   Tasks ({selectedIncident.tasks.length})
@@ -558,6 +650,7 @@ export default function IncidentManagement({
                       </span>
                       <div className="detail-task-info">
                         <span className="detail-task-title">{t.title}</span>
+                        {/* ✅ FIX: was t.assignee_name / t.role_name (raw) */}
                         <span className="detail-task-meta">
                           {t.assignedName} · {t.assignedTo}
                         </span>
@@ -587,7 +680,7 @@ export default function IncidentManagement({
                 {!["Closed"].includes(selectedIncident.status) && (
                   <button
                     className="inc-advance-btn"
-                    onClick={() => advanceStatus(selectedIncident.id)}
+                    onClick={() => advanceStatus(selectedIncident)}
                   >
                     Move to:{" "}
                     {
@@ -634,16 +727,16 @@ export default function IncidentManagement({
             {/* Comments */}
             <div className="inc-detail-section">
               <span className="inc-section-title">
-                Comments ({selectedIncident.comments.length})
+                Comments ({selectedIncident.comments?.length ?? 0})
               </span>
               <div className="inc-comments">
-                {selectedIncident.comments.length === 0 && (
+                {!selectedIncident.comments?.length && (
                   <p className="inc-no-comments">No comments yet.</p>
                 )}
-                {selectedIncident.comments.map((c, i) => (
+                {(selectedIncident.comments ?? []).map((c, i) => (
                   <div key={i} className="inc-comment">
                     <div className="inc-comment-avatar">
-                      {c.author.charAt(0)}
+                      {(c.author ?? "?").charAt(0)}
                     </div>
                     <div className="inc-comment-body">
                       <div className="inc-comment-top">
@@ -700,7 +793,6 @@ export default function IncidentManagement({
               <polyline points="14 2 14 8 20 8" />
               <line x1="16" y1="13" x2="8" y2="13" />
               <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
             </svg>
             <p>Select an incident to view details</p>
           </div>
@@ -736,12 +828,12 @@ export default function IncidentManagement({
                 <label>Description</label>
                 <textarea
                   className="inc-form-input inc-form-textarea"
+                  rows={3}
                   placeholder="Describe the incident in detail..."
                   value={form.description}
                   onChange={(e) =>
                     setForm({ ...form, description: e.target.value })
                   }
-                  rows={3}
                 />
               </div>
               <div className="inc-form-row">
@@ -765,15 +857,22 @@ export default function IncidentManagement({
               </div>
               <div className="inc-form-row">
                 <div className="inc-form-group">
-                  <label>Assign Role</label>
+                  <label>
+                    Assign Role <span className="req">*</span>
+                  </label>
                   <select
                     className="inc-form-input"
-                    value={form.assignedTo}
+                    value={form.roleName}
                     onChange={(e) =>
-                      setForm({ ...form, assignedTo: e.target.value })
+                      setForm({
+                        ...form,
+                        roleName: e.target.value,
+                        assignedId: "",
+                      })
                     }
                   >
-                    {ASSIGNEE_ROLES.map((r) => (
+                    <option value="">— Select role —</option>
+                    {roles.map((r) => (
                       <option key={r} value={r}>
                         {r}
                       </option>
@@ -781,15 +880,28 @@ export default function IncidentManagement({
                   </select>
                 </div>
                 <div className="inc-form-group">
-                  <label>Assignee Name</label>
-                  <input
+                  <label>
+                    Assignee <span className="req">*</span>
+                  </label>
+                  <select
                     className="inc-form-input"
-                    placeholder="Name of person..."
-                    value={form.assignedName}
+                    value={form.assignedId}
                     onChange={(e) =>
-                      setForm({ ...form, assignedName: e.target.value })
+                      setForm({ ...form, assignedId: e.target.value })
                     }
-                  />
+                    disabled={!form.roleName}
+                  >
+                    <option value="">
+                      {form.roleName
+                        ? "— Select person —"
+                        : "Select a role first"}
+                    </option>
+                    {usersForRole(form.roleName).map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="inc-form-group">
@@ -832,26 +944,36 @@ export default function IncidentManagement({
               </div>
             </div>
             <div className="inc-modal-footer">
-              <div></div>
+              <div />
               <button
                 className="inc-modal-cancel"
                 onClick={() => setShowCreate(false)}
               >
                 Cancel
               </button>
-              <button className="inc-modal-submit" onClick={handleCreate}>
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Create Incident
+              <button
+                className="inc-modal-submit"
+                onClick={handleCreate}
+                disabled={saving || !form.title.trim() || !form.assignedId}
+              >
+                {saving ? (
+                  "Creating…"
+                ) : (
+                  <>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                    >
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Create Incident
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -862,6 +984,7 @@ export default function IncidentManagement({
       {convertingIncident && (
         <ConvertToTasksModal
           incident={convertingIncident}
+          users={users}
           onClose={() => setConvertingId(null)}
           onConvert={handleConvertToTasks}
         />

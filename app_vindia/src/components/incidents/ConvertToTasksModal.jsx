@@ -1,31 +1,32 @@
-import React, { useState } from "react";
-import { PRIORITY_CONFIG, ASSIGNEE_ROLES } from "./incidentConfig";
+import React, { useState, useMemo } from "react";
+import { PRIORITY_CONFIG } from "./incidentConfig";
 
-export default function ConvertToTasksModal({ incident, onClose, onConvert }) {
-  const [tasks, setTasks] = useState([
-    {
-      id: Date.now(),
-      title: "",
-      assignedTo: "Site Engineer",
-      assignedName: "",
-      priority: incident.priority,
-      note: "",
-    },
-  ]);
+export default function ConvertToTasksModal({
+  incident,
+  users = [], // [{ id, name, roleId, roleName }]
+  onClose,
+  onConvert,
+}) {
+  // Unique roles from the users list
+  const roles = useMemo(
+    () => [...new Set(users.map((u) => u.roleName).filter(Boolean))].sort(),
+    [users],
+  );
 
-  const addTask = () =>
-    setTasks((t) => [
-      ...t,
-      {
-        id: Date.now() + Math.random(),
-        title: "",
-        assignedTo: "Site Engineer",
-        assignedName: "",
-        priority: incident.priority,
-        note: "",
-      },
-    ]);
+  const emptyTask = () => ({
+    id: Date.now() + Math.random(),
+    title: "",
+    roleId: "",
+    roleName: "",
+    assignedId: "",
+    assignedName: "",
+    priority: incident.priority,
+    note: "",
+  });
 
+  const [tasks, setTasks] = useState([emptyTask()]);
+
+  const addTask = () => setTasks((t) => [...t, emptyTask()]);
   const removeTask = (id) => setTasks((t) => t.filter((tk) => tk.id !== id));
 
   const updateTask = (id, field, val) =>
@@ -33,12 +34,44 @@ export default function ConvertToTasksModal({ incident, onClose, onConvert }) {
       t.map((tk) => (tk.id === id ? { ...tk, [field]: val } : tk)),
     );
 
+  // When role changes, reset the assignee and store roleName
+  const handleRoleChange = (id, roleName) => {
+    setTasks((t) =>
+      t.map((tk) =>
+        tk.id === id
+          ? { ...tk, roleName, roleId: "", assignedId: "", assignedName: "" }
+          : tk,
+      ),
+    );
+  };
+
+  // Filter users by the chosen role for this task row
+  const usersForRole = (roleName) =>
+    users.filter((u) => u.roleName === roleName);
+
+  const handleAssigneeChange = (id, userId) => {
+    const user = users.find((u) => String(u.id) === String(userId));
+    setTasks((t) =>
+      t.map((tk) =>
+        tk.id === id
+          ? {
+              ...tk,
+              assignedId: user?.id ?? "",
+              assignedName: user?.name ?? "",
+            }
+          : tk,
+      ),
+    );
+  };
+
   const handleSubmit = () => {
-    const valid = tasks.filter((t) => t.title.trim());
+    const valid = tasks.filter((t) => t.title.trim() && t.assignedId);
     if (!valid.length) return;
     onConvert(incident.id, valid);
     onClose();
   };
+
+  const allValid = tasks.every((t) => t.title.trim() && t.assignedId);
 
   return (
     <div className="inc-modal-overlay" onClick={onClose}>
@@ -50,8 +83,8 @@ export default function ConvertToTasksModal({ incident, onClose, onConvert }) {
           <div>
             <h3>Convert to Tasks</h3>
             <p className="modal-sub">
-              Break <strong>{incident.id}</strong> into actionable tasks and
-              assign them
+              Break <strong>{incident.incidentNo}</strong> into actionable tasks
+              and assign them
             </p>
           </div>
           <button className="inc-modal-close" onClick={onClose}>
@@ -60,6 +93,7 @@ export default function ConvertToTasksModal({ incident, onClose, onConvert }) {
         </div>
 
         <div className="inc-modal-body">
+          {/* Incident ref */}
           <div className="ctm-incident-ref">
             <span
               className={`inc-priority-badge ${PRIORITY_CONFIG[incident.priority].color}`}
@@ -70,93 +104,119 @@ export default function ConvertToTasksModal({ incident, onClose, onConvert }) {
           </div>
 
           <div className="ctm-tasks-list">
-            {tasks.map((task, idx) => (
-              <div key={task.id} className="ctm-task-row">
-                <div className="ctm-task-num">{idx + 1}</div>
-                <div className="ctm-task-fields">
-                  <div className="ctm-row">
-                    <div className="inc-form-group" style={{ flex: 2 }}>
-                      <label>
-                        Task Title <span className="req">*</span>
-                      </label>
+            {tasks.map((task, idx) => {
+              const roleUsers = usersForRole(task.roleName);
+              return (
+                <div key={task.id} className="ctm-task-row">
+                  <div className="ctm-task-num">{idx + 1}</div>
+                  <div className="ctm-task-fields">
+                    {/* Row 1: title + priority */}
+                    <div className="ctm-row">
+                      <div className="inc-form-group" style={{ flex: 2 }}>
+                        <label>
+                          Task Title <span className="req">*</span>
+                        </label>
+                        <input
+                          className="inc-form-input"
+                          placeholder="What needs to be done..."
+                          value={task.title}
+                          onChange={(e) =>
+                            updateTask(task.id, "title", e.target.value)
+                          }
+                        />
+                      </div>
+                      <div className="inc-form-group">
+                        <label>Priority</label>
+                        <select
+                          className="inc-form-input"
+                          value={task.priority}
+                          onChange={(e) =>
+                            updateTask(task.id, "priority", e.target.value)
+                          }
+                        >
+                          {Object.entries(PRIORITY_CONFIG).map(([k, v]) => (
+                            <option key={k} value={k}>
+                              {v.icon} {k}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Row 2: role → name (cascading) */}
+                    <div className="ctm-row">
+                      <div className="inc-form-group">
+                        <label>
+                          Assign Role <span className="req">*</span>
+                        </label>
+                        <select
+                          className="inc-form-input"
+                          value={task.roleName}
+                          onChange={(e) =>
+                            handleRoleChange(task.id, e.target.value)
+                          }
+                        >
+                          <option value="">— Select role —</option>
+                          {roles.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="inc-form-group" style={{ flex: 2 }}>
+                        <label>
+                          Assignee <span className="req">*</span>
+                        </label>
+                        <select
+                          className="inc-form-input"
+                          value={task.assignedId}
+                          onChange={(e) =>
+                            handleAssigneeChange(task.id, e.target.value)
+                          }
+                          disabled={!task.roleName}
+                        >
+                          <option value="">
+                            {task.roleName
+                              ? "— Select person —"
+                              : "Select a role first"}
+                          </option>
+                          {roleUsers.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Row 3: note */}
+                    <div className="inc-form-group">
+                      <label>Note (optional)</label>
                       <input
                         className="inc-form-input"
-                        placeholder="What needs to be done..."
-                        value={task.title}
+                        placeholder="Any specific instructions..."
+                        value={task.note}
                         onChange={(e) =>
-                          updateTask(task.id, "title", e.target.value)
+                          updateTask(task.id, "note", e.target.value)
                         }
                       />
                     </div>
-                    <div className="inc-form-group">
-                      <label>Priority</label>
-                      <select
-                        className="inc-form-input"
-                        value={task.priority}
-                        onChange={(e) =>
-                          updateTask(task.id, "priority", e.target.value)
-                        }
-                      >
-                        {Object.entries(PRIORITY_CONFIG).map(([k, v]) => (
-                          <option key={k} value={k}>
-                            {v.icon} {k}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
                   </div>
-                  <div className="ctm-row">
-                    <div className="inc-form-group">
-                      <label>Assign Role</label>
-                      <select
-                        className="inc-form-input"
-                        value={task.assignedTo}
-                        onChange={(e) =>
-                          updateTask(task.id, "assignedTo", e.target.value)
-                        }
-                      >
-                        {ASSIGNEE_ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="inc-form-group" style={{ flex: 2 }}>
-                      <label>Assignee Name</label>
-                      <input
-                        className="inc-form-input"
-                        placeholder="Person's name..."
-                        value={task.assignedName}
-                        onChange={(e) =>
-                          updateTask(task.id, "assignedName", e.target.value)
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="inc-form-group">
-                    <label>Note (optional)</label>
-                    <input
-                      className="inc-form-input"
-                      placeholder="Any specific instructions..."
-                      value={task.note}
-                      onChange={(e) =>
-                        updateTask(task.id, "note", e.target.value)
-                      }
-                    />
-                  </div>
+
+                  {tasks.length > 1 && (
+                    <button
+                      className="ctm-remove-btn"
+                      onClick={() => removeTask(task.id)}
+                      title="Remove task"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
-                {tasks.length > 1 && (
-                  <button
-                    className="ctm-remove-btn"
-                    onClick={() => removeTask(task.id)}
-                    title="Remove task"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <button className="ctm-add-task-btn" onClick={addTask}>
@@ -186,7 +246,12 @@ export default function ConvertToTasksModal({ incident, onClose, onConvert }) {
           <button className="inc-modal-cancel" onClick={onClose}>
             Cancel
           </button>
-          <button className="inc-modal-submit" onClick={handleSubmit}>
+          <button
+            className="inc-modal-submit"
+            onClick={handleSubmit}
+            disabled={!allValid}
+            title={!allValid ? "Fill in all task titles and assignees" : ""}
+          >
             <svg
               width="14"
               height="14"

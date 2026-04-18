@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import "../../../styles/IncidentManagement.css";
+//import "../../../styles/IncidentManagement.css";
 
 /* ─── SHARED STATE (lifted to parent) ─────────────────────── */
 // This file exports TWO components: IncidentManagement and TaskQueue

@@ -5,40 +5,49 @@ require("dotenv").config();
 const pool = require("./config/db");
 const path = require("path");
 
-/* ROUTES */
+/* ── EXISTING ROUTES ─────────────────────────────────────── */
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 
-/* PROJECT MODULE */
+/* ── PROJECT MODULE ──────────────────────────────────────── */
 const projectRoutes = require("./routes/projectRoutes");
 const wbsRoutes = require("./routes/wbsRoutes");
 const costRoutes = require("./routes/costRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 
-/* NEW MODULES */
+/* ── OTHER MODULES ───────────────────────────────────────── */
 const structuralRoutes = require("./routes/structuralRoutes");
 const timesheetRoutes = require("./routes/timesheetRoutes");
 const dailyRoutes = require("./routes/dailyUpdatesRoutes");
 const analysisRoutes = require("./routes/analysis");
 
+/* ── INCIDENT MODULE ─────────────────────────────────────── */
+const incidentRoutes = require("./routes/IncidentRoutes");
 
 const app = express();
 
-/* ================= MIDDLEWARE ================= */
+/* ═══════════════════════════════════════════════════════════
+   MIDDLEWARE
+═══════════════════════════════════════════════════════════ */
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 
-/* ================= DEBUG ================= */
+/* ═══════════════════════════════════════════════════════════
+   DEBUG
+═══════════════════════════════════════════════════════════ */
 console.log("authRoutes:", typeof authRoutes);
 console.log("userRoutes:", typeof userRoutes);
 console.log("employeeRoutes:", typeof employeeRoutes);
 console.log("attendanceRoutes:", typeof attendanceRoutes);
 console.log("leaveRoutes:", typeof leaveRoutes);
 
-/* ================= TEST DB ================= */
+/* ═══════════════════════════════════════════════════════════
+   TEST DB
+═══════════════════════════════════════════════════════════ */
 app.get("/", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
@@ -49,38 +58,58 @@ app.get("/", async (req, res) => {
   }
 });
 
-/* ================= ROUTES ================= */
+/* ═══════════════════════════════════════════════════════════
+   ROUTES
+═══════════════════════════════════════════════════════════ */
 try {
-  // AUTH + USERS
+  /* ── Auth + Users ──────────────────────────────────────── */
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);
   app.use("/api/employees", employeeRoutes);
 
-  // HR MODULE
+  /* ── HR Module ─────────────────────────────────────────── */
   app.use("/api/attendance", attendanceRoutes);
   app.use("/api/leaves", leaveRoutes);
 
-  // FILE UPLOADS
+  /* ── File Uploads ──────────────────────────────────────── */
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-  // PROJECT MODULE
+  /* ── Project Module ────────────────────────────────────── */
   app.use("/api/projects", projectRoutes);
   app.use("/api/wbs", wbsRoutes);
   app.use("/api/cost-summary", costRoutes);
   app.use("/api/dashboard", dashboardRoutes);
 
-  // NEW MODULES
+  /* ── Other Modules ─────────────────────────────────────── */
   app.use("/api/structural", structuralRoutes);
   app.use("/api/timesheets", timesheetRoutes);
   app.use("/api/daily-reports", dailyRoutes);
   app.use("/api/analysis", analysisRoutes);
+
+  /* ── Incident Module ───────────────────────────────────── */
+  app.use("/api/incidents", incidentRoutes);
 } catch (err) {
   console.error("❌ Route loading error:", err.message);
 }
 
-/* ================= START SERVER ================= */
-const PORT = process.env.PORT || 5000;
+/* ═══════════════════════════════════════════════════════════
+   404 + GLOBAL ERROR HANDLER
+═══════════════════════════════════════════════════════════ */
+app.use((_req, res) =>
+  res.status(404).json({ success: false, message: "Route not found" }),
+);
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+  console.error("Unhandled error:", err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Internal server error",
+  });
 });
+
+/* ═══════════════════════════════════════════════════════════
+   START
+═══════════════════════════════════════════════════════════ */
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

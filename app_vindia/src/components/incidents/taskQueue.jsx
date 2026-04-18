@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API } from "../../services/authService";
 import {
   PRIORITY_CONFIG,
   TASK_STATUS_FLOW,
@@ -6,14 +7,9 @@ import {
 } from "./incidentConfig";
 import { timeAgo } from "./incidentHelpers";
 
-/* ─── BLOCKED REASON MODAL ───────────────────────────────── */
+/* ─── BLOCKED REASON MODAL ─────────────────────────────────── */
 function BlockedReasonModal({ task, onConfirm, onCancel }) {
   const [reason, setReason] = useState("");
-
-  const handleConfirm = () => {
-    if (!reason.trim()) return;
-    onConfirm(task.id, reason.trim());
-  };
 
   return (
     <div className="inc-modal-overlay" onClick={onCancel}>
@@ -23,16 +19,16 @@ function BlockedReasonModal({ task, onConfirm, onCancel }) {
             <h3>Mark as Blocked</h3>
             <p className="modal-sub">
               Provide a reason — this will be sent to{" "}
-              <strong>{task.assignedName}</strong>'s assigner as a comment
+              {/* ✅ FIX: was task.assignedName which may be undefined */}
+              <strong>{task.assignedName || "the assignee"}</strong>'s assigner
+              as a comment
             </p>
           </div>
           <button className="inc-modal-close" onClick={onCancel}>
             ×
           </button>
         </div>
-
         <div className="inc-modal-body">
-          {/* Task ref */}
           <div className="ctm-incident-ref">
             <span
               className={`inc-priority-badge ${PRIORITY_CONFIG[task.priority].color}`}
@@ -41,21 +37,19 @@ function BlockedReasonModal({ task, onConfirm, onCancel }) {
             </span>
             <span className="ctm-inc-title">{task.title}</span>
           </div>
-
           <div className="inc-form-group">
             <label>
               Reason for blocking <span className="req">*</span>
             </label>
             <textarea
               className="inc-form-input inc-form-textarea"
-              placeholder="e.g. Waiting for material delivery, design approval pending, access not granted..."
+              placeholder="e.g. Waiting for material delivery, design approval pending..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={4}
               autoFocus
             />
           </div>
-
           <div className="blocked-reason-hint">
             <svg
               width="13"
@@ -69,11 +63,9 @@ function BlockedReasonModal({ task, onConfirm, onCancel }) {
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            This reason will be saved as a comment on the task so the assigner
-            knows what action is needed.
+            This reason will be saved as a comment on the task.
           </div>
         </div>
-
         <div className="inc-modal-footer">
           <div />
           <button className="inc-modal-cancel" onClick={onCancel}>
@@ -81,7 +73,7 @@ function BlockedReasonModal({ task, onConfirm, onCancel }) {
           </button>
           <button
             className="blocked-confirm-btn"
-            onClick={handleConfirm}
+            onClick={() => reason.trim() && onConfirm(task.id, reason.trim())}
             disabled={!reason.trim()}
           >
             <svg
@@ -104,7 +96,7 @@ function BlockedReasonModal({ task, onConfirm, onCancel }) {
   );
 }
 
-/* ─── TASK QUEUE ─────────────────────────────────────────── */
+/* ─── TASK QUEUE ────────────────────────────────────────────── */
 export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
   const [filterRole, setFilterRole] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -115,8 +107,9 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
   const [commentText, setCommentText] = useState("");
 
   // Flatten all tasks with incident context
+  // ✅ FIX: tasks are already normalised by AppShell — use camelCase fields
   const allTasks = incidents.flatMap((inc) =>
-    (inc.tasks || []).map((t) => ({
+    (inc.tasks ?? []).map((t) => ({
       ...t,
       incidentTitle: inc.title,
       incidentPriority: inc.priority,
@@ -128,9 +121,10 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
     (t) => t.incidentPriority === "P1" && t.status === "Pending",
   );
 
+  // ✅ FIX: use t.assignedTo (normalised) not t.role_name (raw)
   const roles = [
     "All",
-    ...Array.from(new Set(allTasks.map((t) => t.assignedTo))),
+    ...Array.from(new Set(allTasks.map((t) => t.assignedTo).filter(Boolean))),
   ];
 
   const filtered = allTasks.filter((t) => {
@@ -139,14 +133,14 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
     const matchPriority =
       filterPriority === "All" || t.priority === filterPriority;
     const matchSearch =
-      t.title.toLowerCase().includes(searchText.toLowerCase()) ||
-      t.assignedName.toLowerCase().includes(searchText.toLowerCase()) ||
-      t.incidentId.toLowerCase().includes(searchText.toLowerCase());
+      (t.title ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
+      (t.assignedName ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
+      (t.incidentId ?? "").toLowerCase().includes(searchText.toLowerCase());
     return matchRole && matchStatus && matchPriority && matchSearch;
   });
 
-  // Always read fresh from allTasks so comments update reactively
-  const selectedTask = allTasks.find((t) => t.id === selectedTaskId);
+  // ✅ FIX: always read from allTasks so comments update reactively
+  const selectedTask = allTasks.find((t) => t.id === selectedTaskId) ?? null;
 
   /* ── Status click — intercept Blocked ── */
   const handleStatusClick = (task, newStatus) => {
@@ -157,16 +151,19 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
     updateTaskStatus(task.id, newStatus);
   };
 
-  /* ── Core update — optionally attaches a blocked comment ── */
-  const updateTaskStatus = (taskId, newStatus, blockedReason = null) => {
+  /* ── Core status update ── */
+  const updateTaskStatus = async (taskId, newStatus, blockedReason = null) => {
+    const prevIncidents = incidents;
+
+    // Optimistic
     setIncidents((prev) =>
       prev.map((inc) => ({
         ...inc,
-        tasks: (inc.tasks || []).map((t) => {
+        tasks: (inc.tasks ?? []).map((t) => {
           if (t.id !== taskId) return t;
           const updatedComments = blockedReason
             ? [
-                ...(t.comments || []),
+                ...(t.comments ?? []),
                 {
                   author: t.assignedName,
                   text: `🚫 Blocked: ${blockedReason}`,
@@ -174,7 +171,7 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                   type: "blocked",
                 },
               ]
-            : t.comments || [];
+            : (t.comments ?? []);
           return {
             ...t,
             status: newStatus,
@@ -184,34 +181,79 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
         }),
       })),
     );
+
+    try {
+      // ✅ FIX: was using raw fetch — now uses API (same axios instance with auth headers)
+      await API.patch(`/incidents/tasks/${taskId}/status`, {
+        status: newStatus,
+        ...(blockedReason ? { blocked_reason: blockedReason } : {}),
+      });
+    } catch (err) {
+      console.error("updateTaskStatus:", err);
+      setIncidents(prevIncidents); // rollback
+      alert(
+        "Failed to update task status: " +
+          (err.response?.data?.message ?? err.message),
+      );
+    }
   };
 
-  /* ── Confirmed blocked with reason ── */
+  /* ── Confirmed blocked ── */
   const handleBlockedConfirm = (taskId, reason) => {
     updateTaskStatus(taskId, "Blocked", reason);
     setBlockingTask(null);
   };
 
-  /* ── Add free-form comment ── */
-  const addComment = (taskId) => {
+  /* ── Add comment ── */
+  const addComment = async (taskId) => {
     if (!commentText.trim()) return;
+    const text = commentText.trim();
+    setCommentText("");
+
+    const tempComment = {
+      author: "You",
+      text,
+      time: new Date(),
+      type: "comment",
+    };
+
     setIncidents((prev) =>
       prev.map((inc) => ({
         ...inc,
-        tasks: (inc.tasks || []).map((t) => {
+        tasks: (inc.tasks ?? []).map((t) => {
           if (t.id !== taskId) return t;
           return {
             ...t,
-            comments: [
-              ...(t.comments || []),
-              { author: "You", text: commentText, time: new Date() },
-            ],
+            comments: [...(t.comments ?? []), tempComment],
             updatedAt: new Date(),
           };
         }),
       })),
     );
-    setCommentText("");
+
+    try {
+      // ✅ FIX: was using raw fetch — now uses API
+      await API.post(`/incidents/tasks/${taskId}/comments`, { body: text });
+    } catch (err) {
+      console.error("addComment:", err);
+      // Rollback
+      setIncidents((prev) =>
+        prev.map((inc) => ({
+          ...inc,
+          tasks: (inc.tasks ?? []).map((t) => {
+            if (t.id !== taskId) return t;
+            return {
+              ...t,
+              comments: (t.comments ?? []).filter((c) => c !== tempComment),
+            };
+          }),
+        })),
+      );
+      alert(
+        "Failed to add comment: " +
+          (err.response?.data?.message ?? err.message),
+      );
+    }
   };
 
   const stats = {
@@ -222,8 +264,9 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
     p1Urgent: p1AutoTasks.length,
   };
 
+  // ✅ FIX: group by assignedName (normalised) not raw assignee_name
   const byAssignee = filtered.reduce((acc, t) => {
-    const key = t.assignedName || t.assignedTo;
+    const key = t.assignedName || t.assignedTo || "Unassigned";
     if (!acc[key]) acc[key] = [];
     acc[key].push(t);
     return acc;
@@ -430,7 +473,7 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                   task.incidentPriority === "P1" && task.status === "Pending";
                 const isActive = selectedTaskId === task.id;
                 const isBlocked = task.status === "Blocked";
-                const lastBlockComment = [...(task.comments || [])]
+                const lastBlock = [...(task.comments ?? [])]
                   .reverse()
                   .find((c) => c.type === "blocked");
 
@@ -458,16 +501,15 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                     </div>
                     <h3 className="inc-card-title">{task.title}</h3>
                     <p className="inc-card-desc tq-incident-ref">
-                      From: {task.incidentTitle.substring(0, 70)}
-                      {task.incidentTitle.length > 70 ? "…" : ""}
+                      From: {(task.incidentTitle ?? "").substring(0, 70)}
+                      {(task.incidentTitle?.length ?? 0) > 70 ? "…" : ""}
                     </p>
                     {task.note && (
                       <p className="tq-task-note">📝 {task.note}</p>
                     )}
-                    {/* Blocked reason preview on card */}
-                    {isBlocked && lastBlockComment && (
+                    {isBlocked && lastBlock && (
                       <div className="tq-blocked-reason-chip">
-                        🚫 {lastBlockComment.text.replace("🚫 Blocked: ", "")}
+                        🚫 {lastBlock.text.replace("🚫 Blocked: ", "")}
                       </div>
                     )}
                     <div className="inc-card-meta">
@@ -565,8 +607,8 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                     </span>
                   ),
                 },
-                { label: "Assigned Role", val: selectedTask.assignedTo },
-                { label: "Assignee", val: selectedTask.assignedName },
+                { label: "Assigned Role", val: selectedTask.assignedTo || "—" },
+                { label: "Assignee", val: selectedTask.assignedName || "—" },
                 {
                   label: "Task Priority",
                   val: (
@@ -610,7 +652,7 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
               </div>
             )}
 
-            {/* ── Update Status ── */}
+            {/* Update Status */}
             <div className="inc-detail-section">
               <span className="inc-section-title">Update Status</span>
               <div className="tq-status-actions">
@@ -653,16 +695,16 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
               </div>
             </div>
 
-            {/* ── Comments ── */}
+            {/* Comments */}
             <div className="inc-detail-section">
               <span className="inc-section-title">
-                Comments ({(selectedTask.comments || []).length})
+                Comments ({(selectedTask.comments ?? []).length})
               </span>
               <div className="inc-comments">
-                {(selectedTask.comments || []).length === 0 && (
+                {!selectedTask.comments?.length && (
                   <p className="inc-no-comments">No comments yet.</p>
                 )}
-                {(selectedTask.comments || []).map((c, i) => (
+                {(selectedTask.comments ?? []).map((c, i) => (
                   <div
                     key={i}
                     className={`inc-comment ${c.type === "blocked" ? "inc-comment-blocked" : ""}`}
@@ -670,13 +712,13 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                     <div
                       className={`inc-comment-avatar ${c.type === "blocked" ? "inc-comment-avatar-blocked" : ""}`}
                     >
-                      {c.author.charAt(0)}
+                      {(c.author ?? "?").charAt(0)}
                     </div>
                     <div className="inc-comment-body">
                       <div className="inc-comment-top">
                         <span className="inc-comment-author">{c.author}</span>
                         {c.type === "blocked" && (
-                          <span className="inc-comment-blocked-tag"></span>
+                          <span className="inc-comment-blocked-tag" />
                         )}
                         <span className="inc-comment-time">
                           {timeAgo(c.time)}
@@ -738,7 +780,6 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
         )}
       </div>
 
-      {/* Blocked Reason Modal */}
       {blockingTask && (
         <BlockedReasonModal
           task={blockingTask}
