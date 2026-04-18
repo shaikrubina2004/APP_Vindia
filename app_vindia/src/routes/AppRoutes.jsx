@@ -22,7 +22,7 @@ import SignInMobile from "../pages/SignInMobile";
 import SignUpMobile from "../pages/SignUpMobile";
 import MEPDashboard from "../pages/MEP Engineer/MEPDashboard";
 import ProjectCoordinatorDashboard from "../pages/Project Coordinator/ProjectCoordinatorDashboard";
-import SiteEngineerDashboard from "../pages/Site Engineer/SiteEngineerDashboard";
+import SiteEngineerDashboard from "../pages/siteEngineer/SiteEngineerDashboard";
 import PlanningEngineerDashboard from "../pages/Planning Engineer/PlanningEngineerDashboard";
 import QCDashboard from "../pages/QC Engineer/QCDashboard";
 import QuantitySurveyorDashboard from "../pages/Quality Surveyor/QuantitySurveyorDashboard";
@@ -45,10 +45,15 @@ import AppShell from "../components/incidents/AppShell";
 import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
 import Reports from "../pages/projects/projectmanager/Reports";
 import SiteEngineerLayout from "../layouts/SiteEngineerLayout"; // ADD THIS
-import DailyDiary from "../pages/Site Engineer/DailyDiary";
-import RFI from "../pages/Site Engineer/RFI";
-import NCR from "../pages/Site Engineer/NCR";
+import DailyDiary from "../pages/siteEngineer/DailyDiary";
+import RFI from "../pages/siteEngineer/RFI";
+import NCR from "../pages/siteEngineer/NCR";
 import StructuralRoutes from "./StructuralRoutes";
+import Checklist from "../pages/siteEngineer/Checklist";
+import Progress from "../pages/siteEngineer/Progress";
+import ActivityLog from "../pages/siteEngineer/ActivityLog";
+
+
 const AppRoutes = () => {
   const useIsMobile = () => {
     const [mobile, setMobile] = useState(window.innerWidth <= 768);
@@ -336,6 +341,17 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      <Route
+  path="/site-engineer/checklist"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+      <SiteEngineerLayout>
+        <Checklist />
+      </SiteEngineerLayout>
+    </ProtectedRoute>
+  }
+/>
+
 
       <Route
         path="/site-engineer/daily-diary"
@@ -347,6 +363,17 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      <Route
+  path="/site-engineer/activity"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+      <SiteEngineerLayout>
+        <ActivityLog />
+      </SiteEngineerLayout>
+    </ProtectedRoute>
+  }
+/>
+
 
       <Route
         path="/site-engineer/rfi"
@@ -369,6 +396,16 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+    <Route
+  path="/site-engineer/progress"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+      <SiteEngineerLayout>
+        <Progress />
+      </SiteEngineerLayout>
+    </ProtectedRoute>
+  }
+/>
 
       <Route
         path="/mep/dashboard"

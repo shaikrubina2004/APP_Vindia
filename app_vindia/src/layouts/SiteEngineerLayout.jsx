@@ -3,7 +3,7 @@ import siteEngineerMenu from "../menus/siteEngineerMenu";
 
 function SiteEngineerLayout({ children }) {
   return (
-    <AppLayout menuItems={siteEngineerMenu}>
+    <AppLayout menuItems={siteEngineerMenu} sidebarMode="full">
       {children}
     </AppLayout>
   );

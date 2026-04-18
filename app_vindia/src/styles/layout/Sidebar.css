@@ -1,3 +1,5 @@
+/* src/styles/layout/Sidebar.css */
+
 /* ================= DESKTOP ================= */
 
 .sidebar {
@@ -45,7 +47,8 @@
 }
 
 /* ICON */
-.sidebar__link svg {
+.sidebar__link svg,
+.sidebar__link i {
   width: 20px;
   height: 20px;
 }
@@ -77,11 +80,18 @@
   opacity: 0;
   transition: 0.2s;
   pointer-events: none;
+  white-space: nowrap;
+  transform-origin: left center;
+  transform: translateX(-6px);
 }
 
-.sidebar__link svg:hover + span {
+/* show tooltip when hovering the link or focusing it */
+.sidebar__link:hover span,
+.sidebar__link:focus-within span {
   opacity: 1;
+  transform: translateX(0);
 }
+
 /* ================= MOBILE ================= */
 
 .sidebar-toggle {
@@ -132,7 +142,7 @@
     padding: 20px;
 
     transform: translateX(-100%);
-    transition: 0.3s ease;
+    transition: transform 0.3s ease;
 
     background: white;
   }
@@ -162,5 +172,10 @@
     background: none;
     color: #1e293b;
     font-size: 14px;
+    transform: none;
+    pointer-events: auto;
   }
 }
+
+/* Accessibility focus */
+.sidebar__link:focus { outline: 2px solid rgba(11,90,120,0.18); outline-offset: 2px; }
