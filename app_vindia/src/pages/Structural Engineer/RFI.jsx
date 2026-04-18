@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "./rfi.css";
+import "./RFI.css";
 import CreateRFI from "./CreateRFI";
 import { useNavigate } from "react-router-dom";
 

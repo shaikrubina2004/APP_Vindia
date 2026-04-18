@@ -1,6 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
-import "./rfi.css";
+import "./RFI.css";
 
 export default function CreateRFI({ onClose, refresh }) {
   const [form, setForm] = useState({
