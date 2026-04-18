@@ -1,7 +1,7 @@
 // src/pages/rfi/RFI.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
-import "../../styles/shared-pages.css";
+// import "../../styles/shared-pages.css";
 const DRAFT_KEY = "rfi:draft:v3";
 const QUEUE_KEY = "rfi:queue:v3";
 const PAGE_SIZE  = 8;

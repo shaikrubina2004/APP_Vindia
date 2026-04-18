@@ -1,7 +1,7 @@
 // src/pages/ncr/NCR.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
-import "../../styles/shared-pages.css";
+// import "../../styles/shared-pages.css";
 const DRAFT_KEY = "ncr:draft:v3";
 const QUEUE_KEY = "ncr:queue:v3";
 const PAGE_SIZE  = 8;

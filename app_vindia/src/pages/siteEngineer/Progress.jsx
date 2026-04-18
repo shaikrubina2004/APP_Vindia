@@ -1,7 +1,7 @@
 // src/pages/siteEngineer/Progress.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
-import "../../styles/shared-pages.css";
+// import "../../styles/shared-pages.css";
 const DRAFT_KEY = "progress:draft:v3";
 const QUEUE_KEY = "progress:queue:v3";
 const PAGE_SIZE  = 8;
@@ -358,3 +358,8 @@ export function Progress() {
     </div>
   );
 }
+// src/pages/siteEngineer/Progress.jsx
+// ... all your existing code stays exactly the same ..
+
+// ADD THIS LINE at the bottom ↓
+export default Progress;

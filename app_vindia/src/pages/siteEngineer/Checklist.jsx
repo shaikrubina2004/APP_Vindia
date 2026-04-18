@@ -284,3 +284,9 @@ export function Checklist() {
     </div>
   );
 }
+// src/pages/siteEngineer/Checklist.jsx
+// ... all your existing code stays exactly the same ...
+
+
+// ADD THIS LINE at the bottom ↓
+export default Checklist;

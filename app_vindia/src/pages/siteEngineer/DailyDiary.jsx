@@ -1,7 +1,7 @@
 // src/pages/dailyDiary/DailyDiary.jsx
 import React, { useEffect, useRef, useState } from "react";
 import api from "../../services/api";
-import "../../styles/shared-pages.css";
+// import "../../styles/shared-pages.css";
 const DRAFT_KEY = "dailyDiary:draft:v3";
 const QUEUE_KEY = "dailyDiary:queue:v3";
 const WEATHER_OPTS = ["Sunny / Clear","Partly Cloudy","Overcast","Light Rain","Heavy Rain","Fog / Mist"];

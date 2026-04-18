@@ -1,7 +1,7 @@
 // src/pages/siteEngineer/ActivityLog.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
-import "../../styles/shared-pages.css";
+// import "../../styles/shared-pages.css";
 const FILTERS_KEY = "activityLog:filters:v3";
 const PAGE_SIZE   = 12;
 
