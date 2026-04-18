@@ -1,6 +1,7 @@
 import { useState } from "react";
 import "../../../styles/DailyUpdates.css";
-
+import { API } from "../../../services/authService";
+import { useEffect } from "react";
 // ─── Constants ───────────────────────────────────────────────
 const STATUS_COLORS = {
   "on-track": { bg: "#d1fae5", text: "#065f46", label: "On Track", dot: "#10b981" },
@@ -79,7 +80,7 @@ const SEED_UPDATES = [
 // ─── Main Component ───────────────────────────────────────────
 export default function DailyUpdates() {
   const [page, setPage] = useState("list"); // list | new | view | edit
-  const [updates, setUpdates] = useState(SEED_UPDATES);
+  const [updates, setUpdates] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [activeTab, setActiveTab] = useState("work");
   const [selectedReport, setSelectedReport] = useState(null);
@@ -87,6 +88,26 @@ export default function DailyUpdates() {
   const [msgModal, setMsgModal] = useState(null); // { to, report }
   const [msgText, setMsgText] = useState("");
   const [toast, setToast] = useState(null);
+  useEffect(() => {
+  fetchReports();
+}, []);
+
+const fetchReports = async () => {
+  try {
+    const res = await API.get("/daily-reports");
+
+    const formatted = res.data.map(item => ({
+      ...item.data,
+      id: item.id,
+      approved: item.approved
+    }));
+
+    setUpdates(formatted);
+
+  } catch (error) {
+    console.error("FETCH ERROR:", error);
+  }
+};
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -126,27 +147,38 @@ export default function DailyUpdates() {
   const goList = () => setPage("list");
 
   // ─── Save ──
-  const handleSave = () => {
-    if (!form.date || !form.projectName) {
-      showToast("Date and Project Name are required.", "error");
-      return;
-    }
-    if (editingId) {
-      setUpdates(prev => prev.map(u => u.id === editingId ? { ...u, ...form } : u));
-      showToast("Report updated successfully!");
-    } else {
-      setUpdates(prev => [{ id: Date.now(), ...form, approved: false }, ...prev]);
-      showToast("Report saved successfully!");
-    }
-    goList();
-  };
+ const handleSave = async () => {
+  try {
+    await API.post("/daily-reports", {
+      project_name: form.projectName,
+      date: form.date,
+      phase: form.phase,
+      overall_status: form.overallStatus,
+      submitted_by: form.submittedBy,
+      submission_time: form.submissionTime,
+      data: form,
+    });
+
+    showToast("Saved to backend!");
+    fetchReports();
+    setPage("list");
+
+  } catch (error) {
+    console.error("SAVE ERROR:", error);
+    alert("Failed to save");
+  }
+};
 
   // ─── Approve ──
-  const handleApprove = (id) => {
-    setUpdates(prev => prev.map(u => u.id === id ? { ...u, approved: true } : u));
-    if (selectedReport?.id === id) setSelectedReport(r => ({ ...r, approved: true }));
+  const handleApprove = async (id) => {
+  try {
+    await API.put(`/daily-reports/approve/${id}`);
+    fetchReports();
     showToast("Report approved!");
-  };
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   // ─── Send Message ──
   const handleSendMessage = () => {

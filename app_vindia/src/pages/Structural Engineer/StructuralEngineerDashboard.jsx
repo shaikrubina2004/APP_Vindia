@@ -21,7 +21,7 @@ ChartJS.register(
   LinearScale,
   ArcElement,
   Tooltip,
-  Legend,
+  Legend
 );
 
 const StructuralEngineerDashboard = () => {
@@ -44,90 +44,82 @@ const StructuralEngineerDashboard = () => {
     );
   }
 
-  // 📊 Chart Data
-const barData = {
-  labels: ["Drawings", "Incidents", "Notifications"],
-  datasets: [
-    {
-      label: "Project Stats",
-      data: [
-        stats.totalDrawings,
-        stats.pendingIncidents,
-        stats.notifications,
-      ],
-      backgroundColor: ["#0A4174", "#4E8EA2", "#7BBDE8"],
-    },
-  ],
-};
+  const barData = {
+    labels: ["Drawings", "Incidents", "Notifications"],
+    datasets: [
+      {
+        data: [
+          stats.totalDrawings,
+          stats.pendingIncidents,
+          stats.notifications,
+        ],
+        backgroundColor: ["#4f46e5", "#f59e0b", "#06b6d4"],
+        borderRadius: 8,
+      },
+    ],
+  };
+
   const pieData = {
-  labels: ["Completed", "Pending"],
-  datasets: [
-    {
-      data: [
-        stats.totalDrawings - stats.pendingIncidents,
-        stats.pendingIncidents,
-      ],
-      backgroundColor: ["#4E8EA2", "#0A4174"],
-    },
-  ],
-};
+    labels: ["Completed", "Pending"],
+    datasets: [
+      {
+        data: [
+          stats.totalDrawings - stats.pendingIncidents,
+          stats.pendingIncidents,
+        ],
+        backgroundColor: ["#22c55e", "#ef4444"],
+      },
+    ],
+  };
 
   return (
     <div className="se-container">
       <h1 className="se-title">Structural Engineer Dashboard</h1>
 
-      {/* Cards */}
+      {/* CARDS */}
       <div className="se-cards">
         <div
-          className="se-card card-1"
+          className="se-card primary"
           onClick={() => navigate("/structural-engineer/drawings")}
         >
+          <div className="card-icon">📐</div>
           <h3>Total Drawings</h3>
-          <p>
-            <CountUp end={stats.totalDrawings} duration={1.5} />
-          </p>
+          <p><CountUp end={stats.totalDrawings} duration={1.5} /></p>
         </div>
 
-        <div className="se-card card-2">
+        <div className="se-card neutral">
+          <div className="card-icon">🧩</div>
           <h3>Latest Version</h3>
           <p>{stats.latestVersion}</p>
         </div>
 
-        <div className="se-card card-3">
+        <div className="se-card warning">
+          <div className="card-icon">⚠️</div>
           <h3>Pending Incidents</h3>
-          <p>
-            <CountUp end={stats.pendingIncidents} duration={1.5} />
-          </p>
+          <p><CountUp end={stats.pendingIncidents} duration={1.5} /></p>
         </div>
 
-        <div className="se-card card-4">
+        <div className="se-card info">
+          <div className="card-icon">🔔</div>
           <h3>Notifications</h3>
-          <p>
-            <CountUp end={stats.notifications} duration={1.5} />
-          </p>
+          <p><CountUp end={stats.notifications} duration={1.5} /></p>
         </div>
       </div>
 
-      {/* Charts */}
+      {/* CHARTS */}
       <div className="se-charts">
         <div className="chart-box">
           <h3>Project Overview</h3>
-          <Bar
-            data={barData}
-            options={{ responsive: true, maintainAspectRatio: false }}
-          />
+          <Bar data={barData} options={{ maintainAspectRatio: false }} />
         </div>
 
         <div className="chart-box">
           <h3>Distribution</h3>
-          <Doughnut
-            data={pieData}
-            options={{ responsive: true, maintainAspectRatio: false }}
-          />{" "}
+          <Doughnut data={pieData} options={{ maintainAspectRatio: false }} />
         </div>
       </div>
 
-      {/* Activity */}
+      {/* ACTIVITY */}
       <div className="se-activity-box">
         <h2>Recent Activity</h2>
         <ul>

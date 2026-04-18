@@ -4,12 +4,13 @@ const pool = require("../config/db");
 const multer = require("multer");
 const path = require("path");
 
-
 // ==============================
 // 📂 MULTER CONFIG (FILE UPLOAD)
 // ==============================
 const storage = multer.diskStorage({
-  destination: "uploads/",
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
   filename: (req, file, cb) => {
     cb(null, Date.now() + "-" + file.originalname);
   },
@@ -17,21 +18,17 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-
 // ==============================
-// 📊 DASHBOARD API (REAL DATA)
+// 📊 DASHBOARD API
 // ==============================
 router.get("/dashboard", async (req, res) => {
   try {
-    const drawingsResult = await pool.query(
-      "SELECT COUNT(*) FROM drawings"
-    );
+    const drawingsResult = await pool.query("SELECT COUNT(*) FROM drawings");
 
     const latestVersionResult = await pool.query(
       "SELECT version FROM drawings ORDER BY created_at DESC LIMIT 1"
     );
 
-    // ✅ SAFE FALLBACK (no table crash)
     let incidentsCount = 0;
     let notificationsCount = 0;
 
@@ -59,7 +56,6 @@ router.get("/dashboard", async (req, res) => {
       pendingIncidents: incidentsCount,
       notifications: notificationsCount,
     });
-
   } catch (err) {
     console.error("Dashboard Error:", err);
     res.status(500).json({ error: err.message });
@@ -67,11 +63,16 @@ router.get("/dashboard", async (req, res) => {
 });
 
 // ==============================
-// 📤 UPLOAD DRAWING API
+// 📤 UPLOAD DRAWING
 // ==============================
 router.post("/upload-drawing", upload.single("file"), async (req, res) => {
   try {
     const { name, version, uploaded_by } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ error: "File is required" });
+    }
+
     const file_url = req.file.filename;
 
     await pool.query(
@@ -80,57 +81,86 @@ router.post("/upload-drawing", upload.single("file"), async (req, res) => {
     );
 
     res.json({ message: "Drawing uploaded successfully" });
-
   } catch (err) {
     console.error("Upload Error:", err);
     res.status(500).json({ error: "Upload failed" });
   }
 });
 
-
 // ==============================
-// 📄 GET ALL DRAWINGS
+// 📄 GET DRAWINGS
 // ==============================
 router.get("/drawings", async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT * FROM drawings ORDER BY created_at DESC"
     );
-
     res.json(result.rows);
-
   } catch (err) {
     console.error("Fetch Drawings Error:", err);
     res.status(500).json({ error: "Error fetching drawings" });
   }
 });
 
+// ==============================
+// ❌ DELETE DRAWING
+// ==============================
 router.delete("/drawings/:id", async (req, res) => {
-  const { id } = req.params;
-
   try {
+    const { id } = req.params;
+
     await pool.query("DELETE FROM drawings WHERE id=$1", [id]);
+
     res.json({ message: "Deleted successfully" });
   } catch (err) {
-    console.error(err);
+    console.error("Delete Error:", err);
     res.status(500).json({ error: "Delete failed" });
   }
 });
 
+// ==============================
+// 🔄 UPDATE DRAWING STATUS
+// ==============================
 router.put("/drawings/:id/status", async (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-
   try {
+    const { id } = req.params;
+    const { role, status } = req.body;
+
+    let column = "";
+
+    if (role === "architect") column = "architect_status";
+    else if (role === "mep") column = "mep_status";
+    else if (role === "manager") column = "manager_status";
+
+    if (!column) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+
     await pool.query(
-      "UPDATE drawings SET status=$1, updated_at=NOW() WHERE id=$2",
+      `UPDATE drawings SET ${column}=$1 WHERE id=$2`,
       [status, id]
     );
 
-    res.json({ message: "Status updated" });
+    res.json({ message: "Updated successfully" });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Update failed" });
+    console.error("Update Error:", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+// ==============================
+// 📋 BOQ ROUTE
+// ==============================
+router.get("/boq", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM boq ORDER BY id DESC"
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("BOQ ERROR:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 

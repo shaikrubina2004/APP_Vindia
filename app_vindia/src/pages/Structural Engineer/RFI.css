@@ -1,0 +1,210 @@
+.rfi-wrapper {
+  padding: 24px;
+  background: #f4f6f9;
+  min-height: 100vh;
+}
+
+.rfi-title {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+/* CARDS */
+/* ================= CARDS ================= */
+.rfi-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.rfi-card {
+  background: white;
+  padding: 18px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+
+.rfi-card strong {
+  display: block;
+  font-size: 22px;
+  margin-top: 5px;
+}
+
+.total { border-left: 4px solid #3b82f6; }
+.open { border-left: 4px solid #f59e0b; }
+.pending { border-left: 4px solid #ef4444; }
+.closed { border-left: 4px solid #10b981; }
+
+/* TABS */
+.rfi-tabs {
+  margin-bottom: 15px;
+}
+
+.rfi-tabs button {
+  margin-right: 10px;
+  padding: 6px 14px;
+  border: none;
+  background: #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.rfi-tabs .active {
+  background: #1f2937;
+  color: white;
+}
+
+/* ================= TABLE ================= */
+.rfi-table-container {
+  background: white;
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+
+.rfi-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+.rfi-table th,
+.rfi-table td {
+  padding: 12px;
+}
+
+
+.rfi-table th {
+  background: #f9fafb;
+  font-size: 12px;
+}
+
+
+.rfi-table tr:hover {
+  background: #f3f4f6;
+}
+
+/* ================= STATUS ================= */
+.status.pending { color: #f59e0b; }
+.status.answered { color: #10b981; }
+
+
+/* PRIORITY */
+.priority.high { color: #ef4444; }
+.priority.medium { color: #f59e0b; }
+.priority.low { color: #10b981; }
+
+/* BUTTON */
+.rfi-add-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.rfi-add-btn:hover {
+  background: #1e40af;
+}
+
+
+/* ================= CHAT ================= */
+.rfi-details {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #fff;
+}
+
+.rfi-details-header {
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+}
+
+.rfi-details-info {
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.rfi-chat {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  background: #f9fafb;
+}
+
+.chat-bubble {
+  background: #e5e7eb;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  max-width: 70%;
+}
+
+.chat-bubble.you {
+  background: #2563eb;
+  color: white;
+  margin-left: auto;
+}
+
+/* INPUT */
+.rfi-chat-input {
+  display: flex;
+  padding: 10px;
+  border-top: 1px solid #eee;
+}
+
+.rfi-chat-input input {
+  flex: 1;
+  padding: 10px;
+}
+
+.rfi-chat-input button {
+  margin-left: 10px;
+}
+
+/* ================= RESPONSIVE ================= */
+
+/* 📱 Mobile (iPhone) */
+@media (max-width: 640px) {
+  .rfi-wrapper {
+    padding: 12px;
+  }
+
+  .rfi-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rfi-title {
+    font-size: 18px;
+  }
+
+  .rfi-table th,
+  .rfi-table td {
+    padding: 8px;
+    font-size: 12px;
+  }
+
+  .chat-bubble {
+    max-width: 90%;
+  }
+}
+
+/* 📱 Tablet */
+@media (max-width: 1024px) {
+  .rfi-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 💻 Laptop/Desktop */
+@media (min-width: 1025px) {
+  .rfi-cards {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

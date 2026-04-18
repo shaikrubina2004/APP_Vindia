@@ -21,6 +21,9 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 /* NEW MODULES */
 const structuralRoutes = require("./routes/structuralRoutes");
 const timesheetRoutes = require("./routes/timesheetRoutes");
+const dailyRoutes = require("./routes/dailyUpdatesRoutes");
+const analysisRoutes = require("./routes/analysis");
+
 
 const app = express();
 
@@ -69,7 +72,8 @@ try {
   // NEW MODULES
   app.use("/api/structural", structuralRoutes);
   app.use("/api/timesheets", timesheetRoutes);
-
+  app.use("/api/daily-reports", dailyRoutes);
+  app.use("/api/analysis", analysisRoutes);
 } catch (err) {
   console.error("❌ Route loading error:", err.message);
 }
