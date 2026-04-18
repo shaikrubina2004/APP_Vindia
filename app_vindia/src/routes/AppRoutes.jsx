@@ -475,14 +475,18 @@ const AppRoutes = () => {
         }
       />
 
-      <Route
-        path="/architect/dashboard"
-        element={
-          <ArchitectLayout>
-            <ArchitectDashboard />
-          </ArchitectLayout>
-        }
-      />
+      {/* ✅ FIXED - Now matches Project Coordinator pattern */}
+<Route
+  path="/architect/dashboard"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
+      <ArchitectLayout>
+        <ArchitectDashboard />
+      </ArchitectLayout>
+    </ProtectedRoute>
+  }
+/>
+      
       <Route
         path="/timesheet"
         element={
