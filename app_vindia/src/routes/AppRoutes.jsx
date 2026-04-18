@@ -31,6 +31,7 @@ import StructuralEngineerDashboard from "../pages/Structural Engineer/Structural
 import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
 import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
+import Milestone from "../pages/Project Coordinator/Milestone";
 import QuantitySurveyorLayout from "../layouts/QuantitySurveyorLayout";
 import DailyUpdatesPC from "../pages/Project Coordinator/DailyUpdates";
 import Qsdailyupdates from "../pages/Quality Surveyor/Qsdailyupdates";
@@ -322,7 +323,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
+      {/* PROJECT COORDINATOR */}
       <Route
         path="/project-coordinator/dashboard"
         element={
@@ -343,6 +344,16 @@ const AppRoutes = () => {
         </ProtectedRoute>
       }
     />
+    <Route
+    path="/project-coordinator/milestone"
+    element={
+      <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
+        <ProjectCoordinatorLayout>
+          <Milestone />
+        </ProjectCoordinatorLayout>
+      </ProtectedRoute>
+    }
+  />
 
       <Route
         path="/site-engineer/dashboard"
