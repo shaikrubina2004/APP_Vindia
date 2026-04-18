@@ -31,7 +31,9 @@ import StructuralEngineerDashboard from "../pages/Structural Engineer/Structural
 import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
 import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
+import QuantitySurveyorLayout from "../layouts/QuantitySurveyorLayout";
 import DailyUpdatesPC from "../pages/Project Coordinator/DailyUpdates";
+import Qsdailyupdates from "../pages/Quality Surveyor/Qsdailyupdates";
 import ArchitectLayout from "../layouts/ArchitectLayout";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
@@ -433,9 +435,20 @@ const AppRoutes = () => {
         path="/quantity-surveyor/dashboard"
         element={
           <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
-            <ProjectManagerLayout>
+            <QuantitySurveyorLayout>
               <QuantitySurveyorDashboard />
-            </ProjectManagerLayout>
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/quantity-surveyor/daily-updates"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Qsdailyupdates />
+            </QuantitySurveyorLayout>
           </ProtectedRoute>
         }
       />
