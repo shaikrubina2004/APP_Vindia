@@ -195,19 +195,19 @@ return (
     {/* 🔷 KPI */}
     <div className="kpi-grid">
 
-      <div className="kpi-card warn">
+      <div className="kpi-card blue">
         <div className="kpi-label">DAILY LOG</div>
         <div className="kpi-val">Pending</div>
         <div className="kpi-meta">Due by 6:00 PM</div>
       </div>
 
-      <div className="kpi-card danger">
+      <div className="kpi-card blue">
         <div className="kpi-label">OPEN INCIDENTS</div>
         <div className="kpi-val">{filteredIncidents.length}</div>
         <div className="kpi-meta">2 high priority</div>
       </div>
 
-      <div className="kpi-card warn">
+      <div className="kpi-card blue">
         <div className="kpi-label">PENDING SIGN-OFFS</div>
         <div className="kpi-val">{pendingSignoffs}</div>
         <div className="kpi-meta">Overdue &gt; 48 hrs</div>
