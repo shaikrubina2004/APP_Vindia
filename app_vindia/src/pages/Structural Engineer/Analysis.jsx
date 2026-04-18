@@ -27,7 +27,6 @@ function Analysis() {
   const [typeFilter, setTypeFilter] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ CLEAN EFFECT (no warning)
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -62,7 +61,7 @@ function Analysis() {
     datasets: [
       {
         data: [approved, pending, rejected],
-        backgroundColor: ["#28a745", "#ffc107", "#dc3545"],
+        backgroundColor: ["#22c55e", "#f59e0b", "#ef4444"],
       },
     ],
   };
@@ -82,6 +81,23 @@ function Analysis() {
         backgroundColor: "#4a90e2",
       },
     ],
+  };
+
+  // ✅ ADD THIS HERE (IMPORTANT)
+  const commonChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          font: {
+            size: 13,
+            family: "Inter, sans-serif",
+          },
+          color: "#374151",
+        },
+      },
+    },
   };
 
   return (
@@ -140,6 +156,7 @@ function Analysis() {
             <Pie
               data={pieData}
               options={{
+                ...commonChartOptions,
                 onClick: (evt, elements) => {
                   if (elements.length > 0) {
                     const index = elements[0].index;
@@ -155,6 +172,21 @@ function Analysis() {
             <Bar
               data={barData}
               options={{
+                ...commonChartOptions,
+                scales: {
+                  x: {
+                    ticks: {
+                      color: "#6b7280",
+                      font: { size: 12 },
+                    },
+                  },
+                  y: {
+                    ticks: {
+                      color: "#6b7280",
+                      font: { size: 12 },
+                    },
+                  },
+                },
                 onClick: (evt, elements) => {
                   if (elements.length > 0) {
                     const index = elements[0].index;
