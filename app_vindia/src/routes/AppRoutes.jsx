@@ -35,6 +35,10 @@ import Milestone from "../pages/Project Coordinator/Milestone";
 import QuantitySurveyorLayout from "../layouts/QuantitySurveyorLayout";
 import DailyUpdatesPC from "../pages/Project Coordinator/DailyUpdates";
 import Qsdailyupdates from "../pages/Quality Surveyor/Qsdailyupdates";
+import Qsboq from "../pages/Quality Surveyor/Qsboq";
+import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
+import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
+import Qssubmissions from "../pages/Quality Surveyor/Qssubmissions";
 import ArchitectLayout from "../layouts/ArchitectLayout";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
@@ -463,7 +467,46 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
+       <Route
+        path="/quantity-surveyor/boq"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Qsboq />
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
+        <Route
+        path="/quantity-surveyor/quantity-report"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Qsquantityreport />
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
+ <Route
+        path="/quantity-surveyor/cost-report"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Qscostreport />
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/quantity-surveyor/submissions"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Qssubmissions />
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
 
       <Route
