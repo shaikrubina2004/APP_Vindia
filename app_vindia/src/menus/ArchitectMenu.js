@@ -11,11 +11,7 @@ export const ArchitectMenu = [
     icon: "file-text" 
    
   },
-  { 
-    name: "Schedule", 
-    path: "/architect/schedule", 
-    icon: "calendar" 
-  },
+
   { 
     /* Routine site reporting */
     name: "Daily Logs", 
