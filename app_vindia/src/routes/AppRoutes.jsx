@@ -31,18 +31,19 @@ import StructuralEngineerDashboard from "../pages/Structural Engineer/Structural
 import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
 import ArchitectTasks from "../pages/Architect/ArchitectTasks";
+import MEPCoordination from "../pages/MEP Engineer/MEPCoordination";
 import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
 import DailyUpdatesPC from "../pages/Project Coordinator/DailyUpdates";
 import Milestone from "../pages/Project Coordinator/Milestone";
-import Payment      from "../pages/Project Coordinator/Payment";
+import Payment from "../pages/Project Coordinator/Payment";
 import ArchitectLayout from "../layouts/ArchitectLayout";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
-
 import CEOLayout from "../layouts/CEOLayout";
 import HRLayout from "../layouts/HRLayout";
 import Timesheet from "../pages/timesheet/Timesheet";
 import ProjectManagerLayout from "../layouts/ProjectManagerLayout";
+import MEPLayout from "../layouts/MEPLayout";
 import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
 import Incidents from "../pages/projects/projectmanager/Incidents";
 import AppShell from "../components/incidents/AppShell";
@@ -52,11 +53,14 @@ import SiteEngineerLayout from "../layouts/SiteEngineerLayout"; // ADD THIS
 import DailyDiary from "../pages/siteEngineer/DailyDiary";
 import RFI from "../pages/siteEngineer/RFI";
 import NCR from "../pages/siteEngineer/NCR";
+import MEPDailylog from "../pages/MEP Engineer/MEPDailylog";
+import MEPDrawings from "../pages/MEP Engineer/MEPDrawings";
+import MEPUploads from "../pages/MEP Engineer/MEPUploads";
+import MEPVerssionControll from "../pages/MEP Engineer/MEPVerssionControll";
 import StructuralRoutes from "./StructuralRoutes";
 import Checklist from "../pages/siteEngineer/Checklist";
 import Progress from "../pages/siteEngineer/Progress";
 import ActivityLog from "../pages/siteEngineer/ActivityLog";
-
 
 const AppRoutes = () => {
   const useIsMobile = () => {
@@ -157,7 +161,7 @@ const AppRoutes = () => {
       <Route
         path="/pm/incidents"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.MEP_ENGINEER]}>
             <ProjectManagerLayout>
               <AppShell /> {/* ← was <IncidentManagement /> */}
             </ProjectManagerLayout>
@@ -335,35 +339,35 @@ const AppRoutes = () => {
         }
       />
       <Route
-      path="/project-coordinator/daily"
-      element={
-        <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
-          <ProjectCoordinatorLayout>
-            <DailyUpdatesPC />
-          </ProjectCoordinatorLayout>
-        </ProtectedRoute>
-      }
-    />
-    <Route
-    path="/project-coordinator/milestone"
-    element={
-      <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
-        <ProjectCoordinatorLayout>
-          <Milestone />
-        </ProjectCoordinatorLayout>
-      </ProtectedRoute>
-    }
-  />
-  <Route
-    path="/project-coordinator/payments"
-    element={
-      <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
-        <ProjectCoordinatorLayout>
-          <Payment />
-        </ProjectCoordinatorLayout>
-      </ProtectedRoute>
-    }
-  />
+        path="/project-coordinator/daily"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
+            <ProjectCoordinatorLayout>
+              <DailyUpdatesPC />
+            </ProjectCoordinatorLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/project-coordinator/milestone"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
+            <ProjectCoordinatorLayout>
+              <Milestone />
+            </ProjectCoordinatorLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/project-coordinator/payments"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
+            <ProjectCoordinatorLayout>
+              <Payment />
+            </ProjectCoordinatorLayout>
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/site-engineer/dashboard"
@@ -376,16 +380,15 @@ const AppRoutes = () => {
         }
       />
       <Route
-  path="/site-engineer/checklist"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
-      <SiteEngineerLayout>
-        <Checklist />
-      </SiteEngineerLayout>
-    </ProtectedRoute>
-  }
-/>
-
+        path="/site-engineer/checklist"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout>
+              <Checklist />
+            </SiteEngineerLayout>
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/site-engineer/daily-diary"
@@ -398,16 +401,15 @@ const AppRoutes = () => {
         }
       />
       <Route
-  path="/site-engineer/activity"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
-      <SiteEngineerLayout>
-        <ActivityLog />
-      </SiteEngineerLayout>
-    </ProtectedRoute>
-  }
-/>
-
+        path="/site-engineer/activity"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout>
+              <ActivityLog />
+            </SiteEngineerLayout>
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/site-engineer/rfi"
@@ -430,24 +432,90 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-    <Route
-  path="/site-engineer/progress"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
-      <SiteEngineerLayout>
-        <Progress />
-      </SiteEngineerLayout>
-    </ProtectedRoute>
-  }
-/>
+      <Route
+        path="/site-engineer/progress"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout>
+              <Progress />
+            </SiteEngineerLayout>
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/mep/dashboard"
         element={
           <ProtectedRoute allowedRoles={[ROLES.MEP_ENGINEER]}>
-            <ProjectManagerLayout>
+            <MEPLayout>
               <MEPDashboard />
-            </ProjectManagerLayout>
+            </MEPLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/mep/coordination"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.MEP_ENGINEER]}>
+            <MEPLayout>
+              <MEPCoordination />
+            </MEPLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/mep/upload"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.MEP_ENGINEER]}>
+            <MEPLayout>
+              <MEPUploads />
+            </MEPLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/mep/drawings"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.MEP_ENGINEER]}>
+            <MEPLayout>
+              <MEPDrawings />
+            </MEPLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/mep/incidents"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.MEP_ENGINEER]}>
+            <MEPLayout>
+              <AppShell />
+            </MEPLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/mep/daily-log"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.MEP_ENGINEER]}>
+            <MEPLayout>
+              <MEPDailylog />
+            </MEPLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/mep/version-control"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.MEP_ENGINEER]}>
+            <MEPLayout>
+              <MEPVerssionControll />
+            </MEPLayout>
           </ProtectedRoute>
         }
       />
@@ -499,28 +567,28 @@ const AppRoutes = () => {
       />
 
       {/* ✅ FIXED - Now matches Project Coordinator pattern */}
-<Route
-  path="/architect/dashboard"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
-      <ArchitectLayout>
-        <ArchitectDashboard />
-      </ArchitectLayout>
-    </ProtectedRoute>
-  }
-/>
+      <Route
+        path="/architect/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
+            <ArchitectLayout>
+              <ArchitectDashboard />
+            </ArchitectLayout>
+          </ProtectedRoute>
+        }
+      />
 
-<Route
-  path="/architect/tasks"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
-      <ArchitectLayout>
-        <ArchitectTasks />
-  </ArchitectLayout>
-</ProtectedRoute>
-  }
-/>
-      
+      <Route
+        path="/architect/tasks"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
+            <ArchitectLayout>
+              <ArchitectTasks />
+            </ArchitectLayout>
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/timesheet"
         element={

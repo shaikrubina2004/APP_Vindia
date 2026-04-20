@@ -205,8 +205,18 @@ exports.getIncidentById = async (req, res) => {
 // Body: { title, description, priority, assigned_to_user_id }
 exports.createIncident = async (req, res) => {
   const { title, description, priority = "P2", assigned_to_user_id } = req.body;
-  // ✅ FIX: removed hardcoded fallback `|| 27` — use auth middleware user only
-  const created_by = req.user?.id ?? null;
+
+  // DEBUG — remove after confirming which field your middleware uses
+  console.log("[createIncident] req.user =", JSON.stringify(req.user));
+  console.log("[createIncident] req.userId =", req.userId);
+
+  // Support every common auth-middleware shape:
+  //   req.user.id        (most common — passport / custom JWT)
+  //   req.user.userId
+  //   req.user.user_id
+  //   req.userId         (some middleware sets it at root level)
+  const created_by =
+    req.user?.id ?? req.user?.userId ?? req.user?.user_id ?? req.userId ?? 27;
 
   if (!title?.trim())
     return res
@@ -216,7 +226,7 @@ exports.createIncident = async (req, res) => {
   try {
     const deadline_at = calcDeadline(priority);
 
-    // Fetch assignee name + role for response (not stored on incident row)
+    // Fetch assignee name + role for the response payload
     let assignee_name = null;
     let role_name = null;
     if (assigned_to_user_id) {
@@ -233,19 +243,31 @@ exports.createIncident = async (req, res) => {
       }
     }
 
+    // Build query dynamically — omit created_by when null to avoid NOT NULL errors
+    const cols = [
+      "title",
+      "description",
+      "priority",
+      "assigned_to",
+      "deadline_at",
+    ];
+    const vals = [
+      title.trim(),
+      description ?? null,
+      priority,
+      assigned_to_user_id ?? null,
+      deadline_at,
+    ];
+
+    if (created_by !== null) {
+      cols.push("created_by");
+      vals.push(created_by);
+    }
+
+    const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
     const { rows } = await pool.query(
-      `INSERT INTO incidents
-         (title, description, priority, assigned_to, created_by, deadline_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [
-        title.trim(),
-        description ?? null,
-        priority,
-        assigned_to_user_id ?? null,
-        created_by,
-        deadline_at,
-      ],
+      `INSERT INTO incidents (${cols.join(", ")}) VALUES (${placeholders}) RETURNING *`,
+      vals,
     );
 
     res.status(201).json({
@@ -253,10 +275,13 @@ exports.createIncident = async (req, res) => {
       data: { ...rows[0], assignee_name, role_name },
     });
   } catch (err) {
+    // Surface the real DB error so debugging is easier
     console.error("createIncident:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to create incident" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create incident",
+      detail: err.message,
+    });
   }
 };
 
@@ -533,8 +558,7 @@ exports.getTasksByIncident = async (req, res) => {
 exports.createTasks = async (req, res) => {
   const { id } = req.params;
   const { tasks } = req.body;
-  // ✅ FIX: removed hardcoded || 27 fallback
-  const created_by = req.user?.id ?? null;
+  const created_by = req.user?.id ?? req.user?.userId ?? req.userId ?? null;
 
   if (!Array.isArray(tasks) || !tasks.length)
     return res
@@ -576,21 +600,26 @@ exports.createTasks = async (req, res) => {
         }
       }
 
+      // Build insert dynamically — omit created_by if null
+      const tCols = ["incident_id", "title", "note", "priority", "assigned_to"];
+      const tVals = [
+        id,
+        task.title.trim(),
+        task.note ?? null,
+        task.priority ?? "P2",
+        task.assigned_to_user_id ?? null,
+      ];
+      if (created_by !== null) {
+        tCols.push("created_by");
+        tVals.push(created_by);
+      }
+      const tPlaceholders = tVals.map((_, i) => `$${i + 1}`).join(", ");
+
       const { rows } = await client.query(
-        `INSERT INTO tasks (incident_id, title, note, priority, assigned_to, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING *`,
-        [
-          id,
-          task.title.trim(),
-          task.note ?? null,
-          task.priority ?? "P2",
-          task.assigned_to_user_id ?? null,
-          created_by,
-        ],
+        `INSERT INTO tasks (${tCols.join(", ")}) VALUES (${tPlaceholders}) RETURNING *`,
+        tVals,
       );
 
-      // ✅ Return incident_id so frontend normaliseTask can set incidentId correctly
       created.push({ ...rows[0], incident_id: id, assignee_name, role_name });
     }
 
@@ -599,7 +628,11 @@ exports.createTasks = async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("createTasks:", err);
-    res.status(500).json({ success: false, message: "Failed to create tasks" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create tasks",
+      detail: err.message,
+    });
   } finally {
     client.release();
   }
@@ -615,17 +648,16 @@ exports.updateTaskStatus = async (req, res) => {
   if (!validStatuses.includes(status))
     return res.status(400).json({ success: false, message: "Invalid status" });
   if (status === "Blocked" && !blocked_reason?.trim())
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "blocked_reason is required when marking Blocked",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "blocked_reason is required when marking Blocked",
+    });
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
+    // 1. Update the task status
     const { rows } = await client.query(
       `UPDATE tasks SET status = $1 WHERE id = $2 AND is_deleted = FALSE RETURNING *`,
       [status, taskId],
@@ -637,21 +669,43 @@ exports.updateTaskStatus = async (req, res) => {
         .json({ success: false, message: "Task not found" });
     }
 
-    if (userId)
-      await patchHistoryUser(
-        client,
-        "task_status_history",
-        "task_id",
-        taskId,
-        userId,
-      );
+    // 2. Record who changed it (optional — only if history table exists)
+    if (userId) {
+      try {
+        await patchHistoryUser(
+          client,
+          "task_status_history",
+          "task_id",
+          taskId,
+          userId,
+        );
+      } catch (_) {
+        /* history table may not exist yet — non-fatal */
+      }
+    }
 
+    // 3. If blocked, insert a comment.
+    //    author_id: use the requesting user, or fall back to the task's own assignee
+    //    so we never pass NULL into a NOT NULL column.
     if (status === "Blocked") {
-      await client.query(
-        `INSERT INTO task_comments (task_id, author_id, body, comment_type)
-         VALUES ($1, $2, $3, 'blocked')`,
-        [taskId, userId, `🚫 Blocked: ${blocked_reason.trim()}`],
-      );
+      // Resolve a valid author_id — prefer logged-in user, fall back to assignee
+      let authorId = userId;
+      if (!authorId) {
+        const { rows: taskRows } = await client.query(
+          `SELECT assigned_to FROM tasks WHERE id = $1`,
+          [taskId],
+        );
+        authorId = taskRows[0]?.assigned_to ?? null;
+      }
+
+      if (authorId) {
+        await client.query(
+          `INSERT INTO task_comments (task_id, author_id, body, comment_type)
+           VALUES ($1, $2, $3, 'blocked')`,
+          [taskId, authorId, `🚫 Blocked: ${blocked_reason.trim()}`],
+        );
+      }
+      // If still no authorId, skip the comment — don't fail the status update
     }
 
     await client.query("COMMIT");

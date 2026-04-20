@@ -99,7 +99,9 @@ export default function IncidentManagement({
       console.error("createIncident:", err);
       alert(
         "Failed to create incident: " +
-          (err.response?.data?.message ?? err.message),
+          (err.response?.data?.detail ??
+            err.response?.data?.message ??
+            err.message),
       );
     } finally {
       setSaving(false);
@@ -198,7 +200,9 @@ export default function IncidentManagement({
       console.error("convertToTasks:", err);
       alert(
         "Failed to create tasks: " +
-          (err.response?.data?.message ?? err.message),
+          (err.response?.data?.detail ??
+            err.response?.data?.message ??
+            err.message),
       );
     }
   };
