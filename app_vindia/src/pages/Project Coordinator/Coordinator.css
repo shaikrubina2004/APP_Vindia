@@ -279,12 +279,7 @@
   border-color: var(--accent, #2563eb);
   box-shadow: 0 6px 20px rgba(37,99,235,.12);
 }
-.pc-stat-card__icon {
-  font-size: 18px;
-  position: absolute;
-  top: 14px; right: 14px;
-  opacity: .25;
-}
+/* icon removed — not used */
 .pc-stat-card__label {
   font-size: 11px;
   font-weight: 600;
@@ -405,23 +400,21 @@
 .alert-row:last-child { margin-bottom: 0; }
 .alert-row:hover { transform: translateX(4px); box-shadow: 0 3px 10px rgba(0,0,0,.08); }
 
-/* ⚠️ overdue → solid amber */
+/* alert rows — soft, matching theme */
 .alert-row--warn {
-  background: #fff3cd;
-  border: 2px solid #f59e0b;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
   color: #92400e;
 }
-/* ⏳ pending → solid blue */
 .alert-row--info {
-  background: #dbeafe;
-  border: 2px solid #2563eb;
-  color: #1e3a8a;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
 }
-/* 📋 scheduled → solid green */
 .alert-row--ok {
-  background: #d1fae5;
-  border: 2px solid #10b981;
-  color: #064e3b;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
 }
 
 .alert-row__text { flex: 1; }
@@ -440,30 +433,51 @@
 .payment-label { font-size: 12px; font-weight: 600; color: #0a2540; }
 .payment-amt   { font-size: 11px; color: #94a3b8; margin-top: 1px; }
 
-/* ── Badges — solid fills, no washed out pastels ── */
+/* ── Badges — soft outlined style ── */
 .badge {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  padding: 5px 12px;
+  padding: 3px 10px;
   border-radius: 20px;
   letter-spacing: .03em;
   white-space: nowrap;
+  border: 1px solid transparent;
 }
-/* "3 Active" on Alerts header */
-.badge--red {
-  background: #ef4444;
-  color: #ffffff;
+.badge--red    { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+.badge--green  { background: #f0fdf4; color: #16a34a; border-color: #86efac; }
+.badge--yellow { background: #fefce8; color: #ca8a04; border-color: #fde047; }
+
+/* ── Payment footer bar ── */
+.pc-payment-footer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f6ff;
 }
-/* Completed — solid green */
-.badge--green {
-  background: #10b981;
-  color: #ffffff;
+.pc-payment-footer__bar-track {
+  height: 5px; background: #e8edf5; border-radius: 10px;
+  overflow: hidden; margin-bottom: 5px;
 }
-/* Pending — solid amber */
-.badge--yellow {
-  background: #f59e0b;
-  color: #ffffff;
+.pc-payment-footer__bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  border-radius: 10px; transition: width .8s ease;
 }
+.pc-payment-footer__note {
+  font-size: 11px; color: #94a3b8; font-weight: 500;
+}
+
+/* ── View All button ── */
+.pc-view-all {
+  background: none; border: none;
+  color: #2563eb; font-size: 11px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  padding: 2px 0; text-decoration: underline;
+  transition: opacity .2s;
+}
+.pc-view-all:hover { opacity: .7; }
+
+/* ── Payment row hover ── */
+.payment-row:hover { background: #f8fbff; border-radius: 8px; }
 
 /* ══════════════════════════════════════════════
    SCROLLBAR
@@ -535,4 +549,163 @@
   .pc-title { font-size: 18px; }
   .pc-stat-card__value { font-size: 24px; }
   .pc-project-card__name { font-size: 12px; }
+}
+
+/* ══════════════════════════════════════════════
+   NOTIFICATION BELL + PANEL
+══════════════════════════════════════════════ */
+.pc-notif-wrap {
+  position: relative;
+}
+
+.pc-notif-btn {
+  position: relative;
+  background: #fff;
+  border: 1.5px solid #e2eaf4;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: #475569;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+}
+.pc-notif-btn:hover, .pc-notif-btn.active {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.pc-notif-badge {
+  position: absolute;
+  top: -5px; right: -5px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 9px; font-weight: 800;
+  min-width: 17px; height: 17px;
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid #fff;
+  font-family: inherit;
+}
+
+/* notification dropdown panel */
+.notif-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 380px;
+  background: #fff;
+  border: 1.5px solid #e2eaf4;
+  border-radius: 18px;
+  box-shadow: 0 12px 40px rgba(37,99,235,.14);
+  z-index: 999;
+  animation: fadeUp .25s ease both;
+  overflow: hidden;
+}
+
+.notif-panel__header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 16px 18px 10px;
+  border-bottom: 1px solid #f0f6ff;
+}
+.notif-panel__title  { font-size:15px; font-weight:800; color:#0a2540; }
+.notif-panel__unread {
+  font-size:10px; font-weight:700; color:#2563eb;
+  background:#eff6ff; border:1px solid #bfdbfe;
+  padding:2px 8px; border-radius:20px; margin-top:3px; display:inline-block;
+}
+
+.notif-mark-all {
+  background: none; border: none; color: #2563eb;
+  font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;
+  text-decoration: underline; transition: opacity .2s;
+}
+.notif-mark-all:hover { opacity: .7; }
+.notif-close {
+  background: none; border: none; color: #94a3b8;
+  font-size:14px; cursor:pointer; padding:0 4px; line-height:1;
+}
+.notif-close:hover { color: #0a2540; }
+
+/* type filters */
+.notif-filters {
+  display: flex; gap: 5px; padding: 10px 14px;
+  border-bottom: 1px solid #f0f6ff; overflow-x: auto;
+  scrollbar-width: none;
+}
+.notif-filters::-webkit-scrollbar { display: none; }
+.notif-filter-btn {
+  padding: 4px 12px; border-radius: 20px;
+  font-size:11px; font-weight:600; font-family:inherit;
+  border:1px solid #e2eaf4; background:#fff;
+  color:#64748b; cursor:pointer; transition:all .2s; white-space:nowrap;
+}
+.notif-filter-btn:hover  { border-color:#bfdbfe; color:#2563eb; }
+.notif-filter-btn.active { background:#eff6ff; border-color:#2563eb; color:#2563eb; }
+
+/* notification list */
+.notif-list {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.notif-list::-webkit-scrollbar { width: 4px; }
+.notif-list::-webkit-scrollbar-thumb { background:#bfdbfe; border-radius:4px; }
+
+.notif-empty {
+  text-align:center; padding:24px; color:#94a3b8; font-size:13px;
+}
+
+.notif-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background .15s;
+  border-bottom: 1px solid #f8fafc;
+}
+.notif-item:last-child { border-bottom: none; }
+.notif-item:hover { background: #f8fbff; }
+.notif-item.read  { opacity: .7; }
+.notif-item.unread { background: #fafcff; }
+
+.notif-item__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 5px;
+}
+.notif-item__body { flex: 1; min-width: 0; }
+.notif-item__top  {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 3px;
+}
+.notif-type-chip {
+  font-size:9px; font-weight:700; padding:2px 7px;
+  border-radius:20px; letter-spacing:.04em;
+}
+.notif-item__time  { font-size:10px; color:#94a3b8; margin-left: auto; }
+.notif-unread-dot  {
+  width:6px; height:6px; border-radius:50%;
+  background:#2563eb; flex-shrink:0;
+}
+.notif-item__title { font-size:12px; font-weight:700; color:#0a2540; margin-bottom:2px; }
+.notif-item__desc  { font-size:11px; color:#64748b; line-height:1.4; }
+
+/* ── quick notification summary in side panel ── */
+.pc-notif-summary-row {
+  display:flex; align-items:center; gap:9px;
+  padding:8px 0; cursor:pointer;
+  border-bottom:1px solid #f0f6ff;
+  transition: background .15s;
+}
+.pc-notif-summary-row:last-child  { border-bottom:none; }
+.pc-notif-summary-row:hover       { background:#f8fbff; border-radius:8px; padding:8px 6px; }
+.pc-notif-summary-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.pc-notif-summary-text { flex:1; min-width:0; }
+.pc-notif-summary-title { font-size:12px; font-weight:600; color:#0a2540; display:block; }
+.pc-notif-summary-time  { font-size:10px; color:#94a3b8; }
+.pc-notif-type-tag {
+  font-size:9px; font-weight:700; padding:2px 7px;
+  border-radius:20px; white-space:nowrap;
+}
+
+@media (max-width: 600px) {
+  .notif-panel { width: calc(100vw - 28px); right: -14px; }
 }

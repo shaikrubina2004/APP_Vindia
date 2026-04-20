@@ -1,0 +1,360 @@
+/* ============================================================
+   PAYMENT PAGE — same blue/white theme as Coordinator
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+@keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+@keyframes slideD { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── page ── */
+.pay-page {
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+  padding: 28px 32px;
+  background: linear-gradient(160deg, #f0f6ff 0%, #eef3f9 55%, #f8fbff 100%);
+  min-height: 100vh;
+  color: #0a2540;
+}
+
+/* ── header ── */
+.pay-header {
+  margin-bottom: 22px;
+  animation: fadeUp .4s ease both;
+}
+.pay-breadcrumb { font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:.07em; text-transform:uppercase; margin-bottom:4px; }
+.pay-title      { font-size:26px; font-weight:800; color:#0a2540; letter-spacing:-.3px; }
+
+/* ══════════════════════════════
+   SUMMARY CARDS
+══════════════════════════════ */
+.pay-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+  animation: fadeUp .4s .06s ease both;
+}
+.pay-summary-card {
+  background: #fff;
+  border: 1px solid #e8edf5;
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 6px rgba(37,99,235,.04);
+  transition: box-shadow .2s;
+}
+.pay-summary-card:hover { box-shadow: 0 6px 18px rgba(37,99,235,.08); }
+.pay-summary-card__label { font-size:10px; font-weight:600; color:#94a3b8; letter-spacing:.06em; text-transform:uppercase; margin-bottom:5px; }
+.pay-summary-card__val   { font-size:22px; font-weight:800; line-height:1; }
+
+/* ══════════════════════════════
+   PROGRESS CARD
+══════════════════════════════ */
+.pay-progress-card {
+  background: #fff;
+  border: 1px solid #e8edf5;
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 6px rgba(37,99,235,.04);
+  animation: fadeUp .4s .1s ease both;
+}
+.pay-progress-card__top {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px;
+}
+.pay-progress-card__label { font-size:12px; font-weight:700; color:#0a2540; }
+.pay-progress-card__pct   { font-size:12px; font-weight:700; color:#2563eb; }
+
+.pay-progress-track {
+  height: 8px; background: #e8edf5; border-radius: 10px;
+  overflow: hidden; display: flex; margin-bottom: 10px;
+}
+.pay-progress-fill {
+  height: 100%; transition: width 1s ease;
+}
+.pay-progress-fill--paid    { background: #2563eb; }
+.pay-progress-fill--partial { background: #93c5fd; }
+
+.pay-progress-legend {
+  display: flex; gap: 16px; flex-wrap: wrap;
+}
+.pay-progress-legend span {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: #64748b; font-weight: 500;
+}
+.pay-legend-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* ══════════════════════════════
+   FILTERS
+══════════════════════════════ */
+.pay-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  animation: fadeUp .4s .14s ease both;
+}
+.pay-search {
+  flex: 1; min-width: 200px;
+  padding: 8px 14px;
+  border: 1.5px solid #dbeafe;
+  border-radius: 10px;
+  font-size: 13px; font-family: inherit;
+  color: #0a2540; background: #fff; outline: none;
+  transition: border-color .2s;
+}
+.pay-search:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.08); }
+.pay-search::placeholder { color: #94a3b8; }
+
+.pay-select {
+  padding: 8px 14px; border-radius: 10px;
+  border: 1.5px solid #dbeafe; background: #fff;
+  font-size: 13px; font-weight: 600; color: #0a2540;
+  font-family: inherit; outline: none; cursor: pointer; transition: border-color .2s;
+}
+.pay-select:focus { border-color: #2563eb; }
+
+.pay-status-tabs { display: flex; gap: 5px; flex-wrap: wrap; }
+.pay-status-tab {
+  padding: 7px 14px; border-radius: 8px;
+  font-size: 12px; font-weight: 600; font-family: inherit;
+  border: 1.5px solid #e8edf5; background: #fff;
+  color: #64748b; cursor: pointer; transition: all .2s;
+}
+.pay-status-tab:hover  { border-color: #bfdbfe; color: #2563eb; }
+.pay-status-tab.active { background: #eff6ff; border-color: #2563eb; color: #2563eb; }
+
+.pay-count {
+  font-size: 12px; color: #94a3b8; font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.pay-empty {
+  text-align:center; padding:48px 20px; color:#94a3b8; font-size:14px;
+  background:#fff; border:1px solid #e8edf5; border-radius:14px;
+}
+
+/* ══════════════════════════════
+   PAYMENT CARDS
+══════════════════════════════ */
+.pay-list { display: flex; flex-direction: column; gap: 8px; animation: fadeUp .4s .18s ease both; }
+
+.pay-card {
+  background: #fff;
+  border: 1px solid #e8edf5;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  transition: border-color .2s, box-shadow .2s;
+}
+.pay-card:hover, .pay-card.open {
+  border-color: #bfdbfe;
+  box-shadow: 0 4px 16px rgba(37,99,235,.08);
+}
+.pay-card.overdue {
+  border-color: #fca5a5;
+}
+.pay-card.overdue:hover { border-color: #ef4444; }
+
+/* left accent strip */
+.pay-card__accent {
+  width: 4px; flex-shrink: 0;
+}
+
+/* collapsed header */
+.pay-card__header {
+  flex: 1; display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px; cursor: pointer; gap: 16px;
+}
+.pay-card__main { flex: 1; min-width: 0; }
+.pay-card__top  {
+  display: flex; align-items: center; gap: 7px;
+  flex-wrap: wrap; margin-bottom: 3px;
+}
+.pay-card__invoice  { font-size:11px; font-weight:700; color:#94a3b8; letter-spacing:.04em; }
+.pay-card__milestone { font-size:13px; font-weight:700; color:#0a2540; margin-bottom:2px; }
+.pay-card__project  { font-size:11px; color:#94a3b8; font-weight:500; }
+
+/* right side */
+.pay-card__right {
+  display: flex; flex-direction: column;
+  align-items: flex-end; gap: 6px; flex-shrink: 0;
+}
+.pay-card__amount {
+  font-size: 16px; font-weight: 800; color: #0a2540;
+}
+.pay-card__meta-row {
+  display: flex; align-items: center; gap: 16px;
+}
+.pay-meta-item { text-align: right; }
+.pay-meta-label { font-size:10px; color:#94a3b8; font-weight:600; text-transform:uppercase; margin-bottom:1px; }
+.pay-meta-val   { font-size:12px; color:#0a2540; font-weight:600; }
+.pay-chevron    { font-size:10px; color:#94a3b8; }
+
+/* badges */
+.pay-badge {
+  font-size: 10px; font-weight: 700;
+  padding: 3px 9px; border-radius: 20px;
+  white-space: nowrap;
+}
+.pay-type-chip {
+  font-size: 10px; font-weight: 700;
+  padding: 3px 9px; border-radius: 20px;
+  white-space: nowrap;
+}
+
+/* expanded body */
+.pay-card__body {
+  border-top: 1px solid #e8edf5;
+  padding: 14px 16px 16px 20px;
+  background: #fafcff;
+  animation: slideD .2s ease both;
+}
+.pay-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.pay-detail-block { background:#fff; border:1px solid #e8edf5; border-radius:10px; padding:10px 12px; }
+.pay-detail-block--wide { grid-column: 1 / -1; }
+.pay-detail-label { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.05em; margin-bottom:3px; }
+.pay-detail-val   { font-size:13px; color:#0a2540; line-height:1.4; }
+
+.pay-overdue-alert {
+  background: #fef2f2; border: 1px solid #fca5a5;
+  border-radius: 10px; padding: 10px 14px;
+  font-size: 12px; font-weight: 600; color: #dc2626;
+}
+
+/* ══════════════════════════════
+   RESPONSIVE — TABLET ≤ 900px
+══════════════════════════════ */
+@media (max-width: 900px) {
+  .pay-summary { grid-template-columns: repeat(2, 1fr); }
+  .pay-card__header { flex-wrap: wrap; }
+  .pay-card__right  { align-items: flex-start; }
+  .pay-detail-grid  { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ══════════════════════════════
+   RESPONSIVE — MOBILE ≤ 600px
+══════════════════════════════ */
+@media (max-width: 600px) {
+  .pay-page   { padding: 16px 14px; }
+  .pay-title  { font-size: 20px; }
+  .pay-summary { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .pay-summary-card__val { font-size: 18px; }
+  .pay-filters { flex-direction: column; align-items: stretch; }
+  .pay-search  { min-width: unset; }
+  .pay-status-tabs { overflow-x: auto; flex-wrap: nowrap; }
+  .pay-card__header { padding: 11px 12px; gap: 10px; }
+  .pay-card__meta-row { gap: 10px; flex-wrap: wrap; }
+  .pay-detail-grid { grid-template-columns: 1fr; }
+  .pay-card__amount { font-size: 14px; }
+}
+
+/* ══════════════════════════════
+   PROJECT TABS
+══════════════════════════════ */
+.pay-project-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 20px;
+  animation: fadeUp .4s .12s ease both;
+}
+.pay-project-tab {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 16px; border-radius: 10px;
+  font-size: 12px; font-weight: 600; font-family: inherit;
+  border: 1.5px solid #e8edf5; background: #fff;
+  color: #64748b; cursor: pointer; transition: all .2s;
+  white-space: nowrap;
+}
+.pay-project-tab:hover  { border-color: #bfdbfe; color: #2563eb; }
+.pay-project-tab.active {
+  background: linear-gradient(135deg, #eff6ff, #fff);
+  border-color: #2563eb; color: #2563eb;
+  box-shadow: 0 4px 12px rgba(37,99,235,.12);
+}
+.pay-tab-count {
+  background: #e2eaf4; color: #475569;
+  font-size: 10px; font-weight: 700;
+  padding: 1px 7px; border-radius: 20px;
+}
+.pay-project-tab.active .pay-tab-count { background: #2563eb; color: #fff; }
+
+/* ══════════════════════════════
+   PROJECT SECTION
+══════════════════════════════ */
+.pay-project-section {
+  background: #fff;
+  border: 1px solid #e8edf5;
+  border-radius: 18px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 10px rgba(37,99,235,.05);
+  animation: fadeUp .4s ease both;
+}
+
+.pay-project-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 14px; flex-wrap: wrap; gap: 10px;
+}
+.pay-project-name   { font-size:16px; font-weight:800; color:#0a2540; margin-bottom:2px; }
+.pay-project-client { font-size:12px; color:#94a3b8; font-weight:500; }
+.pay-project-header__right { display:flex; gap:7px; align-items:center; }
+
+.pay-project-alert {
+  background:#fef2f2; color:#dc2626; border:1px solid #fca5a5;
+  font-size:10px; font-weight:700; padding:3px 10px; border-radius:20px;
+}
+.pay-project-pending {
+  background:#fefce8; color:#ca8a04; border:1px solid #fde047;
+  font-size:10px; font-weight:700; padding:3px 10px; border-radius:20px;
+}
+
+/* project stats row */
+.pay-project-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 12px; margin-bottom: 12px;
+}
+.pay-project-stat {
+  background: #f8fbff; border:1px solid #e8edf5;
+  border-radius: 10px; padding: 10px 12px;
+}
+.pay-project-stat--profit {
+  background: #f5f3ff; border-color: #ddd6fe;
+  position: relative;
+}
+.pay-project-stat__label { font-size:10px; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+.pay-project-stat__val   { font-size:16px; font-weight:800; color:#0a2540; line-height:1; }
+.pay-project-stat__note  { font-size:9px; color:#94a3b8; margin-top:3px; font-style:italic; }
+
+/* project progress bar */
+.pay-proj-bar-wrap {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}
+.pay-proj-bar-track {
+  flex:1; height:6px; background:#e8edf5; border-radius:10px; overflow:hidden;
+}
+.pay-proj-bar-fill {
+  height:100%;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  border-radius:10px; transition: width 1s ease;
+}
+.pay-proj-bar-pct { font-size:11px; font-weight:700; color:#2563eb; flex-shrink:0; }
+
+@media (max-width: 900px) {
+  .pay-project-stats { grid-template-columns: repeat(2, 1fr); }
+  .pay-project-tabs  { overflow-x: auto; flex-wrap: nowrap; }
+}
+@media (max-width: 600px) {
+  .pay-project-section { padding: 14px; }
+  .pay-project-stats   { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .pay-project-stat__val { font-size: 14px; }
+}

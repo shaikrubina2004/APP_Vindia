@@ -33,6 +33,8 @@ import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
 import ArchitectTasks from "../pages/Architect/ArchitectTasks";
 import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
 import DailyUpdatesPC from "../pages/Project Coordinator/DailyUpdates";
+import Milestone from "../pages/Project Coordinator/Milestone";
+import Payment      from "../pages/Project Coordinator/Payment";
 import ArchitectLayout from "../layouts/ArchitectLayout";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
@@ -321,7 +323,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
+      {/* PROJECT COORDINATOR */}
       <Route
         path="/project-coordinator/dashboard"
         element={
@@ -342,6 +344,26 @@ const AppRoutes = () => {
         </ProtectedRoute>
       }
     />
+    <Route
+    path="/project-coordinator/milestone"
+    element={
+      <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
+        <ProjectCoordinatorLayout>
+          <Milestone />
+        </ProjectCoordinatorLayout>
+      </ProtectedRoute>
+    }
+  />
+  <Route
+    path="/project-coordinator/payments"
+    element={
+      <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
+        <ProjectCoordinatorLayout>
+          <Payment />
+        </ProjectCoordinatorLayout>
+      </ProtectedRoute>
+    }
+  />
 
       <Route
         path="/site-engineer/dashboard"
