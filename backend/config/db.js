@@ -7,4 +7,8 @@ const pool = new Pool({
   },
 });
 
+pool.connect()
+  .then(() => console.log("🟢 Supabase DB Connected"))
+  .catch(err => console.error("🔴 DB Error:", err));
+
 module.exports = pool;

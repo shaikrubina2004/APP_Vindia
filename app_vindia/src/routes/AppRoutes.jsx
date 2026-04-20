@@ -50,6 +50,7 @@ import AppShell from "../components/incidents/AppShell";
 import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
 import Reports from "../pages/projects/projectmanager/Reports";
 import SiteEngineerLayout from "../layouts/SiteEngineerLayout"; // ADD THIS
+<<<<<<< Updated upstream
 import DailyDiary from "../pages/siteEngineer/DailyDiary";
 import RFI from "../pages/siteEngineer/RFI";
 import NCR from "../pages/siteEngineer/NCR";
@@ -58,6 +59,13 @@ import Checklist from "../pages/siteEngineer/Checklist";
 import Progress from "../pages/siteEngineer/Progress";
 import ActivityLog from "../pages/siteEngineer/ActivityLog";
 
+=======
+import DailyDiary from "../pages/Site Engineer/DailyDiary";
+import RFI from "../pages/Site Engineer/RFI";
+import RFIDetails from "../pages/Structural Engineer/RFIDetails";
+import NCR from "../pages/Site Engineer/NCR";
+import StructuralRoutes from "./StructuralRoutes";
+>>>>>>> Stashed changes
 
 const AppRoutes = () => {
   const useIsMobile = () => {
@@ -466,6 +474,7 @@ const AppRoutes = () => {
 
       <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
 
+      <Route path="/structural-engineer/rfi/:id" element={<RFIDetails />} />
       <Route
         path="/planning-engineer/dashboard"
         element={

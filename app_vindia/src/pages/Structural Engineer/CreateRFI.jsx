@@ -1,63 +1,71 @@
 import { useState } from "react";
+<<<<<<< Updated upstream
 import axios from "axios";
 import "./RFI.css";
+=======
+import "./rfi.css";
+>>>>>>> Stashed changes
 
-export default function CreateRFI({ onClose, refresh }) {
+export default function CreateRFI({ onClose, onCreate }) {
   const [form, setForm] = useState({
     project: "",
     subject: "",
-    description: "",
     priority: "Medium",
   });
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const handleSubmit = (e) => {
+    e.preventDefault();
 
-  const handleSubmit = async () => {
-    try {
-      await axios.post("http://localhost:5000/api/rfi", form);
-      refresh(); // reload table
-      onClose(); // close modal
-    } catch (err) {
-      console.error(err);
-      alert("Error creating RFI");
-    }
+    onCreate({
+      project: form.project,
+      subject: form.subject,
+      priority: form.priority,
+    });
+
+    onClose(); // close modal after submit
   };
 
   return (
-    <div className="rfi-modal">
-      <div className="rfi-modal-content">
-        <h3>Create RFI</h3>
+    <div className="modal-overlay">
+      <div className="modal-box">
+        <h3>Create New RFI</h3>
 
-        <input
-          name="project"
-          placeholder="Project Name"
-          onChange={handleChange}
-        />
+        <form onSubmit={handleSubmit} className="modal-form">
+          <label>Project</label>
+          <input
+            type="text"
+            value={form.project}
+            onChange={(e) => setForm({ ...form, project: e.target.value })}
+            required
+          />
 
-        <input
-          name="subject"
-          placeholder="Subject"
-          onChange={handleChange}
-        />
+          <label>Subject</label>
+          <textarea
+            value={form.subject}
+            onChange={(e) => setForm({ ...form, subject: e.target.value })}
+            required
+          />
 
-        <textarea
-          name="description"
-          placeholder="Describe the issue..."
-          onChange={handleChange}
-        />
+          <label>Priority</label>
+          <select
+            value={form.priority}
+            onChange={(e) => setForm({ ...form, priority: e.target.value })}
+          >
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
 
-        <select name="priority" onChange={handleChange}>
-          <option>High</option>
-          <option>Medium</option>
-          <option>Low</option>
-        </select>
+          <div className="modal-actions">
+            <button type="button" onClick={onClose} className="cancel-btn">
+              Cancel
+            </button>
 
-        <div className="rfi-actions">
-          <button onClick={handleSubmit}>Submit</button>
-          <button onClick={onClose}>Cancel</button>
-        </div>
+            <button type="submit" className="submit-btn">
+              Create
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

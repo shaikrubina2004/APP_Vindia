@@ -3,7 +3,6 @@ const router = express.Router();
 const pool = require("../config/db");
 const multer = require("multer");
 const path = require("path");
-
 // ==============================
 // 📂 MULTER CONFIG (FILE UPLOAD)
 // ==============================

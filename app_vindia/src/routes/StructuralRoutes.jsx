@@ -1,5 +1,3 @@
-// src/routes/StructuralRoutes.jsx
-
 import { Routes, Route } from "react-router-dom";
 import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
 
@@ -12,7 +10,7 @@ import RFI from "../pages/Structural Engineer/RFI";
 import Approvals from "../pages/Structural Engineer/Approvals";
 import Reports from "../pages/Structural Engineer/Reports";
 import Coordination from "../pages/Structural Engineer/Coordination";
-
+import SEDailyUpdates from "../pages/Structural Engineer/SEDailyUpdates";
 
 function StructuralRoutes() {
   return (
@@ -27,6 +25,7 @@ function StructuralRoutes() {
         <Route path="approvals" element={<Approvals />} />
         <Route path="reports" element={<Reports />} />
         <Route path="coordination" element={<Coordination />} />
+        <Route path="daily-updates" element={<SEDailyUpdates />} />
       </Routes>
     </StructuralEngineerLayout>
   );
