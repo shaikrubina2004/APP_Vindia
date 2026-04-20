@@ -26,6 +26,13 @@ import SiteEngineerDashboard from "../pages/siteEngineer/SiteEngineerDashboard";
 import PlanningEngineerDashboard from "../pages/Planning Engineer/PlanningEngineerDashboard";
 import QCDashboard from "../pages/QC Engineer/QCDashboard";
 import QuantitySurveyorDashboard from "../pages/Quality Surveyor/QuantitySurveyorDashboard";
+import Qsdailyupdates from "../pages/Quality Surveyor/Qsdailyupdates";
+import Qsboq from "../pages/Quality Surveyor/Qsboq";
+import Measurements from "../pages/Quality Surveyor/Measurements";
+import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
+import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
+import Qssubmissions from "../pages/Quality Surveyor/Qssubmissions";
+import Incident from "../pages/Quality Surveyor/Incident";
 import SafetyOfficerDashboard from "../pages/Safety Officer/SafetyOfficerDashboard";
 import StructuralEngineerDashboard from "../pages/Structural Engineer/StructuralEngineerDashboard";
 import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
@@ -33,6 +40,7 @@ import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
 import ArchitectTasks from "../pages/Architect/ArchitectTasks";
 import ArchitectDailyLogins from "../pages/Architect/ArchitectDailyLogins";
 import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
+import QuantitySurveyorLayout from "../layouts/QuantitySurveyorLayout";
 import DailyUpdatesPC from "../pages/Project Coordinator/DailyUpdates";
 import Milestone from "../pages/Project Coordinator/Milestone";
 import Payment      from "../pages/Project Coordinator/Payment";
@@ -457,13 +465,82 @@ const AppRoutes = () => {
         path="/quantity-surveyor/dashboard"
         element={
           <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
-            <ProjectManagerLayout>
+            <QuantitySurveyorLayout>
               <QuantitySurveyorDashboard />
-            </ProjectManagerLayout>
+            </QuantitySurveyorLayout>
           </ProtectedRoute>
         }
       />
-
+         <Route
+        path="/quantity-surveyor/daily-updates"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Qsdailyupdates />
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
+         <Route
+        path="/quantity-surveyor/incident"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Incident />
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
+         <Route
+        path="//quantity-surveyor/quantity-report"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Qsquantityreport />
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
+          <Route
+        path="/quantity-surveyor/measurements"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Measurements />
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
+          <Route
+        path="/quantity-surveyor/cost-report"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Qscostreport />
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
+           <Route
+        path="/quantity-surveyor/submissions"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Qssubmissions />
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
+          <Route
+        path="/quantity-surveyor/boq"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <QuantitySurveyorLayout>
+              <Qsboq />
+            </QuantitySurveyorLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
 
       <Route

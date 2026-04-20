@@ -1,0 +1,72 @@
+/* PAGE */
+.measurements-container {
+  padding: 24px;
+  background: #f5f7fb;
+  min-height: 100vh;
+}
+
+/* TITLE */
+.measurements-container h2 {
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+/* TABLE */
+.measurements-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.measurements-table th {
+  background: #1e293b;
+  color: #fff;
+  text-align: left;
+  padding: 12px;
+}
+
+.measurements-table td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+/* STATUS */
+.status {
+  font-weight: 600;
+}
+
+.status.Pending {
+  color: orange;
+}
+
+.status.Approved {
+  color: green;
+}
+
+.status.Rejected {
+  color: red;
+}
+
+/* BUTTONS */
+.btn {
+  padding: 6px 12px;
+  margin-right: 6px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn-approve {
+  background: #22c55e;
+  color: white;
+}
+
+.btn-reject {
+  background: #ef4444;
+  color: white;
+}
