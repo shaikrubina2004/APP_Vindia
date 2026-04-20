@@ -1,56 +1,96 @@
-import { useState } from "react";
+import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import "./rfi.css";
 
 export default function RFIDetails() {
-  const [messages, setMessages] = useState([
-    { sender: "Site Engineer", text: "Please clarify beam detail." },
-    { sender: "Structural Engineer", text: "Refer drawing S-102." },
-  ]);
+  const { id } = useParams();
 
-  const [input, setInput] = useState("");
+  const [rfi, setRfi] = useState(null);
+  const [answer, setAnswer] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const sendMessage = () => {
-    if (!input) return;
+  // ✅ FETCH
+  useEffect(() => {
+    const fetchRFI = async () => {
+      try {
+        const res = await axios.get(`http://localhost:5000/rfis/${id}`);
+        setRfi(res.data);
+        setAnswer(res.data.response || "");
+      } catch (err) {
+        console.error(err);
+      }
+    };
 
-    setMessages([...messages, { sender: "You", text: input }]);
-    setInput("");
+    fetchRFI();
+  }, [id]);
+
+  // ✅ SUBMIT ANSWER
+  const submitAnswer = async () => {
+    if (!answer.trim()) return alert("Please enter response");
+
+    setLoading(true);
+
+    try {
+      const res = await axios.put(
+        `http://localhost:5000/rfis/${id}/answer`,
+        { response: answer }
+      );
+
+      setRfi(res.data); // 🔥 instant UI update
+      alert("✅ Answer submitted");
+    } catch (err) {
+      console.error(err);
+      alert("❌ Failed to submit");
+    }
+
+    setLoading(false);
   };
+
+  if (!rfi) return <div style={{ padding: 20 }}>Loading...</div>;
 
   return (
     <div className="rfi-details">
-      
       {/* HEADER */}
       <div className="rfi-details-header">
-        <h3>RFI-001</h3>
-        <span className="status pending">Pending</span>
+        <h2>{rfi.rfi_code || `RFI-${rfi.id}`}</h2>
+
+        <span className={`status-badge ${rfi.status.toLowerCase()}`}>
+          {rfi.status}
+        </span>
       </div>
 
       {/* INFO */}
       <div className="rfi-details-info">
-        <p><strong>Project:</strong> Sky Tower</p>
-        <p><strong>Subject:</strong> Beam Reinforcement</p>
+        <p><strong>Project:</strong> {rfi.project}</p>
+        <p><strong>Subject:</strong> {rfi.subject}</p>
+        <p><strong>Priority:</strong> {rfi.priority}</p>
+        <p><strong>Raised By:</strong> {rfi.raised_by || "You"}</p>
+        <p><strong>Date:</strong> {new Date(rfi.date).toLocaleDateString()}</p>
       </div>
 
-      {/* CHAT */}
-      <div className="rfi-chat">
-        {messages.map((msg, i) => (
-          <div key={i} className={`chat-bubble ${msg.sender === "You" ? "you" : ""}`}>
-            <strong>{msg.sender}</strong>
-            <p>{msg.text}</p>
+      {/* ✨ RESPONSE SECTION */}
+      <div className="rfi-response-box">
+        <h3>Response</h3>
+
+        {rfi.status === "Answered" ? (
+          <div className="response-view">
+            {rfi.response || "No response provided"}
           </div>
-        ))}
-      </div>
+        ) : (
+          <>
+            <textarea
+              placeholder="Write your response..."
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+            />
 
-      {/* INPUT */}
-      <div className="rfi-chat-input">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type response..."
-        />
-        <button onClick={sendMessage}>Send</button>
+            <button onClick={submitAnswer} disabled={loading}>
+              {loading ? "Saving..." : "Submit Answer"}
+            </button>
+          </>
+        )}
       </div>
-
     </div>
   );
 }

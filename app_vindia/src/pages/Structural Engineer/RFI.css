@@ -1,16 +1,22 @@
 .rfi-wrapper {
-  padding: 24px;
+  padding: 20px;
   background: #f4f6f9;
   min-height: 100vh;
 }
 
+/* HEADER */
+.rfi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .rfi-title {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
 }
 
 /* CARDS */
-/* ================= CARDS ================= */
 .rfi-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -20,15 +26,14 @@
 
 .rfi-card {
   background: white;
-  padding: 18px;
+  padding: 16px;
   border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
-
 
 .rfi-card strong {
   display: block;
-  font-size: 22px;
+  font-size: 20px;
   margin-top: 5px;
 }
 
@@ -51,50 +56,179 @@
   cursor: pointer;
 }
 
+/* RESPONSE BOX */
+.rfi-response-box {
+  margin-top: 30px;
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.rfi-response-box textarea {
+  width: 100%;
+  height: 120px;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  resize: none;
+}
+
+.rfi-response-box button {
+  margin-top: 10px;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.response-view {
+  background: #f3f4f6;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.response-display {
+  background: #e6fffa;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #10b981;
+}
+
+.answered-tag {
+  color: green;
+  font-size: 12px;
+  font-weight: 600;
+}
 .rfi-tabs .active {
   background: #1f2937;
   color: white;
 }
 
-/* ================= TABLE ================= */
+/* TABLE FIX STARTS HERE 🚀 */
 .rfi-table-container {
   background: white;
   border-radius: 10px;
   overflow-x: auto;
 }
 
-
+/* TABLE */
 .rfi-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 700px;
+  table-layout: fixed;
+}
+/* ROW COLORS */
+.rfi-table tr.pending {
+  border-left: 4px solid #f97316;
 }
 
-.rfi-table th,
-.rfi-table td {
-  padding: 12px;
+.rfi-table tr.answered {
+  border-left: 4px solid #16a34a;
 }
 
-
-.rfi-table th {
-  background: #f9fafb;
-  font-size: 12px;
+.rfi-table tr.closed {
+  border-left: 4px solid #6b7280;
 }
-
+.rfi-table tr {
+  transition: 0.2s;
+}
 
 .rfi-table tr:hover {
-  background: #f3f4f6;
+  background: #f9fafb;
+  cursor: pointer;
 }
 
-/* ================= STATUS ================= */
-.status.pending { color: #f59e0b; }
-.status.answered { color: #10b981; }
+.rfi-details {
+  max-width: 900px;
+  margin: auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
 
+.rfi-card {
+  transition: 0.2s;
+}
+
+.rfi-card:hover {
+  transform: translateY(-3px);
+}
+/* CELLS */
+.rfi-table th,
+.rfi-table td {
+  padding: 10px 8px; /* reduced spacing */
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* BETTER COLUMN BALANCE */
+.col-id { width: 80px; }
+.col-project { width: 120px; }
+.col-raised { width: 130px; }
+.col-priority { width: 90px; }
+.col-status { width: 110px; }
+.col-date { width: 110px; }
+
+/* SUBJECT TAKES REMAINING SPACE */
+.col-subject {
+  width: auto;
+}
+
+/* Allow wrap ONLY for subject */
+.text-wrap {
+  white-space: normal;
+}
+
+/* STATUS BADGE IMPROVEMENT */
+/* STATUS BADGES */
+/* STATUS BADGE BASE */
+.status-badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* 🟠 PENDING */
+.status-badge.pending {
+  background: #fff7ed;
+  color: #ea580c;
+  border: 1px solid #fed7aa;
+}
+
+/* 🟢 ANSWERED */
+.status-badge.answered {
+  background: #ecfdf5;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+/* ⚫ CLOSED */
+.status-badge.closed {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+.status-dropdown {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 12px;
+  cursor: pointer;
+}
 
 /* PRIORITY */
-.priority.high { color: #ef4444; }
-.priority.medium { color: #f59e0b; }
-.priority.low { color: #10b981; }
+.priority.high { color: #ef4444; font-weight: 500; }
+.priority.medium { color: #f59e0b; font-weight: 500; }
+.priority.low { color: #10b981; font-weight: 500; }
 
 /* BUTTON */
 .rfi-add-btn {
@@ -110,67 +244,174 @@
   background: #1e40af;
 }
 
+/* ================= MODAL ================= */
 
-/* ================= CHAT ================= */
-.rfi-details {
+/* ================= MODAL OVERLAY ================= */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+/* ================= MODAL BOX ================= */
+.modal-box {
+  background: white;
+  width: 400px;
+  max-width: 90%;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+/* TITLE */
+.modal-box h3 {
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 18px;
+}
+
+/* ================= FORM ================= */
+.modal-form {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  gap: 12px;
+}
+
+/* LABEL */
+.modal-form label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* INPUT + TEXTAREA + SELECT */
+.modal-form input,
+.modal-form textarea,
+.modal-form select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* TEXTAREA HEIGHT */
+.modal-form textarea {
+  min-height: 80px;
+  resize: none;
+}
+
+/* ================= BUTTONS ================= */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cancel-btn {
+  background: #e5e7eb;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.submit-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.submit-btn:hover {
+  background: #1e40af;
+}
+
+
+.status {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rfi-details {
+  padding: 20px;
   background: #fff;
+  min-height: 100vh;
 }
 
 .rfi-details-header {
-  padding: 16px;
-  border-bottom: 1px solid #eee;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
-.rfi-details-info {
-  padding: 16px;
-  border-bottom: 1px solid #eee;
+.rfi-details-info p {
+  margin: 10px 0;
+  font-size: 14px;
 }
-
-.rfi-chat {
-  flex: 1;
-  padding: 16px;
-  overflow-y: auto;
-  background: #f9fafb;
-}
-
-.chat-bubble {
-  background: #e5e7eb;
-  padding: 10px;
-  border-radius: 8px;
-  margin-bottom: 10px;
-  max-width: 70%;
-}
-
-.chat-bubble.you {
-  background: #2563eb;
-  color: white;
-  margin-left: auto;
-}
-
-/* INPUT */
-.rfi-chat-input {
-  display: flex;
-  padding: 10px;
-  border-top: 1px solid #eee;
-}
-
-.rfi-chat-input input {
-  flex: 1;
-  padding: 10px;
-}
-
-.rfi-chat-input button {
+.answer-btn {
   margin-left: 10px;
+  padding: 4px 8px;
+  font-size: 11px;
+  border: none;
+  background: #16a34a;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.answer-btn:hover {
+  background: #15803d;
+}
+
+/* ================= ANIMATION ================= */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* ANIMATION */
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* MOBILE */
+@media (max-width: 480px) {
+  .modal-box {
+    width: 95%;
+    padding: 16px;
+  }
 }
 
 /* ================= RESPONSIVE ================= */
 
-/* 📱 Mobile (iPhone) */
+/* MOBILE */
 @media (max-width: 640px) {
   .rfi-wrapper {
     padding: 12px;
@@ -186,25 +427,21 @@
 
   .rfi-table th,
   .rfi-table td {
+    font-size: 11px;
     padding: 8px;
-    font-size: 12px;
-  }
-
-  .chat-bubble {
-    max-width: 90%;
   }
 }
 
-/* 📱 Tablet */
+/* TABLET */
 @media (max-width: 1024px) {
   .rfi-cards {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .col-subject { width: 180px; }
 }
 
-/* 💻 Laptop/Desktop */
-@media (min-width: 1025px) {
-  .rfi-cards {
-    grid-template-columns: repeat(4, 1fr);
-  }
+/* LARGE SCREENS */
+@media (min-width: 1400px) {
+  .col-subject { width: 260px; }
 }
