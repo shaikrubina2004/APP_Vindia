@@ -1,10 +1,10 @@
-require("dotenv").config();
-
 const express = require("express");
 const cors = require("cors");
+require("dotenv").config();
+
+const pool = require("./config/db");
 const path = require("path");
 
-<<<<<<< Updated upstream
 /* ── EXISTING ROUTES ─────────────────────────────────────── */
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -32,35 +32,10 @@ const app = express();
 /* ═══════════════════════════════════════════════════════════
    MIDDLEWARE
 ═══════════════════════════════════════════════════════════ */
-=======
-const app = express();
-
-/* ── DB ───────────────── */
-const pool = require("./config/db");
-
-/* ── ROUTES ───────────── */
-const authRoutes = require("./routes/authRoutes");
-const userRoutes = require("./routes/userRoutes");
-const employeeRoutes = require("./routes/employeeRoutes");
-const attendanceRoutes = require("./routes/attendanceRoutes");
-const leaveRoutes = require("./routes/leaveRoutes");
-const rfiRoutes = require("./routes/rfiRoutes");
-const structuralRoutes = require("./routes/structuralRoutes"); // ✅ ADD THIS
-// OPTIONAL (only if exists)
-let incidentRoutes;
-try {
-  incidentRoutes = require("./routes/incidentRoutes");
-} catch (err) {
-  console.log("⚠️ Incident routes not found, skipping...");
-}
-
-/* ── MIDDLEWARE ───────── */
->>>>>>> Stashed changes
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-<<<<<<< Updated upstream
 /* ═══════════════════════════════════════════════════════════
    DEBUG
 ═══════════════════════════════════════════════════════════ */
@@ -73,22 +48,16 @@ console.log("leaveRoutes:", typeof leaveRoutes);
 /* ═══════════════════════════════════════════════════════════
    TEST DB
 ═══════════════════════════════════════════════════════════ */
-=======
-/* ── STATIC ───────────── */
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-/* ── TEST DB ──────────── */
->>>>>>> Stashed changes
 app.get("/", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
-    res.json({ message: "API Running ✅", time: result.rows[0] });
+    res.json(result.rows);
   } catch (err) {
+    console.error(err);
     res.status(500).send("Database error");
   }
 });
 
-<<<<<<< Updated upstream
 /* ═══════════════════════════════════════════════════════════
    ROUTES
 ═══════════════════════════════════════════════════════════ */
@@ -129,36 +98,6 @@ try {
 app.use((_req, res) =>
   res.status(404).json({ success: false, message: "Route not found" }),
 );
-=======
-/* ── ROUTES ───────────── */
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/employees", employeeRoutes);
-app.use("/api/attendance", attendanceRoutes);
-app.use("/api/leaves", leaveRoutes);
-app.use("/api/rfis", rfiRoutes);
-app.use("/api/structural", structuralRoutes); // ✅ ADD THIS
-// optional
-if (incidentRoutes) {
-  app.use("/api/incidents", incidentRoutes);
-}
-
-/* ── 404 ─────────────── */
-app.use((_req, res) => {
-  res.status(404).json({ success: false, message: "Route not found" });
-});
-
-/* ── ERROR ───────────── */
-app.use((err, _req, res, _next) => {
-  res.status(500).json({
-    success: false,
-    message: err.message || "Internal server error",
-  });
-});
-
-/* ── START ───────────── */
-const PORT = process.env.PORT || 5000;
->>>>>>> Stashed changes
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {

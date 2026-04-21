@@ -1,11 +1,7 @@
-<<<<<<< Updated upstream
-import { useState } from "react";
+
+import { useState , useEffect} from "react";
 import "./RFI.css";
-=======
-import { useState, useEffect } from "react";
 import axios from "axios";
-import "./rfi.css";
->>>>>>> Stashed changes
 import CreateRFI from "./CreateRFI";
 import { useNavigate } from "react-router-dom";
 
