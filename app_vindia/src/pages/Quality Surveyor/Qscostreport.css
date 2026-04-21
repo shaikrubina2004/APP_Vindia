@@ -1,0 +1,132 @@
+* {
+  box-sizing: border-box;
+}
+
+/* PAGE */
+.qscr-container {
+  padding: 20px;
+  background: #eef2f7;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* HEADER */
+.qscr-header {
+  margin-bottom: 20px;
+}
+
+.qscr-header h2 {
+  font-size: 22px;
+  color: #1e293b;
+}
+
+/* CARDS */
+.qscr-cards {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.card {
+  flex: 1;
+  min-width: 200px;
+  background: white;
+  padding: 18px;
+  border-radius: 12px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+.card.over {
+  border-left: 4px solid #ef4444;
+}
+
+.card.under {
+  border-left: 4px solid #22c55e;
+}
+
+/* TABLE WRAPPER (IMPORTANT) */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  background: white;
+  border-radius: 12px;
+  padding: 15px;
+}
+
+/* TABLE */
+.cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* HEAD */
+.cost-table thead {
+  background: #1e293b;
+  color: white;
+}
+
+/* CELLS */
+.cost-table th,
+.cost-table td {
+  padding: 12px;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* PREVENT TEXT BREAKING */
+.money {
+  white-space: nowrap;
+}
+
+/* ROW */
+.cost-table tr {
+  border-bottom: 1px solid #eee;
+}
+
+.cost-table tr:hover {
+  background: #f9fafb;
+}
+
+/* COLORS */
+.green {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.red {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* BADGE */
+.badge {
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.badge.green {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.badge.red {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+
+  .qscr-cards {
+    flex-direction: column;
+  }
+
+  .cost-table th,
+  .cost-table td {
+    font-size: 12px;
+    padding: 8px;
+  }
+}
