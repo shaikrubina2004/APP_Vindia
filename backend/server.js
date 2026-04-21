@@ -27,6 +27,9 @@ const analysisRoutes = require("./routes/analysis");
 /* ── INCIDENT MODULE ─────────────────────────────────────── */
 const incidentRoutes = require("./routes/IncidentRoutes");
 
+/* ── 🔥 NEW: PC DAILY UPDATE ROUTE ───────────────────────── */
+const pcDailyUpdateRoutes = require("./routes/pcDailyUpdateRoutes");
+
 const app = express();
 
 /* ═══════════════════════════════════════════════════════════
@@ -44,6 +47,7 @@ console.log("userRoutes:", typeof userRoutes);
 console.log("employeeRoutes:", typeof employeeRoutes);
 console.log("attendanceRoutes:", typeof attendanceRoutes);
 console.log("leaveRoutes:", typeof leaveRoutes);
+console.log("pcDailyUpdateRoutes:", typeof pcDailyUpdateRoutes);
 
 /* ═══════════════════════════════════════════════════════════
    TEST DB
@@ -88,6 +92,10 @@ try {
 
   /* ── Incident Module ───────────────────────────────────── */
   app.use("/api/incidents", incidentRoutes);
+
+  /* ── 🔥 NEW: PC DAILY UPDATE ROUTE ─────────────────────── */
+  app.use("/api/pc-daily-updates", pcDailyUpdateRoutes);
+
 } catch (err) {
   console.error("❌ Route loading error:", err.message);
 }
@@ -109,7 +117,10 @@ app.use((err, _req, res, _next) => {
 });
 
 /* ═══════════════════════════════════════════════════════════
-   START
+   START SERVER
 ═══════════════════════════════════════════════════════════ */
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});

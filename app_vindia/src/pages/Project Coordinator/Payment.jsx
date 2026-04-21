@@ -96,88 +96,95 @@ const TypeChip = ({ type }) => (
   <span className="pay-type-chip" style={{ color: TYPE_COLOR[type] || "#475569", background: `${TYPE_COLOR[type] || "#475569"}12`, border: `1px solid ${TYPE_COLOR[type] || "#475569"}30` }}>{type}</span>
 );
 
-/* ─── Month/Year Dropdown ─── */
-const MonthDropdown = ({ value, onChange }) => {
+/* ─── Month Year Picker — uses full-page overlay like notification panel ─── */
+const MonthYearPicker = ({ value, onChange }) => {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [viewYear, setViewYear] = useState(() => {
+    if (value) return parseInt(value.split("-")[0]);
+    return new Date().getFullYear();
+  });
 
-  useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+  const activeYears = [...new Set(ACTIVITY_MONTHS.map(m => parseInt(m.split("-")[0])))].sort();
+  const minYear = activeYears[0] || new Date().getFullYear();
+  const maxYear = activeYears[activeYears.length - 1] || new Date().getFullYear();
 
-  const display = value
-    ? (() => { const [y, m] = value.split("-"); return `${MONTH_SHORT[parseInt(m) - 1]} ${y}`; })()
-    : "All Months";
+  const activeMonthsInYear = ACTIVITY_MONTHS
+    .filter(m => parseInt(m.split("-")[0]) === viewYear)
+    .map(m => parseInt(m.split("-")[1]) - 1);
+
+  const displayLabel = value
+    ? (() => { const [y, m] = value.split("-"); return `${MONTH_SHORT[parseInt(m)-1]} ${y}`; })()
+    : "Select Month";
 
   return (
-    <div className="month-dropdown" ref={ref}>
-      <button className={`month-dropdown__btn ${open ? "open" : ""}`} onClick={() => setOpen(v => !v)}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+    <>
+      <button className={`myp-trigger ${open ? "open" : ""} ${value ? "has-value" : ""}`}
+        onClick={() => setOpen(true)}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
         </svg>
-        <span>{display}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: "auto", transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }}>
+        <span>{displayLabel}</span>
+        {value && (
+          <span className="myp-clear" onClick={(e) => { e.stopPropagation(); onChange(null); }}>✕</span>
+        )}
+        <svg className="myp-arrow" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
 
       {open && (
-        <div className="month-dropdown__panel">
-          <div className="month-dropdown__option month-dropdown__option--clear"
-            onClick={() => { onChange(null); setOpen(false); }}>
-            All Months
-            {!value && <span className="month-dropdown__check">✓</span>}
-          </div>
-          <div className="month-dropdown__divider" />
+        <div className="myp-overlay" onClick={() => setOpen(false)}>
+          <div className="myp-panel" onClick={e => e.stopPropagation()}>
 
-          {/* group by year */}
-          {(() => {
-            const byYear = {};
-            ACTIVITY_MONTHS.forEach(ym => {
-              const [y] = ym.split("-");
-              if (!byYear[y]) byYear[y] = [];
-              byYear[y].push(ym);
-            });
-            return Object.entries(byYear).map(([year, months]) => (
-              <div key={year}>
-                <p className="month-dropdown__year-label">{year}</p>
-                <div className="month-dropdown__month-grid">
-                  {months.map(ym => {
-                    const m = parseInt(ym.split("-")[1]) - 1;
-                    const activity = getMonthActivity(ym);
-                    const hasOverdue  = activity?.payments.some(p => p.status === "overdue");
-                    const hasDeadline = activity?.deadlines.length > 0;
-                    const hasStart    = activity?.starts.length > 0;
-                    return (
-                      <button key={ym}
-                        className={`month-grid-btn ${value === ym ? "active" : ""}`}
-                        onClick={() => { onChange(ym); setOpen(false); }}>
-                        <span className="month-grid-btn__name">{MONTH_SHORT[m]}</span>
-                        <div className="month-grid-btn__dots">
-                          {hasStart    && <span className="mgdot mgdot--start" />}
-                          {hasDeadline && <span className="mgdot mgdot--deadline" />}
-                          {hasOverdue  && <span className="mgdot mgdot--overdue" />}
-                          {!hasStart && !hasDeadline && !hasOverdue &&
-                            <span className="mgdot mgdot--pay" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ));
-          })()}
+            <div className="myp-panel-header">
+              <h3 className="myp-panel-title">Select Month</h3>
+              <button className="myp-panel-close" onClick={() => setOpen(false)}>✕</button>
+            </div>
 
-          <div className="month-dropdown__legend">
-            {[["#10b981","Start"],["#ef4444","Deadline"],["#f59e0b","Overdue"],["#2563eb","Payment"]].map(([c,l]) => (
-              <span key={l}><span className="mgdot" style={{ background: c }} />{l}</span>
-            ))}
+            <div className="myp-year-nav">
+              <button className="myp-year-btn" disabled={viewYear <= minYear}
+                onClick={() => setViewYear(v => v - 1)}>‹</button>
+              <span className="myp-year-label">{viewYear}</span>
+              <button className="myp-year-btn" disabled={viewYear >= maxYear}
+                onClick={() => setViewYear(v => v + 1)}>›</button>
+            </div>
+
+            <div className="myp-month-grid">
+              {MONTH_SHORT.map((name, i) => {
+                const ym = `${viewYear}-${String(i+1).padStart(2,"0")}`;
+                const hasActivity = activeMonthsInYear.includes(i);
+                const isSelected  = value === ym;
+                const act = hasActivity ? getMonthActivity(ym) : null;
+                const hasOverdue  = act?.payments.some(p => p.status === "overdue");
+                const hasDeadline = act?.deadlines.length > 0;
+                const hasStart    = act?.starts.length > 0;
+                return (
+                  <button key={i}
+                    className={`myp-month-btn ${isSelected ? "selected" : ""} ${hasActivity ? "has-activity" : "no-activity"}`}
+                    onClick={() => { if (hasActivity) { onChange(isSelected ? null : ym); setOpen(false); } }}>
+                    <span className="myp-month-name">{name}</span>
+                    <div className="myp-dots">
+                      {hasStart    && <span className="myp-dot myp-dot--start" />}
+                      {hasDeadline && <span className="myp-dot myp-dot--deadline" />}
+                      {hasOverdue  && <span className="myp-dot myp-dot--overdue" />}
+                      {hasActivity && !hasStart && !hasDeadline && !hasOverdue &&
+                        <span className="myp-dot myp-dot--pay" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="myp-legend">
+              {[["#10b981","Project Start"],["#ef4444","Deadline"],["#f59e0b","Overdue"],["#2563eb","Payment Due"]].map(([c,l]) => (
+                <span key={l}><span className="myp-dot" style={{ background: c }} />{l}</span>
+              ))}
+            </div>
+
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
@@ -377,7 +384,6 @@ const ProjectSection = ({ proj, expandedId, onToggle, filterMonth }) => {
 ══════════════════════════════════════════ */
 export default function Payment() {
   const [expandedId,    setExpanded]    = useState(null);
-  const [activeProject, setActiveProject] = useState("all");
   const [filterMonth,   setFilterMonth]   = useState(null);
 
   const onToggle = (id) => setExpanded(prev => prev === id ? null : id);
@@ -389,9 +395,7 @@ export default function Payment() {
   const totalOverdue     = allPayments.filter(p => p.status === "overdue").reduce((s, p) => s + p.amount, 0);
   const overallPct       = totalContract ? Math.round((totalReceived / totalContract) * 100) : 0;
 
-  const visibleProjects = activeProject === "all"
-    ? PROJECTS_DATA
-    : PROJECTS_DATA.filter(p => p.id === parseInt(activeProject));
+  const visibleProjects = PROJECTS_DATA;
 
   return (
     <div className="pay-page">
@@ -430,27 +434,13 @@ export default function Payment() {
         </div>
       </div>
 
-      {/* FILTER BAR — project tabs + month dropdown */}
+      {/* FILTER ROW — All Projects label + month picker */}
       <div className="pay-filter-bar">
-        {/* project tabs */}
-        <div className="pay-project-tabs">
-          <button className={`pay-project-tab ${activeProject === "all" ? "active" : ""}`}
-            onClick={() => setActiveProject("all")}>
-            All Projects
-            <span className="pay-tab-count">{allPayments.length}</span>
-          </button>
-          {PROJECTS_DATA.map(p => (
-            <button key={p.id}
-              className={`pay-project-tab ${activeProject === String(p.id) ? "active" : ""}`}
-              onClick={() => setActiveProject(String(p.id))}>
-              {p.name}
-              <span className="pay-tab-count">{p.payments.length}</span>
-            </button>
-          ))}
+        <div className="pay-all-projects-tag">
+          All Projects
+          <span className="pay-tab-count">{allPayments.length}</span>
         </div>
-
-        {/* month dropdown */}
-        <MonthDropdown value={filterMonth} onChange={setFilterMonth} />
+        <MonthYearPicker value={filterMonth} onChange={setFilterMonth} />
       </div>
 
       {/* ACTIVE FILTER CHIPS */}

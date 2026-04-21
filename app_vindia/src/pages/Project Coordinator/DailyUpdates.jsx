@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import { createUpdate, getUpdates, updateUpdate } 
+from "../../services/pcDailyUpdateService";
+import React, { useState, useEffect } from "react";
 import "./DailyUpdates.css";
 
 const today     = new Date();
@@ -12,63 +14,23 @@ const SEVERITY_OPTIONS = [
   { value: "moderate", label: "Moderate", color: "#ef8c1a", bg: "#ffe4b5" },
   { value: "critical", label: "Critical", color: "#ef4444", bg: "#fee2e2" },
 ];
-
 const EMPTY_FORM = {
-  work:          "",
-  progress:      "",
-  workers:       "",
-  absent:        "",
-  cementUsed:    "",
-  steelUsed:     "",
+  work: "",
+  progress: "",
+  workers: "",
+  absent: "",
+  cementUsed: "",
+  steelUsed: "",
   materialShort: "",
-  issues:        "",
-  severity:      "none",
-  delayHours:    "",
-  delayImpact:   "",
-  pending:       "",
-  next:          "",
-  safety:        "",
-  approvals:     "",
+  issues: "",
+  severity: "none",
+  delayHours: "",
+  delayImpact: "",
+  pending: "",
+  next: "",
+  safety: "",
+  approvals: "",
 };
-
-const INITIAL_LOGS = [
-  {
-    id: 1, date: "2025-06-09", day: "Monday",
-    work: "Foundation work completed for Block A. Concrete pouring done.",
-    progress: "65", workers: "35", absent: "2",
-    cementUsed: "40 bags", steelUsed: "1.5 tons", materialShort: "None",
-    issues: "Minor delay due to rain in the morning.",
-    severity: "minor", delayHours: "2", delayImpact: "Concrete work delayed by 2 hrs",
-    pending: "Block B shuttering work.", next: "Start Block B foundation work.",
-    safety: "All workers with PPE", approvals: "None",
-    status: "approved", submittedAt: "06:45 PM",
-  },
-  {
-    id: 2, date: "2025-06-10", day: "Tuesday",
-    work: "Block B shuttering completed. Steel reinforcement started.",
-    progress: "72", workers: "38", absent: "1",
-    cementUsed: "30 bags", steelUsed: "2.0 tons", materialShort: "None",
-    issues: "None", severity: "none", delayHours: "0", delayImpact: "None",
-    pending: "Steel reinforcement completion.",
-    next: "Complete steel reinforcement for Block B.",
-    safety: "Safe — daily toolbox done",
-    approvals: "Approval needed for Block C start",
-    status: "approved", submittedAt: "07:10 PM",
-  },
-  {
-    id: 3, date: "2025-06-11", day: "Wednesday",
-    work: "Steel reinforcement completed. Concrete mix prepared.",
-    progress: "78", workers: "40", absent: "3",
-    cementUsed: "55 bags", steelUsed: "0.5 tons",
-    materialShort: "Sand — ordered extra stock",
-    issues: "Shortage of sand.", severity: "moderate",
-    delayHours: "3", delayImpact: "Concrete pouring postponed",
-    pending: "Concrete pouring for Block B.", next: "Complete concrete pouring.",
-    safety: "1 minor scaffold issue — fixed",
-    approvals: "Material approval pending",
-    status: "pending", submittedAt: "06:55 PM",
-  },
-];
 
 const STATUS_CFG = {
   approved: { label: "Approved",       bg: "#d1fae5", color: "#065f46", border: "#10b981" },
@@ -103,54 +65,109 @@ const DetailBlock = ({ label, val }) => (
 );
 
 export default function DailyUpdates() {
-  const [logs, setLogs]           = useState(INITIAL_LOGS);
+  const [logs, setLogs] = useState([]);
   const [form, setForm]           = useState({ ...EMPTY_FORM });
   const [editId, setEditId]       = useState(null);
   const [toast, setToast]         = useState(null);
   const [expandedId, setExpanded] = useState(null);
   const [submitting, setSubmit]   = useState(false);
   const [activeTab, setActiveTab] = useState("form");
+    useEffect(() => {
+    fetchLogs();
+  }, []);
+
+  const fetchLogs = async () => {
+    try {
+      const res = await getUpdates(101); // 🔥 your coordinator_id
+      setLogs(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const todayLog = logs.find(l => l.date === todayStr && l.id !== editId);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const showToast = (type, msg) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 4500);
-  };
+  setToast({ type, msg });
+  setTimeout(() => setToast(null), 4000);
+};
 
-  const handleSubmit = () => {
-    if (!form.work.trim())     { showToast("error", "Please fill in Work Done Today."); return; }
-    if (!form.progress.trim()) { showToast("error", "Please enter today's progress %."); return; }
+  const handleSubmit = async () => {
+  if (!form.work.trim()) {
+    showToast("error", "Please fill in Work Done Today.");
+    return;
+  }
 
-    setSubmit(true);
-    setTimeout(() => {
-      if (editId) {
-        setLogs(prev => prev.map(l =>
-          l.id === editId ? { ...l, ...form, status: "pending" } : l
-        ));
-        setEditId(null);
-        showToast("success", "Update edited and re-submitted to Project Manager.");
-      } else {
-        setLogs(prev => [{
-          id: Date.now(), date: todayStr, day: todayDay, ...form,
-          status: "pending",
-          submittedAt: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-        }, ...prev]);
-        showToast("success", "Daily update submitted to Project Manager.");
-      }
-      setForm({ ...EMPTY_FORM });
-      setSubmit(false);
-      setActiveTab("history");
-    }, 1400);
-  };
+  if (!form.progress) {
+    showToast("error", "Please enter today's progress %.");
+    return;
+  }
+
+  setSubmit(true);
+
+  try {
+    const payload = {
+      ...form,
+      project_id: 1,
+      coordinator_id: 101,
+      date: todayStr,
+      day: todayDay
+    };
+
+    if (editId) {
+      const res = await updateUpdate(editId, payload);
+
+      setLogs(prev =>
+        prev.map(l => (l.id === editId ? res.data : l))
+      );
+
+      setEditId(null);
+      showToast("success", "Updated & re-submitted to Project Manager.");
+
+    } else {
+      const res = await createUpdate(payload);
+
+      setLogs(prev => [res.data, ...prev]);
+
+      showToast("success", "Daily update submitted to Project Manager.");
+    }
+
+    setForm({ ...EMPTY_FORM });
+    setActiveTab("history");
+
+  } catch (err) {
+    console.error(err);
+    showToast("error", "Server error");
+  }
+
+  setSubmit(false);
+};
 
   const handleEdit = (log) => {
-    setEditId(log.id);
-    setForm({ ...EMPTY_FORM, ...log });
-    setActiveTab("form");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  setEditId(log.id);
+
+  setForm({
+    work: log.work || "",
+    progress: log.progress || "",
+    workers: log.workers || "",
+    absent: log.absent || "",
+    cementUsed: log.cement_used || "",
+    steelUsed: log.steel_used || "",
+    materialShort: log.material_short || "",
+    issues: log.issues || "",
+    severity: log.severity || "none",
+    delayHours: log.delay_hours || "",
+    delayImpact: log.delay_impact || "",
+    pending: log.pending || "",
+    next: log.next || "",
+    safety: log.safety || "",
+    approvals: log.approvals || "",
+  });
+
+  setActiveTab("form");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
 
   const cancelEdit = () => { setEditId(null); setForm({ ...EMPTY_FORM }); };
 
@@ -430,7 +447,7 @@ export default function DailyUpdates() {
                       </div>
 
                       <div className="du-log-item__actions">
-                        <span className="du-log-time">Submitted at {log.submittedAt}</span>
+                        <span className="du-log-time">Submitted at {log.submitted_at}</span>
                         <div style={{ display: "flex", gap: 8 }}>
                           {log.status !== "approved" && (
                             <button className="du-btn-edit" onClick={() => handleEdit(log)}>
