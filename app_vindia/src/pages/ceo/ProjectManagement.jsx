@@ -135,14 +135,22 @@ useEffect(() => {
     rate: "",
   });
   const [newProject, setNewProject] = useState({
-    name: "",
-    client: "",
-    startDate: "",
-    endDate: "",
-    budget: "",
-    manager: "",
-    teamSize: "",
-  });
+  name: "",
+  client: "",
+  startDate: "",
+  endDate: "",
+  budget: "",
+  manager: "",
+  teamSize: "",
+
+  // ✅ NEW FIELDS
+  building_type: "",
+  floors: "",
+  description: "",
+  location: "",
+  plot_size: "",
+  phone: "",
+});
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [payments, setPayments] = useState([
     {
@@ -182,22 +190,31 @@ useEffect(() => {
       }
 
       const res = await fetch("http://localhost:5000/api/projects", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: newProject.name,
-          client: newProject.client,
-          budget: newProject.budget,
-          start_date: newProject.startDate,
-          end_date: newProject.endDate,
-          manager_id: newProject.manager_id, // ✅ ADD
-          site_engineer_id: newProject.site_engineer_id,
-        }),
-      });
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: newProject.name,
+        client: newProject.client,
+        budget: newProject.budget,
+        start_date: newProject.startDate,
+        end_date: newProject.endDate,
+        manager_id: newProject.manager_id,
+        site_engineer_id: newProject.site_engineer_id,
 
-      const data = await res.json();
+        // ✅ new fields
+        building_type: newProject.building_type,
+        floors: newProject.floors,
+        description: newProject.description,
+        location: newProject.location,
+        plot_size: newProject.plot_size,
+        phone: newProject.phone,
+      }),
+    }); // ✅ fetch ends here
+
+// ✅ THIS MUST BE OUTSIDE
+const data = await res.json();
 
       // ✅ Update UI instantly
       setProjects((prev) => [data, ...prev]);
@@ -205,13 +222,21 @@ useEffect(() => {
 
       // ✅ Reset form
       setNewProject({
-        name: "",
-        client: "",
-        startDate: "",
-        endDate: "",
-        budget: "",
-        site_engineer_id: "",
-      });
+      name: "",
+      client: "",
+      phone: "",
+      startDate: "",
+      endDate: "",
+      budget: "",
+      site_engineer_id: "",
+
+      // ✅ RESET NEW FIELDS
+      building_type: "",
+      floors: "",
+      description: "",
+      location: "",
+      plot_size: "",
+    });
 
       setShowProjectModal(false);
     } catch (err) {
@@ -516,6 +541,17 @@ const costBreakdown = {
                     }
                   />
                 </div>
+                <div className="form-group">
+                <label>Phone Number</label>
+                <input
+                  type="tel"
+                  placeholder="e.g., 9876543210"
+                  value={newProject.phone}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, phone: e.target.value })
+                  }
+                />
+              </div>
                 <div className="form-row">
                   <div className="form-group">
                     <label>Start Date</label>
@@ -555,6 +591,79 @@ const costBreakdown = {
                     }
                   />
                 </div>
+                <div className="form-row">
+
+                {/* BUILDING TYPE */}
+                <div className="form-group">
+                  <label>Building Type</label>
+                  <select
+                    value={newProject.building_type}
+                    onChange={(e) =>
+                      setNewProject({ ...newProject, building_type: e.target.value })
+                    }
+                  >
+                    <option value="">Select Type</option>
+                    <option value="Commercial">Commercial</option>
+                    <option value="Residential">Residential</option>
+                  </select>
+                </div>
+
+                {/* FLOORS */}
+                <div className="form-group">
+                  <label>Floors</label>
+                  <select
+                    value={newProject.floors}
+                    onChange={(e) =>
+                      setNewProject({ ...newProject, floors: e.target.value })
+                    }
+                  >
+                    <option value="">Select Floors</option>
+                    <option value="G">G</option>
+                    <option value="G+1">G+1</option>
+                    <option value="G+2">G+2</option>
+                    <option value="G+3">G+3</option>
+                  </select>
+                </div>
+
+              </div>
+
+              {/* LOCATION */}
+              <div className="form-group">
+                <label>Location</label>
+                <input
+                  type="text"
+                  placeholder="Enter location"
+                  value={newProject.location}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, location: e.target.value })
+                  }
+                />
+              </div>
+
+              {/* PLOT SIZE */}
+              <div className="form-group">
+                <label>Plot Size (sq ft)</label>
+                <input
+                  type="number"
+                  placeholder="e.g., 1200"
+                  value={newProject.plot_size}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, plot_size: e.target.value })
+                  }
+                />
+              </div>
+
+              {/* DESCRIPTION */}
+              <div className="form-group">
+                <label>Description</label>
+                <textarea
+                  placeholder="Project description..."
+                  value={newProject.description}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, description: e.target.value })
+                  }
+                />
+              </div>
                 <div className="form-row">
                   <div className="form-group">
                     <label>Project Manager</label>
