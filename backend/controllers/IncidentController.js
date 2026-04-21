@@ -81,13 +81,25 @@ exports.getUsersByRole = async (req, res) => {
 ══════════════════════════════════════════════════════════════ */
 
 // GET /api/incidents
+// Only returns incidents the logged-in user created OR is assigned to
 exports.getAllIncidents = async (req, res) => {
   try {
-    const { status, priority, assigned_to, search } = req.query;
+    const { status, priority, search } = req.query;
+
+    const userId = req.user?.id ?? null;
 
     let conditions = [];
     let params = [];
     let idx = 1;
+
+    // ── Scope to current user (created_by OR assigned_to) ──
+    if (userId !== null) {
+      conditions.push(
+        `(created_by_id = $${idx} OR assigned_to_id = $${idx + 1})`,
+      );
+      params.push(userId, userId);
+      idx += 2;
+    }
 
     if (status) {
       conditions.push(`status = $${idx++}`);
@@ -96,10 +108,6 @@ exports.getAllIncidents = async (req, res) => {
     if (priority) {
       conditions.push(`priority = $${idx++}`);
       params.push(priority);
-    }
-    if (assigned_to) {
-      conditions.push(`assigned_to_id = $${idx++}`);
-      params.push(assigned_to);
     }
     if (search) {
       conditions.push(`(title ILIKE $${idx} OR incident_no ILIKE $${idx + 1})`);
@@ -206,17 +214,7 @@ exports.getIncidentById = async (req, res) => {
 exports.createIncident = async (req, res) => {
   const { title, description, priority = "P2", assigned_to_user_id } = req.body;
 
-  // DEBUG — remove after confirming which field your middleware uses
-  console.log("[createIncident] req.user =", JSON.stringify(req.user));
-  console.log("[createIncident] req.userId =", req.userId);
-
-  // Support every common auth-middleware shape:
-  //   req.user.id        (most common — passport / custom JWT)
-  //   req.user.userId
-  //   req.user.user_id
-  //   req.userId         (some middleware sets it at root level)
-  const created_by =
-    req.user?.id ?? req.user?.userId ?? req.user?.user_id ?? req.userId ?? 27;
+  const created_by = req.user?.id ?? null;
 
   if (!title?.trim())
     return res
@@ -467,13 +465,21 @@ exports.addIncidentPhoto = async (req, res) => {
 ══════════════════════════════════════════════════════════════ */
 
 // GET /api/incidents/tasks
+// Only returns tasks the logged-in user is assigned to
 exports.getAllTasks = async (req, res) => {
   try {
     const { role, status, priority, search } = req.query;
+    const userId = req.user?.id ?? null;
 
     let conditions = [];
     let params = [];
     let idx = 1;
+
+    // ── Scope to current user (assignee only for task queue) ──
+    if (userId !== null) {
+      conditions.push(`assignee_id = $${idx++}`);
+      params.push(userId);
+    }
 
     if (role) {
       conditions.push(`role_name = $${idx++}`);
@@ -558,7 +564,7 @@ exports.getTasksByIncident = async (req, res) => {
 exports.createTasks = async (req, res) => {
   const { id } = req.params;
   const { tasks } = req.body;
-  const created_by = req.user?.id ?? req.user?.userId ?? req.userId ?? null;
+  const created_by = req.user?.id ?? null;
 
   if (!Array.isArray(tasks) || !tasks.length)
     return res
@@ -628,11 +634,13 @@ exports.createTasks = async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("createTasks:", err);
-    res.status(500).json({
-      success: false,
-      message: "Failed to create tasks",
-      detail: err.message,
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to create tasks",
+        detail: err.message,
+      });
   } finally {
     client.release();
   }
@@ -648,10 +656,12 @@ exports.updateTaskStatus = async (req, res) => {
   if (!validStatuses.includes(status))
     return res.status(400).json({ success: false, message: "Invalid status" });
   if (status === "Blocked" && !blocked_reason?.trim())
-    return res.status(400).json({
-      success: false,
-      message: "blocked_reason is required when marking Blocked",
-    });
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "blocked_reason is required when marking Blocked",
+      });
 
   const client = await pool.connect();
   try {
