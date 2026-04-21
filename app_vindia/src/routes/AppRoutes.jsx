@@ -71,7 +71,6 @@ import ArchitectDailyLogins from "../pages/Architect/ArchitectDailyLogins";
 import ArchitectDesigns from "../pages/Architect/ArchitectDesigns";
 import ArchitectCoordination from "../pages/Architect/ArchitectCoordination";
 import ArchitectSignOff from "../pages/Architect/ArchitectSignOff";
-import ArchitectTasks from "../pages/Architect/ArchitectTasks";
 import ArchitectProject from "../pages/Architect/ArchitectProject";
 
 
