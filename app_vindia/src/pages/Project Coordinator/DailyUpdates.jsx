@@ -443,7 +443,14 @@ export default function DailyUpdates() {
                       <div>
                         <p className="du-log-item__day">
                           {log.day}
-                          <span className="du-log-item__date"> · {log.date}</span>
+                          <span className="du-log-item__date">
+                            {" "}
+                            · {new Date(log.date).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </span>
                         </p>
                         <p className="du-log-item__preview">
                           {log.work?.length > 70 ? log.work.slice(0, 70) + "…" : log.work}
