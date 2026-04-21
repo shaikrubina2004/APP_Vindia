@@ -41,5 +41,10 @@ export const ArchitectMenu = [
   name: "Coordination",
   path: "/architect/coordination",
   icon: "git-merge"
-}
+},
+ {
+    name: "Projects",
+    path: "/architect/project",
+    icon: "grid"
+  }
 ];

@@ -68,6 +68,12 @@ import RFIDetails from "../pages/Structural Engineer/RFIDetails";
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
 import ArchitectTasks from "../pages/Architect/ArchitectTasks";
 import ArchitectDailyLogins from "../pages/Architect/ArchitectDailyLogins";
+import ArchitectDesigns from "../pages/Architect/ArchitectDesigns";
+import ArchitectCoordination from "../pages/Architect/ArchitectCoordination";
+import ArchitectSignOff from "../pages/Architect/ArchitectSignOff";
+import ArchitectTasks from "../pages/Architect/ArchitectTasks";
+import ArchitectProject from "../pages/Architect/ArchitectProject";
+
 
 /* PROJECT COORDINATOR */
 import ProjectCoordinatorDashboard from "../pages/Project Coordinator/ProjectCoordinatorDashboard";
@@ -564,6 +570,46 @@ const AppRoutes = () => {
           </ArchitectLayout>
         }
       />
+      <Route
+        path="/architect/designs"
+        element={
+          <ArchitectLayout>
+            <ArchitectDesigns />
+          </ArchitectLayout>
+        }
+      />
+      <Route
+        path="/architect/sign-off"
+        element={
+          <ArchitectLayout>
+            <ArchitectSignOff />
+          </ArchitectLayout>
+        }
+      />
+      <Route
+        path="/architect/coordination"
+        element={
+          <ArchitectLayout>
+            <ArchitectCoordination />
+          </ArchitectLayout>
+        }
+      />
+      <Route
+        path="/architect/coordination"
+        element={
+          <ArchitectLayout>
+            <ArchitectCoordination />
+          </ArchitectLayout>
+        }
+      />
+      <Route
+        path="/architect/project"
+        element={
+          <ArchitectLayout>
+            <ArchitectProject />
+          </ArchitectLayout>
+        }
+      />
 
       {/* PROJECT COORDINATOR */}
       <Route
@@ -599,13 +645,13 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/project-coordinator/tasks"
-        element={
-          <ProjectCoordinatorLayout>
-            <Tasks />
-          </ProjectCoordinatorLayout>
-        }
-      />
+      path="/project-coordinator/tasks"
+      element={
+        <ProjectCoordinatorLayout>
+          <Tasks />
+        </ProjectCoordinatorLayout>
+      }
+    />
 
       {/* TIMESHEET */}
       <Route

@@ -12,7 +12,7 @@ const PROJECTS    = ["Skyward Residency", "Green Valley Towers", "Horizon Plaza"
 const ROLES       = ["Lead Architect", "Architect", "Junior Architect", "Intern Architect", "Technician"];
 const TASK_STATUS = ["To Do", "In Progress", "Under Review", "Done"];
 const ISSUE_TYPES = ["Design Issue", "Missing Info", "Structural Conflict", "MEP Conflict", "Site Issue", "Client Change"];
-const SEVERITIES  = ["Low", "P2", "P1"];
+const SEVERITIES  = ["P3", "P2", "P1"];
 
 const MOCK_FILES = [
   { name: "L4-FloorPlan-RevC.dwg",      type: "DWG",  icon: "📐" },
