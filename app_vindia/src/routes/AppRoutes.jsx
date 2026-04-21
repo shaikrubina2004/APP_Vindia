@@ -73,7 +73,6 @@ import ArchitectCoordination from "../pages/Architect/ArchitectCoordination";
 import ArchitectSignOff from "../pages/Architect/ArchitectSignOff";
 import ArchitectProject from "../pages/Architect/ArchitectProject";
 
-
 /* PROJECT COORDINATOR */
 import ProjectCoordinatorDashboard from "../pages/Project Coordinator/ProjectCoordinatorDashboard";
 import DailyUpdatesPC from "../pages/Project Coordinator/DailyUpdates";
@@ -644,13 +643,13 @@ const AppRoutes = () => {
         }
       />
       <Route
-      path="/project-coordinator/tasks"
-      element={
-        <ProjectCoordinatorLayout>
-          <Tasks />
-        </ProjectCoordinatorLayout>
-      }
-    />
+        path="/project-coordinator/tasks"
+        element={
+          <ProjectCoordinatorLayout>
+            <Tasks />
+          </ProjectCoordinatorLayout>
+        }
+      />
 
       {/* TIMESHEET */}
       <Route

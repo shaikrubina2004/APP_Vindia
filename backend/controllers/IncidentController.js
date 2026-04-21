@@ -634,13 +634,11 @@ exports.createTasks = async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("createTasks:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to create tasks",
-        detail: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create tasks",
+      detail: err.message,
+    });
   } finally {
     client.release();
   }
@@ -656,12 +654,10 @@ exports.updateTaskStatus = async (req, res) => {
   if (!validStatuses.includes(status))
     return res.status(400).json({ success: false, message: "Invalid status" });
   if (status === "Blocked" && !blocked_reason?.trim())
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "blocked_reason is required when marking Blocked",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "blocked_reason is required when marking Blocked",
+    });
 
   const client = await pool.connect();
   try {
