@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { useNavigate } from "react-router-dom"; // ✅ IMPORTANT
 import "./ArchitectDashboard.css";
 
 const projectsData = [
@@ -86,6 +86,8 @@ const projectsData = [
 ];
 
 function ArchitectDashboard() {
+  const navigate = useNavigate(); // ✅ ONLY here (correct place)
+
   const [projects] = useState(projectsData);
   const [selectedProjectId, setSelectedProjectId] = useState(projects[0].id);
   const [logSubmitted, setLogSubmitted] = useState(false);
@@ -100,7 +102,12 @@ function ArchitectDashboard() {
 
   useEffect(() => {
     const tick = () =>
-      setClock(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
+      setClock(
+        new Date().toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      );
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
@@ -225,75 +232,72 @@ return (
     <div className="two-col">
 
       {/* DAILY LOG */}
-      <div className="panel">
-        <div className="panel-head">
-          <div className="panel-title">
-            Daily Progress Log
-            <span className="panel-badge pb-danger">Not submitted</span>
-          </div>
-          <button className="log-tag">History</button>
-        </div>
-
-        <textarea
-          className="log-input"
-          placeholder="Describe today's progress — design reviews, coordination calls, submissions..."
-          value={logText}
-          onChange={(e) => setLogText(e.target.value)}
-        />
-
-        <div className="log-tags">
-          {["Design Review","Client Meeting","Coordination","Submission","Site Visit"].map(tag => (
-            <button
-              key={tag}
-              className={`log-tag ${selectedTags.includes(tag) ? "sel" : ""}`}
-              onClick={() => toggleTag(tag)}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-
-        <div className="log-footer">
-          <span>{clock}</span>
-          <button className="btn-submit" onClick={handleSubmitLog}>
-            Submit Log →
-          </button>
-        </div>
-      </div>
-
-      {/* INCIDENT QUEUE */}
-      <div className="panel">
-        <div className="panel-head">
-          <div className="panel-title">
-            Incident Queue
-            <span className="panel-badge pb-danger">
-              {filteredIncidents.length} open
-            </span>
-          </div>
-          <button className="log-tag">+ New</button>
-        </div>
-
-        {filteredIncidents.map((inc) => (
-          <div key={inc.id} className="inc-row">
-            <div className={`inc-prio ${
-              inc.priority === "HIGH" ? "p-high" :
-              inc.priority === "MEDIUM" ? "p-med" : "p-low"
-            }`} />
-
-            <div>
-              <div className="inc-title">{inc.issue}</div>
-              <div className="inc-sub">
-                {inc.discipline} • INC-00{inc.id}
-              </div>
-            </div>
-
-            <span className="inc-status">{inc.status}</span>
-            <span className="inc-age">{inc.age}</span>
-          </div>
-        ))}
-      </div>
-
+      {/* DAILY LOG CARD */}
+<div 
+  className="panel daily-log-card"
+  onClick={() => navigate("/architect/logs")}
+>
+  <div className="panel-head">
+    <div className="panel-title">
+      Daily Progress
+      <span className="panel-badge pb-danger">Not submitted</span>
     </div>
+  </div>
+
+  <div className="daily-log-content">
+    <div className="daily-icon">＋</div>
+
+    <div>
+      <div className="daily-title">Add Today’s Progress</div>
+      <div className="daily-sub">
+        Log design updates, meetings, coordination notes
+      </div>
+    </div>
+  </div>
+</div>
+
+     <div className="panel">
+  <div className="panel-head">
+    <div className="panel-title">
+      Incident Queue
+      <span className="panel-badge pb-danger">
+        {filteredIncidents.length} open
+      </span>
+    </div>
+
+    <button 
+      className="log-tag"
+      onClick={() => navigate("/architect/incidents")}
+    >
+      + New
+    </button>
+  </div>
+
+  {filteredIncidents.map((inc) => (
+    <div key={inc.id} className="inc-row">
+      <div
+        className={`inc-prio ${
+          inc.priority === "HIGH"
+            ? "p-high"
+            : inc.priority === "MEDIUM"
+            ? "p-med"
+            : "p-low"
+        }`}
+      />
+
+      <div>
+        <div className="inc-title">{inc.issue}</div>
+        <div className="inc-sub">
+          {inc.discipline} • INC-00{inc.id}
+        </div>
+      </div>
+
+      <span className="inc-status">{inc.status}</span>
+      <span className="inc-age">{inc.age}</span>
+    </div>
+  ))}
+</div>
+</div>
 
     {/* 🔷 ROW 2 */}
     <div className="three-col">
@@ -307,7 +311,15 @@ return (
               {pendingSignoffs} pending
             </span>
           </div>
-          <button className="log-tag">Chase</button>
+          <button
+  className="log-tag"
+  onClick={(e) => {
+    e.stopPropagation(); // prevents parent click interference (safe)
+    navigate("/architect/sign-off");
+  }}
+>
+  Chase
+</button>
         </div>
 
         {selectedProject.signoffItems.map((s) => (
@@ -331,7 +343,12 @@ return (
             Task Assignments
             <span className="panel-badge pb-success">{activeTasks} active</span>
           </div>
-          <button className="log-tag">+ Assign</button>
+          <button
+  className="log-tag"
+  onClick={() => navigate("/architect/tasks")}
+>
+  + Assign
+</button>
         </div>
 
         {selectedProject.tasks.map((task) => {
@@ -369,7 +386,10 @@ return (
             Design Versions
             <span className="panel-badge pb-success">Active</span>
           </div>
-          <button className="log-tag">Upload</button>
+          <button
+  className="log-tag"
+  onClick={() => navigate("/architect/designs")}
+>Upload</button>
         </div>
 
         {selectedProject.versions.map((v) => (
@@ -392,7 +412,8 @@ return (
       Cross-Discipline Coordination
       <span className="panel-badge pb-success">Structural + MEP</span>
     </div>
-    <button className="log-tag">+ Log Item</button>
+    <button className="log-tag"
+  onClick={() => navigate("/architect/coordination")}>+ Log Item</button>
   </div>
 
   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>

@@ -17,7 +17,14 @@ const CSS = `
   --danger:#c0392b;--warn:#e6a817;--ok:#1c5e35;
   --fd:'Fraunces',serif;--fm:'DM Mono',monospace;--r:12px;
 }
-body{font-family:var(--fm);background:var(--bg);color:var(--navy);font-size:13px;line-height:1.55}
+/* ── Base ── (NORMAL FONTS) */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: var(--bg);
+  color: var(--navy);
+  font-size: 13px;
+  line-height: 1.55;
+}
 
 .tp{background:var(--white);border-bottom:1px solid var(--border);padding:0 32px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30}
 .tp-crumb{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--b4)}
