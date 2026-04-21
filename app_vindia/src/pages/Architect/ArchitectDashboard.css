@@ -11,7 +11,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  
+  font-family: Arial, Helvetica, sans-serif !important;
+
   background: #f0f5f9;
   color: #001D39;
   font-size: 16px;
@@ -58,12 +60,11 @@ body {
 }
 
 .page-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #001D39;
-  letter-spacing: -0.4px;
+  font-size: 24px;        /* optional: slightly less bold look */
+  font-weight: 400;       /* THIS is the main fix */
+  font-family: inherit;   /* forces normal system font */
+  letter-spacing: 0;      /* remove tight spacing */
 }
-
 .page-sub {
   font-size: 15px;
   color: #49769F;
@@ -213,46 +214,60 @@ body {
 .log-tag:hover { background: #BDD8E9; }
 .log-tag.sel   { background: #0A4174; color: #fff; border-color: #0A4174; }
 
-/* ── Daily Log Textarea ── */
-.log-input {
-  width: 100%;
-  min-height: 120px;
-  resize: vertical;
-  border: 1px solid #c6ddef;
-  border-radius: 10px;
-  padding: 16px 18px;
-  font-size: 15px;
-  color: #001D39;
-  background: #f6fafd;
-  outline: none;
-  font-family: inherit;
+/* DAILY LOG CARD */
+.daily-log-card {
+  cursor: pointer;
   transition: all 0.2s ease;
-  margin-bottom: 14px;
+  border: 1px dashed #334155;
 }
 
-.log-input:focus { 
-  border-color: #4E8EA2; 
-  background: #fff; 
-  box-shadow: 0 0 0 4px rgba(78, 142, 162, 0.1);
+.daily-log-card:hover {
+  transform: translateY(-2px);
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
 }
 
-.log-input::placeholder { color: #6EA2B3; }
-
-.log-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.log-footer {
+.daily-log-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 14px;
-  color: #6EA2B3;
+  gap: 14px;
+  margin: 20px 0;
 }
 
+.daily-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #60a5fa;
+}
+
+.daily-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.daily-sub {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.daily-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.daily-cta {
+  color: #60a5fa;
+  font-weight: 500;
+}
 /* ── Submit Button ── */
 .btn-submit {
   font-size: 14px;

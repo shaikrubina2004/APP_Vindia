@@ -1,7 +1,8 @@
 // src/pages/siteEngineer/Progress.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
-// import "../../styles/shared-pages.css";
+import "../../styles/shared-pages.css";
+import "../../styles/Progress.css";
 const DRAFT_KEY = "progress:draft:v3";
 const QUEUE_KEY = "progress:queue:v3";
 const PAGE_SIZE  = 8;

@@ -1,7 +1,8 @@
 // src/pages/ncr/NCR.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
-// import "../../styles/shared-pages.css";
+import "../../styles/shared-pages.css";
+import "../../styles/NCR.css";
 const DRAFT_KEY = "ncr:draft:v3";
 const QUEUE_KEY = "ncr:queue:v3";
 const PAGE_SIZE  = 8;
@@ -171,8 +172,8 @@ export default function NCR() {
             <div className="ncr-panel-head">
               <div className="ncr-panel-title">New NCR</div>
               <div className="ncr-panel-actions">
-                <button type="button" className="ncr-btn ncr-btn--ghost" onClick={() => { ls.save(DRAFT_KEY, form); setStatus("Draft saved"); }}>Save Draft</button>
-                <button type="button" className="ncr-btn ncr-btn--ghost" onClick={() => { ls.del(DRAFT_KEY); setForm({ ...BLANK }); }}>Clear</button>
+                <button type="button" className="ncr-btn ncr-btn--ghost ncr-btn--sm" onClick={() => { ls.save(DRAFT_KEY, form); setStatus("Draft saved"); }}>Save Draft</button>
+                <button type="button" className="ncr-btn ncr-btn--ghost ncr-btn--sm" onClick={() => { ls.del(DRAFT_KEY); setForm({ ...BLANK }); }}>Clear</button>
               </div>
             </div>
             <div className="ncr-panel-body">
@@ -208,21 +209,21 @@ export default function NCR() {
                         {users.map(u => <option key={u.id} value={u.id}>{u.name} — {u.role}</option>)}
                       </select>
                     </div>
-                    <div className="ncr-field" style={{ justifyContent: "flex-end" }}>
-                      <label className="ncr-label" style={{ marginBottom: 10 }}>Work Hold</label>
-                      <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                    <div className="ncr-field ncr-field--hold">
+                      <label className="ncr-label ncr-label--hold">Work Hold</label>
+                      <label className="ncr-checkbox-label">
                         <input
                           type="checkbox"
+                          className="ncr-checkbox"
                           checked={form.holdPlaced}
                           onChange={e => setF("holdPlaced", e.target.checked)}
-                          style={{ width: 18, height: 18, accentColor: "var(--c-navy-700)", cursor: "pointer" }}
                         />
-                        <span style={{ fontSize: 13, color: "var(--c-text-2)" }}>Work stopped pending resolution</span>
+                        <span className="ncr-checkbox-text">Work stopped pending resolution</span>
                       </label>
                     </div>
                     <div className="ncr-field ncr-full">
                       <label className="ncr-label">Immediate Action Taken</label>
-                      <textarea className="ncr-textarea" style={{ minHeight: 70 }} value={form.immediateAction} onChange={e => setF("immediateAction", e.target.value)} placeholder="What was done immediately? e.g. Material quarantined, work halted, area cordoned off." />
+                      <textarea className="ncr-textarea ncr-textarea--action" value={form.immediateAction} onChange={e => setF("immediateAction", e.target.value)} placeholder="What was done immediately? e.g. Material quarantined, work halted, area cordoned off." />
                     </div>
                     <div className="ncr-field ncr-full">
                       <label className="ncr-label">Attachments (photos, test results, PDFs)</label>
@@ -325,8 +326,8 @@ export default function NCR() {
             <div className="ncr-aside-title">Severity Breakdown</div>
             {["critical","high","medium","low"].map(s => (
               <div key={s} className="ncr-aside-row">
-                <span style={{ textTransform: "capitalize" }}>{s}</span>
-                <strong style={{ color: s === "critical" ? "var(--c-danger)" : s === "high" ? "var(--c-warning)" : "var(--c-navy-700)" }}>
+                <span className="ncr-aside-label">{s}</span>
+                <strong className={`ncr-aside-value ncr-aside-value--${s}`}>
                   {ncrs.filter(n => (n.severity || "medium") === s).length}
                 </strong>
               </div>

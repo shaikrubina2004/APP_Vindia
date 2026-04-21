@@ -35,5 +35,11 @@ export const ArchitectMenu = [
     name: "Incident", 
     path: "/architect/incidents", 
     icon: "alert-triangle" 
-  }
+  },
+  {
+  /* Structural + MEP coordination, clash resolution */
+  name: "Coordination",
+  path: "/architect/coordination",
+  icon: "git-merge"
+}
 ];

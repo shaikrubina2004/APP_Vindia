@@ -704,3 +704,179 @@
   .month-activity-grid { grid-template-columns: 1fr; }
   .pay-project-tabs { overflow-x: auto; flex-wrap: nowrap; }
 }
+
+/* ── month row sits on its own line, never overlaps ── */
+.pay-month-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+/* override old filter-bar rule that tried to put tabs + dropdown side by side */
+.pay-filter-bar {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* ══════════════════════════════════════════════
+   FILTER BAR — single row, no overlap
+══════════════════════════════════════════════ */
+.pay-filter-bar {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: nowrap;
+  animation: fadeUp .4s .12s ease both;
+}
+
+.pay-all-projects-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 10px;
+  background: linear-gradient(135deg, #eff6ff, #fff);
+  border: 1.5px solid #2563eb;
+  font-size: 13px; font-weight: 700; color: #2563eb;
+  box-shadow: 0 4px 12px rgba(37,99,235,.1);
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════
+   MONTH YEAR PICKER
+   Opens downward, never overlaps
+══════════════════════════════════════════════ */
+.myp-trigger {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 14px; border-radius: 10px;
+  border: 1.5px solid #e8edf5; background: #fff;
+  font-size: 12px; font-weight: 600; color: #475569;
+  cursor: pointer; font-family: inherit;
+  transition: all .2s; white-space: nowrap;
+  min-width: 150px;
+}
+.myp-trigger:hover { border-color: #bfdbfe; color: #2563eb; }
+.myp-trigger.open,
+.myp-trigger.has-value {
+  border-color: #2563eb; color: #2563eb; background: #eff6ff;
+}
+
+.myp-clear {
+  margin-left: 2px; font-size: 10px; font-weight: 700;
+  color: #94a3b8; cursor: pointer; padding: 0 2px;
+  transition: color .15s;
+}
+.myp-clear:hover { color: #dc2626; }
+
+.myp-arrow {
+  margin-left: auto;
+  transition: transform .2s;
+  flex-shrink: 0;
+}
+.myp-trigger.open .myp-arrow { transform: rotate(180deg); }
+
+/* ── picker panel — opens strictly downward ── */
+/* overlay — covers full page, panel anchored top-right */
+.myp-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 37, 64, 0.15);
+  z-index: 1000;
+  animation: fadeOverlay .18s ease both;
+}
+
+.myp-panel {
+  position: fixed;
+  top: 80px;       /* below the top nav bar */
+  right: 24px;     /* flush to right edge */
+  width: 300px;
+  background: #fff;
+  border: 1.5px solid #e2eaf4;
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(37,99,235,.18);
+  padding: 20px;
+  z-index: 1001;
+  animation: slidePanel .22s cubic-bezier(.4,0,.2,1) both;
+}
+
+.myp-panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.myp-panel-title { font-size:15px; font-weight:800; color:#0a2540; }
+.myp-panel-close {
+  background:none; border:none; cursor:pointer;
+  color:#94a3b8; font-size:16px; line-height:1; padding:0;
+}
+.myp-panel-close:hover { color:#0a2540; }
+
+/* year nav */
+.myp-year-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+  background: #f8fbff; border-radius: 10px; padding: 6px 10px;
+  border: 1px solid #e8edf5;
+}
+.myp-year-label { font-size:14px; font-weight:800; color:#0a2540; }
+.myp-year-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; color: #2563eb; line-height: 1;
+  padding: 0 6px; font-weight: 700; transition: opacity .2s;
+}
+.myp-year-btn:disabled { color: #cbd5e1; cursor: not-allowed; }
+.myp-year-btn:not(:disabled):hover { opacity: .7; }
+
+/* month grid — 4 columns */
+.myp-month-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.myp-month-btn {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 8px 4px 6px; border-radius: 10px;
+  border: 1px solid transparent; background: #f8fbff;
+  cursor: pointer; font-family: inherit; transition: all .18s;
+}
+.myp-month-btn.has-activity:hover {
+  border-color: #bfdbfe; background: #eff6ff;
+}
+.myp-month-btn.selected {
+  border-color: #2563eb; background: #eff6ff;
+  box-shadow: 0 2px 8px rgba(37,99,235,.15);
+}
+.myp-month-btn.no-activity {
+  opacity: .35; cursor: not-allowed;
+}
+
+.myp-month-name { font-size:12px; font-weight:700; color:#0a2540; line-height:1; }
+.myp-month-btn.selected .myp-month-name { color: #2563eb; }
+
+.myp-dots {
+  display: flex; gap: 2px; margin-top: 4px;
+  min-height: 6px; align-items: center; justify-content: center;
+}
+.myp-dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.myp-dot--start    { background: #10b981; }
+.myp-dot--deadline { background: #ef4444; }
+.myp-dot--overdue  { background: #f59e0b; }
+.myp-dot--pay      { background: #2563eb; }
+
+/* legend */
+.myp-legend {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding-top: 8px; border-top: 1px solid #f0f6ff;
+}
+.myp-legend span {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 9px; color: #94a3b8; font-weight: 500;
+}
+
+/* ── remove old month row override ── */
+.pay-month-row { display: none; }
+
+@media (max-width: 600px) {
+  .pay-filter-bar { flex-wrap: wrap; }
+  .myp-panel { left: auto; right: 0; }
+}
