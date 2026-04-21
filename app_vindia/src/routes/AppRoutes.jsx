@@ -1,3 +1,4 @@
+
 import { Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
 
@@ -169,4 +170,9 @@ const AppRoutes = () => {
   );
 };
 
+<<<<<<< HEAD
 export default AppRoutes;
+=======
+export default AppRoutes;
+
+>>>>>>> e4f850963b7eda094e1e3cf6a9f27e24180d92d8

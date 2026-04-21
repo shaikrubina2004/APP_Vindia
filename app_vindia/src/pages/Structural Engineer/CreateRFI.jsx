@@ -1,10 +1,6 @@
 import { useState } from "react";
-<<<<<<< Updated upstream
-import axios from "axios";
+
 import "./RFI.css";
-=======
-import "./rfi.css";
->>>>>>> Stashed changes
 
 export default function CreateRFI({ onClose, onCreate }) {
   const [form, setForm] = useState({
