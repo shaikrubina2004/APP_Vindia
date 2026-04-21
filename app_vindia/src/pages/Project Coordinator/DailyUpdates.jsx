@@ -77,13 +77,26 @@ export default function DailyUpdates() {
   }, []);
 
   const fetchLogs = async () => {
-    try {
-      const res = await getUpdates(101); // 🔥 your coordinator_id
-      setLogs(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  try {
+    const res = await getUpdates(101);
+
+    const mappedData = res.data.map(log => ({
+      ...log,
+
+      cementUsed: log.cement_used,
+      steelUsed: log.steel_used,
+      materialShort: log.material_short,
+
+      delayHours: log.delay_hours,
+      delayImpact: log.delay_impact,
+    }));
+
+    setLogs(mappedData);
+
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   const todayLog = logs.find(l => l.date === todayStr && l.id !== editId);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -118,8 +131,19 @@ export default function DailyUpdates() {
     if (editId) {
       const res = await updateUpdate(editId, payload);
 
+      const updated = {
+        ...res.data,
+
+        cementUsed: res.data.cement_used,
+        steelUsed: res.data.steel_used,
+        materialShort: res.data.material_short,
+
+        delayHours: res.data.delay_hours,
+        delayImpact: res.data.delay_impact,
+      };
+
       setLogs(prev =>
-        prev.map(l => (l.id === editId ? res.data : l))
+        prev.map(l => (l.id === editId ? updated : l))
       );
 
       setEditId(null);
@@ -128,7 +152,18 @@ export default function DailyUpdates() {
     } else {
       const res = await createUpdate(payload);
 
-      setLogs(prev => [res.data, ...prev]);
+      const created = {
+        ...res.data,
+
+        cementUsed: res.data.cement_used,
+        steelUsed: res.data.steel_used,
+        materialShort: res.data.material_short,
+
+        delayHours: res.data.delay_hours,
+        delayImpact: res.data.delay_impact,
+      };
+
+      setLogs(prev => [created, ...prev]);
 
       showToast("success", "Daily update submitted to Project Manager.");
     }
@@ -152,13 +187,17 @@ export default function DailyUpdates() {
     progress: log.progress || "",
     workers: log.workers || "",
     absent: log.absent || "",
-    cementUsed: log.cement_used || "",
-    steelUsed: log.steel_used || "",
-    materialShort: log.material_short || "",
+
+    cementUsed: log.cementUsed || log.cement_used || "",
+    steelUsed: log.steelUsed || log.steel_used || "",
+    materialShort: log.materialShort || log.material_short || "",
+
     issues: log.issues || "",
     severity: log.severity || "none",
-    delayHours: log.delay_hours || "",
-    delayImpact: log.delay_impact || "",
+
+    delayHours: log.delayHours || log.delay_hours || "",
+    delayImpact: log.delayImpact || log.delay_impact || "",
+
     pending: log.pending || "",
     next: log.next || "",
     safety: log.safety || "",
@@ -432,12 +471,12 @@ export default function DailyUpdates() {
                         <DetailBlock label="Work Done"         val={log.work} />
                         <DetailBlock label="Progress"          val={`${log.progress}%`} />
                         <DetailBlock label="Workforce"         val={`${log.workers} present · ${log.absent} absent`} />
-                        <DetailBlock label="Cement Used"       val={log.cementUsed} />
+                        <DetailBlock label="Cement Used"       val={log.cementUsed || "—"}/>
                         <DetailBlock label="Steel Used"        val={log.steelUsed} />
                         <DetailBlock label="Material Shortage" val={log.materialShort} />
                         <DetailBlock label="Issues"            val={log.issues} />
                         {log.severity !== "none" && <>
-                          <DetailBlock label="Delay"           val={`${log.delayHours} hrs`} />
+                          <DetailBlock label="Delay"           val={log.delayHours ? `${log.delayHours} hrs` : "—"} />
                           <DetailBlock label="Impact"          val={log.delayImpact} />
                         </>}
                         <DetailBlock label="Pending Work"      val={log.pending} />
@@ -447,7 +486,12 @@ export default function DailyUpdates() {
                       </div>
 
                       <div className="du-log-item__actions">
-                        <span className="du-log-time">Submitted at {log.submitted_at}</span>
+                        <span className="du-log-time">
+                          Submitted at {new Date(`1970-01-01T${log.submitted_at}`).toLocaleTimeString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
                         <div style={{ display: "flex", gap: 8 }}>
                           {log.status !== "approved" && (
                             <button className="du-btn-edit" onClick={() => handleEdit(log)}>
