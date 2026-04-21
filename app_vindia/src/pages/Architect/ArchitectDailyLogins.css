@@ -5,7 +5,7 @@
             #6EA2B3 · #7BBDE8 · #BDD8E9 · #f0f5f9
 ══════════════════════════════════════════════════════ */
 
-/*@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
 
 /* ── Reset ── */
 *,
@@ -256,7 +256,10 @@ body {
   max-height: 140px;
 }
 
-
+/* Issues slightly bigger */
+.sec.issues {
+  max-height: 140px;
+}
 /* Section number badge */
 .sn {
   width: 22px;
@@ -510,39 +513,19 @@ body {
 /* ══════════════════════════════════════════════════════
    ISSUE ROWS
 ══════════════════════════════════════════════════════ */
-/* ══════════════════════════════════════════════════════
-   ISSUE ROWS — COMPACT VERSION
-══════════════════════════════════════════════════════ */
 .issue-row {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 7px;
-  padding: 4px 6px;  /* ← tighter */
-  margin-bottom: 4px;/* ← tighter */
-}
-.issue-row .fi {
-  padding: 4px 6px;  /* ← tighter */
-  font-size: 9px;    /* ← smaller */
-}
-.issue-row .fta {
-  min-height: 32px;  /* ← shorter */
-  padding: 4px 6px;  /* ← tighter */
-  font-size: 9px;    /* ← smaller */
-}
-.issue-row .chip {
-  padding: 2px 6px;  /* ← smallest */
-  font-size: 8px;    /* ← tiniest */
-}
-
-.sec.issues {
-  max-height: 130px; /* ← room for ~6 issues */
+  padding: 6px 8px;
+  margin-bottom: 5px;
 }
 
 .issue-top {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin-bottom: 5px;
+  gap: px;
+  margin-bottom: 8px;
 }
 
 .sev-dot {

@@ -920,12 +920,12 @@ export default function ArchitectTaskPage() {
               <div className="dds">
                 <div className="ddst">Actions</div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Re-assigning…")}>👥 Re-assign</button>
-                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Linking design…")}>📐 Link Design</button>
-                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Opening sign-off…")}>✍️ Sign-Off</button>
-                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Schedule view…")}>📅 Schedule</button>
-                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Linking incident…")}>🚨 Incident</button>
-                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Adding log…")}>📋 Add Log</button>
+                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Re-assigning…")}> Re-assign</button>
+                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Linking design…")}> Link Design</button>
+                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Opening sign-off…")}> Sign-Off</button>
+                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Schedule view…")}> Schedule</button>
+                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Linking incident…")}> Incident</button>
+                  <button className="btn btn-s btn-sm" onClick={()=>toast_("Adding log…")}> Add Log</button>
                   <button className="btn btn-d btn-sm" onClick={()=>{if(window.confirm("Delete this task?")){setTasks(p=>p.filter(t=>t.id!==liveDetail.id));setDetail(null);toast_("Task deleted.");}}}>🗑 Delete</button>
                 </div>
               </div>
@@ -1004,7 +1004,7 @@ export default function ArchitectTaskPage() {
 
             <div className="mf"><div className="ml3">Link to</div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                {["📐 Drawing","⚠️ RFI","📋 Daily Log","🚨 Incident","✍️ Sign-Off","📅 Schedule"].map(l=>(
+                {[" Drawing"," RFI"," Daily Log"," Incident"," Sign-Off"," Schedule"].map(l=>(
                   <button key={l} className="btn btn-g btn-sm" onClick={()=>toast_(`Linking ${l}…`)}>{l}</button>
                 ))}
               </div>

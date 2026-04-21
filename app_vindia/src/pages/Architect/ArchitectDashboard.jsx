@@ -232,29 +232,55 @@ return (
     <div className="two-col">
 
       {/* DAILY LOG */}
-      {/* DAILY LOG CARD */}
-<div 
-  className="panel daily-log-card"
+    <div 
+  className="panel daily-log-card enhanced-log-card"
   onClick={() => navigate("/architect/logs")}
 >
   <div className="panel-head">
     <div className="panel-title">
       Daily Progress
-      <span className="panel-badge pb-danger">Not submitted</span>
+      <span className="panel-badge pb-danger">
+        Not submitted
+      </span>
+    </div>
+
+    <div className="log-mini-status">
+      Due: 6:00 PM
     </div>
   </div>
 
+  {/* MAIN CONTENT */}
   <div className="daily-log-content">
-    <div className="daily-icon">＋</div>
+    <div className="daily-icon">📝</div>
 
-    <div>
-      <div className="daily-title">Add Today’s Progress</div>
+    <div style={{ flex: 1 }}>
+      <div className="daily-title">
+        Start Today’s Log
+      </div>
+
       <div className="daily-sub">
-        Log design updates, meetings, coordination notes
+        Capture site updates, coordination notes, and design changes
+      </div>
+
+      {/* EXTRA CONTEXT */}
+      <div className="log-meta">
+        <span>Last update: Yesterday 6:42 PM</span>
+        <span>•</span>
+        <span>0/3 sections completed</span>
       </div>
     </div>
+
+    <div className="log-cta">
+      Open →
+    </div>
+  </div>
+
+  {/* PROGRESS BAR */}
+  <div className="log-progress">
+    <div className="log-progress-fill" />
   </div>
 </div>
+
 
      <div className="panel">
   <div className="panel-head">
