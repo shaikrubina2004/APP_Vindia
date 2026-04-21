@@ -12,7 +12,7 @@ const PROJECTS    = ["Skyward Residency", "Green Valley Towers", "Horizon Plaza"
 const ROLES       = ["Lead Architect", "Architect", "Junior Architect", "Intern Architect", "Technician"];
 const TASK_STATUS = ["To Do", "In Progress", "Under Review", "Done"];
 const ISSUE_TYPES = ["Design Issue", "Missing Info", "Structural Conflict", "MEP Conflict", "Site Issue", "Client Change"];
-const SEVERITIES  = ["Low", "Medium", "High"];
+const SEVERITIES  = ["Low", "P2", "P1"];
 
 const MOCK_FILES = [
   { name: "L4-FloorPlan-RevC.dwg",      type: "DWG",  icon: "📐" },
@@ -23,8 +23,8 @@ const MOCK_FILES = [
 ];
 
 /* ─── Helpers ─── */
-const sevDot  = s => s === "High" ? "sd-h" : s === "Medium" ? "sd-m" : "sd-l";
-const sevChip = s => s === "High" ? "on-danger" : s === "Medium" ? "on-warn" : "on-ok";
+const sevDot  = s => s === "P1" ? "sd-h" : s === "P2" ? "sd-m" : "sd-l";
+const sevChip = s => s === "P1" ? "on-danger" : s === "P2" ? "on-warn" : "on-ok";
 
 /* ══════════════════════════════════════════════════════
    COMPONENT
@@ -89,7 +89,7 @@ export default function DailyLogPage() {
       toast_("Describe the work done today."); return;
     }
     setLogStatus(status);
-    toast_(status === "Submitted" ? "Daily log submitted ✓" : "Saved as draft ✓");
+    toast_(status === "Submitted" ? "Daily log submitted ✓" : "Saved as draft ");
   };
 
   /* ── Section completion flags ── */
@@ -121,7 +121,7 @@ export default function DailyLogPage() {
 
           {logStatus === "Submitted" && (
             <div className="success-banner">
-              <span className="sb-icon">✅</span>
+              <span className="sb-icon"></span>
               <div>
                 <div className="sb-title">Log Submitted</div>
                 <div className="sb-sub">Pending PM review</div>
@@ -192,7 +192,7 @@ export default function DailyLogPage() {
             </div>
 
             {/* 2 · TASKS WORKED ON */}
-            <div className="sec grow">
+            <div className="sec ">
               <div className="sec-head">
                 <div className={`sn${tasksDone ? " done" : ""}`}>
                   {tasksDone ? "✓" : "2"}
@@ -230,7 +230,7 @@ export default function DailyLogPage() {
             </div>
 
             {/* 3 · WORK DONE TODAY */}
-            <div className="sec grow">
+            <div className="sec work ">
               <div className="sec-head">
                 <div className={`sn${workDone_ ? " done" : ""}`}>
                   {workDone_ ? "✓" : "3"}
@@ -254,7 +254,7 @@ export default function DailyLogPage() {
           <div className="col">
 
             {/* 4 · ISSUES / BLOCKERS */}
-            <div className="sec grow">
+            <div className="sec issues ">
               <div className="sec-head">
                 <div className={`sn${issues.length > 0 ? " warn" : ""}`}>
                   {issues.length > 0 ? issues.length : "4"}
@@ -311,7 +311,7 @@ export default function DailyLogPage() {
             </div>
 
             {/* 5 · ATTACHMENTS */}
-            <div className="sec grow">
+            <div className="sec attach">
               <div className="sec-head">
                 <div className={`sn${attachments.length > 0 ? " info" : ""}`}>
                   {attachments.length > 0 ? attachments.length : "5"}
@@ -354,10 +354,10 @@ export default function DailyLogPage() {
               </div>
               <div className="sbtns">
                 <button className="btn btn-s" onClick={() => handleSubmit("Draft")}>
-                  💾 Save Draft
+                  Save Draft
                 </button>
                 <button className="btn btn-p" onClick={() => handleSubmit("Submitted")}>
-                  ✅ Submit Log
+                  Submit Log
                 </button>
               </div>
             </div>
