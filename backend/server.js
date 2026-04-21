@@ -30,6 +30,15 @@ const incidentRoutes = require("./routes/IncidentRoutes");
 /* ── 🔥 NEW: PC DAILY UPDATE ROUTE ───────────────────────── */
 const pcDailyUpdateRoutes = require("./routes/pcDailyUpdateRoutes");
 
+/* ── SITE ENGINEER MODULES ───────────────────────────────── */
+const rfiRoutes = require("./routes/rfiRoutes");
+const siteEngineerRfiRoutes = require("./routes/siteEngineerRfiRoutes");
+const ncrRoutes = require("./routes/ncrRoutes");
+const siteDiaryRoutes = require("./routes/siteDiaryRoutes");
+const activityLogRoutes = require("./routes/activityLogRoutes");
+const progressRoutes = require("./routes/progressRoutes");
+const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoutes");
+
 const app = express();
 
 /* ═══════════════════════════════════════════════════════════
@@ -95,6 +104,15 @@ try {
 
   /* ── 🔥 NEW: PC DAILY UPDATE ROUTE ─────────────────────── */
   app.use("/api/pc-daily-updates", pcDailyUpdateRoutes);
+
+  /* ── Site Engineer Modules ─────────────────────────────── */
+  app.use("/api/rfi", rfiRoutes); // Structural Engineer RFI
+  app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes); // Site Engineer RFI
+  app.use("/api/ncr", ncrRoutes);
+  app.use("/api/diary", siteDiaryRoutes);
+  app.use("/api/activity-log", activityLogRoutes);
+  app.use("/api/progress", progressRoutes);
+  app.use("/api/site-engineer-dashboard", siteEngineerDashboardRoutes);
 
 } catch (err) {
   console.error("❌ Route loading error:", err.message);

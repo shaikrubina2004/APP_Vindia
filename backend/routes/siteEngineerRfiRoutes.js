@@ -1,0 +1,97 @@
+const express = require("express");
+const router = express.Router();
+const pool = require("../config/db");
+
+// ✅ GET ALL RFIs FOR SITE ENGINEER
+router.get("/", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM rfis ORDER BY id DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ✅ GET SINGLE RFI
+router.get("/:id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM rfis WHERE id=$1",
+      [req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ✅ CREATE RFI (SITE ENGINEER)
+router.post("/", async (req, res) => {
+  const { project, subject, priority } = req.body;
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO rfis (project, subject, priority, status, date)
+       VALUES ($1, $2, $3, 'Pending', NOW())
+       RETURNING *`,
+      [project, subject, priority]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ✅ UPDATE STATUS (SITE ENGINEER)
+router.put("/:id/status", async (req, res) => {
+  const { status } = req.body;
+
+  try {
+    const result = await pool.query(
+      "UPDATE rfis SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING *",
+      [status, req.params.id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ✅ ANSWER RFI (SITE ENGINEER)
+router.put("/:id/answer", async (req, res) => {
+  const { response } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE rfis
+       SET response=$1, status='Answered', updated_at=NOW()
+       WHERE id=$2
+       RETURNING *`,
+      [response, req.params.id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ✅ DELETE RFI (SITE ENGINEER)
+router.delete("/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM rfis WHERE id=$1", [req.params.id]);
+    res.json({ success: true, message: "RFI deleted" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+module.exports = router;

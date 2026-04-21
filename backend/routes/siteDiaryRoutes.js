@@ -1,8 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const { createDiary, getDiary } = require("../controllers/siteDiaryController");
+const authMiddleware = require("../middleware/authMiddleware");
+const { createDiary, getDiary, getDiaryById } = require("../controllers/siteDiaryController");
 
-router.post("/", createDiary);
-router.get("/:projectId", getDiary);
+/* ===== CREATE ===== */
+router.post("/", authMiddleware, createDiary);
+
+/* ===== GET ===== */
+router.get("/", authMiddleware, getDiary);
+router.get("/:id", authMiddleware, getDiaryById);
 
 module.exports = router;

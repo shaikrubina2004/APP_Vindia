@@ -1,7 +1,8 @@
 // src/pages/rfi/RFI.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
-// import "../../styles/shared-pages.css";
+import "../../styles/shared-pages.css";
+import "../../styles/RFI.css";
 const DRAFT_KEY = "rfi:draft:v3";
 const QUEUE_KEY = "rfi:queue:v3";
 const PAGE_SIZE  = 8;
@@ -24,7 +25,7 @@ async function flushQueue() {
   for (const item of q) {
     try {
       if (item.payload?._fd) { rem.push(item); continue; }
-      const res = await api.post("/rfi", item.payload);
+      const res = await api.post("/site-engineer/rfi", item.payload);
       if (!res || (res.status && res.status >= 400)) throw new Error();
     } catch { rem.push(item); }
   }
@@ -86,7 +87,7 @@ export default function RFI() {
   async function loadAll() {
     setLL(true);
     try {
-      const [rr, ur] = await Promise.all([api.get("/rfi"), api.get("/users").catch(() => ({ data: [] }))]);
+      const [rr, ur] = await Promise.all([api.get("/site-engineer/rfi"), api.get("/users").catch(() => ({ data: [] }))]);
       const raw = Array.isArray(rr?.data) ? rr.data : [];
       const seen = new Set();
       if (alive.current) {
@@ -120,10 +121,10 @@ export default function RFI() {
         const fd = new FormData();
         ["title","description","zone","discipline","priority","assignedTo"].forEach(k => fd.append(k, form[k] || ""));
         form.attachments.forEach(f => fd.append("attachments", f, f.name));
-        res = await api.post("/rfi", fd, { headers: { "Content-Type": "multipart/form-data" } });
+        res = await api.post("/site-engineer/rfi", fd, { headers: { "Content-Type": "multipart/form-data" } });
       } else {
         const { attachments: _, ...payload } = form;
-        res = await api.post("/rfi", payload);
+        res = await api.post("/site-engineer/rfi", payload);
       }
       if (!res || (res.status && res.status >= 400)) throw new Error();
       await loadAll(); ls.del(DRAFT_KEY); setForm({ ...BLANK }); setStatus("RFI created ✓");
@@ -318,8 +319,8 @@ export default function RFI() {
             <div className="rfi-aside-title">Priority Breakdown</div>
             {["critical","high","medium","low"].map(p => (
               <div key={p} className="rfi-aside-row">
-                <span style={{ textTransform: "capitalize" }}>{p}</span>
-                <strong style={{ color: p === "critical" || p === "high" ? "var(--danger)" : "var(--navy-700)" }}>
+                <span className="rfi-aside-label">{p}</span>
+                <strong className={`rfi-aside-value rfi-aside-value--${p}`}>
                   {rfis.filter(r => r.priority === p).length}
                 </strong>
               </div>

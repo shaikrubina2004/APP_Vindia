@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
-// import "../../styles/shared-pages.css";
+import "../../styles/shared-pages.css";
+import "../../styles/Checklist.css";
 const CL_DRAFT    = "se:checklist:draft:v2";
 const CL_TEMPLATES= "se:checklist:templates:v2";
 const CL_QUEUE    = "se:checklist:queue:v2";

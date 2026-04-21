@@ -1,5 +1,5 @@
 export const ROLES = {
-  CEO: "ceo", // ✅ FIXED
+  CEO: "ceo",
   EMPLOYEE: "employee",
   FINANCE: "finance",
   MARKETING: "marketing",
@@ -7,7 +7,7 @@ export const ROLES = {
   SITE_ENGINEER: "site_engineer",
   BDA: "bda",
   PROJECT_COORDINATOR: "project_coordinator",
-  SITE_ENGINEER: "site_engineer",
+  PROJECT_MANAGER: "project_manager",
   QUANTITY_SURVEYOR: "quantity_surveyor",
   STRUCTURAL_ENGINEER: "structural_engineer",
   MEP_ENGINEER: "mep_engineer",

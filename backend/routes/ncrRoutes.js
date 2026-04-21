@@ -1,8 +1,16 @@
 const express = require("express");
 const router = express.Router();
-const { createNCR, getNCR } = require("../controllers/ncrController");
+const authMiddleware = require("../middleware/authMiddleware");
+const { createNCR, getNCR, getNCRById, updateNCR } = require("../controllers/ncrController");
 
-router.post("/", createNCR);
+/* ===== CREATE ===== */
+router.post("/", authMiddleware, createNCR);
+
+/* ===== GET ===== */
 router.get("/", getNCR);
+router.get("/:id", getNCRById);
+
+/* ===== UPDATE ===== */
+router.put("/:id", authMiddleware, updateNCR);
 
 module.exports = router;
