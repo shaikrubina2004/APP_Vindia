@@ -1,19 +1,14 @@
 import { Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
 
-/* AUTH */
 import SignIn from "../pages/SignIn";
 import SignUp from "../pages/SignUp";
-import SignInMobile from "../pages/SignInMobile";
-import SignUpMobile from "../pages/SignUpMobile";
 
-/* CEO */
 import Dashboard from "../pages/ceo/Dashboard";
 import CEOPanel from "../pages/ceo/CEOPanel";
 import UserManagement from "../pages/ceo/UserManagement";
 import ProjectManagement from "../pages/ceo/ProjectManagement";
 
-/* HR */
 import HRDashboard from "../pages/hr/HRDashboard";
 import Employees from "../pages/hr/Employees";
 import AddEmployee from "../pages/hr/AddEmployee";
@@ -23,73 +18,38 @@ import Documents from "../pages/hr/Documents";
 import Leaves from "../pages/hr/Leaves";
 import Payroll from "../pages/hr/Payroll";
 import Travel from "../pages/hr/Travel";
-
-/* PROJECT MANAGER */
-import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
-import AppShell from "../components/incidents/AppShell";
-import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
-import Reports from "../pages/projects/projectmanager/Reports";
-
-/* SITE ENGINEER */
-import SiteEngineerDashboard from "../pages/siteEngineer/SiteEngineerDashboard";
-import DailyDiary from "../pages/siteEngineer/DailyDiary";
-import RFI from "../pages/siteEngineer/RFI";
-import NCR from "../pages/siteEngineer/NCR";
-import Checklist from "../pages/siteEngineer/Checklist";
-import Progress from "../pages/siteEngineer/Progress";
-import ActivityLog from "../pages/siteEngineer/ActivityLog";
-
-/* QUANTITY SURVEYOR */
-import QuantitySurveyorDashboard from "../pages/Quality Surveyor/QuantitySurveyorDashboard";
-import Qsdailyupdates from "../pages/Quality Surveyor/Qsdailyupdates";
-import Qsboq from "../pages/Quality Surveyor/Qsboq";
-import Measurements from "../pages/Quality Surveyor/Measurements";
-import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
-import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
-import Qssubmissions from "../pages/Quality Surveyor/Qssubmissions";
-import Incident from "../pages/Quality Surveyor/Incident";
-
-/* OTHER ROLES */
+import SignInMobile from "../pages/SignInMobile";
+import SignUpMobile from "../pages/SignUpMobile";
 import MEPDashboard from "../pages/MEP Engineer/MEPDashboard";
+import ProjectCoordinatorDashboard from "../pages/Project Coordinator/ProjectCoordinatorDashboard";
+import SiteEngineerDashboard from "../pages/Site Engineer/SiteEngineerDashboard";
 import PlanningEngineerDashboard from "../pages/Planning Engineer/PlanningEngineerDashboard";
 import QCDashboard from "../pages/QC Engineer/QCDashboard";
+import QuantitySurveyorDashboard from "../pages/Quality Surveyor/QuantitySurveyorDashboard";
 import SafetyOfficerDashboard from "../pages/Safety Officer/SafetyOfficerDashboard";
-
-/* STRUCTURAL */
-import StructuralRoutes from "./StructuralRoutes";
-import RFIDetails from "../pages/Structural Engineer/RFIDetails";
-
-/* ARCHITECT */
+import StructuralEngineerDashboard from "../pages/Structural Engineer/StructuralEngineerDashboard";
+import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
-import ArchitectTasks from "../pages/Architect/ArchitectTasks";
-import ArchitectDailyLogins from "../pages/Architect/ArchitectDailyLogins";
-import ArchitectDesigns from "../pages/Architect/ArchitectDesigns";
-import ArchitectCoordination from "../pages/Architect/ArchitectCoordination";
-import ArchitectSignOff from "../pages/Architect/ArchitectSignOff";
-
-
-/* PROJECT COORDINATOR */
-import ProjectCoordinatorDashboard from "../pages/Project Coordinator/ProjectCoordinatorDashboard";
-import DailyUpdatesPC from "../pages/Project Coordinator/DailyUpdates";
-import Milestone from "../pages/Project Coordinator/Milestone";
-import Payment from "../pages/Project Coordinator/Payment";
-
-/* LAYOUTS */
-import CEOLayout from "../layouts/CEOLayout";
-import HRLayout from "../layouts/HRLayout";
-import ProjectManagerLayout from "../layouts/ProjectManagerLayout";
-import SiteEngineerLayout from "../layouts/SiteEngineerLayout";
-import QuantitySurveyorLayout from "../layouts/QuantitySurveyorLayout";
 import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
 import ArchitectLayout from "../layouts/ArchitectLayout";
-
-/* COMMON */
-import Timesheet from "../pages/timesheet/Timesheet";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
 
+import CEOLayout from "../layouts/CEOLayout";
+import HRLayout from "../layouts/HRLayout";
+import Timesheet from "../pages/timesheet/Timesheet";
+import ProjectManagerLayout from "../layouts/ProjectManagerLayout";
+import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
+import Incidents from "../pages/projects/projectmanager/Incidents";
+import AppShell from "../components/incidents/AppShell";
+import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
+import Reports from "../pages/projects/projectmanager/Reports";
+import SiteEngineerLayout from "../layouts/SiteEngineerLayout"; // ADD THIS
+import DailyDiary from "../pages/Site Engineer/DailyDiary";
+import RFI from "../pages/Site Engineer/RFI";
+import NCR from "../pages/Site Engineer/NCR";
+import StructuralRoutes from "./StructuralRoutes";
 const AppRoutes = () => {
-
   const useIsMobile = () => {
     const [mobile, setMobile] = useState(window.innerWidth <= 768);
 
@@ -101,17 +61,6 @@ const AppRoutes = () => {
 
     return mobile;
   };
-
-  const SignInWrapper = () => {
-    const isMobile = useIsMobile();
-    return isMobile ? <SignInMobile /> : <SignIn />;
-  };
-
-  const SignUpWrapper = () => {
-    const isMobile = useIsMobile();
-    return isMobile ? <SignUpMobile /> : <SignUp />;
-  };
-
   const PROJECT_ROLES = [
     ROLES.PROJECT_MANAGER,
     ROLES.PROJECT_COORDINATOR,
@@ -124,108 +73,387 @@ const AppRoutes = () => {
     ROLES.QC_ENGINEER,
   ];
 
+  const SignInWrapper = () => {
+    const isMobile = useIsMobile();
+    return isMobile ? <SignInMobile /> : <SignIn />;
+  };
+
+  const SignUpWrapper = () => {
+    const isMobile = useIsMobile();
+    return isMobile ? <SignUpMobile /> : <SignUp />;
+  };
   return (
     <Routes>
-
-      {/* AUTH */}
+      {/* PUBLIC */}
       <Route path="/" element={<SignInWrapper />} />
       <Route path="/signup" element={<SignUpWrapper />} />
+      {/* DASHBOARD */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
+            <CEOLayout>
+              <Dashboard />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* CEO */}
-      <Route path="/dashboard" element={
-        <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
-          <CEOLayout><Dashboard /></CEOLayout>
-        </ProtectedRoute>
-      }/>
+      <Route
+        path="/ceo"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <CEOLayout>
+              <CEOPanel />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="/ceo" element={
-        <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-          <CEOLayout><CEOPanel /></CEOLayout>
-        </ProtectedRoute>
-      }/>
+      {/* CEO USERS */}
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <CEOLayout>
+              <UserManagement />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="/users" element={
-        <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-          <CEOLayout><UserManagement /></CEOLayout>
-        </ProtectedRoute>
-      }/>
+      {/* CEO PROJECTS */}
+      <Route
+        path="/projects"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ...PROJECT_ROLES]}>
+            <ProjectManagerLayout>
+              <ProjectManagement />
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="/projects" element={
-        <ProtectedRoute allowedRoles={[ROLES.CEO, ...PROJECT_ROLES]}>
-          <ProjectManagerLayout><ProjectManagement /></ProjectManagerLayout>
-        </ProtectedRoute>
-      }/>
+      <Route
+        path="/pm/team"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <ProjectManagerLayout>
+              <TeamManagement />
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pm/incidents"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <ProjectManagerLayout>
+              <AppShell /> {/* ← was <IncidentManagement /> */}
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pm/daily-updates"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <ProjectManagerLayout>
+              <DailyUpdates />
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pm/reports"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <ProjectManagerLayout>
+              <Reports />
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* HR DASHBOARD */}
+      <Route
+        path="/hr"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <HRDashboard />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      {/* PROJECT MANAGER */}
-      <Route path="/pm/team" element={<ProjectManagerLayout><TeamManagement /></ProjectManagerLayout>} />
-      <Route path="/pm/incidents" element={<ProjectManagerLayout><AppShell /></ProjectManagerLayout>} />
-      <Route path="/pm/daily-updates" element={<ProjectManagerLayout><DailyUpdates /></ProjectManagerLayout>} />
-      <Route path="/pm/reports" element={<ProjectManagerLayout><Reports /></ProjectManagerLayout>} />
+      {/* HR EMPLOYEES */}
+      <Route
+        path="/hr/employees"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Employees />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/employee"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <CEOLayout>
+              <Employees />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      {/* HR */}
-      <Route path="/hr" element={<HRLayout><HRDashboard /></HRLayout>} />
-      <Route path="/hr/employees" element={<HRLayout><Employees /></HRLayout>} />
-      <Route path="/hr/add-employee" element={<HRLayout><AddEmployee /></HRLayout>} />
-      <Route path="/hr/employee/:id" element={<HRLayout><EmployeeDetails /></HRLayout>} />
-      <Route path="/hr/attendance" element={<HRLayout><Attendance /></HRLayout>} />
-      <Route path="/hr/documents" element={<HRLayout><Documents /></HRLayout>} />
-      <Route path="/hr/payroll" element={<HRLayout><Payroll /></HRLayout>} />
-      <Route path="/hr/travel" element={<HRLayout><Travel /></HRLayout>} />
-      <Route path="/hr/leaves" element={<HRLayout><Leaves /></HRLayout>} />
+      <Route
+        path="/hr/employee/:id"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <EmployeeDetails />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* ADD EMPLOYEE */}
+      <Route
+        path="/hr/add-employee"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <AddEmployee />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      {/* SITE ENGINEER */}
-      <Route path="/site-engineer/dashboard" element={<SiteEngineerLayout><SiteEngineerDashboard /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/daily-diary" element={<SiteEngineerLayout><DailyDiary /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/rfi" element={<SiteEngineerLayout><RFI /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/ncr" element={<SiteEngineerLayout><NCR /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/checklist" element={<SiteEngineerLayout><Checklist /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/progress" element={<SiteEngineerLayout><Progress /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/activity" element={<SiteEngineerLayout><ActivityLog /></SiteEngineerLayout>} />
+      {/* HR ATTENDANCE */}
+      <Route
+        path="/hr/attendance"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Attendance />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      {/* QUANTITY SURVEYOR */}
-      <Route path="/quantity-surveyor/dashboard" element={<QuantitySurveyorLayout><QuantitySurveyorDashboard /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/daily-updates" element={<QuantitySurveyorLayout><Qsdailyupdates /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/incident" element={<QuantitySurveyorLayout><Incident /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/measurements" element={<QuantitySurveyorLayout><Measurements /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/quantity-report" element={<QuantitySurveyorLayout><Qsquantityreport /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/cost-report" element={<QuantitySurveyorLayout><Qscostreport /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/submissions" element={<QuantitySurveyorLayout><Qssubmissions /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/boq" element={<QuantitySurveyorLayout><Qsboq /></QuantitySurveyorLayout>} />
+      {/* HR DOCUMENTS */}
+      <Route
+        path="/hr/documents"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Documents />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      {/* OTHER ROLES */}
-      <Route path="/mep/dashboard" element={<ProjectManagerLayout><MEPDashboard /></ProjectManagerLayout>} />
-      <Route path="/planning-engineer/dashboard" element={<ProjectManagerLayout><PlanningEngineerDashboard /></ProjectManagerLayout>} />
-      <Route path="/qc/dashboard" element={<ProjectManagerLayout><QCDashboard /></ProjectManagerLayout>} />
-      <Route path="/safety/dashboard" element={<ProjectManagerLayout><SafetyOfficerDashboard /></ProjectManagerLayout>} />
+      {/* CEO ATTENDANCE VIEW */}
+      <Route
+        path="/attendance"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <CEOLayout>
+              <Attendance />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      {/* STRUCTURAL */}
+      {/* HR PAYROLL */}
+      <Route
+        path="/hr/payroll"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Payroll />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* CEO PAYROLL VIEW */}
+      <Route
+        path="/payroll"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <CEOLayout>
+              <Payroll />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* HR TRAVEL */}
+      <Route
+        path="/hr/travel"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Travel />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* HR LEAVES */}
+      <Route
+        path="/hr/leaves"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+            <HRLayout>
+              <Leaves />
+            </HRLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/project-coordinator/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.PROJECT_COORDINATOR]}>
+            <ProjectCoordinatorLayout>
+              <ProjectCoordinatorDashboard />
+            </ProjectCoordinatorLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/site-engineer/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout>
+              <SiteEngineerDashboard />
+            </SiteEngineerLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/site-engineer/daily-diary"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout>
+              <DailyDiary />
+            </SiteEngineerLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/site-engineer/rfi"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout>
+              <RFI />
+            </SiteEngineerLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/site-engineer/ncr"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SITE_ENGINEER]}>
+            <SiteEngineerLayout>
+              <NCR />
+            </SiteEngineerLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/mep/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.MEP_ENGINEER]}>
+            <ProjectManagerLayout>
+              <MEPDashboard />
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/quantity-surveyor/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+            <ProjectManagerLayout>
+              <QuantitySurveyorDashboard />
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
+
       <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
-      <Route path="/structural-engineer/rfi/:id" element={<RFIDetails />} />
 
-      {/* ARCHITECT */}
-      <Route path="/architect/dashboard" element={<ArchitectLayout><ArchitectDashboard /></ArchitectLayout>} />
-      <Route path="/architect/tasks" element={<ArchitectLayout><ArchitectTasks /></ArchitectLayout>} />
-      <Route path="/architect/logs" element={<ArchitectLayout><ArchitectDailyLogins /></ArchitectLayout>} />
-      <Route path="/architect/designs" element={<ArchitectLayout><ArchitectDesigns /></ArchitectLayout>} />
-      <Route path="/architect/coordination" element={<ArchitectLayout><ArchitectCoordination /></ArchitectLayout>} />
-      <Route path="/architect/sign-off" element={<ArchitectLayout><ArchitectSignOff /></ArchitectLayout>} />
+      <Route
+        path="/planning-engineer/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.PLANNING_ENGINEER]}>
+            <ProjectManagerLayout>
+              <PlanningEngineerDashboard />
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      {/* PROJECT COORDINATOR */}
-      <Route path="/project-coordinator/dashboard" element={<ProjectCoordinatorLayout><ProjectCoordinatorDashboard /></ProjectCoordinatorLayout>} />
-      <Route path="/project-coordinator/daily" element={<ProjectCoordinatorLayout><DailyUpdatesPC /></ProjectCoordinatorLayout>} />
-      <Route path="/project-coordinator/milestone" element={<ProjectCoordinatorLayout><Milestone /></ProjectCoordinatorLayout>} />
-      <Route path="/project-coordinator/payments" element={<ProjectCoordinatorLayout><Payment /></ProjectCoordinatorLayout>} />
+      <Route
+        path="/safety/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.SAFETY_OFFICER]}>
+            <ProjectManagerLayout>
+              <SafetyOfficerDashboard />
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
 
-      {/* TIMESHEET */}
-      <Route path="/timesheet" element={
-        <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR, ...PROJECT_ROLES]}>
-          <CEOLayout><Timesheet /></CEOLayout>
-        </ProtectedRoute>
-      }/>
+      <Route
+        path="/qc/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.QC_ENGINEER]}>
+            <ProjectManagerLayout>
+              <QCDashboard />
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/architect/dashboard"
+        element={
+          <ArchitectLayout>
+            <ArchitectDashboard />
+          </ArchitectLayout>
+        }
+      />
+      <Route
+        path="/timesheet"
+        element={
+          <ProtectedRoute
+            allowedRoles={[
+              ROLES.CEO,
+              ROLES.HR,
+              ...PROJECT_ROLES, // ✅ ADD THIS
+            ]}
+          >
+            <CEOLayout>
+              <Timesheet />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* FALLBACK */}
       <Route path="*" element={<h2>Page Not Found</h2>} />
-
     </Routes>
   );
 };
