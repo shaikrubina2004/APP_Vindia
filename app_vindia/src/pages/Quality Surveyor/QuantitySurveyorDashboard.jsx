@@ -1,26 +1,14 @@
 import "./QuantitySurveyorDashboard.css";
 import { useNavigate } from "react-router-dom";
 
+
 export default function QuantitySurveyorDashboard() {
   const navigate = useNavigate();
-
-  const updates = [
-    { name: "Tower A", task: "Footing casting Grid C1-C4", status: "On Track", progress: 72 },
-    { name: "Mall Project", task: "Column casting Lvl 3", status: "Delayed", progress: 45 },
-    { name: "Hospital Block", task: "Plumbing rough-in Wing C", status: "Critical", progress: 29 },
-    { name: "Villa Complex", task: "Internal plastering Unit 3A", status: "Ahead", progress: 88 },
-  ];
-
-  const milestones = [
-    { name: "Foundation", percent: 87 },
-    { name: "Structure", percent: 43 },
-    { name: "Finishing", percent: 0 },
-    { name: "MEP", percent: 29 },
-  ];
 
   return (
     <div className="qsdb">
 
+      {/* HEADER */}
       <div className="qsdb-header">
         <div>
           <p className="qsdb-sub">CONSTRUCTION MANAGEMENT</p>
@@ -29,84 +17,177 @@ export default function QuantitySurveyorDashboard() {
         </div>
       </div>
 
-      {/* SUMMARY */}
+      {/* CLICKABLE CARDS */}
       <div className="qsdb-cards">
-        <div className="qs-card" onClick={() => navigate("/quantity-surveyor/boq")}>
-          <h3>12</h3>
-          <p>BOQ Items</p>
+
+        <div className="qs-card purple" onClick={() => navigate("/quantity-surveyor/quantity-report")}>
+          <span>📋</span>
+          <div>
+            <p>BOQ Items</p>
+            <h3>12</h3>
+          </div>
         </div>
 
-        <div className="qs-card" onClick={() => navigate("/quantity-surveyor/cost-report")}>
-          <h3>₹1.84 Cr</h3>
-          <p>Planned Cost</p>
+        <div className="qs-card dark" onClick={() => navigate("/quantity-surveyor/cost-report")}>
+          <span>💰</span>
+          <div>
+            <p>Planned Cost</p>
+            <h3>₹1.84 Cr</h3>
+          </div>
         </div>
 
-        <div className="qs-card" onClick={() => navigate("/quantity-surveyor/cost-report")}>
-          <h3>₹62.4 L</h3>
-          <p>Actual Spent</p>
+        <div className="qs-card orange" onClick={() => navigate("/quantity-surveyor/cost-report")}>
+          <span>⚠</span>
+          <div>
+            <p>Actual Spent</p>
+            <h3>₹62.4 L</h3>
+          </div>
         </div>
 
-        <div className="qs-card" onClick={() => navigate("/quantity-surveyor/quantity-report")}>
-          <h3>38%</h3>
-          <p>Avg Progress</p>
+        <div className="qs-card cyan" onClick={() => navigate("/quantity-surveyor/measurements")}>
+          <span>📊</span>
+          <div>
+            <p>Avg Progress</p>
+            <h3>38%</h3>
+          </div>
         </div>
+
       </div>
 
-      {/* GRID */}
+      {/* GRAPH SECTION */}
       <div className="qsdb-grid">
+        {/* BOTTOM SECTION */}
+<div className="bottom-grid">
 
-        {/* DAILY */}
+  {/* RECENT ACTIVITY */}
+  <div className="box">
+    <div className="box-header">
+      <h3>Recent Activities</h3>
+    <span onClick={() => navigate("/quantity-surveyor/daily-updates")}>
+  View all →
+</span>
+    </div>
+
+    <div className="activity">
+
+      <div className="activity-item">
+        <p className="title">BOQ Updated</p>
+        <span className="sub">Steel quantity revised</span>
+      </div>
+
+      <div className="activity-item">
+        <p className="title">Measurement Added</p>
+        <span className="sub">Concrete work updated</span>
+      </div>
+
+      <div className="activity-item">
+        <p className="title">Cost Alert</p>
+        <span className="sub red-text">Over budget detected</span>
+      </div>
+
+    </div>
+  </div>
+
+  {/* ALERTS */}
+  <div className="box">
+    <div className="box-header">
+      <h3>Alerts</h3>
+    </div>
+
+    <div className="alerts">
+
+      <div className="alert red-bg">
+        ⚠ Steel exceeding budget
+      </div>
+
+      <div className="alert yellow-bg">
+        ⏳ Pending approval (2 items)
+      </div>
+
+      <div className="alert green-bg">
+        ✔ Foundation work on track
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+        {/* SMALL BAR CARDS */}
         <div className="qsdb-card">
-          <div className="card-header">
-            <h3>Recent Daily Updates</h3>
-            <span className="link" onClick={() => navigate("/quantity-surveyor/daily-updates")}>
-              View all →
-            </span>
-          </div>
+          <div className="box">
+  <h3>Project Overview</h3>
 
-          {updates.map((u, i) => (
-            <div key={i} className="update-row">
-              <div className="update-left">
-                <h4>{u.name}</h4>
-                <p>{u.task}</p>
-              </div>
+  <div className="overview-list">
 
-              <div className="right">
-                <span className={`badge ${u.status.replace(" ", "")}`}>
-                  {u.status}
-                </span>
+    {/* Quantity */}
+    <div className="overview-item">
+      <div className="overview-top">
+        <span>Quantity Work</span>
+        <span>70%</span>
+      </div>
+      <div className="progress-bar">
+        <div className="progress-fill purple-fill" style={{ width: "70%" }}></div>
+      </div>
+    </div>
 
-                <div className="progress">
-                  <div style={{ width: `${u.progress}%` }}></div>
-                </div>
+    {/* Cost */}
+    <div className="overview-item">
+      <div className="overview-top">
+        <span>Cost Utilization</span>
+        <span>55%</span>
+      </div>
+      <div className="progress-bar">
+        <div className="progress-fill blue-fill" style={{ width: "55%" }}></div>
+      </div>
+    </div>
 
-                <span className="percent">{u.progress}%</span>
-              </div>
+    {/* Progress */}
+    <div className="overview-item">
+      <div className="overview-top">
+        <span>Project Progress</span>
+        <span>40%</span>
+      </div>
+      <div className="progress-bar">
+        <div className="progress-fill cyan-fill" style={{ width: "40%" }}></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+          <div className="mini-bars">
+
+            <div className="mini-bar">
+              <div className="mini-fill purple-fill" style={{ height: "60%" }}></div>
+              <p>Quantity</p>
             </div>
-          ))}
+
+            <div className="mini-bar">
+              <div className="mini-fill blue-fill" style={{ height: "80%" }}></div>
+              <p>Cost</p>
+            </div>
+
+            <div className="mini-bar">
+              <div className="mini-fill cyan-fill" style={{ height: "40%" }}></div>
+              <p>Progress</p>
+            </div>
+
+          </div>
         </div>
 
-        {/* MILESTONE */}
+        {/* SMALL DONUT */}
         <div className="qsdb-card">
-          <div className="card-header">
-            <h3>Milestone Cost Summary</h3>
-            <span className="link" onClick={() => navigate("/quantity-surveyor/quantity-report")}>
-              Full report →
-            </span>
+          <h3>Distribution</h3>
+
+          <div className="donut small">
+            <div className="donut-inner">70%</div>
           </div>
 
-          {milestones.map((m, i) => (
-            <div key={i} className="milestone">
-              <div className="top">
-                <span>{m.name}</span>
-                <span>{m.percent}%</span>
-              </div>
-
-              <div className="progress">
-                <div style={{ width: `${m.percent}%` }}></div>
-              </div>
-            </div>
-          ))}
+          <div className="legend">
+            <span><b className="green"></b> Completed</span>
+            <span><b className="red"></b> Pending</span>
+          </div>
         </div>
 
       </div>
