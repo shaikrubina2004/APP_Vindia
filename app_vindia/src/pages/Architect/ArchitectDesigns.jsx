@@ -1,96 +1,91 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./ArchitectDesigns.css";
 
 const DESIGN_DATA = [
   {
-    id: "DWG-A101",
+    id: "A101",
+    project: "Skyward Residency",
+    discipline: "Architectural",
+    type: "Floor Plan",
     title: "Level 4 Floor Plan - Block A",
-    version: "Rev C (v2.4)",
-    format: "DWG",
-    size: "2.1 MB",
-    updated: "Apr 20, 2:15 PM",
-    author: "Arjun K. (AK)",
-    status: "Current",
-    issues: 2,
-    approvals: "Approved",
-    downloads: 14,
-    phase: "Construction Docs"
-  },
-  {
-    id: "DWG-A201", 
-    title: "Facade Elevation - South Wing",
-    version: "Rev D (v1.7)",
-    format: "DWG",
-    size: "1.8 MB",
-    updated: "Apr 19, 11:30 AM",
-    author: "S. Mehta (SM)",
-    status: "Pending Review",
-    issues: 1,
-    approvals: "Pending",
-    downloads: 8,
-    phase: "Design Development"
-  },
-  {
-    id: "PDF-MEP501",
-    title: "MEP Coordination Sheet - Level 5",
-    version: "Rev 2.1",
-    format: "PDF",
-    size: "845 KB",
-    updated: "Apr 18, 4:45 PM", 
-    author: "T. Kumar (TK)",
+    versions: [
+      { num: "Rev C v2.4", date: "Apr 20", by: "Arjun K.", status: "Approved" },
+      { num: "Rev B v2.3", date: "Apr 18", by: "S. Mehta", status: "Under Review" },
+      { num: "Rev A v2.0", date: "Apr 15", by: "Arjun K.", status: "Draft" }
+    ],
     status: "Approved",
-    issues: 0,
-    approvals: "Approved",
-    downloads: 23,
-    phase: "Construction Docs"
+    revisions: 2,
+    comments: 3,
+    filesize: "2.1 MB"
   },
   {
-    id: "RVT-STRUCT001",
-    title: "Structural Model - Core B",
-    version: "v3.0",
-    format: "RVT",
-    size: "48.2 MB",
-    updated: "Apr 17, 9:20 AM",
-    author: "Eng. Sharma",
-    status: "Current",
-    issues: 3,
-    approvals: "Pending",
-    downloads: 5,
-    phase: "Design Development"
+    id: "MEP501",
+    project: "Skyward Residency",
+    discipline: "MEP",
+    type: "Coordination",
+    title: "MEP Coordination Sheet - Level 5",
+    versions: [
+      { num: "Rev 2.1", date: "Apr 18", by: "T. Kumar", status: "Approved" },
+      { num: "Rev 1.0", date: "Apr 16", by: "T. Kumar", status: "Rejected" }
+    ],
+    status: "Approved",
+    revisions: 0,
+    comments: 1,
+    filesize: "845 KB"
+  },
+  {
+    id: "S001",
+    project: "Green Valley Towers",
+    discipline: "Structural",
+    type: "Site Plan",
+    title: "Site Plan Update - Phase 2 Boundary",
+    versions: [
+      { num: "Rev E v3.0", date: "Apr 17", by: "Eng. Sharma", status: "Approved" },
+      { num: "Rev D v2.9", date: "Apr 14", by: "Eng. Sharma", status: "Under Review" }
+    ],
+    status: "Under Review",
+    revisions: 1,
+    comments: 2,
+    filesize: "1.8 MB"
   }
 ];
 
 function ArchitectDesigns() {
   const navigate = useNavigate();
   const [designs, setDesigns] = useState(DESIGN_DATA);
-  const [filterPhase, setFilterPhase] = useState("All Phases");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [uploadFile, setUploadFile] = useState(null);
+  const [filters, setFilters] = useState({
+    project: "All Projects",
+    discipline: "All Disciplines",
+    status: "All Statuses"
+  });
   const [selectedDesign, setSelectedDesign] = useState(null);
+  const [uploadFile, setUploadFile] = useState(null);
+
+  const projects = ["All Projects", "Skyward Residency", "Green Valley Towers"];
+  const disciplines = ["All Disciplines", "Architectural", "Structural", "MEP"];
+  const statuses = ["All Statuses", "Draft", "Under Review", "Approved", "Rejected"];
 
   const filteredDesigns = designs.filter(d => 
-    (filterPhase === "All Phases" || d.phase === filterPhase) &&
-    (d.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     d.id.toLowerCase().includes(searchTerm.toLowerCase()))
+    (filters.project === "All Projects" || d.project === filters.project) &&
+    (filters.discipline === "All Disciplines" || d.discipline === filters.discipline) &&
+    (filters.status === "All Statuses" || d.status === filters.status)
   );
 
   const handleUpload = () => {
     if (uploadFile) {
-      // Simulate upload
+      // Simulate new design upload
       const newDesign = {
-        id: `DWG-NEW-${Date.now()}`,
+        id: `NEW-${Date.now() % 1000}`,
+        project: "Skyward Residency",
+        discipline: uploadFile.name.includes('MEP') ? "MEP" : "Architectural",
+        type: "Plan",
         title: uploadFile.name,
-        version: "Rev A (v1.0)",
-        format: uploadFile.name.split('.').pop().toUpperCase(),
-        size: `${(uploadFile.size / 1024 / 1024).toFixed(1)} MB`,
-        updated: new Date().toLocaleString(),
-        author: "Arjun K. (AK)",
-        status: "New",
-        issues: 0,
-        approvals: "Draft",
-        downloads: 0,
-        phase: "Schematic Design"
+        versions: [{ num: "Rev A v1.0", date: "Today", by: "Arjun K.", status: "Draft" }],
+        status: "Draft",
+        revisions: 0,
+        comments: 0,
+        filesize: `${(uploadFile.size/1024/1024).toFixed(1)} MB`
       };
       setDesigns([newDesign, ...designs]);
       setUploadFile(null);
@@ -98,30 +93,40 @@ function ArchitectDesigns() {
   };
 
   return (
-    <div className="designs-main">
-      {/* HEADER */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Design Library</h1>
-          <p className="page-subtitle">
-            {filteredDesigns.length} drawings • {designs.filter(d => d.status === "Current").length} active versions
-          </p>
+    <div className="designs-erp">
+      {/* 🏗️ HEADER WITH STATS */}
+      <div className="erp-header">
+        <div className="header-left">
+          <h1 className="erp-title">Design Library</h1>
+          <div className="stats-row">
+            <div className="stat-item">
+              <div className="stat-number">{filteredDesigns.length}</div>
+              <div className="stat-label">Drawings</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-number">{designs.filter(d => d.status === "Approved").length}</div>
+              <div className="stat-label">Approved</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-number">{designs.reduce((sum, d) => sum + d.revisions, 0)}</div>
+              <div className="stat-label">Revisions</div>
+            </div>
+          </div>
         </div>
-        <div className="header-actions">
-          <input
-            className="search-input"
-            placeholder="Search drawings..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+        
+        <div className="header-right">
+          <input 
+            className="search-bar" 
+            placeholder="Search drawings..." 
           />
-          <label className="upload-btn">
+          <label className="upload-trigger">
             <input 
               type="file" 
               accept=".dwg,.pdf,.rvt,.dxf,.ifc"
               onChange={(e) => setUploadFile(e.target.files[0])}
-              style={{ display: "none" }}
+              style={{display: 'none'}}
             />
-            Upload Drawing
+            <span>📤 Upload Design</span>
           </label>
           {uploadFile && (
             <button className="confirm-upload" onClick={handleUpload}>
@@ -131,105 +136,180 @@ function ArchitectDesigns() {
         </div>
       </div>
 
-      {/* FILTERS */}
-      <div className="filters-row">
+      {/* 🔍 FILTERS */}
+      <div className="filters-bar">
         <select 
-          className="filter-select"
-          value={filterPhase}
-          onChange={(e) => setFilterPhase(e.target.value)}
+          className="filter-dropdown"
+          value={filters.project}
+          onChange={(e) => setFilters({...filters, project: e.target.value})}
         >
-          <option>All Phases</option>
-          <option>Schematic Design</option>
-          <option>Design Development</option>
-          <option>Construction Docs</option>
+          {projects.map(p => <option key={p}>{p}</option>)}
         </select>
-        
-        <div className="filter-chips">
-          <span className="chip active">DWG</span>
-          <span className="chip">PDF</span>
-          <span className="chip">RVT</span>
-          <span className="chip">Issues</span>
-          <span className="chip">Pending</span>
-        </div>
+        <select 
+          className="filter-dropdown"
+          value={filters.discipline}
+          onChange={(e) => setFilters({...filters, discipline: e.target.value})}
+        >
+          {disciplines.map(d => <option key={d}>{d}</option>)}
+        </select>
+        <select 
+          className="filter-dropdown"
+          value={filters.status}
+          onChange={(e) => setFilters({...filters, status: e.target.value})}
+        >
+          {statuses.map(s => <option key={s}>{s}</option>)}
+        </select>
       </div>
 
-      {/* DRAWINGS GRID */}
-      <div className="drawings-grid">
+      {/* 📂 DESIGN LIBRARY */}
+      <div className="design-grid">
         {filteredDesigns.map((design) => (
           <div 
             key={design.id}
-            className="drawing-card"
+            className="design-card"
             onClick={() => setSelectedDesign(design)}
           >
+            {/* PROJECT & DISCIPLINE HEADER */}
             <div className="card-header">
-              <div className="design-id">{design.id}</div>
-              <div className={`status-badge ${design.status.toLowerCase()}`}>
-                {design.status}
+              <div className="project-tag">{design.project}</div>
+              <div className={`discipline-badge ${design.discipline.toLowerCase()}`}>
+                {design.discipline}
               </div>
             </div>
-            
-            <div className="design-title">{design.title}</div>
-            <div className="design-meta">
-              <span>v{design.version}</span>
-              <span>{design.format}</span>
-              <span>{design.size}</span>
-            </div>
-            
-            <div className="design-actions">
-              <div className="issues-count">
-                <span className="issues-icon">!</span>
-                {design.issues}
+
+            {/* MAIN CONTENT */}
+            <div className="card-main">
+              <div className="design-id">#{design.id}</div>
+              <div className="design-title">{design.title}</div>
+              <div className="design-type">{design.type}</div>
+              
+              {/* LATEST VERSION */}
+              <div className="latest-version">
+                <div className="version-info">
+                  <span className="version-number">
+                    {design.versions[0]?.num || "No versions"}
+                  </span>
+                  <span className="version-date">{design.versions[0]?.date}</span>
+                  <span className="version-by">{design.versions[0]?.by}</span>
+                </div>
+                <div className={`version-status ${design.versions[0]?.status?.toLowerCase() || 'draft'}`}>
+                  {design.versions[0]?.status || "Draft"}
+                </div>
               </div>
-              <div className={`approval ${design.approvals.toLowerCase()}`}>
-                {design.approvals}
+
+              {/* METRICS */}
+              <div className="design-metrics">
+                <span className="metric">
+                  <strong>{design.revisions}</strong> Revisions
+                </span>
+                <span className="metric">
+                  <strong>{design.comments}</strong> Comments
+                </span>
+                <span className="metric filesize">{design.filesize}</span>
               </div>
-              <div className="downloads">{design.downloads}↓</div>
             </div>
-            
-            <div className="design-footer">
-              <span className="author">{design.author}</span>
-              <span>{design.updated}</span>
+
+            {/* QUICK ACTIONS */}
+            <div className="card-actions">
+              <button className="action-btn small primary">New Version</button>
+              <button className="action-btn small secondary">Send Review</button>
+              <button className="action-btn small download">Download</button>
             </div>
           </div>
         ))}
       </div>
 
-      {/* UPLOAD ZONE */}
-      {uploadFile && (
-        <div className="upload-preview">
-          <div className="preview-content">
-            <span className="preview-icon">📄</span>
-            <div>
-              <div className="preview-title">{uploadFile.name}</div>
-              <div className="preview-size">
-                {(uploadFile.size / 1024 / 1024).toFixed(1)} MB
-              </div>
+      {/* 📈 ACTIVITY TIMELINE */}
+      <div className="activity-panel">
+        <h3>Recent Activity</h3>
+        <div className="activity-list">
+          <div className="activity-item">
+            <div className="activity-icon approved">✓</div>
+            <div className="activity-content">
+              <strong>A101 Rev C v2.4</strong> approved by Client
+              <span>2 hours ago</span>
             </div>
-            <button className="btn-cancel" onClick={() => setUploadFile(null)}>
-              Cancel
-            </button>
+          </div>
+          <div className="activity-item">
+            <div className="activity-icon revision">↻</div>
+            <div className="activity-content">
+              <strong>MEP501 Rev 2.1</strong> new revision requested by MEP Lead
+              <span>1 day ago</span>
+            </div>
+          </div>
+          <div className="activity-item">
+            <div className="activity-icon upload">📤</div>
+            <div className="activity-content">
+              <strong>S001 Rev E v3.0</strong> uploaded by Eng. Sharma
+              <span>3 days ago</span>
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* MODAL - SELECTED DESIGN */}
+      {/* MODAL: DESIGN DETAIL */}
       {selectedDesign && (
-        <div className="design-modal">
-          <div className="modal-content">
+        <div className="modal-overlay" onClick={() => setSelectedDesign(null)}>
+          <div className="design-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{selectedDesign.title}</h2>
-              <button 
-                className="modal-close" 
-                onClick={() => setSelectedDesign(null)}
-              >
-                ×
-              </button>
+              <div>
+                <h2>{selectedDesign.title}</h2>
+                <div className="modal-meta">
+                  <span className="project-tag">{selectedDesign.project}</span>
+                  <span className={`discipline-badge ${selectedDesign.discipline.toLowerCase()}`}>
+                    {selectedDesign.discipline}
+                  </span>
+                </div>
+              </div>
+              <button className="close-btn">×</button>
             </div>
+
+            {/* VERSION HISTORY */}
+            <div className="version-history">
+              <h4>Version History ({selectedDesign.versions.length})</h4>
+              <div className="versions-list">
+                {selectedDesign.versions.map((version, index) => (
+                  <div key={version.num} className={`version-row ${index === 0 ? 'current' : ''}`}>
+                    <div className="version-left">
+                      <span className="version-number">{version.num}</span>
+                      <span className="version-date">{version.date}</span>
+                      <span className="version-by">by {version.by}</span>
+                    </div>
+                    <div className={`version-status-badge ${version.status.toLowerCase()}`}>
+                      {version.status}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* REVISION REQUESTS */}
+            <div className="revision-requests">
+              <h4>Revision Requests ({selectedDesign.revisions})</h4>
+              <div className="requests-list">
+                <div className="request-item">
+                  <div className="request-header">
+                    <span className="request-by">MEP Lead</span>
+                    <span className="request-priority high">High</span>
+                  </div>
+                  <div className="request-desc">"Adjust duct routing at Grid B-12"</div>
+                </div>
+                <div className="request-item resolved">
+                  <div className="request-header">
+                    <span className="request-by">Client</span>
+                    <span className="request-priority medium">Medium</span>
+                  </div>
+                  <div className="request-desc">"Window sizes confirmed"</div>
+                </div>
+              </div>
+            </div>
+
+            {/* ACTIONS */}
             <div className="modal-actions">
-              <button className="btn-primary">Download</button>
-              <button className="btn-secondary">View Online</button>
-              <button className="btn-danger">New Revision</button>
-              <button>Link Issues ({selectedDesign.issues})</button>
+              <button className="action-btn primary large">Create New Version</button>
+              <button className="action-btn secondary large">Send for Approval</button>
+              <button className="action-btn secondary large">Compare Versions</button>
+              <button className="action-btn download large">Download Latest</button>
             </div>
           </div>
         </div>
