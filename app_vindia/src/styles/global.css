@@ -11,16 +11,31 @@
   --navbar-height: 70px;
 }
 
+/* SCROLL FIX — must be here to override Tailwind base */
+html,
+body {
+  height: auto !important;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+}
+
+#root {
+  height: auto !important;
+  min-height: 100vh;
+  overflow: visible !important;
+}
+
 /* BODY */
 body {
   background: #f5f7fb;
   color: #222;
 }
 
-/* MAIN CONTENT (VERY IMPORTANT FIX) */
+/* MAIN CONTENT */
 .main-content {
-  margin-left: 110px;                 /* space for sidebar */
-  margin-top: var(--navbar-height);   /* pushes below navbar */
+  margin-left: 110px;
+  margin-top: var(--navbar-height);
   padding: 20px;
 }
 

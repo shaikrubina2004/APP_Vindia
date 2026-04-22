@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "./QuantitySurveyorDashboard.css";
+import "./Qssubmissions.css";
 
 const SEED = [
   { id:1,  date:"2026-04-14", project:"Tower A",       phase:"Foundation", activity:"Footing casting Grid C1-C4",          qty:15,  unit:"m³", location:"Grid C, Lvl 0",  manpower:14, status:"on-track", progress:72, issues:"",                                          submittedTo:"CEO & Project Manager", submittedAt:"18:00" },
