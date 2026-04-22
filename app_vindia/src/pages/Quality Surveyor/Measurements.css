@@ -1,80 +1,72 @@
-.measure-container {
-  padding: 20px;
-  background: #eef2f7;
+/* PAGE */
+.measurements-container {
+  padding: 24px;
+  background: #f5f7fb;
+  min-height: 100vh;
 }
 
-/* FORM */
-.measure-form {
-  background: white;
-  padding: 15px;
-  border-radius: 12px;
+/* TITLE */
+.measurements-container h2 {
   margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: 600;
 }
 
-.measure-form form {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 10px;
+/* TABLE */
+.measurements-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
 
-.measure-form input,
-.measure-form select {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
+.measurements-table th {
+  background: #1e293b;
+  color: #fff;
+  text-align: left;
+  padding: 12px;
 }
 
-.measure-form button {
-  background: #2563eb;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-/* LIST */
-.measure-list {
-  background: white;
-  padding: 15px;
-  border-radius: 12px;
-}
-
-.record {
-  display: flex;
-  justify-content: space-between;
+.measurements-table td {
+  padding: 12px;
   border-bottom: 1px solid #eee;
-  padding: 12px 0;
 }
 
-.tag {
-  background: #e0f2fe;
-  color: #0284c7;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-}
-
+/* STATUS */
 .status {
-  background: #dcfce7;
-  color: #16a34a;
-  padding: 5px 10px;
+  font-weight: 600;
+}
+
+.status.Pending {
+  color: orange;
+}
+
+.status.Approved {
+  color: green;
+}
+
+.status.Rejected {
+  color: red;
+}
+
+/* BUTTONS */
+.btn {
+  padding: 6px 12px;
+  margin-right: 6px;
+  border: none;
   border-radius: 6px;
-  font-size: 12px;
+  cursor: pointer;
+  font-size: 13px;
 }
 
-.remarks {
-  color: #64748b;
-  font-size: 12px;
+.btn-approve {
+  background: #22c55e;
+  color: white;
 }
 
-.empty {
-  text-align: center;
-  color: #94a3b8;
-}
-
-/* RESPONSIVE */
-@media (max-width: 768px) {
-  .measure-form form {
-    grid-template-columns: 1fr;
-  }
+.btn-reject {
+  background: #ef4444;
+  color: white;
 }
