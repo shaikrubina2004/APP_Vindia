@@ -18,7 +18,6 @@ const wbsRoutes = require("./routes/wbsRoutes");
 const costRoutes = require("./routes/costRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 
-
 /* ── OTHER MODULES ───────────────────────────────────────── */
 const structuralRoutes = require("./routes/structuralRoutes");
 const timesheetRoutes = require("./routes/timesheetRoutes");
@@ -32,7 +31,6 @@ const incidentRoutes = require("./routes/IncidentRoutes");
 const pcDailyUpdateRoutes = require("./routes/pcDailyUpdateRoutes");
 
 /* ── SITE ENGINEER MODULES ───────────────────────────────── */
-
 const rfiRoutes = require("./routes/rfiRoutes");
 const siteEngineerRfiRoutes = require("./routes/siteEngineerRfiRoutes");
 const ncrRoutes = require("./routes/ncrRoutes");
@@ -41,16 +39,12 @@ const activityLogRoutes = require("./routes/activityLogRoutes");
 const progressRoutes = require("./routes/progressRoutes");
 const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoutes");
 
-const qsRoutes = require("./routes/quantitySurveyorRoutes");
-
 const app = express();
 
 /* ═══════════════════════════════════════════════════════════
    MIDDLEWARE
 ═══════════════════════════════════════════════════════════ */
 app.use(cors());
-app.use(express.json());
-
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -119,9 +113,6 @@ try {
   app.use("/api/activity-log", activityLogRoutes);
   app.use("/api/progress", progressRoutes);
   app.use("/api/site-engineer-dashboard", siteEngineerDashboardRoutes);
-
-
-  app.use("/api/qs", qsRoutes);
 
 } catch (err) {
   console.error("❌ Route loading error:", err.message);
