@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "./QsSubmissions.css";
+import "./Qssubmissions.css";
 
 const QsSubmissions = () => {
   const [data] = useState([
