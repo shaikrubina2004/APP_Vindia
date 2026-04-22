@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from "react";
 import ConvertToTasksModal from "./ConvertToTasksModal";
 import { API } from "../../services/authService";
+import "../../styles/IncidentManagement.css";
 
 import {
   PRIORITY_CONFIG,
@@ -995,4 +996,3 @@ export default function IncidentManagement({
     </div>
   );
 }
-import "../../styles/IncidentManagement.css";

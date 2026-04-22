@@ -48,7 +48,6 @@ import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
 import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
 import Qssubmissions from "../pages/Quality Surveyor/Qssubmissions";
 
-
 /* OTHER ROLES */
 import MEPDashboard from "../pages/MEP Engineer/MEPDashboard";
 import MEPDailylog from "../pages/MEP Engineer/MEPDailylog";
@@ -401,7 +400,7 @@ const AppRoutes = () => {
           </QuantitySurveyorLayout>
         }
       />
-     
+
       <Route
         path="/quantity-surveyor/measurements"
         element={
@@ -457,7 +456,7 @@ const AppRoutes = () => {
         path="/mep/daily-log"
         element={
           <MEPLayout>
-            <MEPDashboard />
+            <MEPDailylog />
           </MEPLayout>
         }
       />
@@ -466,7 +465,7 @@ const AppRoutes = () => {
         path="/mep/drawings"
         element={
           <MEPLayout>
-            <MEPDashboard />
+            <MEPDrawings />
           </MEPLayout>
         }
       />
@@ -475,7 +474,7 @@ const AppRoutes = () => {
         path="/mep/version-control"
         element={
           <MEPLayout>
-            <MEPDashboard />
+            <MEPVerssionControll />
           </MEPLayout>
         }
       />
@@ -493,7 +492,7 @@ const AppRoutes = () => {
         path="/mep/coordination"
         element={
           <MEPLayout>
-            <MEPDashboard />
+            <MEPUploads />
           </MEPLayout>
         }
       />
@@ -502,7 +501,7 @@ const AppRoutes = () => {
         path="/mep/upload"
         element={
           <MEPLayout>
-            <MEPDashboard />
+            <MEPUploads />
           </MEPLayout>
         }
       />
@@ -538,75 +537,75 @@ const AppRoutes = () => {
 
       {/* ARCHITECT */}
       <Route
-  path="/architect/dashboard"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-      <ArchitectLayout>
-        <ArchitectDashboard />
-      </ArchitectLayout>
-    </ProtectedRoute>
-  }
-/>
+        path="/architect/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ArchitectLayout>
+              <ArchitectDashboard />
+            </ArchitectLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route
-  path="/architect/tasks"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-      <ArchitectLayout>
-        <ArchitectTasks />
-      </ArchitectLayout>
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/architect/logs"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-      <ArchitectLayout>
-        <ArchitectDailyLogins />
-      </ArchitectLayout>
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/architect/designs"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-      <ArchitectLayout>
-        <ArchitectDesigns />
-      </ArchitectLayout>
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/architect/sign-off"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-      <ArchitectLayout>
-        <ArchitectSignOff />
-      </ArchitectLayout>
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/architect/coordination"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-      <ArchitectLayout>
-        <ArchitectCoordination />
-      </ArchitectLayout>
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/architect/projects"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-      <ArchitectLayout>
-        <ArchitectProject />
-      </ArchitectLayout>
-    </ProtectedRoute>
-  }
-/>
+        path="/architect/tasks"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ArchitectLayout>
+              <ArchitectTasks />
+            </ArchitectLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/architect/logs"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ArchitectLayout>
+              <ArchitectDailyLogins />
+            </ArchitectLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/architect/designs"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ArchitectLayout>
+              <ArchitectDesigns />
+            </ArchitectLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/architect/sign-off"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ArchitectLayout>
+              <ArchitectSignOff />
+            </ArchitectLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/architect/coordination"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ArchitectLayout>
+              <ArchitectCoordination />
+            </ArchitectLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/architect/projects"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ArchitectLayout>
+              <ArchitectProject />
+            </ArchitectLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* PROJECT COORDINATOR */}
       <Route
