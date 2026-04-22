@@ -393,7 +393,7 @@ const AppRoutes = () => {
           </QuantitySurveyorLayout>
         }
       />
-        <Route
+      <Route
         path="/quantity-surveyor/alerts"
         element={
           <QuantitySurveyorLayout>
