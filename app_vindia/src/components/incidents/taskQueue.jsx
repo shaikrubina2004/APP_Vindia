@@ -278,19 +278,6 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
       {/* Header */}
       <div className="inc-header">
         <div className="inc-header-left">
-          <button className="tq-back-btn" onClick={onNavigateBack}>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-            Incidents
-          </button>
           <div>
             <h1>Task Queue</h1>
             <p>Tasks generated from incidents — assigned to team members</p>

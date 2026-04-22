@@ -1,39 +1,27 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import IncidentManagement from "./IncidentManagement";
 import TaskQueue from "./taskQueue";
 import { API } from "../../services/authService";
-// adjust if your base URL differs
 
-/* ─── normalise API incident shape → shape the UI expects ── */
 function normaliseIncident(inc) {
   return {
-    // identity
     id: inc.id,
     incidentNo: inc.incident_no,
-
-    // content
     title: inc.title,
     description: inc.description ?? "",
     priority: inc.priority,
     status: inc.status,
-
-    // assignee — comes from v_incident_overview joins
     assignedTo: inc.assigned_role ?? "",
     assignedName: inc.assigned_to_name ?? "",
     assignedId: inc.assigned_to_id ?? null,
-
-    // dates — keep as ISO strings, helpers call new Date() when needed
     createdAt: new Date(inc.created_at),
     updatedAt: new Date(inc.updated_at),
     deadlineAt: inc.deadline_at ? new Date(inc.deadline_at) : null,
     resolvedAt: inc.resolved_at ? new Date(inc.resolved_at) : null,
-
-    // counts from the overview view
     taskCount: Number(inc.task_count ?? 0),
     commentCount: Number(inc.comment_count ?? 0),
     photoCount: Number(inc.photo_count ?? 0),
-
-    // detail arrays — populated when a single incident is fetched
     comments: (inc.comments ?? []).map((c) => ({
       author: c.author_name,
       text: c.body,
@@ -67,19 +55,37 @@ function normaliseTask(t) {
   };
 }
 
-/* ─── APP SHELL ─────────────────────────────────────────── */
 export default function AppShell() {
-  const [page, setPage] = useState("incidents");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [page, setPage] = useState(
+    searchParams.get("page") === "tasks" ? "taskqueue" : "incidents",
+  );
   const [incidents, setIncidents] = useState([]);
-  const [users, setUsers] = useState([]); // [{ id, name, role_name, role_id }]
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  /* ── Fetch all incidents (list view) ── */
+  // Sync page state when URL query param changes (e.g. sidebar link clicked)
+  useEffect(() => {
+    if (searchParams.get("page") === "tasks") {
+      setPage("taskqueue");
+    } else {
+      setPage("incidents");
+    }
+  }, [searchParams]);
+
+  // Keep URL in sync when page changes programmatically
+  const navigateToQueue = useCallback(() => {
+    setSearchParams({ page: "tasks" });
+  }, [setSearchParams]);
+
+  const navigateToIncidents = useCallback(() => {
+    setSearchParams({});
+  }, [setSearchParams]);
+
   const fetchIncidents = useCallback(async () => {
     try {
       const res = await API.get("/incidents");
-
       const data = res.data.data.map(normaliseIncident);
       setIncidents(data);
     } catch (err) {
@@ -88,23 +94,18 @@ export default function AppShell() {
     }
   }, []);
 
-  /* ── Fetch users with their roles (for assign dropdowns) ── */
   const fetchUsers = useCallback(async () => {
     try {
-      // Your existing users endpoint — adjust if path differs
-      // Expected shape: [{ id, name, role_id, role_name }]
       const res = await API.get("/users");
-
       const normalised = (Array.isArray(res.data) ? res.data : []).map((u) => ({
         id: u.id,
         name: u.name,
         roleId: u.role_id,
-        roleName: u.role ?? "", // 👈 VERY IMPORTANT
+        roleName: u.role ?? "",
       }));
       setUsers(normalised);
     } catch (err) {
       console.error("fetchUsers:", err);
-      // Non-fatal — dropdowns just stay empty
     }
   }, []);
 
@@ -114,21 +115,19 @@ export default function AppShell() {
     );
   }, [fetchIncidents, fetchUsers]);
 
-  /* ── Re-fetch a single incident after mutation and merge it in ── */
   const refreshIncident = useCallback(async (incidentId) => {
     try {
       const res = await API.get(`/incidents/${incidentId}`);
       const updated = normaliseIncident(res.data.data);
-
       setIncidents((prev) =>
         prev.map((inc) => (inc.id === incidentId ? updated : inc)),
       );
+      return updated;
     } catch (err) {
       console.error("refreshIncident:", err);
     }
   }, []);
 
-  /* ── Loading / error states ── */
   if (loading) {
     return (
       <div
@@ -184,7 +183,7 @@ export default function AppShell() {
           setIncidents={setIncidents}
           users={users}
           refreshIncident={refreshIncident}
-          onNavigateToQueue={() => setPage("taskqueue")}
+          onNavigateToQueue={navigateToQueue}
         />
       ) : (
         <TaskQueue
@@ -192,7 +191,7 @@ export default function AppShell() {
           setIncidents={setIncidents}
           users={users}
           refreshIncident={refreshIncident}
-          onNavigateBack={() => setPage("incidents")}
+          onNavigateBack={navigateToIncidents}
         />
       )}
     </>

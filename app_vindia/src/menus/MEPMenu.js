@@ -11,6 +11,12 @@ export const MEPMenu = [
 
   { name: "Coordination", path: "/mep/coordination", icon: "users" },
 
+  {
+    name: "Task Queue",
+    path: "/mep/incidents?page=tasks",
+    icon: "check-square",
+  },
+
   { name: "Upload", path: "/mep/upload", icon: "upload" },
 ];
 export default MEPMenu;
