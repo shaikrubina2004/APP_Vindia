@@ -1,9 +1,3 @@
-/* SCROLL + LAYOUT FIXES */
-
-.inc-page {
-  overflow-y: visible !important;
-}
-
 /* ===================== */
 /* INCIDENTS PAGE STYLES */
 /* ===================== */
@@ -31,7 +25,6 @@
 .inc-page {
   padding: 20px;
   background: var(--bg-light);
-  min-height: 100%;
   display: flex !important;
   flex-direction: column !important;
   gap: 16px;
