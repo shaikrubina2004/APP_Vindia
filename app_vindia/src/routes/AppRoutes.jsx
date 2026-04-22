@@ -538,69 +538,75 @@ const AppRoutes = () => {
 
       {/* ARCHITECT */}
       <Route
-        path="/architect/dashboard"
-        element={
-          <ArchitectLayout>
-            <ArchitectDashboard />
-          </ArchitectLayout>
-        }
-      />
+  path="/architect/dashboard"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+      <ArchitectLayout>
+        <ArchitectDashboard />
+      </ArchitectLayout>
+    </ProtectedRoute>
+  }
+/>
       <Route
-        path="/architect/tasks"
-        element={
-          <ArchitectLayout>
-            <ArchitectTasks />
-          </ArchitectLayout>
-        }
-      />
-      <Route
-        path="/architect/logs"
-        element={
-          <ArchitectLayout>
-            <ArchitectDailyLogins />
-          </ArchitectLayout>
-        }
-      />
-      <Route
-        path="/architect/designs"
-        element={
-          <ArchitectLayout>
-            <ArchitectDesigns />
-          </ArchitectLayout>
-        }
-      />
-      <Route
-        path="/architect/sign-off"
-        element={
-          <ArchitectLayout>
-            <ArchitectSignOff />
-          </ArchitectLayout>
-        }
-      />
-      <Route
-        path="/architect/coordination"
-        element={
-          <ArchitectLayout>
-            <ArchitectCoordination />
-          </ArchitectLayout>
-        }
-      />
-      <Route
-        path="/architect/coordination"
-        element={
-          <ArchitectLayout>
-            <ArchitectCoordination />
-          </ArchitectLayout>
-        }
-      />
-      <Route
-        path="/architect/project"
-        element={
-          <ArchitectLayout>
-            <ArchitectProject />
-          </ArchitectLayout>
-        }
-      />
+  path="/architect/tasks"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+      <ArchitectLayout>
+        <ArchitectTasks />
+      </ArchitectLayout>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/architect/logs"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+      <ArchitectLayout>
+        <ArchitectDailyLogins />
+      </ArchitectLayout>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/architect/designs"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+      <ArchitectLayout>
+        <ArchitectDesigns />
+      </ArchitectLayout>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/architect/sign-off"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+      <ArchitectLayout>
+        <ArchitectSignOff />
+      </ArchitectLayout>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/architect/coordination"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+      <ArchitectLayout>
+        <ArchitectCoordination />
+      </ArchitectLayout>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/architect/projects"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+      <ArchitectLayout>
+        <ArchitectProject />
+      </ArchitectLayout>
+    </ProtectedRoute>
+  }
+/>
 
       {/* PROJECT COORDINATOR */}
       <Route
