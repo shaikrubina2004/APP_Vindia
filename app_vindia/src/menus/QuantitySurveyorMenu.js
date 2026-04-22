@@ -15,6 +15,12 @@ const QuantitySurveyorMenu = [
 
   // ✅ NEW
   { name: "Incident",         path: "/quantity-surveyor/incident",        icon: "alert-triangle" },
+  {
+  name: "Alerts",
+  path: "/quantity-surveyor/alerts",
+  icon: "bell",
+}
 ];
+
 
 export default QuantitySurveyorMenu;

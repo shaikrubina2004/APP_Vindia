@@ -1,132 +1,132 @@
-* {
-  box-sizing: border-box;
-}
-
 /* PAGE */
 .qscr-container {
   padding: 20px;
-  background: #eef2f7;
+  background: #f1f5f9;
   min-height: 100vh;
-  width: 100%;
 }
 
 /* HEADER */
-.qscr-header {
+.qscr-header h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #0f172a;
+}
+
+.qscr-header p {
+  color: #64748b;
   margin-bottom: 20px;
 }
 
-.qscr-header h2 {
-  font-size: 22px;
-  color: #1e293b;
-}
-
-/* CARDS */
+/* SUMMARY CARDS */
 .qscr-cards {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 15px;
   margin-bottom: 20px;
-  flex-wrap: wrap;
 }
 
 .card {
-  flex: 1;
-  min-width: 200px;
   background: white;
-  padding: 18px;
+  padding: 16px;
   border-radius: 12px;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
 }
 
+.card h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.card h3 {
+  margin-top: 6px;
+  color: #0f172a;
+}
+
+/* Variance colors (soft, not strong) */
 .card.over {
-  border-left: 4px solid #ef4444;
+  border-left: 3px solid #ef4444;
 }
 
 .card.under {
-  border-left: 4px solid #22c55e;
+  border-left: 3px solid #22c55e;
 }
 
-/* TABLE WRAPPER (IMPORTANT) */
+/* TABLE CARD */
 .table-wrapper {
-  width: 100%;
-  overflow-x: auto;
   background: white;
   border-radius: 12px;
-  padding: 15px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
 }
 
 /* TABLE */
 .cost-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
 }
 
-/* HEAD */
+/* HEADER (FIXED - LIGHT STYLE) */
 .cost-table thead {
-  background: #1e293b;
-  color: white;
+  background: #f8fafc;
 }
 
-/* CELLS */
-.cost-table th,
+.cost-table th {
+  text-align: left;
+  padding: 12px;
+  font-size: 13px;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* BODY */
 .cost-table td {
   padding: 12px;
-  text-align: center;
-  font-size: 14px;
+  color: #0f172a;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-/* PREVENT TEXT BREAKING */
+/* HOVER */
+.cost-table tr:hover {
+  background: #f8fafc;
+}
+
+/* MONEY */
 .money {
   white-space: nowrap;
 }
 
-/* ROW */
-.cost-table tr {
-  border-bottom: 1px solid #eee;
-}
-
-.cost-table tr:hover {
-  background: #f9fafb;
-}
-
-/* COLORS */
+/* COLORS (soft) */
 .green {
   color: #16a34a;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .red {
-  color: #ef4444;
-  font-weight: 600;
+  color: #dc2626;
+  font-weight: 500;
 }
 
 /* BADGE */
 .badge {
-  padding: 5px 10px;
-  border-radius: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
   font-size: 12px;
 }
 
 .badge.green {
   background: #dcfce7;
-  color: #16a34a;
+  color: #166534;
 }
 
 .badge.red {
   background: #fee2e2;
-  color: #dc2626;
+  color: #991b1b;
 }
 
 /* RESPONSIVE */
 @media (max-width: 768px) {
-
   .qscr-cards {
-    flex-direction: column;
-  }
-
-  .cost-table th,
-  .cost-table td {
-    font-size: 12px;
-    padding: 8px;
+    grid-template-columns: 1fr;
   }
 }

@@ -1,0 +1,297 @@
+/* PAGE */
+.qsd-page {
+  padding: 20px;
+  background: #f1f5f9;
+  min-height: 100vh;
+}
+
+/* HEADER */
+.qs-page-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.qs-page-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.qs-page-sub {
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* BUTTONS */
+.qs-btn-primary {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.qs-btn-secondary {
+  background: #e2e8f0;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* FILTER */
+.qs-filter-bar {
+  margin-bottom: 15px;
+}
+
+.qs-filter-pill {
+  margin-right: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid #cbd5f5;
+  background: white;
+  cursor: pointer;
+}
+
+.qs-filter-pill.active {
+  background: #2563eb;
+  color: white;
+}
+
+/* EMPTY */
+.qs-empty {
+  text-align: center;
+  padding: 40px;
+  color: #64748b;
+}
+
+.qs-empty-icon {
+  font-size: 30px;
+}
+
+/* LIST */
+.qsdu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* CARD */
+.qsdu-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+}
+
+/* TOP */
+.qsdu-top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.qsdu-project {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.qsdu-meta {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.qsdu-top-right {
+  text-align: right;
+}
+
+/* BADGE */
+.qs-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.qs-badge--green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.qs-badge--yellow {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.qs-badge--red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.qs-badge--blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* ACTIVITY */
+.qsdu-activity {
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+/* NUMBERS */
+.qsdu-nums {
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+/* ISSUE */
+.qsdu-issue {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+/* PROGRESS */
+.qsdu-prog-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.qs-prog-track {
+  width: 100%;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 5px;
+}
+
+.qs-prog-fill {
+  height: 100%;
+  border-radius: 5px;
+}
+
+.qs-prog-lbl {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* VIEW BUTTON */
+.qsdu-view-btn {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+}
+
+/* MODAL */
+.qs-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.qs-modal {
+  background: white;
+  border-radius: 12px;
+  width: 600px;
+  max-width: 90%;
+  overflow: hidden;
+}
+
+.qs-modal-hdr {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.qs-modal-title {
+  font-weight: 600;
+}
+
+.qs-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.qs-modal-body {
+  padding: 16px;
+}
+
+.qs-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* FORM */
+.qs-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.qs-form-full {
+  grid-column: span 2;
+}
+
+.qs-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.qs-input,
+.qs-select,
+.qs-textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #cbd5f5;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.qs-textarea {
+  min-height: 80px;
+}
+
+/* TOAST */
+.qs-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #16a34a;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+}
+
+.qs-toast--err {
+  background: #dc2626;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .qs-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .qs-form-full {
+    grid-column: span 1;
+  }
+}

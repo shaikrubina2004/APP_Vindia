@@ -47,6 +47,7 @@ import Measurements from "../pages/Quality Surveyor/Measurements";
 import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
 import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
 import Qssubmissions from "../pages/Quality Surveyor/Qssubmissions";
+import Qsalerts from "../pages/Quality Surveyor/Qsalerts";
 
 /* OTHER ROLES */
 import MEPDashboard from "../pages/MEP Engineer/MEPDashboard";
@@ -389,6 +390,14 @@ const AppRoutes = () => {
         element={
           <QuantitySurveyorLayout>
             <QuantitySurveyorDashboard />
+          </QuantitySurveyorLayout>
+        }
+      />
+        <Route
+        path="/quantity-surveyor/alerts"
+        element={
+          <QuantitySurveyorLayout>
+            <Qsalerts />
           </QuantitySurveyorLayout>
         }
       />

@@ -1,72 +1,87 @@
-/* PAGE */
-.measurements-container {
-  padding: 24px;
-  background: #f5f7fb;
+.ms-page {
+  padding: 20px;
+  background: #f1f5f9;
   min-height: 100vh;
 }
 
-/* TITLE */
-.measurements-container h2 {
+/* Header */
+.ms-header {
   margin-bottom: 20px;
-  font-size: 24px;
-  font-weight: 600;
 }
 
-/* TABLE */
-.measurements-table {
+.ms-header h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #0f172a;
+}
+
+.ms-header p {
+  color: #64748b;
+  font-size: 14px;
+}
+
+/* Card */
+.ms-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Form */
+.ms-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ms-form input {
+  padding: 10px;
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #f8fafc;
+}
+
+.ms-form input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.ms-form button {
+  padding: 10px 16px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.ms-form button:hover {
+  background: #1d4ed8;
+}
+
+/* Table */
+.ms-table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
 
-.measurements-table th {
-  background: #1e293b;
-  color: #fff;
+.ms-table th {
   text-align: left;
-  padding: 12px;
-}
-
-.measurements-table td {
-  padding: 12px;
-  border-bottom: 1px solid #eee;
-}
-
-/* STATUS */
-.status {
-  font-weight: 600;
-}
-
-.status.Pending {
-  color: orange;
-}
-
-.status.Approved {
-  color: green;
-}
-
-.status.Rejected {
-  color: red;
-}
-
-/* BUTTONS */
-.btn {
-  padding: 6px 12px;
-  margin-right: 6px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
   font-size: 13px;
+  color: #64748b;
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.btn-approve {
-  background: #22c55e;
-  color: white;
+.ms-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #0f172a;
 }
 
-.btn-reject {
-  background: #ef4444;
-  color: white;
+.ms-table tr:hover {
+  background: #f8fafc;
 }

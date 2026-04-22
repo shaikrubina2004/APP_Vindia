@@ -1,125 +1,133 @@
 import { useState } from "react";
 import "./Qsquantityreport.css";
 
-const QsSubmissions = () => {
-  const [data] = useState([
-    {
-      id: 1,
-      project: "Hospital Block",
-      type: "MEP",
-      date: "2026-04-13",
-      time: "16:45",
-      title: "Plumbing rough-in Wing C",
-      issue: "Material shortage – uPVC fittings pending",
-      status: "Critical",
-      progress: 29,
-    },
-    {
-      id: 2,
-      project: "Mall Project",
-      type: "MEP",
-      date: "2026-04-12",
-      time: "16:30",
-      title: "Electrical conduit laying Basement B1",
-      issue: "",
-      status: "On Track",
-      progress: 33,
-    },
-  ]);
+const DATA = [
+  { id: 1, item: "Excavation", unit: "m³", boq: 450, actual: 320, milestone: "Foundation" },
+  { id: 2, item: "Concrete", unit: "m³", boq: 200, actual: 150, milestone: "Structure" },
+  { id: 3, item: "Brick Work", unit: "m³", boq: 300, actual: 100, milestone: "Structure" },
+  { id: 4, item: "Plastering", unit: "m²", boq: 900, actual: 0, milestone: "Finishing" },
+];
+
+const getPercent = (actual, boq) => boq ? Math.round((actual / boq) * 100) : 0;
+
+const getStatus = (actual, boq) => {
+  if (actual === 0) return "Not Started";
+  if (actual >= boq) return "Completed";
+  return "In Progress";
+};
+
+export default function Qsquantityreport() {
+  const [filter, setFilter] = useState("All");
+
+  const filtered =
+    filter === "All"
+      ? DATA
+      : DATA.filter((d) => d.milestone === filter);
+
+  const summary = {
+    total: filtered.length,
+    completed: filtered.filter((d) => d.actual >= d.boq).length,
+    progress: filtered.filter((d) => d.actual > 0 && d.actual < d.boq).length,
+    pending: filtered.filter((d) => d.actual === 0).length,
+  };
 
   return (
-    <div className="sub-container">
-
+    <div className="qr-container">
+      
       {/* HEADER */}
-      <div className="sub-header">
-        <h2>Submissions</h2>
-        <p>All submitted daily updates — history and tracking</p>
+      <div className="qr-header">
+        <h2>Quantity Report</h2>
+        <p>Track BOQ vs actual work progress</p>
       </div>
 
-      {/* STATS */}
-      <div className="sub-stats">
-        <div className="stat-card blue">
-          <h2>6</h2>
-          <p>Total Submitted</p>
+      {/* SUMMARY */}
+      <div className="qr-cards">
+        <div className="card">
+          <h4>Total Items</h4>
+          <h3>{summary.total}</h3>
         </div>
 
-        <div className="stat-card green">
-          <h2>3</h2>
-          <p>On Track</p>
+        <div className="card">
+          <h4>Completed</h4>
+          <h3>{summary.completed}</h3>
         </div>
 
-        <div className="stat-card red">
-          <h2>2</h2>
-          <p>With Issues</p>
+        <div className="card">
+          <h4>In Progress</h4>
+          <h3>{summary.progress}</h3>
         </div>
 
-        <div className="stat-card purple">
-          <h2>56%</h2>
-          <p>Avg Progress</p>
+        <div className="card">
+          <h4>Not Started</h4>
+          <h3>{summary.pending}</h3>
         </div>
       </div>
 
-      {/* SEARCH */}
-      <input
-        className="search"
-        placeholder="Search project or activity..."
-      />
-
-      {/* FILTERS */}
-      <div className="filters">
-        <button className="active">All Status</button>
-        <button>On Track</button>
-        <button>Delayed</button>
-        <button>Critical</button>
-        <button>Ahead</button>
-      </div>
-
-      {/* LIST */}
-      <div className="sub-list">
-        {data.map((item) => (
-          <div key={item.id} className="sub-card">
-
-            <div className="left">
-              <h3>{item.project}</h3>
-
-              <p className="meta">
-                {item.type} • {item.date} • {item.time}
-              </p>
-
-              <p>{item.title}</p>
-
-              {item.issue && (
-                <div className="issue">
-                  ⚠ {item.issue}
-                </div>
-              )}
-            </div>
-
-            <div className="right">
-
-              <span className={`status ${item.status.toLowerCase()}`}>
-                {item.status}
-              </span>
-
-              <div className="progress">
-                <div
-                  className="bar"
-                  style={{ width: `${item.progress}%` }}
-                ></div>
-              </div>
-
-              <span className="percent">{item.progress}%</span>
-
-              <button className="view">View →</button>
-
-            </div>
-
-          </div>
+      {/* FILTER */}
+      <div className="qr-filter">
+        {["All", "Foundation", "Structure", "Finishing"].map((f) => (
+          <button
+            key={f}
+            className={filter === f ? "active" : ""}
+            onClick={() => setFilter(f)}
+          >
+            {f}
+          </button>
         ))}
+      </div>
+
+      {/* TABLE */}
+      <div className="table-wrapper">
+        <table className="qr-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Item</th>
+              <th>Unit</th>
+              <th>BOQ</th>
+              <th>Actual</th>
+              <th>Remaining</th>
+              <th>Progress</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {filtered.map((d, i) => {
+              const percent = getPercent(d.actual, d.boq);
+              const status = getStatus(d.actual, d.boq);
+
+              return (
+                <tr key={d.id}>
+                  <td>{i + 1}</td>
+                  <td>{d.item}</td>
+                  <td>{d.unit}</td>
+                  <td>{d.boq}</td>
+                  <td>{d.actual}</td>
+                  <td>{d.boq - d.actual}</td>
+
+                  <td>
+                    <div className="qr-progress">
+                      <div
+                        className="qr-bar"
+                        style={{ width: `${percent}%` }}
+                      ></div>
+                      <span>{percent}%</span>
+                    </div>
+                  </td>
+
+                  <td>
+                    <span className={`badge ${status.replace(" ", "")}`}>
+                      {status}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
     </div>
   );
-};
-
-export default QsSubmissions;
+}

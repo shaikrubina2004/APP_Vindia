@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "./QuantitySurveyorDashboard.css";
+import "./Qsdailyupdates.css";
 
 const EMPTY = {
   date:"",project:"",phase:"Foundation",activity:"",qty:"",unit:"",
