@@ -451,7 +451,6 @@
   gap: 12px;
 }
 
-.month-detail__section { }
 .month-detail__section--wide { grid-column: 1 / -1; }
 
 .month-detail__label {
@@ -659,7 +658,6 @@
   grid-template-columns: 1fr 1fr 2fr;
   gap: 14px;
 }
-.month-activity-col { }
 .month-activity-col--wide { grid-column: span 1; }
 
 .month-activity-label {

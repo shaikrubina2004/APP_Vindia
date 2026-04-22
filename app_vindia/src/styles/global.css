@@ -61,3 +61,10 @@ p {
   color: #666;
   font-size: 14px;
 }
+input[type="text"] {
+  border-radius: 50px !important;
+  padding-left: 38px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  font-size: 12px !important;
+}

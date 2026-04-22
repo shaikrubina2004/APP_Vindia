@@ -263,8 +263,6 @@
 .ms-detail-val   { font-size:13px; color:#0a2540; line-height:1.5; }
 
 /* ── payment section ── */
-.ms-payment-body { }
-.ms-payment-top  { }
 .ms-payment-hero {
   display: grid; grid-template-columns: repeat(4,1fr); gap: 12px;
   background: #fff; border: 1.5px solid #e2eaf4;
@@ -286,7 +284,6 @@
 }
 
 /* ── next planning section ── */
-.ms-next-body { }
 .ms-next-card {
   background: #fff; border: 1.5px solid #e2eaf4;
   border-radius: 14px; padding: 18px 20px;
