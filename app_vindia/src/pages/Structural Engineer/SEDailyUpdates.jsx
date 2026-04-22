@@ -45,46 +45,53 @@ const STATUS_COLORS = {
   "ahead":    { label: "Ahead",    dot: "#3b82f6", badge: "#dbeafe", text: "#1e40af" },
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 export default function SEDailyUpdates() {
   const [view, setView]             = useState("week");
   const [logs, setLogs]             = useState([]);
   const [attendance, setAttendance] = useState({});
-  const [form, setForm]             = useState(EMPTY_LOG);
+  const [form, setForm]             = useState({ ...EMPTY_LOG, date: todayStr() });
   const [selected, setSelected]     = useState(null);
   const [toast, setToast]           = useState(null);
   const [checkedIn, setCheckedIn]   = useState(false);
   const [loading, setLoading]       = useState(true);
+  const [checkingIn, setCheckingIn] = useState(false);
+  const [saving, setSaving]         = useState(false);
 
   const weekDates = getWeekDates();
 
-  // ── loadData declared before useEffect ────────────────────────────────────
+  // ── Load all reports from backend ─────────────────────────────────────────
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await API.get("/se-daily-reports");
-      const formatted = res.data.map(r => ({
-        ...r.data,
-        id: r.id,
-        approved: r.approved,
+      const raw = Array.isArray(res.data) ? res.data : [];
+
+      const formatted = raw.map(r => ({
+        ...(r.data || {}),
+        id:       r.id,
+        approved: r.approved || false,
+        // Ensure date comes from top-level if not in data
+        date:     (r.data && r.data.date) ? r.data.date : r.date,
       }));
       setLogs(formatted);
 
+      // Build attendance map keyed by date string
       const att = {};
       formatted.forEach(r => {
         if (r.date) {
           att[r.date] = {
-            checkIn:  r.checkIn,
-            checkOut: r.checkOut,
-            status:   r.checkIn ? "present" : "absent",
+            checkIn:  r.checkIn  || "",
+            checkOut: r.checkOut || "",
+            status:   r.checkIn  ? "present" : "absent",
           };
         }
       });
       setAttendance(att);
 
       const todayLog = formatted.find(r => r.date === todayStr());
-      if (todayLog?.checkIn) setCheckedIn(true);
-    } catch {
+      if (todayLog && todayLog.checkIn) setCheckedIn(true);
+    } catch (err) {
+      console.error("loadData error:", err?.response?.data || err.message);
       setLogs([]);
     } finally {
       setLoading(false);
@@ -93,51 +100,75 @@ export default function SEDailyUpdates() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ── Toast helper ──────────────────────────────────────────────────────────
+  // ── Toast ─────────────────────────────────────────────────────────────────
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3200);
+    setTimeout(() => setToast(null), 3500);
   };
 
   // ── Check In ──────────────────────────────────────────────────────────────
   const handleCheckIn = async () => {
+    if (checkingIn || checkedIn) return;
     const time = nowTime();
+    setCheckingIn(true);
     try {
       await API.post("/se-daily-reports", {
-        project_name:   "Check In",
+        project_name:   "Daily Check In",
         date:           todayStr(),
         overall_status: "on-track",
         submitted_by:   "SE",
-        data:           { ...EMPTY_LOG, date: todayStr(), checkIn: time },
+        data: {
+          ...EMPTY_LOG,
+          date:    todayStr(),
+          checkIn: time,
+        },
       });
       setCheckedIn(true);
-      setAttendance(a => ({ ...a, [todayStr()]: { checkIn: time, status: "present" } }));
-      showToast(`Checked in at ${time}`);
+      setAttendance(prev => ({
+        ...prev,
+        [todayStr()]: { checkIn: time, checkOut: "", status: "present" },
+      }));
+      showToast(`Checked in at ${time} ✓`);
       loadData();
-    } catch {
+    } catch (err) {
+      console.error("Check-in error:", err?.response?.data || err.message);
       showToast("Check-in failed — please try again.", "error");
+    } finally {
+      setCheckingIn(false);
     }
   };
 
   // ── Save Log ──────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!form.projectName.trim()) {
+    if (!form.projectName || !form.projectName.trim()) {
       showToast("Project name is required.", "error");
       return;
     }
+    setSaving(true);
     try {
-      await API.post("/se-daily-reports", {
+      const payload = {
         project_name:   form.projectName,
         date:           form.date,
-        overall_status: form.overallStatus,
-        submitted_by:   form.submittedBy || "Structural Engineer",
+        overall_status: form.overallStatus || "on-track",
+        submitted_by:   form.submittedBy   || "Structural Engineer",
         data:           form,
-      });
-      showToast("Daily log saved successfully");
+      };
+
+      if (form.id) {
+        // Update existing record
+        await API.put(`/se-daily-reports/${form.id}`, payload);
+      } else {
+        // Create new (controller upserts by date)
+        await API.post("/se-daily-reports", payload);
+      }
+      showToast("Daily log saved successfully ✓");
       await loadData();
       setView("week");
-    } catch {
+    } catch (err) {
+      console.error("Save error:", err?.response?.data || err.message);
       showToast("Save failed — please try again.", "error");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -170,12 +201,13 @@ export default function SEDailyUpdates() {
   //  WEEK VIEW
   // ════════════════════════════════════════════════════════════════════════════
   if (view === "week") {
-    const td = todayStr();
-    const totalPresent   = weekDates.filter(d => attendance[d]?.status === "present").length;
-    const logsThisWeek   = logs.filter(l => weekDates.includes(l.date));
-    const issuesThisWeek = logsThisWeek.reduce((a, l) =>
+    const td           = todayStr();
+    const totalPresent = weekDates.filter(d => attendance[d]?.status === "present").length;
+    const logsThisWeek = logs.filter(l => weekDates.includes(l.date));
+    const issuesCount  = logsThisWeek.reduce((a, l) =>
       a + (l.issues || []).filter(i => i.issue).length, 0);
-    const approvedCount  = logsThisWeek.filter(l => l.approved).length;
+    const approvedCnt  = logsThisWeek.filter(l => l.approved).length;
+    const tdAtt        = attendance[td];
 
     return (
       <div className="sed-page">
@@ -186,28 +218,42 @@ export default function SEDailyUpdates() {
           </div>
         )}
 
-        {/* ── Hero Header ── */}
+        {/* ── Hero ── */}
         <div className="sed-hero">
           <div className="sed-hero-bg" />
           <div className="sed-hero-inner">
             <div className="sed-hero-left">
               <p className="sed-eyebrow">— Structural Engineering</p>
               <h1 className="sed-title">Daily Updates</h1>
-              <div className="sed-week-chip">
-                {new Date(weekDates[0]).getDate()}&nbsp;
-                {MONTHS[new Date(weekDates[0]).getMonth()]} —&nbsp;
-                {new Date(weekDates[6]).getDate()}&nbsp;
-                {MONTHS[new Date(weekDates[6]).getMonth()]}&nbsp;
-                {new Date(weekDates[6]).getFullYear()}
+              <div className="sed-hero-chips">
+                <div className="sed-week-chip">
+                  📅&nbsp;
+                  {new Date(weekDates[0]).getDate()}&nbsp;{MONTHS[new Date(weekDates[0]).getMonth()]}
+                  &nbsp;—&nbsp;
+                  {new Date(weekDates[6]).getDate()}&nbsp;{MONTHS[new Date(weekDates[6]).getMonth()]}&nbsp;
+                  {new Date(weekDates[6]).getFullYear()}
+                </div>
+                {tdAtt?.checkIn && (
+                  <div className="sed-checkin-info-chip">
+                    <span className="sed-att-dot sed-att-dot--in" />
+                    Checked in at <strong>{tdAtt.checkIn}</strong>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="sed-hero-right">
               {!checkedIn ? (
-                <button className="sed-checkin-btn" onClick={handleCheckIn}>
-                  <span className="sed-ci-pulse" />
+                <button
+                  className={`sed-checkin-btn${checkingIn ? " sed-checkin-btn--busy" : ""}`}
+                  onClick={handleCheckIn}
+                  disabled={checkingIn}
+                >
+                  {checkingIn
+                    ? <span className="sed-ci-spinner" />
+                    : <span className="sed-ci-pulse" />}
                   <span className="sed-ci-text">
-                    <strong>Check In</strong>
+                    <strong>{checkingIn ? "Checking in…" : "Check In"}</strong>
                     <small>Mark attendance for today</small>
                   </span>
                 </button>
@@ -216,11 +262,30 @@ export default function SEDailyUpdates() {
                   <span className="sed-ci-tick">✓</span>
                   <span className="sed-ci-text">
                     <strong>Checked In</strong>
-                    <small>{attendance[td]?.checkIn}</small>
+                    <small>{tdAtt?.checkIn || "Today"}</small>
                   </span>
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Week progress dots */}
+          <div className="sed-week-progress">
+            <div className="sed-wp-bar">
+              {weekDates.slice(0, 5).map((d, i) => (
+                <div
+                  key={i}
+                  className={`sed-wp-day ${
+                    attendance[d]?.status === "present" ? "sed-wp-day--done" :
+                    d === td ? "sed-wp-day--today" : d < td ? "sed-wp-day--missed" : ""
+                  }`}
+                  title={DAYS[i]}
+                />
+              ))}
+            </div>
+            <span className="sed-wp-label">
+              {totalPresent} of 5 days present · {logsThisWeek.length} logs filed
+            </span>
           </div>
         </div>
 
@@ -237,12 +302,14 @@ export default function SEDailyUpdates() {
             <span className="sed-stat-lbl">Logs Filed</span>
           </div>
           <div className="sed-stat">
-            <span className="sed-stat-val">{issuesThisWeek}</span>
+            <span className="sed-stat-val" style={{ color: issuesCount > 0 ? "#f59e0b" : undefined }}>
+              {issuesCount}
+            </span>
             <span className="sed-stat-lbl">Issues Raised</span>
           </div>
           <div className="sed-stat">
-            <span className="sed-stat-val" style={{ color: approvedCount > 0 ? "#16a34a" : undefined }}>
-              {approvedCount}
+            <span className="sed-stat-val" style={{ color: approvedCnt > 0 ? "#16a34a" : undefined }}>
+              {approvedCnt}
             </span>
             <span className="sed-stat-lbl">Approved</span>
           </div>
@@ -250,10 +317,15 @@ export default function SEDailyUpdates() {
 
         {/* ── Week Grid ── */}
         <div className="sed-grid-wrap">
+          <div className="sed-grid-topbar">
+            <h2 className="sed-grid-title">This Week</h2>
+            <button className="sed-btn-new" onClick={() => openForm(td)}>+ New Log</button>
+          </div>
+
           {loading ? (
             <div className="sed-loading">
               <span className="sed-spinner" />
-              <p>Loading…</p>
+              <p>Loading week data…</p>
             </div>
           ) : (
             <div className="sed-week-grid">
@@ -276,17 +348,16 @@ export default function SEDailyUpdates() {
                       idx >= 5 ? "sed-day--weekend" : "",
                     ].filter(Boolean).join(" ")}
                   >
-                    {/* Card Header */}
-                    <div className={`sed-day-hdr ${isToday ? "sed-day-hdr--today" : ""}`}>
+                    <div className={`sed-day-hdr${isToday ? " sed-day-hdr--today" : ""}`}>
                       <div className="sed-day-hdr-left">
                         <span className="sed-day-name">{DAYS[idx]}</span>
                         <span className="sed-day-num">{dn.getDate()}</span>
                         <span className="sed-day-mon">{MONTHS[dn.getMonth()]}</span>
                       </div>
                       {isToday && <span className="sed-today-pill">Today</span>}
+                      {!isToday && att?.checkIn && <span className="sed-present-pip" />}
                     </div>
 
-                    {/* Attendance */}
                     <div className="sed-day-att">
                       {att?.checkIn ? (
                         <div className="sed-att-row">
@@ -302,21 +373,16 @@ export default function SEDailyUpdates() {
                           )}
                         </div>
                       ) : (
-                        <span className="sed-att-nil">
-                          {isFuture ? "—" : "No check-in"}
-                        </span>
+                        <span className="sed-att-nil">{isFuture ? "—" : "No check-in"}</span>
                       )}
                     </div>
 
-                    {/* Log summary */}
                     <div className="sed-day-log">
                       {log ? (
                         <>
                           <div className="sed-log-proj">{log.projectName || "—"}</div>
                           {taskCnt > 0 && (
-                            <div className="sed-log-tasks">
-                              {taskCnt} task{taskCnt !== 1 ? "s" : ""} logged
-                            </div>
+                            <div className="sed-log-tasks">{taskCnt} task{taskCnt !== 1 ? "s" : ""}</div>
                           )}
                           {sc && (
                             <span className="sed-status-pill" style={{ background: sc.badge, color: sc.text }}>
@@ -331,24 +397,17 @@ export default function SEDailyUpdates() {
                       ) : null}
                     </div>
 
-                    {/* Actions */}
                     {!isFuture && (
                       <div className="sed-day-actions">
                         {log ? (
                           <>
-                            <button className="sed-btn-view" onClick={() => openView(log)}>
-                              View →
-                            </button>
+                            <button className="sed-btn-view" onClick={() => openView(log)}>View →</button>
                             {!log.approved && (
-                              <button className="sed-btn-edit" onClick={() => openForm(date)}>
-                                Edit
-                              </button>
+                              <button className="sed-btn-edit" onClick={() => openForm(date)}>Edit</button>
                             )}
                           </>
                         ) : (
-                          <button className="sed-btn-file" onClick={() => openForm(date)}>
-                            + File Log
-                          </button>
+                          <button className="sed-btn-file" onClick={() => openForm(date)}>+ File Log</button>
                         )}
                       </div>
                     )}
@@ -359,14 +418,12 @@ export default function SEDailyUpdates() {
           )}
         </div>
 
-        {/* ── All Logs List ── */}
+        {/* ── All Logs ── */}
         {logs.length > 0 && (
           <div className="sed-all-logs">
             <div className="sed-section-hdr">
               <h2 className="sed-section-title">All Logs</h2>
-              <button className="sed-btn-new" onClick={() => openForm(todayStr())}>
-                + New Log
-              </button>
+              <span className="sed-log-count">{logs.length} total</span>
             </div>
             <div className="sed-log-list">
               {logs.slice().reverse().map(log => {
@@ -402,6 +459,16 @@ export default function SEDailyUpdates() {
             </div>
           </div>
         )}
+
+        {/* ── Empty State ── */}
+        {!loading && logs.length === 0 && (
+          <div className="sed-empty">
+            <div className="sed-empty-icon">📋</div>
+            <h3 className="sed-empty-title">No logs filed yet</h3>
+            <p className="sed-empty-sub">Check in first, then file your daily log to track site progress.</p>
+            <button className="sed-empty-btn" onClick={() => openForm(td)}>+ File Today's Log</button>
+          </div>
+        )}
       </div>
     );
   }
@@ -428,13 +495,15 @@ export default function SEDailyUpdates() {
           </div>
           <div className="sed-bar-actions">
             <button className="sed-cancel-btn" onClick={() => setView("week")}>Cancel</button>
-            <button className="sed-save-btn" onClick={handleSave}>Save Log</button>
+            <button className="sed-save-btn" onClick={handleSave} disabled={saving}>
+              {saving ? "Saving…" : "Save Log"}
+            </button>
           </div>
         </div>
 
         <div className="sed-form-body">
 
-          {/* ── §1 Attendance & Site Details ── */}
+          {/* §1 Attendance & Site */}
           <div className="sed-card">
             <div className="sed-card-hdr">
               <span className="sed-card-icon">🕐</span>
@@ -458,22 +527,26 @@ export default function SEDailyUpdates() {
               </div>
               <div className="sed-field sed-field--span2">
                 <label className="sed-lbl">Project Name <span className="sed-req">*</span></label>
-                <input className="sed-inp" placeholder="e.g. Greenfield Tower Block A" value={form.projectName}
+                <input className="sed-inp" placeholder="e.g. Greenfield Tower Block A"
+                  value={form.projectName}
                   onChange={e => setField("projectName", e.target.value)} />
               </div>
               <div className="sed-field">
                 <label className="sed-lbl">Location / Zone</label>
-                <input className="sed-inp" placeholder="Grid C3, Level 4" value={form.location}
+                <input className="sed-inp" placeholder="Grid C3, Level 4"
+                  value={form.location}
                   onChange={e => setField("location", e.target.value)} />
               </div>
               <div className="sed-field">
                 <label className="sed-lbl">Weather</label>
-                <input className="sed-inp" placeholder="Clear / Rainy" value={form.weather}
+                <input className="sed-inp" placeholder="Clear / Rainy"
+                  value={form.weather}
                   onChange={e => setField("weather", e.target.value)} />
               </div>
               <div className="sed-field">
                 <label className="sed-lbl">Temp (°C)</label>
-                <input className="sed-inp" placeholder="34" value={form.weatherTemp}
+                <input className="sed-inp" placeholder="34"
+                  value={form.weatherTemp}
                   onChange={e => setField("weatherTemp", e.target.value)} />
               </div>
               <div className="sed-field">
@@ -489,7 +562,7 @@ export default function SEDailyUpdates() {
             </div>
           </div>
 
-          {/* ── §2 Morning Briefing ── */}
+          {/* §2 Morning */}
           <div className="sed-card">
             <div className="sed-card-hdr">
               <span className="sed-card-icon">☀️</span>
@@ -498,13 +571,13 @@ export default function SEDailyUpdates() {
             <div className="sed-field">
               <label className="sed-lbl">What was planned for today?</label>
               <textarea className="sed-inp sed-ta" rows={3}
-                placeholder="Column pour at Grid C3–D4, Rebar inspection at Level 3, Concrete cube sampling…"
+                placeholder="Column pour at Grid C3–D4, Rebar inspection at Level 3…"
                 value={form.morningBriefing}
                 onChange={e => setField("morningBriefing", e.target.value)} />
             </div>
           </div>
 
-          {/* ── §3 Work Done ── */}
+          {/* §3 Work Done */}
           <div className="sed-card">
             <div className="sed-card-hdr">
               <span className="sed-card-icon">🏗</span>
@@ -517,22 +590,22 @@ export default function SEDailyUpdates() {
             </div>
             {form.workDone.map((row, i) => (
               <div key={i} className="sed-table-row">
-                <input className="sed-inp sed-td sed-td--3" placeholder="Column casting at C3…" value={row.task}
-                  onChange={e => setRow("workDone", i, "task", e.target.value)} />
-                <input className="sed-inp sed-td sed-td--1" placeholder="6" value={row.qty}
-                  onChange={e => setRow("workDone", i, "qty", e.target.value)} />
-                <input className="sed-inp sed-td sed-td--1" placeholder="Nos" value={row.unit}
-                  onChange={e => setRow("workDone", i, "unit", e.target.value)} />
-                <select className="sed-inp sed-td sed-td--2 sed-select" value={row.status}
+                <input className="sed-inp sed-td" placeholder="Column casting at C3…"
+                  value={row.task} onChange={e => setRow("workDone", i, "task", e.target.value)} />
+                <input className="sed-inp sed-td" placeholder="6"
+                  value={row.qty} onChange={e => setRow("workDone", i, "qty", e.target.value)} />
+                <input className="sed-inp sed-td" placeholder="Nos"
+                  value={row.unit} onChange={e => setRow("workDone", i, "unit", e.target.value)} />
+                <select className="sed-inp sed-td sed-select" value={row.status}
                   onChange={e => setRow("workDone", i, "status", e.target.value)}>
                   <option value="completed">Completed</option>
                   <option value="in-progress">In Progress</option>
                   <option value="pending">Pending</option>
                   <option value="deferred">Deferred</option>
                 </select>
-                <input className="sed-inp sed-td sed-td--2" placeholder="Notes…" value={row.remark}
-                  onChange={e => setRow("workDone", i, "remark", e.target.value)} />
-                <button className="sed-rm-btn" title="Remove row" onClick={() => removeRow("workDone", i)}>✕</button>
+                <input className="sed-inp sed-td" placeholder="Notes…"
+                  value={row.remark} onChange={e => setRow("workDone", i, "remark", e.target.value)} />
+                <button className="sed-rm-btn" onClick={() => removeRow("workDone", i)}>✕</button>
               </div>
             ))}
             <button className="sed-add-btn"
@@ -541,7 +614,7 @@ export default function SEDailyUpdates() {
             </button>
           </div>
 
-          {/* ── §4 Issues ── */}
+          {/* §4 Issues */}
           <div className="sed-card">
             <div className="sed-card-hdr">
               <span className="sed-card-icon">⚠️</span>
@@ -551,11 +624,9 @@ export default function SEDailyUpdates() {
               <div key={i} className="sed-issue-block">
                 <div className="sed-issue-top">
                   <span className="sed-issue-num">#{i + 1}</span>
-                  <select
-                    className={`sed-priority sed-priority--${row.priority}`}
+                  <select className={`sed-priority sed-priority--${row.priority}`}
                     value={row.priority}
-                    onChange={e => setRow("issues", i, "priority", e.target.value)}
-                  >
+                    onChange={e => setRow("issues", i, "priority", e.target.value)}>
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
@@ -566,13 +637,13 @@ export default function SEDailyUpdates() {
                 <div className="sed-two-col">
                   <div className="sed-field">
                     <label className="sed-lbl">Issue Description</label>
-                    <input className="sed-inp" placeholder="Describe the issue…" value={row.issue}
-                      onChange={e => setRow("issues", i, "issue", e.target.value)} />
+                    <input className="sed-inp" placeholder="Describe the issue…"
+                      value={row.issue} onChange={e => setRow("issues", i, "issue", e.target.value)} />
                   </div>
                   <div className="sed-field">
                     <label className="sed-lbl">Action Taken</label>
-                    <input className="sed-inp" placeholder="Corrective action taken…" value={row.action}
-                      onChange={e => setRow("issues", i, "action", e.target.value)} />
+                    <input className="sed-inp" placeholder="Corrective action…"
+                      value={row.action} onChange={e => setRow("issues", i, "action", e.target.value)} />
                   </div>
                 </div>
               </div>
@@ -583,7 +654,7 @@ export default function SEDailyUpdates() {
             </button>
           </div>
 
-          {/* ── §5 Safety ── */}
+          {/* §5 Safety */}
           <div className="sed-card">
             <div className="sed-card-hdr">
               <span className="sed-card-icon">🦺</span>
@@ -598,7 +669,7 @@ export default function SEDailyUpdates() {
             </div>
           </div>
 
-          {/* ── §6 Tomorrow ── */}
+          {/* §6 Tomorrow */}
           <div className="sed-card">
             <div className="sed-card-hdr">
               <span className="sed-card-icon">📅</span>
@@ -613,7 +684,7 @@ export default function SEDailyUpdates() {
             </div>
           </div>
 
-          {/* ── §7 Remarks & Submission ── */}
+          {/* §7 Remarks */}
           <div className="sed-card">
             <div className="sed-card-hdr">
               <span className="sed-card-icon">📝</span>
@@ -629,7 +700,8 @@ export default function SEDailyUpdates() {
             <div className="sed-two-col" style={{ marginTop: 16 }}>
               <div className="sed-field">
                 <label className="sed-lbl">Submitted By</label>
-                <input className="sed-inp" placeholder="Ravi Kumar, SE" value={form.submittedBy || ""}
+                <input className="sed-inp" placeholder="Ravi Kumar, SE"
+                  value={form.submittedBy || ""}
                   onChange={e => setField("submittedBy", e.target.value)} />
               </div>
               <div className="sed-field">
@@ -637,9 +709,7 @@ export default function SEDailyUpdates() {
                 <label className="sed-upload-box">
                   📷 Upload Photos
                   <input type="file" multiple accept="image/*" style={{ display: "none" }}
-                    onChange={e =>
-                      setField("photoNames", Array.from(e.target.files || []).map(f => f.name))
-                    } />
+                    onChange={e => setField("photoNames", Array.from(e.target.files || []).map(f => f.name))} />
                 </label>
                 {(form.photoNames?.length || 0) > 0 && (
                   <div className="sed-file-list">
@@ -651,14 +721,25 @@ export default function SEDailyUpdates() {
           </div>
         </div>
 
-        {/* Sticky footer */}
+        {/* ── Sticky Footer ── */}
         <div className="sed-sticky-footer">
-          <span className="sed-footer-label">
-            {form.projectName ? `📐 ${form.projectName}` : "New SE Log"} · {form.date || "No date"}
-          </span>
+          <div className="sed-footer-info">
+            <span className="sed-footer-icon">📐</span>
+            <span className="sed-footer-project">
+              {form.projectName ? form.projectName : "New SE Log"}
+            </span>
+            <span className="sed-footer-sep">·</span>
+            <span className="sed-footer-date">
+              {form.date
+                ? new Date(form.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                : "No date"}
+            </span>
+          </div>
           <div className="sed-footer-btns">
             <button className="sed-cancel-btn" onClick={() => setView("week")}>Cancel</button>
-            <button className="sed-save-btn" onClick={handleSave}>Save Log</button>
+            <button className="sed-save-btn" onClick={handleSave} disabled={saving}>
+              {saving ? "Saving…" : "Save Log"}
+            </button>
           </div>
         </div>
       </div>
@@ -701,9 +782,7 @@ export default function SEDailyUpdates() {
                   showToast("Log approved!");
                   await loadData();
                   setView("week");
-                } catch {
-                  showToast("Approval failed", "error");
-                }
+                } catch { showToast("Approval failed", "error"); }
               }}>
                 ✓ Approve
               </button>
@@ -713,7 +792,7 @@ export default function SEDailyUpdates() {
 
         <div className="sed-view-body">
 
-          {/* Hero card */}
+          {/* Hero */}
           <div className="sed-view-hero">
             <div className="sed-view-hero-left">
               <h2 className="sed-view-project">{r.projectName || "Untitled"}</h2>
@@ -723,16 +802,18 @@ export default function SEDailyUpdates() {
                 {r.weather  && <span> · 🌤 {r.weather}{r.weatherTemp ? ` ${r.weatherTemp}°C` : ""}</span>}
               </div>
               <div className="sed-view-times">
-                {r.checkIn  && <span className="sed-time-chip sed-time-chip--in">In: {r.checkIn}</span>}
-                {r.checkOut && <span className="sed-time-chip sed-time-chip--out">Out: {r.checkOut}</span>}
+                {r.checkIn  && <span className="sed-time-chip sed-time-chip--in">🟢 In: {r.checkIn}</span>}
+                {r.checkOut && <span className="sed-time-chip sed-time-chip--out">🔴 Out: {r.checkOut}</span>}
               </div>
             </div>
-            <span className="sed-status-pill sed-status-pill--lg" style={{ background: sc.badge, color: sc.text }}>
+            <span className="sed-status-pill sed-status-pill--lg"
+              style={{ background: sc.badge, color: sc.text }}>
               <span className="sed-status-dot" style={{ background: sc.dot }} />
               {sc.label}
             </span>
           </div>
 
+          {/* Morning Plan */}
           {r.morningBriefing && (
             <div className="sed-vcard">
               <div className="sed-vcard-title">☀️ Morning Plan</div>
@@ -740,6 +821,7 @@ export default function SEDailyUpdates() {
             </div>
           )}
 
+          {/* Work Done */}
           <div className="sed-vcard">
             <div className="sed-vcard-title">🏗 Work Completed</div>
             {(r.workDone || []).filter(w => w.task).length === 0 ? (
@@ -756,6 +838,7 @@ export default function SEDailyUpdates() {
             ))}
           </div>
 
+          {/* Issues */}
           <div className="sed-vcard">
             <div className="sed-vcard-title">⚠️ Issues</div>
             {(r.issues || []).filter(i => i.issue).length === 0 ? (
@@ -773,15 +856,17 @@ export default function SEDailyUpdates() {
             ))}
           </div>
 
+          {/* Safety */}
           {r.safetyPoints && (
             <div className="sed-vcard">
               <div className="sed-vcard-title">🦺 Safety Observations</div>
               {r.safetyPoints.split("\n").filter(Boolean).map((l, i) => (
-                <div key={i} className="sed-safety-line">{l}</div>
+                <div key={i} className="sed-safety-line">✓ {l}</div>
               ))}
             </div>
           )}
 
+          {/* Tomorrow */}
           {r.tomorrowPlan && (
             <div className="sed-vcard">
               <div className="sed-vcard-title">📅 Tomorrow's Plan</div>
@@ -789,6 +874,7 @@ export default function SEDailyUpdates() {
             </div>
           )}
 
+          {/* SE Remarks */}
           {r.seRemarks && (
             <div className="sed-vcard">
               <div className="sed-vcard-title">📝 SE Remarks</div>
@@ -796,8 +882,9 @@ export default function SEDailyUpdates() {
             </div>
           )}
 
+          {/* Footer */}
           <div className="sed-vfooter">
-            Submitted by: <strong>{r.submittedBy || "Structural Engineer"}</strong>
+            <span>Submitted by: <strong>{r.submittedBy || "Structural Engineer"}</strong></span>
             <span className="sed-vfooter-dist">
               Distribution: Project Manager · Consultant · QC Team
             </span>
