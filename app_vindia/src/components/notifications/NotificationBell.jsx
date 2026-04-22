@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNotifications } from "../../context/useNotifications";
 import "./NotificationBell.css";
 
 const TYPE_CFG = {
@@ -8,16 +7,21 @@ const TYPE_CFG = {
   work:     { label: "Work",     color: "#ca8a04", bg: "#fefce8" },
   approval: { label: "Approval", color: "#7c3aed", bg: "#f5f3ff" },
 };
-const SEV_COLOR = { critical: "#dc2626", warn: "#f59e0b", info: "#2563eb", ok: "#10b981" };
-
-export default function NotificationBell() {
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
-  const [open,   setOpen]   = useState(false);
+export default function NotificationBell({ notifications = [] }) {
+  const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [notifs, setNotifs] = useState(notifications);
+
+  const unreadCount = notifs.filter(n => !n.read).length;
+
+  const markRead = (id) => setNotifs(p => p.map(n => n.id === id ? { ...n, read: true } : n));
+  const markAllRead = () => setNotifs(p => p.map(n => ({ ...n, read: true })));
 
   const shown = filter === "all"
-    ? notifications
-    : notifications.filter(n => n.type === filter);
+    ? notifs
+    : notifs.filter(n => n.type === filter);
+
+    const SEV_COLOR = { critical: "#dc2626", warn: "#f59e0b", info: "#2563eb", ok: "#10b981" };
 
   return (
     <>

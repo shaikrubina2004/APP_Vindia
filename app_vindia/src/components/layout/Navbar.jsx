@@ -1,18 +1,26 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
 import { useAuth } from "../../context/useAuth";
 import NotificationBell from "../../components/notifications/NotificationBell";
-
 import "../../styles/layout/Navbar.css";
-
 import logo from "../../assets/logo.png.png";
-
 function Navbar() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+
+  const [userNotifications, setUserNotifications] = useState([]);
+
+useEffect(() => {
+  if (user?.id) {
+    fetch(`/api/notifications/${user.id}`)
+      .then(res => res.json())
+      .then(data => setUserNotifications(data))
+      .catch(() => setUserNotifications([]));
+  }
+}, [user?.id]);
 
   const handleLogout = () => {
     setIsProfileOpen(false);
@@ -161,9 +169,8 @@ function Navbar() {
         </div>
 
         {/* Notification Icon */}
-        {user?.role === "project_coordinator" && (
-          <NotificationBell />
-        )}
+        <NotificationBell notifications={userNotifications} />
+
         {/* Profile Dropdown */}
         <div
           className="profile-dropdown-wrapper"
