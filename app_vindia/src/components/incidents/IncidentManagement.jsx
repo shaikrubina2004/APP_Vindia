@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo } from "react";
 import ConvertToTasksModal from "./ConvertToTasksModal";
+import "../../styles/IncidentManagement.css";
 import { API } from "../../services/authService";
 
 import {
@@ -995,4 +996,3 @@ export default function IncidentManagement({
     </div>
   );
 }
-import "../../styles/IncidentManagement.css";
