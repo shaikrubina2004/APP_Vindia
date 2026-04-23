@@ -246,99 +246,19 @@ function ArchitectDashboard() {
 
       </div>
 
-      {/* ── ROW 2: Sign-offs, Tasks, Versions ── */}
-      <div className="three-col">
-
-        {/* CLIENT SIGN-OFFS */}
-        <div className="panel">
-          <div className="panel-head">
-            <div className="panel-title">
-              Client Sign-offs
-              <span className="panel-badge pb-warn">{pendingSignoffs} pending</span>
-            </div>
-            <button
-              className="log-tag"
-              onClick={() => navigate("/architect/sign-off")}
-            >
-              Chase
-            </button>
-          </div>
-
-          {selectedProject.signoffItems.map((s) => (
-            <div key={s.id} className="signoff-row">
-              <div className="so-head">
-                <span>{s.title}</span>
-                <span className="so-version">{s.version}</span>
-              </div>
-              <div className="so-meta">
-                <span>{s.sentDaysAgo === 0 ? "Today" : `${s.sentDaysAgo} days ago`}</span>
-                <span style={{
-                  color: s.status === "OVERDUE"  ? "var(--danger)"
-                       : s.status === "APPROVED" ? "var(--ok)"
-                       : "var(--b4)",
-                  fontWeight: 600,
-                }}>
-                  {s.status}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+      
 
         
 
        
 
-      </div>
+    
 
-      {/* ── ROW 3: Cross-Discipline Coordination ── */}
-      <div className="panel" style={{ marginTop: 20 }}>
-        <div className="panel-head">
-          <div className="panel-title">
-            Cross-Discipline Coordination
-            <span className="panel-badge pb-blue">Structural + MEP</span>
-          </div>
-          <button
-            className="log-tag"
-            onClick={() => navigate("/architect/coordination")}
-          >
-            + Log Item
-          </button>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
-
-          {/* STRUCTURAL */}
-          <div>
-            <div style={{
-              fontFamily: "var(--fm)",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: "var(--b4)",
-              marginBottom: 10,
-              paddingBottom: 6,
-              borderBottom: "1px solid var(--border)",
-            }}>
-              Structural
-            </div>
-            {selectedProject.structural.map((item, i) => (
-              <div key={i} className="inc-row">
-                <div className="inc-prio p-med" />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="inc-title">{item.title}</div>
-                  <div className="inc-sub">{item.age} · {item.by}</div>
-                </div>
-                <span className="inc-status">{item.status}</span>
-              </div>
-            ))}
-          </div>
+    
 
           
 
-        </div>
-      </div>
+      
 
     </div>
   );

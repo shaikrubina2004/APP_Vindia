@@ -69,7 +69,6 @@ import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
 import ArchitectTasks from "../pages/Architect/ArchitectTasks";
 import ArchitectDailyLogins from "../pages/Architect/ArchitectDailyLogins";
 import ArchitectDesigns from "../pages/Architect/ArchitectDesigns";
-import ArchitectCoordination from "../pages/Architect/ArchitectCoordination";
 import ArchitectSignOff from "../pages/Architect/ArchitectSignOff";
 import ArchitectProject from "../pages/Architect/ArchitectProject";
 
@@ -605,16 +604,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/architect/coordination"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-            <ArchitectLayout>
-              <ArchitectCoordination />
-            </ArchitectLayout>
-          </ProtectedRoute>
-        }
-      />
+     
       <Route
         path="/architect/projects"
         element={
