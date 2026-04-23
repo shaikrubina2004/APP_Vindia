@@ -1,17 +1,19 @@
 import { useState } from "react";
 import "./Measurements.css";
-const Measurements = () => {
-  
 
+const Measurements = () => {
   const [data, setData] = useState([]);
+
   const [form, setForm] = useState({
     type: "",
     location: "",
+    qty: "",
+    unit: "m³",
     length: "",
     width: "",
     height: "",
     nos: "",
-    unit: "m³",
+    date: "",
   });
 
   const handleChange = (e) => {
@@ -20,132 +22,149 @@ const Measurements = () => {
 
   const calculateQty = () => {
     return (
-      Number(form.length) *
-      Number(form.width) *
-      Number(form.height) *
+      Number(form.length || 0) *
+      Number(form.width || 0) *
+      Number(form.height || 0) *
       Number(form.nos || 1)
     );
   };
 
   const handleAdd = () => {
-    if (!form.type || !form.length || !form.width || !form.height) return;
+    if (!form.type || !form.location) return;
 
-    const qty = calculateQty();
+    const quantity = form.qty || calculateQty();
 
     const newItem = {
       ...form,
-      project,
-      qty,
+      qty: Number(quantity),
       status: "pending",
     };
 
-    setData([...data, newItem]);
+    setData([newItem, ...data]);
 
     setForm({
       type: "",
       location: "",
+      qty: "",
+      unit: "m³",
       length: "",
       width: "",
       height: "",
       nos: "",
-      unit: "m³",
+      date: "",
     });
   };
 
-  const approveItem = (index) => {
+  const updateStatus = (i, status) => {
     const updated = [...data];
-    updated[index].status = "approved";
+    updated[i].status = status;
     setData(updated);
   };
-
-  const rejectItem = (index) => {
-    const updated = [...data];
-    updated[index].status = "rejected";
-    setData(updated);
-  };
- const convertToBOQ = (item) => {
-    console.log("Convert to BOQ:", item);
-    // later connect with BOQ page
-  };
-
-  const filteredData = data.filter((d) => d.project === project);
 
   return (
     <div className="measure-container">
 
-      {/* HEADER */}
-      <div className="measure-header">
-        <h2>Measurements</h2>
-       
-      </div>
+      <h2 className="title">Measurement Management</h2>
+
+      {/* CARDS */}
+     <div className="cards">
+
+  <div className="card purple">
+    <p>Total</p>
+    <h3>{data.length}</h3>
+  </div>
+
+  <div className="card green">
+    <p>Approved</p>
+    <h3>{data.filter(d => d.status === "approved").length}</h3>
+  </div>
+
+  <div className="card orange">
+    <p>Pending</p>
+    <h3>{data.filter(d => d.status === "pending").length}</h3>
+  </div>
+
+</div>
 
       {/* FORM */}
-      <div className="measure-form">
+      <div className="box">
+        <h3>Add Measurement</h3>
 
-        <input name="type" placeholder="Work Type" value={form.type} onChange={handleChange} />
-        <input name="location" placeholder="Location" value={form.location} onChange={handleChange} />
+        <div className="form-grid">
+          <input name="type" placeholder="Work Type" value={form.type} onChange={handleChange} />
+          <input name="location" placeholder="Location" value={form.location} onChange={handleChange} />
+          <input name="qty" type="number" placeholder="Manual Qty" value={form.qty} onChange={handleChange} />
+          <select name="unit" value={form.unit} onChange={handleChange}>
+            <option>m³</option>
+            <option>m²</option>
+            <option>nos</option>
+          </select>
 
-        <input name="length" type="number" placeholder="Length" value={form.length} onChange={handleChange} />
-        <input name="width" type="number" placeholder="Width" value={form.width} onChange={handleChange} />
-        <input name="height" type="number" placeholder="Height" value={form.height} onChange={handleChange} />
+          <input name="length" type="number" placeholder="L" value={form.length} onChange={handleChange} />
+          <input name="width" type="number" placeholder="W" value={form.width} onChange={handleChange} />
+          <input name="height" type="number" placeholder="H" value={form.height} onChange={handleChange} />
+          <input name="nos" type="number" placeholder="Nos" value={form.nos} onChange={handleChange} />
 
-        <input name="nos" type="number" placeholder="Nos" value={form.nos} onChange={handleChange} />
+          <input name="date" type="date" value={form.date} onChange={handleChange} />
 
-        <select name="unit" value={form.unit} onChange={handleChange}>
-          <option>m³</option>
-          <option>m²</option>
-          <option>nos</option>
-        </select>
-
-        <button onClick={handleAdd}>Add</button>
+          <button className="add-btn" onClick={handleAdd}>
+            Add Measurement
+          </button>
+        </div>
       </div>
 
       {/* TABLE */}
-      <div className="measure-table">
-        {filteredData.length === 0 ? (
-          <p className="empty">No measurements</p>
+      <div className="box">
+        <h3>Measurements</h3>
+
+        {data.length === 0 ? (
+          <p className="empty">No measurements added</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Work</th>
-                <th>Location</th>
-                <th>Dimensions</th>
-                <th>Qty</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {filteredData.map((d, i) => (
-                <tr key={i}>
-                  <td>{d.type}</td>
-                  <td>{d.location}</td>
-                  <td>{d.length}×{d.width}×{d.height} × {d.nos || 1}</td>
-                  <td>{d.qty} {d.unit}</td>
-
-                  <td className={`status ${d.status}`}>
-                    {d.status}
-                  </td>
-
-                  <td className="actions">
-                    {d.status === "pending" && (
-                      <>
-                        <button className="approve" onClick={() => approveItem(i)}>✔</button>
-                        <button className="reject" onClick={() => rejectItem(i)}>✖</button>
-                      </>
-                    )}
-
-                    <button className="boq" onClick={() => convertToBOQ(d)}>
-                      BOQ
-                    </button>
-                  </td>
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Work</th>
+                  <th>Location</th>
+                  <th>Qty</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
+              </thead>
 
-          </table>
+              <tbody>
+                {data.map((d, i) => (
+                  <tr key={i}>
+                    <td>{d.type}</td>
+                    <td>{d.location}</td>
+                    <td>{d.qty} {d.unit}</td>
+                    <td>{d.date || "-"}</td>
+
+                    <td>
+                      <span className={`status ${d.status}`}>
+                        {d.status}
+                      </span>
+                    </td>
+
+                    <td>
+                      {d.status === "pending" && (
+                        <>
+                        <button className="approve-btn" onClick={() => updateStatus(i, "approved")}>
+  Approve
+</button>
+
+<button className="reject-btn" onClick={() => updateStatus(i, "rejected")}>
+  Reject
+</button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

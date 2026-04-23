@@ -52,17 +52,30 @@ const Qsboq = () => {
   };
 
   // SEND TO ENGINEER
-  const sendBOQ = () => {
-    if (items.length === 0) return;
+ const sendBOQ = () => {
+  if (items.length === 0) {
+    alert("Add at least one item");
+    return;
+  }
 
-    setStatus("sent");
-
-    console.log("Sending BOQ:", {
-      project,
-      items,
-      remarks,
-    });
+  const boqData = {
+    projectId: "PROJECT-1",   // later dynamic
+    items: items,
+    totalCost: totalCost,
+    remarks: remarks,
+    status: "sent",
+    sentTo: "structural_engineer",
+    createdBy: "qs",
+    createdAt: new Date(),
   };
+
+  console.log("BOQ SENT:", boqData);
+
+  // simulate sending
+  setStatus("sent");
+
+  alert("BOQ sent to Structural Engineer ✅");
+};
 
   const totalCost = items.reduce((sum, i) => sum + i.total, 0);
 
@@ -181,6 +194,16 @@ const Qsboq = () => {
           {status.toUpperCase()}
         </span>
       </div>
+      {status === "sent" && (
+  <div className="box">
+    <h3>Sent to Structural Engineer</h3>
+
+    <p className="sent-label">Remarks:</p>
+    <div className="sent-remarks">
+      {remarks || "No remarks added"}
+    </div>
+  </div>
+)}
 
     </div>
   );
