@@ -78,7 +78,7 @@ import ProjectCoordinatorDashboard from "../pages/Project Coordinator/ProjectCoo
 import DailyUpdatesPC from "../pages/Project Coordinator/DailyUpdates";
 import Milestone from "../pages/Project Coordinator/Milestone";
 import Payment from "../pages/Project Coordinator/Payment";
-import Tasks from "../pages/Project Coordinator/Tasks";
+
 
 /* LAYOUTS */
 import CEOLayout from "../layouts/CEOLayout";
@@ -658,11 +658,12 @@ const AppRoutes = () => {
           </ProjectCoordinatorLayout>
         }
       />
+
       <Route
-        path="/project-coordinator/tasks"
+        path= "/project-coordinator/incidents"
         element={
           <ProjectCoordinatorLayout>
-            <Tasks />
+            <AppShell/>
           </ProjectCoordinatorLayout>
         }
       />
