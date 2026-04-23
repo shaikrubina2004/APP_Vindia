@@ -1,116 +1,117 @@
+import "./QsBoq.css";
 import { useState } from "react";
-import "./Qsboq.css";
 
-const Qsboq = () => {
-  const [items, setItems] = useState([]);
-  const [form, setForm] = useState({
-    item: "",
-    quantity: "",
-    unit: "",
-    rate: "",
-  });
+export default function QsBoq() {
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const [boqData, setBoqData] = useState([
+    {
+      id: 1,
+      item: "Steel Work",
+      quantity: "85 tons",
+      cost: "₹12,00,000",
+      status: "pending",
+    },
+    {
+      id: 2,
+      item: "Concrete Work",
+      quantity: "120 m³",
+      cost: "₹8,50,000",
+      status: "pending",
+    },
+    {
+      id: 3,
+      item: "Brick Work",
+      quantity: "5000 units",
+      cost: "₹3,20,000",
+      status: "approved",
+    }
+  ]);
+
+  const [rejectBox, setRejectBox] = useState(null);
+  const [reason, setReason] = useState("");
+
+  const approveBOQ = (id) => {
+    setBoqData(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, status: "approved" } : item
+      )
+    );
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    if (!form.item || !form.quantity || !form.rate) return;
-
-    const newItem = {
-      ...form,
-      quantity: Number(form.quantity),
-      rate: Number(form.rate),
-      total: Number(form.quantity) * Number(form.rate),
-    };
-
-    setItems([...items, newItem]);
-    setForm({ item: "", quantity: "", unit: "", rate: "" });
+  const openReject = (id) => {
+    setRejectBox(id);
   };
 
-  const handleDelete = (index) => {
-    setItems(items.filter((_, i) => i !== index));
+  const submitReject = () => {
+    setBoqData(prev =>
+      prev.map(item =>
+        item.id === rejectBox
+          ? { ...item, status: "rejected", reason }
+          : item
+      )
+    );
+    setRejectBox(null);
+    setReason("");
   };
-
-  const totalCost = items.reduce((sum, i) => sum + i.total, 0);
 
   return (
-    <div className="qsboq-container">
+    <div className="qsboq">
 
-      {/* HEADER */}
-      <div className="qsboq-header">
-        <h2>BOQ Management</h2>
-        <button className="add-btn">+ Add Item</button>
-      </div>
+      <h2>BOQ Approval</h2>
 
-      {/* SUMMARY */}
-      <div className="qsboq-cards">
-        <div className="card">
-          <h4>Total Items</h4>
-          <p>{items.length}</p>
-        </div>
+      <div className="boq-grid">
+        {boqData.map((boq) => (
+          <div className="boq-card" key={boq.id}>
 
-        <div className="card">
-          <h4>Total Cost</h4>
-          <p>₹{totalCost}</p>
-        </div>
-      </div>
+            <div className="boq-top">
+              <h3>{boq.item}</h3>
+              <span className={`status ${boq.status}`}>
+                {boq.status}
+              </span>
+            </div>
 
-      {/* FORM */}
-      <div className="qsboq-form">
-        <form onSubmit={handleSubmit}>
-          <input name="item" placeholder="Item" value={form.item} onChange={handleChange} />
-          <input name="quantity" type="number" placeholder="Qty" value={form.quantity} onChange={handleChange} />
-          <input name="unit" placeholder="Unit" value={form.unit} onChange={handleChange} />
-          <input name="rate" type="number" placeholder="Rate ₹" value={form.rate} onChange={handleChange} />
+            <p><b>Quantity:</b> {boq.quantity}</p>
+            <p><b>Cost:</b> {boq.cost}</p>
 
-          <button type="submit" className="submit-btn">Add</button>
-        </form>
-      </div>
+            {boq.reason && (
+              <p className="reason">Reason: {boq.reason}</p>
+            )}
 
-      {/* BOQ LIST */}
-      <div className="qsboq-list">
-        {items.length === 0 ? (
-          <p className="empty">No BOQ items added</p>
-        ) : (
-          items.map((i, index) => (
-            <div key={index} className="boq-item">
-
-              <div className="boq-left">
-                <div className="top-row">
-                  <span className="boq-badge">BOQ</span>
-                  <span className="boq-id">#ITEM-{index + 1}</span>
-                </div>
-
-                <h3 className="boq-title">{i.item}</h3>
-
-                <div className="boq-meta">
-                  <span>{i.quantity} {i.unit}</span>
-                  <span>•</span>
-                  <span>₹{i.rate} / unit</span>
-                </div>
-              </div>
-
-              <div className="boq-right">
-                <div className="boq-total">₹{i.total}</div>
-
-                <button
-                  className="delete-btn"
-                  onClick={() => handleDelete(index)}
-                >
-                  Delete
+            {boq.status === "pending" && (
+              <div className="actions">
+                <button className="approve" onClick={() => approveBOQ(boq.id)}>
+                  Approve
+                </button>
+                <button className="reject" onClick={() => openReject(boq.id)}>
+                  Reject
                 </button>
               </div>
+            )}
 
-            </div>
-          ))
-        )}
+          </div>
+        ))}
       </div>
+
+      {/* REJECT MODAL */}
+      {rejectBox && (
+        <div className="modal">
+          <div className="modal-box">
+            <h3>Reject BOQ</h3>
+
+            <textarea
+              placeholder="Enter reason..."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+
+            <div className="modal-actions">
+              <button onClick={submitReject}>Submit</button>
+              <button onClick={() => setRejectBox(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
-};
-
-export default Qsboq;
+}

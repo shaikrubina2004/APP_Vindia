@@ -1,124 +1,145 @@
+// QuantitySurveyorDashboard.jsx
+
 import "./QuantitySurveyorDashboard.css";
 import { useNavigate } from "react-router-dom";
 
-
-export default function QuantitySurveyorDashboard() {
+export default function QuantitySurveyorDashboard()
+ {
   const navigate = useNavigate();
-
   return (
     <div className="qsdb">
 
       {/* HEADER */}
-      <div className="qsdb-header">
-        <div>
-          <p className="qsdb-sub">CONSTRUCTION MANAGEMENT</p>
-          <h2>QS Dashboard</h2>
-          <p className="qsdb-desc">Cost, Quantity & Reporting Overview</p>
-        </div>
+      <div className="header">
+        <h2>Dashboard</h2>
+        <p>Welcome back! Here's what's happening on your projects.</p>
       </div>
 
-      {/* CLICKABLE CARDS */}
-      <div className="qsdb-cards">
+      {/* TOP CARDS */}
+     <div className="top-cards">
 
-        <div className="qs-card purple" onClick={() => navigate("/quantity-surveyor/quantity-report")}>
-          <span>📋</span>
-          <div>
-            <p>BOQ Items</p>
-            <h3>12</h3>
-          </div>
-        </div>
-
-        <div className="qs-card dark" onClick={() => navigate("/quantity-surveyor/cost-report")}>
-          <span>💰</span>
-          <div>
-            <p>Planned Cost</p>
-            <h3>₹1.84 Cr</h3>
-          </div>
-        </div>
-
-        <div className="qs-card orange" onClick={() => navigate("/quantity-surveyor/cost-report")}>
-          <span>⚠</span>
-          <div>
-            <p>Actual Spent</p>
-            <h3>₹62.4 L</h3>
-          </div>
-        </div>
-
-        <div className="qs-card cyan" onClick={() => navigate("/quantity-surveyor/measurements")}>
-          <span>📊</span>
-          <div>
-            <p>Avg Progress</p>
-            <h3>38%</h3>
-          </div>
-        </div>
-
-      </div>
-
-      {/* GRAPH SECTION */}
-      <div className="qsdb-grid">
-        {/* BOTTOM SECTION */}
-<div className="bottom-grid">
-
-  {/* RECENT ACTIVITY */}
-  <div className="box">
-    <div className="box-header">
-      <h3>Recent Activities</h3>
-    <span onClick={() => navigate("/quantity-surveyor/daily-updates")}>
-  View all →
-</span>
+  {/* CARD 1 */}
+  <div className="top-card">
+    <div>
+      <p className="label">Total Projects</p>
+      <h2>12</h2>
+      <span className="sub purple-text">● Active Projects</span>
     </div>
-
-    <div className="activity">
-
-      <div className="activity-item">
-        <p className="title">BOQ Updated</p>
-        <span className="sub">Steel quantity revised</span>
-      </div>
-
-      <div className="activity-item">
-        <p className="title">Measurement Added</p>
-        <span className="sub">Concrete work updated</span>
-      </div>
-
-      <div className="activity-item">
-        <p className="title">Cost Alert</p>
-        <span className="sub red-text">Over budget detected</span>
-      </div>
-
-    </div>
+    <div className="icon-box purple-bg">📁</div>
   </div>
 
-  {/* ALERTS */}
-  <div className="box">
-    <div className="box-header">
-      <h3>Alerts</h3>
+  {/* CARD 2 */}
+  <div className="top-card">
+    <div>
+      <p className="label">Quantity Progress</p>
+      <h2>70%</h2>
+      <span className="sub green-text">+8% from last week</span>
     </div>
+    <div className="icon-box green-bg">📈</div>
+  </div>
 
-    <div className="alerts">
-
-      <div className="alert red-bg">
-        ⚠ Steel exceeding budget
-      </div>
-
-      <div className="alert yellow-bg">
-        ⏳ Pending approval (2 items)
-      </div>
-
-      <div className="alert green-bg">
-        ✔ Foundation work on track
-      </div>
-
+  {/* CARD 3 */}
+  <div className="top-card">
+    <div>
+      <p className="label">Cost Utilization</p>
+      <h2>55%</h2>
+      <span className="sub orange-text">On Budget</span>
     </div>
+    <div className="icon-box orange-bg">💰</div>
+  </div>
+
+  {/* CARD 4 */}
+  <div className="top-card">
+    <div>
+      <p className="label">Tasks Pending</p>
+      <h2>8</h2>
+      <span className="sub blue-text">Requires attention</span>
+    </div>
+    <div className="icon-box blue-bg">📋</div>
   </div>
 
 </div>
 
-        {/* SMALL BAR CARDS */}
-        <div className="qsdb-card">
-          <div className="box">
-  <h3>Project Overview</h3>
+      {/* MAIN GRID */}
+   <div className="mid-grid">
 
-  <div className="overview-list">
+  {/* RECENT */}
+  <div className="card-box">
+  <div className="card-header">
+    <h3>Recent Activities</h3>
+   <span onClick={() => navigate("/quantity-surveyor/daily-updates")}>
+  View all
+</span>
+  </div>
+
+  <div className="activity-item">
+    <div className="icon purple">📄</div>
+    <div>
+      <p className="title">BOQ Updated</p>
+      <span className="sub">Steel quantity revised for Block A</span>
+    </div>
+    <span className="time">10 min ago</span>
+  </div>
+
+  <div className="activity-item">
+    <div className="icon green">📏</div>
+    <div>
+      <p className="title">Measurement Added</p>
+      <span className="sub">Concrete work updated</span>
+    </div>
+    <span className="time">1 hour ago</span>
+  </div>
+
+  <div className="activity-item">
+    <div className="icon orange">💰</div>
+    <div>
+      <p className="title">Cost Alert</p>
+      <span className="sub red-text">Over budget detected</span>
+    </div>
+    <span className="time">3 hours ago</span>
+  </div>
+
+  <div className="activity-item">
+    <div className="icon blue">📋</div>
+    <div>
+      <p className="title">Daily Update Submitted</p>
+      <span className="sub">Daily progress submitted</span>
+    </div>
+    <span className="time">5 hours ago</span>
+  </div>
+</div>
+  {/* ALERTS */}
+  <div className="card-box">
+  <div className="card-header">
+    <h3>Alerts</h3>
+    <span onClick={() => navigate("/quantity-surveyor/alerts")}>
+  View all
+</span>
+  </div>
+
+  <div className="alert red">
+    <span>⚠ Steel exceeding budget</span>
+    <span>2h ago</span>
+  </div>
+
+  <div className="alert yellow">
+    <span>⏳ Pending approval (2 items)</span>
+    <span>4h ago</span>
+  </div>
+
+  <div className="alert green">
+    <span>✔ Foundation work on track</span>
+    <span>6h ago</span>
+  </div>
+</div>
+
+  {/* PROJECT OVERVIEW */}
+<div className="card-box">
+  <div className="card-header">
+    <h3>Project Overview</h3>
+  </div>
+
+  <div className="overview">
 
     {/* Quantity */}
     <div className="overview-item">
@@ -126,8 +147,8 @@ export default function QuantitySurveyorDashboard() {
         <span>Quantity Work</span>
         <span>70%</span>
       </div>
-      <div className="progress-bar">
-        <div className="progress-fill purple-fill" style={{ width: "70%" }}></div>
+      <div className="progress-bar purple">
+        <div style={{ width: "70%" }}></div>
       </div>
     </div>
 
@@ -137,8 +158,8 @@ export default function QuantitySurveyorDashboard() {
         <span>Cost Utilization</span>
         <span>55%</span>
       </div>
-      <div className="progress-bar">
-        <div className="progress-fill blue-fill" style={{ width: "55%" }}></div>
+      <div className="progress-bar blue">
+        <div style={{ width: "55%" }}></div>
       </div>
     </div>
 
@@ -148,50 +169,75 @@ export default function QuantitySurveyorDashboard() {
         <span>Project Progress</span>
         <span>40%</span>
       </div>
-      <div className="progress-bar">
-        <div className="progress-fill cyan-fill" style={{ width: "40%" }}></div>
+      <div className="progress-bar cyan">
+        <div style={{ width: "40%" }}></div>
       </div>
     </div>
 
   </div>
 </div>
 
-          <div className="mini-bars">
+</div>
+<div className="bottom-grid">
 
-            <div className="mini-bar">
-              <div className="mini-fill purple-fill" style={{ height: "60%" }}></div>
-              <p>Quantity</p>
-            </div>
+  {/* WORK DISTRIBUTION */}
+  <div className="card-box">
+    <h3>Work Distribution</h3>
 
-            <div className="mini-bar">
-              <div className="mini-fill blue-fill" style={{ height: "80%" }}></div>
-              <p>Cost</p>
-            </div>
-
-            <div className="mini-bar">
-              <div className="mini-fill cyan-fill" style={{ height: "40%" }}></div>
-              <p>Progress</p>
-            </div>
-
-          </div>
-        </div>
-
-        {/* SMALL DONUT */}
-        <div className="qsdb-card">
-          <h3>Distribution</h3>
-
-          <div className="donut small">
-            <div className="donut-inner">70%</div>
-          </div>
-
-          <div className="legend">
-            <span><b className="green"></b> Completed</span>
-            <span><b className="red"></b> Pending</span>
-          </div>
-        </div>
-
-      </div>
-
+    <div className="donut">
+      <div className="donut-inner">70%</div>
     </div>
+
+    <div className="legend">
+      <span><b className="green"></b> Completed 70%</span>
+      <span><b className="red"></b> Pending 30%</span>
+    </div>
+  </div>
+
+  {/* TASK OVERVIEW */}
+  <div className="card-box">
+    <div className="card-header">
+      <h3>Tasks Overview</h3>
+     
+    </div>
+
+    <div className="task-list">
+      <p>🟡 Pending <span>8</span></p>
+      <p>🔵 In Progress <span>5</span></p>
+      <p>🟢 Completed <span>12</span></p>
+      <p>🔴 Overdue <span>2</span></p>
+    </div>
+  </div>
+
+  {/* UPCOMING DEADLINES */}
+  <div className="card-box">
+    <div className="card-header">
+      <h3>Upcoming Deadlines</h3>
+     
+    </div>
+
+    <div className="deadline">
+      <p>📅 Cost Report - April <span className="red-tag">25 Apr</span></p>
+      <small>Skyline Tower</small>
+    </div>
+
+    <div className="deadline">
+      <p>📅 Measurement Approval <span className="yellow-tag">27 Apr</span></p>
+      <small>Green View Residency</small>
+    </div>
+
+    <div className="deadline">
+      <p>📅 BOQ Finalization <span className="green-tag">30 Apr</span></p>
+      <small>Central Plaza</small>
+    </div>
+  </div>
+
+</div>
+
+        
+
+        </div>
+
+     
   );
 }
