@@ -78,7 +78,11 @@ export default function DailyUpdates() {
 
   const fetchLogs = async () => {
   try {
-    const res = await getUpdates(101);
+    const selectedProjectId = 3;
+
+    console.log("CALLING API WITH:", selectedProjectId);
+
+    const res = await getUpdates(selectedProjectId);
 
     const mappedData = res.data.map(log => ({
       ...log,
@@ -91,12 +95,19 @@ export default function DailyUpdates() {
       delayImpact: log.delay_impact,
     }));
 
-    setLogs(mappedData);
+    setLogs(mappedData); // ✅ USE THIS
+    console.log("LOGS SET:", mappedData);
 
   } catch (err) {
     console.error(err);
   }
 };
+
+<div>
+  {logs.map(l => (
+    <p key={l.id}>{l.work}</p>
+  ))}
+</div>
 
   const todayLog = logs.find(l => l.date === todayStr && l.id !== editId);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -122,8 +133,8 @@ export default function DailyUpdates() {
   try {
     const payload = {
       ...form,
-      project_id: 1,
-      coordinator_id: 101,
+      project_id: 3,
+      coordinator_id: 101, // replace later with user.id
       date: todayStr,
       day: todayDay
     };
@@ -133,11 +144,9 @@ export default function DailyUpdates() {
 
       const updated = {
         ...res.data,
-
         cementUsed: res.data.cement_used,
         steelUsed: res.data.steel_used,
         materialShort: res.data.material_short,
-
         delayHours: res.data.delay_hours,
         delayImpact: res.data.delay_impact,
       };
@@ -147,25 +156,23 @@ export default function DailyUpdates() {
       );
 
       setEditId(null);
-      showToast("success", "Updated & re-submitted to Project Manager.");
+      showToast("success", "Updated & re-submitted.");
 
     } else {
       const res = await createUpdate(payload);
 
       const created = {
         ...res.data,
-
         cementUsed: res.data.cement_used,
         steelUsed: res.data.steel_used,
         materialShort: res.data.material_short,
-
         delayHours: res.data.delay_hours,
         delayImpact: res.data.delay_impact,
       };
 
       setLogs(prev => [created, ...prev]);
 
-      showToast("success", "Daily update submitted to Project Manager.");
+      showToast("success", "Daily update submitted.");
     }
 
     setForm({ ...EMPTY_FORM });
