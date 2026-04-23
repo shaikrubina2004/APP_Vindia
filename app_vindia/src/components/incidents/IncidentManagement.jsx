@@ -1,8 +1,8 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import ConvertToTasksModal from "./ConvertToTasksModal";
 import "../../styles/IncidentManagement.css";
 import { API } from "../../services/authService";
-import "../../styles/IncidentManagement.css";
+import { useAuth } from "../../context/useAuth";
 
 import {
   PRIORITY_CONFIG,
@@ -19,6 +19,8 @@ export default function IncidentManagement({
   refreshIncident,
   onNavigateToQueue,
 }) {
+  const { user: currentUser } = useAuth();
+
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedIncidentData, setSelectedIncidentData] = useState(null);
@@ -29,7 +31,7 @@ export default function IncidentManagement({
   const [commentText, setCommentText] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
   const [saving, setSaving] = useState(false);
-  const fileRef = useRef(null);
+  const fileRef = React.useRef(null);
 
   const [form, setForm] = useState({
     title: "",
@@ -39,7 +41,6 @@ export default function IncidentManagement({
     roleName: "",
   });
 
-  // Unique roles derived from the users prop
   const roles = useMemo(
     () => [...new Set(users.map((u) => u.roleName).filter(Boolean))].sort(),
     [users],
@@ -47,8 +48,6 @@ export default function IncidentManagement({
   const usersForRole = (roleName) =>
     users.filter((u) => u.roleName === roleName);
 
-  // ✅ FIX: use selectedIncidentData (fresh) when available, otherwise fall back
-  //         to list item — but always read tasks from the fresh copy
   const selectedIncident =
     selectedIncidentData ?? incidents.find((i) => i.id === selectedId) ?? null;
 
@@ -74,7 +73,6 @@ export default function IncidentManagement({
     p1: incidents.filter((i) => i.priority === "P1").length,
   };
 
-  /* ── Create incident ────────────────────────────────────── */
   const handleCreate = async () => {
     if (!form.title.trim() || !form.assignedId) return;
     setSaving(true);
@@ -85,7 +83,6 @@ export default function IncidentManagement({
         priority: form.priority,
         assigned_to_user_id: form.assignedId,
       });
-      // Refresh to get full server-side shape (with incidentNo, deadlineAt, etc.)
       await refreshIncident(res.data.data.id);
       setForm({
         title: "",
@@ -109,13 +106,11 @@ export default function IncidentManagement({
     }
   };
 
-  /* ── Advance status ─────────────────────────────────────── */
   const advanceStatus = async (inc) => {
     const idx = STATUS_FLOW.indexOf(inc.status);
     if (idx >= STATUS_FLOW.length - 1) return;
     const newStatus = STATUS_FLOW[idx + 1];
 
-    // Optimistic
     const patch = (list) =>
       list.map((i) =>
         i.id === inc.id
@@ -134,7 +129,6 @@ export default function IncidentManagement({
       await API.patch(`/incidents/${inc.id}/status`, { status: newStatus });
     } catch (err) {
       console.error("advanceStatus:", err);
-      // Rollback
       setIncidents((prev) =>
         prev.map((i) => (i.id === inc.id ? { ...i, status: inc.status } : i)),
       );
@@ -143,7 +137,6 @@ export default function IncidentManagement({
     }
   };
 
-  /* ── Add incident comment ───────────────────────────────── */
   const addComment = async (incidentId) => {
     if (!commentText.trim()) return;
     const text = commentText.trim();
@@ -151,26 +144,19 @@ export default function IncidentManagement({
 
     const tempComment = { author: "You", text, time: new Date() };
 
-    // Optimistic — update both list and detail panel
     const addToComments = (inc) =>
       inc.id !== incidentId
         ? inc
-        : {
-            ...inc,
-            comments: [...(inc.comments ?? []), tempComment],
-          };
+        : { ...inc, comments: [...(inc.comments ?? []), tempComment] };
     setIncidents((prev) => prev.map(addToComments));
     setSelectedIncidentData((prev) => (prev ? addToComments(prev) : prev));
 
     try {
-      // ✅ FIX: was referencing undefined `json` variable
       await API.post(`/incidents/${incidentId}/comments`, { body: text });
-      // Refresh to get server-generated author name
       const fresh = await refreshIncident(incidentId);
       if (fresh) setSelectedIncidentData(fresh);
     } catch (err) {
       console.error("addComment:", err);
-      // Rollback optimistic comment
       const remove = (inc) =>
         inc.id !== incidentId
           ? inc
@@ -183,7 +169,6 @@ export default function IncidentManagement({
     }
   };
 
-  /* ── Convert to tasks ───────────────────────────────────── */
   const handleConvertToTasks = async (incidentId, newTasks) => {
     try {
       await API.post(`/incidents/${incidentId}/tasks`, {
@@ -194,7 +179,6 @@ export default function IncidentManagement({
           assigned_to_user_id: t.assignedId,
         })),
       });
-      // ✅ FIX: refresh returns the updated incident; update detail panel too
       const fresh = await refreshIncident(incidentId);
       if (fresh && selectedId === incidentId) setSelectedIncidentData(fresh);
     } catch (err) {
@@ -208,7 +192,6 @@ export default function IncidentManagement({
     }
   };
 
-  /* ── Photo ──────────────────────────────────────────────── */
   const handlePhoto = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -226,11 +209,9 @@ export default function IncidentManagement({
     0,
   );
 
-  /* ── Card click handler ─────────────────────────────────── */
   const handleCardClick = async (inc) => {
     setSelectedId(inc.id);
-    setSelectedIncidentData(null); // show list version instantly while fetching
-    // ✅ FIX: refreshIncident now returns the updated object
+    setSelectedIncidentData(null);
     const fresh = await refreshIncident(inc.id);
     if (fresh) setSelectedIncidentData(fresh);
   };
@@ -466,8 +447,12 @@ export default function IncidentManagement({
             const pcfg = PRIORITY_CONFIG[inc.priority];
             const scfg = STATUS_CONFIG[inc.status];
             const active = selectedId === inc.id;
-            // ✅ FIX: use taskCount (from overview) OR tasks array length
             const taskCount = inc.taskCount ?? inc.tasks?.length ?? 0;
+
+            // Ownership tags
+            const isCreatedByMe = inc.createdById === currentUser?.id;
+            const isAssignedToMe = inc.assignedId === currentUser?.id;
+
             return (
               <div
                 key={inc.id}
@@ -486,9 +471,22 @@ export default function IncidentManagement({
                       </span>
                     )}
                   </div>
-                  <span className={`inc-status-chip ${scfg.color}`}>
-                    {scfg.icon} {inc.status}
-                  </span>
+                  <div className="inc-card-right">
+                    {/* Ownership tags */}
+                    {isCreatedByMe && (
+                      <span className="inc-tag inc-tag-createdby">
+                        ✏️ Created by me
+                      </span>
+                    )}
+                    {isAssignedToMe && (
+                      <span className="inc-tag inc-tag-assignedto">
+                        📥 Assigned to me
+                      </span>
+                    )}
+                    <span className={`inc-status-chip ${scfg.color}`}>
+                      {scfg.icon} {inc.status}
+                    </span>
+                  </div>
                 </div>
                 <h3 className="inc-card-title">{inc.title}</h3>
                 <p className="inc-card-desc">
@@ -508,7 +506,6 @@ export default function IncidentManagement({
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                       <circle cx="12" cy="7" r="4" />
                     </svg>
-                    {/* ✅ FIX: was inc.assignee_name (raw) — should be inc.assignedName (normalised) */}
                     {inc.assignedName || "—"}
                   </span>
                   <span className={`inc-deadline ${overdue ? "overdue" : ""}`}>
@@ -599,7 +596,6 @@ export default function IncidentManagement({
                     </span>
                   ),
                 },
-                // ✅ FIX: was selectedIncident.role_name / assignee_name (raw snake_case)
                 {
                   label: "Assigned Role",
                   val: selectedIncident.assignedTo || "—",
@@ -655,7 +651,6 @@ export default function IncidentManagement({
                       </span>
                       <div className="detail-task-info">
                         <span className="detail-task-title">{t.title}</span>
-                        {/* ✅ FIX: was t.assignee_name / t.role_name (raw) */}
                         <span className="detail-task-meta">
                           {t.assignedName} · {t.assignedTo}
                         </span>

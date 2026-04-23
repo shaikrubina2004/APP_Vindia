@@ -1709,3 +1709,33 @@
     gap: 8px;
   }
 }
+.inc-card-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.inc-ownership-tags {
+  display: flex;
+  gap: 6px;
+}
+
+.inc-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.inc-tag-assignedto {
+  background: #e0f0ff;
+  color: #1a6fbf;
+}
+
+.inc-tag-createdby {
+  background: #f0e6ff;
+  color: #7c3aed;
+}

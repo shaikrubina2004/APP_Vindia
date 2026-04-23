@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { API } from "../../services/authService";
+import { useAuth } from "../../context/useAuth";
 
 import {
   PRIORITY_CONFIG,
@@ -8,7 +9,6 @@ import {
 } from "./incidentConfig";
 import { timeAgo } from "./incidentHelpers";
 
-/* ─── BLOCKED REASON MODAL ─────────────────────────────────── */
 function BlockedReasonModal({ task, onConfirm, onCancel }) {
   const [reason, setReason] = useState("");
 
@@ -19,10 +19,9 @@ function BlockedReasonModal({ task, onConfirm, onCancel }) {
           <div>
             <h3>Mark as Blocked</h3>
             <p className="modal-sub">
-              Provide a reason — this will be sent to{" "}
-              {/* ✅ FIX: was task.assignedName which may be undefined */}
+              Provide a reason —{" "}
               <strong>{task.assignedName || "the assignee"}</strong>'s assigner
-              as a comment
+              will be notified as a comment
             </p>
           </div>
           <button className="inc-modal-close" onClick={onCancel}>
@@ -97,8 +96,9 @@ function BlockedReasonModal({ task, onConfirm, onCancel }) {
   );
 }
 
-/* ─── TASK QUEUE ────────────────────────────────────────────── */
 export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
+  const { user: currentUser } = useAuth();
+
   const [filterRole, setFilterRole] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterPriority, setFilterPriority] = useState("All");
@@ -107,13 +107,11 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
   const [blockingTask, setBlockingTask] = useState(null);
   const [commentText, setCommentText] = useState("");
 
-  // Flatten all tasks with incident context
-  // ✅ FIX: tasks are already normalised by AppShell — use camelCase fields
   const allTasks = incidents.flatMap((inc) =>
     (inc.tasks ?? []).map((t) => ({
       ...t,
-      incidentTitle: inc.title,
-      incidentPriority: inc.priority,
+      incidentTitle: t.incidentTitle ?? inc.title,
+      incidentPriority: t.incidentPriority ?? inc.priority,
       incidentStatus: inc.status,
     })),
   );
@@ -122,7 +120,6 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
     (t) => t.incidentPriority === "P1" && t.status === "Pending",
   );
 
-  // ✅ FIX: use t.assignedTo (normalised) not t.role_name (raw)
   const roles = [
     "All",
     ...Array.from(new Set(allTasks.map((t) => t.assignedTo).filter(Boolean))),
@@ -135,15 +132,12 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
       filterPriority === "All" || t.priority === filterPriority;
     const matchSearch =
       (t.title ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
-      (t.assignedName ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
-      (t.incidentId ?? "").toLowerCase().includes(searchText.toLowerCase());
+      (t.assignedName ?? "").toLowerCase().includes(searchText.toLowerCase());
     return matchRole && matchStatus && matchPriority && matchSearch;
   });
 
-  // ✅ FIX: always read from allTasks so comments update reactively
   const selectedTask = allTasks.find((t) => t.id === selectedTaskId) ?? null;
 
-  /* ── Status click — intercept Blocked ── */
   const handleStatusClick = (task, newStatus) => {
     if (newStatus === "Blocked") {
       setBlockingTask(task);
@@ -152,11 +146,9 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
     updateTaskStatus(task.id, newStatus);
   };
 
-  /* ── Core status update ── */
   const updateTaskStatus = async (taskId, newStatus, blockedReason = null) => {
     const prevIncidents = incidents;
 
-    // Optimistic
     setIncidents((prev) =>
       prev.map((inc) => ({
         ...inc,
@@ -184,14 +176,13 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
     );
 
     try {
-      // ✅ FIX: was using raw fetch — now uses API (same axios instance with auth headers)
       await API.patch(`/incidents/tasks/${taskId}/status`, {
         status: newStatus,
         ...(blockedReason ? { blocked_reason: blockedReason } : {}),
       });
     } catch (err) {
       console.error("updateTaskStatus:", err);
-      setIncidents(prevIncidents); // rollback
+      setIncidents(prevIncidents);
       alert(
         "Failed to update task status: " +
           (err.response?.data?.message ?? err.message),
@@ -199,13 +190,11 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
     }
   };
 
-  /* ── Confirmed blocked ── */
   const handleBlockedConfirm = (taskId, reason) => {
     updateTaskStatus(taskId, "Blocked", reason);
     setBlockingTask(null);
   };
 
-  /* ── Add comment ── */
   const addComment = async (taskId) => {
     if (!commentText.trim()) return;
     const text = commentText.trim();
@@ -221,33 +210,33 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
     setIncidents((prev) =>
       prev.map((inc) => ({
         ...inc,
-        tasks: (inc.tasks ?? []).map((t) => {
-          if (t.id !== taskId) return t;
-          return {
-            ...t,
-            comments: [...(t.comments ?? []), tempComment],
-            updatedAt: new Date(),
-          };
-        }),
+        tasks: (inc.tasks ?? []).map((t) =>
+          t.id !== taskId
+            ? t
+            : {
+                ...t,
+                comments: [...(t.comments ?? []), tempComment],
+                updatedAt: new Date(),
+              },
+        ),
       })),
     );
 
     try {
-      // ✅ FIX: was using raw fetch — now uses API
       await API.post(`/incidents/tasks/${taskId}/comments`, { body: text });
     } catch (err) {
       console.error("addComment:", err);
-      // Rollback
       setIncidents((prev) =>
         prev.map((inc) => ({
           ...inc,
-          tasks: (inc.tasks ?? []).map((t) => {
-            if (t.id !== taskId) return t;
-            return {
-              ...t,
-              comments: (t.comments ?? []).filter((c) => c !== tempComment),
-            };
-          }),
+          tasks: (inc.tasks ?? []).map((t) =>
+            t.id !== taskId
+              ? t
+              : {
+                  ...t,
+                  comments: (t.comments ?? []).filter((c) => c !== tempComment),
+                },
+          ),
         })),
       );
       alert(
@@ -265,7 +254,6 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
     p1Urgent: p1AutoTasks.length,
   };
 
-  // ✅ FIX: group by assignedName (normalised) not raw assignee_name
   const byAssignee = filtered.reduce((acc, t) => {
     const key = t.assignedName || t.assignedTo || "Unassigned";
     if (!acc[key]) acc[key] = [];
@@ -465,6 +453,9 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                   .reverse()
                   .find((c) => c.type === "blocked");
 
+                // Ownership tags
+                const isAssignedToMe = task.assignedId === currentUser?.id;
+
                 return (
                   <div
                     key={task.id}
@@ -483,9 +474,17 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                           </span>
                         )}
                       </div>
-                      <span className={`inc-status-chip ${scfg.color}`}>
-                        {scfg.icon} {task.status}
-                      </span>
+                      <div className="inc-card-right">
+                        {/* Ownership tag */}
+                        {isAssignedToMe && (
+                          <span className="inc-tag inc-tag-assignedto">
+                            📥 Assigned to me
+                          </span>
+                        )}
+                        <span className={`inc-status-chip ${scfg.color}`}>
+                          {scfg.icon} {task.status}
+                        </span>
+                      </div>
                     </div>
                     <h3 className="inc-card-title">{task.title}</h3>
                     <p className="inc-card-desc tq-incident-ref">
@@ -533,8 +532,9 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
               <div>
                 <div className="inc-detail-id-row">
                   <span className="inc-detail-id">
-                    {selectedTask.incidentId}
+                    {selectedTask.incidentTitle || selectedTask.incidentId}
                   </span>
+
                   <span
                     className={`inc-priority-badge ${PRIORITY_CONFIG[selectedTask.priority].color}`}
                   >
@@ -545,6 +545,11 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                     selectedTask.status === "Pending" && (
                       <span className="tq-auto-badge">⚡ Auto-assigned</span>
                     )}
+                  {selectedTask.assignedId === currentUser?.id && (
+                    <span className="inc-tag inc-tag-assignedto">
+                      📥 Assigned to me
+                    </span>
+                  )}
                 </div>
                 <h2 className="inc-detail-title">{selectedTask.title}</h2>
               </div>
@@ -608,7 +613,10 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                     </span>
                   ),
                 },
-                { label: "From Incident", val: selectedTask.incidentId },
+                {
+                  label: "From Incident",
+                  val: selectedTask.incidentTitle || selectedTask.incidentId,
+                },
                 { label: "Created", val: timeAgo(selectedTask.createdAt) },
               ].map((f) => (
                 <div key={f.label} className="inc-detail-field">

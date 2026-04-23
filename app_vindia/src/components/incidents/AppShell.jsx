@@ -15,6 +15,7 @@ function normaliseIncident(inc) {
     assignedTo: inc.assigned_role ?? "",
     assignedName: inc.assigned_to_name ?? "",
     assignedId: inc.assigned_to_id ?? null,
+    createdById: inc.created_by ?? null,
     createdAt: new Date(inc.created_at),
     updatedAt: new Date(inc.updated_at),
     deadlineAt: inc.deadline_at ? new Date(inc.deadline_at) : null,
@@ -37,6 +38,8 @@ function normaliseTask(t) {
     id: t.id,
     taskNo: t.task_no,
     incidentId: t.incident_id ?? t.incidentId,
+    incidentTitle: t.incident_title ?? t.incidentTitle ?? "",
+    incidentPriority: t.incident_priority ?? t.incidentPriority ?? "P2",
     title: t.title,
     note: t.note ?? "",
     priority: t.priority,
@@ -65,7 +68,7 @@ export default function AppShell() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Sync page state when URL query param changes (e.g. sidebar link clicked)
+  // Sync page state when URL query param changes
   useEffect(() => {
     if (searchParams.get("page") === "tasks") {
       setPage("taskqueue");
@@ -83,17 +86,20 @@ export default function AppShell() {
     setSearchParams({});
   }, [setSearchParams]);
 
+  /* ── Fetch all incidents (list view) ── */
   const fetchIncidents = useCallback(async () => {
     try {
       const res = await API.get("/incidents");
       const data = res.data.data.map(normaliseIncident);
       setIncidents(data);
+      return data;
     } catch (err) {
       console.error("fetchIncidents:", err);
       setError("Failed to load incidents");
     }
   }, []);
 
+  /* ── Fetch users with their roles ── */
   const fetchUsers = useCallback(async () => {
     try {
       const res = await API.get("/users");
@@ -109,12 +115,70 @@ export default function AppShell() {
     }
   }, []);
 
-  useEffect(() => {
-    Promise.all([fetchIncidents(), fetchUsers()]).finally(() =>
-      setLoading(false),
-    );
-  }, [fetchIncidents, fetchUsers]);
+  /* ── Fetch all tasks assigned to current user and merge into incidents ── */
+  const fetchAllTasks = useCallback(async () => {
+    try {
+      const res = await API.get("/incidents/tasks");
+      const tasks = res.data.data.map(normaliseTask);
 
+      setIncidents((prev) => {
+        // Merge tasks into existing incidents
+        const merged = prev.map((inc) => ({
+          ...inc,
+          tasks: tasks.filter((t) => t.incidentId === inc.id),
+        }));
+
+        // Find tasks whose incident is NOT in the current user's incident list
+        const existingIds = new Set(prev.map((i) => i.id));
+        const orphanTasks = tasks.filter((t) => !existingIds.has(t.incidentId));
+
+        // Group orphan tasks by incidentId
+        const orphanGroups = orphanTasks.reduce((acc, t) => {
+          if (!acc[t.incidentId]) acc[t.incidentId] = [];
+          acc[t.incidentId].push(t);
+          return acc;
+        }, {});
+
+        // Create placeholder incidents for orphan tasks
+        const placeholders = Object.entries(orphanGroups).map(
+          ([incId, incTasks]) => ({
+            id: incId,
+            incidentNo: incTasks[0]?.incidentId ?? incId,
+            title: incTasks[0]?.incidentTitle ?? "External Incident",
+            description: "",
+            priority: incTasks[0]?.incidentPriority ?? "P2",
+            status: "In Progress",
+            assignedTo: "",
+            assignedName: "",
+            assignedId: null,
+            createdById: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            deadlineAt: null,
+            resolvedAt: null,
+            taskCount: incTasks.length,
+            commentCount: 0,
+            photoCount: 0,
+            comments: [],
+            tasks: incTasks,
+            photos: [],
+          }),
+        );
+
+        return [...merged, ...placeholders];
+      });
+    } catch (err) {
+      console.error("fetchAllTasks:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    Promise.all([fetchIncidents(), fetchUsers()])
+      .then(() => fetchAllTasks())
+      .finally(() => setLoading(false));
+  }, [fetchIncidents, fetchUsers, fetchAllTasks]);
+
+  /* ── Re-fetch a single incident after mutation and merge it in ── */
   const refreshIncident = useCallback(async (incidentId) => {
     try {
       const res = await API.get(`/incidents/${incidentId}`);
@@ -165,7 +229,9 @@ export default function AppShell() {
             onClick={() => {
               setError(null);
               setLoading(true);
-              fetchIncidents().finally(() => setLoading(false));
+              Promise.all([fetchIncidents(), fetchUsers()])
+                .then(() => fetchAllTasks())
+                .finally(() => setLoading(false));
             }}
           >
             Retry
