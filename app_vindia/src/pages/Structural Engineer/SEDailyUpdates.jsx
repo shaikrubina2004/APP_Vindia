@@ -223,7 +223,7 @@ export default function SEDailyUpdates() {
           <div className="sed-hero-bg" />
           <div className="sed-hero-inner">
             <div className="sed-hero-left">
-              <p className="sed-eyebrow">— Structural Engineering</p>
+              {/* <p className="sed-eyebrow">— Structural Engineering</p> */}
               <h1 className="sed-title">Daily Updates</h1>
               <div className="sed-hero-chips">
                 <div className="sed-week-chip">

@@ -19,7 +19,6 @@ const costRoutes = require("./routes/costRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 
 /* ── OTHER MODULES ───────────────────────────────────────── */
-const structuralRoutes = require("./routes/structuralRoutes");
 const timesheetRoutes = require("./routes/timesheetRoutes");
 const dailyRoutes = require("./routes/dailyUpdatesRoutes");
 const analysisRoutes = require("./routes/analysis");
@@ -31,13 +30,18 @@ const incidentRoutes = require("./routes/IncidentRoutes");
 const pcDailyUpdateRoutes = require("./routes/pcDailyUpdateRoutes");
 
 /* ── SITE ENGINEER MODULES ───────────────────────────────── */
-const rfiRoutes = require("./routes/rfiRoutes");
 const siteEngineerRfiRoutes = require("./routes/siteEngineerRfiRoutes");
 const ncrRoutes = require("./routes/ncrRoutes");
 const siteDiaryRoutes = require("./routes/siteDiaryRoutes");
 const activityLogRoutes = require("./routes/activityLogRoutes");
 const progressRoutes = require("./routes/progressRoutes");
 const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoutes");
+
+
+/* ── STRUCTURAL ENGINEER MODULES ───────────────────────────────── */
+const structuralRoutes = require("./routes/structuralRoutes");
+const seDailyRoutes = require("./routes/Dailyupdatesseroutes");
+const rfiRoutes = require("./routes/rfiRoutes");
 
 const app = express();
 
@@ -93,8 +97,13 @@ try {
   app.use("/api/cost-summary", costRoutes);
   app.use("/api/dashboard", dashboardRoutes);
 
-  /* ── Other Modules ─────────────────────────────────────── */
+    /* ── Structural Engineer Modules ─────────────────────────────────────── */
   app.use("/api/structural", structuralRoutes);
+  app.use("/api/se-daily-reports", seDailyRoutes);
+  app.use("/api/rfi", rfiRoutes); // Structural Engineer RFI
+
+  /* ── Other Modules ─────────────────────────────────────── */
+
   app.use("/api/timesheets", timesheetRoutes);
   app.use("/api/daily-reports", dailyRoutes);
   app.use("/api/analysis", analysisRoutes);
@@ -106,7 +115,6 @@ try {
   app.use("/api/pc-daily-updates", pcDailyUpdateRoutes);
 
   /* ── Site Engineer Modules ─────────────────────────────── */
-  app.use("/api/rfi", rfiRoutes); // Structural Engineer RFI
   app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes); // Site Engineer RFI
   app.use("/api/ncr", ncrRoutes);
   app.use("/api/diary", siteDiaryRoutes);

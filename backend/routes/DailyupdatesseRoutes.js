@@ -34,5 +34,18 @@ router.put   ("/approve/:id",  approveReport);   // ✅ BEFORE /:id  — approve
 router.get   ("/:id",          getReportById);   // GET  single report
 router.put   ("/:id",          updateReport);    // PUT  update report
 router.delete("/:id",          deleteReport);    // DELETE report
+router.post("/", async (req, res) => {
+  try {
+    console.log("Incoming data:", req.body);
+
+    // TEMP TEST RESPONSE
+    res.status(200).json({ success: true, message: "Check-in working" });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 
 module.exports = router;

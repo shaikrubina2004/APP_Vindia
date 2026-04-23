@@ -11,7 +11,7 @@ import Approvals from "../pages/Structural Engineer/Approvals";
 import Reports from "../pages/Structural Engineer/Reports";
 import Coordination from "../pages/Structural Engineer/Coordination";
 import SEDailyUpdates from "../pages/Structural Engineer/SEDailyUpdates";
-
+import AppShell  from "../components/incidents/AppShell";
 function StructuralRoutes() {
   return (
     <StructuralEngineerLayout>
@@ -24,6 +24,7 @@ function StructuralRoutes() {
         <Route path="rfi" element={<RFI />} />
         <Route path="approvals" element={<Approvals />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="incidents" element={<AppShell />} />
         <Route path="coordination" element={<Coordination />} />
         <Route path="daily-updates" element={<SEDailyUpdates />} />
       </Routes>
