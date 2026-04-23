@@ -40,7 +40,7 @@ const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoute
 
 /* ── STRUCTURAL ENGINEER MODULES ───────────────────────────────── */
 const structuralRoutes = require("./routes/structuralRoutes");
-const seDailyRoutes = require("./routes/DailyUpdatesseroutes");
+const seDailyRoutes = require("./routes/DailyUpdatesseRoutes");
 const rfiRoutes = require("./routes/rfiRoutes");
 
 const app = express();
