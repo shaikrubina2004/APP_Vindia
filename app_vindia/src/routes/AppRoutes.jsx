@@ -375,6 +375,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/site-engineer/incidents"
+        element={
+          <SiteEngineerLayout>
+            <AppShell />
+          </SiteEngineerLayout>
+        }
+      />
+      <Route
         path="/site-engineer/activity"
         element={
           <SiteEngineerLayout>
