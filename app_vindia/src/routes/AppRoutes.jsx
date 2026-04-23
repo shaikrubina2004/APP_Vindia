@@ -46,7 +46,7 @@ import Qsboq from "../pages/Quality Surveyor/Qsboq";
 import Measurements from "../pages/Quality Surveyor/Measurements";
 import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
 import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
-import Qssubmissions from "../pages/Quality Surveyor/Qssubmissions";
+
 import Qsalerts from "../pages/Quality Surveyor/Qsalerts";
 
 /* MEP ROLES */
@@ -78,7 +78,7 @@ import ProjectCoordinatorDashboard from "../pages/Project Coordinator/ProjectCoo
 import DailyUpdatesPC from "../pages/Project Coordinator/DailyUpdates";
 import Milestone from "../pages/Project Coordinator/Milestone";
 import Payment from "../pages/Project Coordinator/Payment";
-import Tasks from "../pages/Project Coordinator/Tasks";
+
 
 /* LAYOUTS */
 import CEOLayout from "../layouts/CEOLayout";
@@ -452,14 +452,7 @@ const AppRoutes = () => {
           </QuantitySurveyorLayout>
         }
       />
-      <Route
-        path="/quantity-surveyor/submissions"
-        element={
-          <QuantitySurveyorLayout>
-            <Qssubmissions />
-          </QuantitySurveyorLayout>
-        }
-      />
+     
       <Route
         path="/quantity-surveyor/boq"
         element={
@@ -658,11 +651,12 @@ const AppRoutes = () => {
           </ProjectCoordinatorLayout>
         }
       />
+
       <Route
-        path="/project-coordinator/tasks"
+        path= "/project-coordinator/incidents"
         element={
           <ProjectCoordinatorLayout>
-            <Tasks />
+            <AppShell/>
           </ProjectCoordinatorLayout>
         }
       />

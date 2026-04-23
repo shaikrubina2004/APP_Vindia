@@ -1,87 +1,77 @@
-.ms-page {
+.measure-container {
   padding: 20px;
-  background: #f1f5f9;
+  background: #f5f7fb;
   min-height: 100vh;
 }
 
-/* Header */
-.ms-header {
-  margin-bottom: 20px;
-}
-
-.ms-header h2 {
-  margin: 0;
-  font-size: 22px;
-  color: #0f172a;
-}
-
-.ms-header p {
-  color: #64748b;
-  font-size: 14px;
-}
-
-/* Card */
-.ms-card {
-  background: white;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 20px;
-  border: 1px solid #e2e8f0;
-}
-
-/* Form */
-.ms-form {
+/* HEADER */
+.measure-header {
   display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+
+/* FORM */
+.measure-form {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
   gap: 10px;
-  flex-wrap: wrap;
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 20px;
 }
 
-.ms-form input {
-  padding: 10px;
-  border: 1px solid #cbd5f5;
+.measure-form input,
+.measure-form select {
+  padding: 8px;
   border-radius: 8px;
-  font-size: 14px;
-  background: #f8fafc;
+  border: 1px solid #ddd;
 }
 
-.ms-form input:focus {
-  outline: none;
-  border-color: #2563eb;
-}
-
-.ms-form button {
-  padding: 10px 16px;
-  border: none;
-  background: #2563eb;
+.measure-form button {
+  background: #3b82f6;
   color: white;
   border-radius: 8px;
-  cursor: pointer;
 }
 
-.ms-form button:hover {
-  background: #1d4ed8;
+/* TABLE */
+.measure-table {
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
 }
 
-/* Table */
-.ms-table {
+table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.ms-table th {
-  text-align: left;
-  font-size: 13px;
-  color: #64748b;
-  padding: 12px;
-  border-bottom: 1px solid #e2e8f0;
+th, td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
 }
 
-.ms-table td {
-  padding: 12px;
-  border-bottom: 1px solid #f1f5f9;
-  color: #0f172a;
+/* STATUS */
+.status.pending { color: orange; }
+.status.approved { color: green; }
+.status.rejected { color: red; }
+
+/* ACTIONS */
+.actions button {
+  margin-right: 5px;
+  border: none;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
-.ms-table tr:hover {
-  background: #f8fafc;
+.approve { background: #22c55e; color: white; }
+.reject { background: #ef4444; color: white; }
+.boq { background: #6366f1; color: white; }
+
+/* EMPTY */
+.empty {
+  text-align: center;
+  color: #999;
 }

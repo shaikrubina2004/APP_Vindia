@@ -1,96 +1,156 @@
 import { useState } from "react";
 import "./Measurements.css";
+const Measurements = () => {
+  
 
-export default function Measurements() {
-  const [data, setData] = useState([
-    { id: 1, item: "Excavation", unit: "m³", qty: 120, date: "2026-04-20" },
-    { id: 2, item: "Concrete Work", unit: "m³", qty: 60, date: "2026-04-21" },
-  ]);
-
+  const [data, setData] = useState([]);
   const [form, setForm] = useState({
-    item: "",
-    unit: "",
-    qty: "",
-    date: "",
+    type: "",
+    location: "",
+    length: "",
+    width: "",
+    height: "",
+    nos: "",
+    unit: "m³",
   });
 
-  const handleAdd = () => {
-    if (!form.item || !form.qty) return;
-
-    const newEntry = {
-      id: Date.now(),
-      ...form,
-    };
-
-    setData([newEntry, ...data]);
-    setForm({ item: "", unit: "", qty: "", date: "" });
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const calculateQty = () => {
+    return (
+      Number(form.length) *
+      Number(form.width) *
+      Number(form.height) *
+      Number(form.nos || 1)
+    );
+  };
+
+  const handleAdd = () => {
+    if (!form.type || !form.length || !form.width || !form.height) return;
+
+    const qty = calculateQty();
+
+    const newItem = {
+      ...form,
+      project,
+      qty,
+      status: "pending",
+    };
+
+    setData([...data, newItem]);
+
+    setForm({
+      type: "",
+      location: "",
+      length: "",
+      width: "",
+      height: "",
+      nos: "",
+      unit: "m³",
+    });
+  };
+
+  const approveItem = (index) => {
+    const updated = [...data];
+    updated[index].status = "approved";
+    setData(updated);
+  };
+
+  const rejectItem = (index) => {
+    const updated = [...data];
+    updated[index].status = "rejected";
+    setData(updated);
+  };
+ const convertToBOQ = (item) => {
+    console.log("Convert to BOQ:", item);
+    // later connect with BOQ page
+  };
+
+  const filteredData = data.filter((d) => d.project === project);
+
   return (
-    <div className="ms-page">
-      {/* Header */}
-      <div className="ms-header">
-        <div>
-          <h2>Measurements</h2>
-          <p>Record and manage site measurements</p>
-        </div>
+    <div className="measure-container">
+
+      {/* HEADER */}
+      <div className="measure-header">
+        <h2>Measurements</h2>
+       
       </div>
 
-      {/* Form Card */}
-      <div className="ms-card">
-        <div className="ms-form">
-          <input
-            placeholder="Item"
-            value={form.item}
-            onChange={(e) => setForm({ ...form, item: e.target.value })}
-          />
-          <input
-            placeholder="Unit"
-            value={form.unit}
-            onChange={(e) => setForm({ ...form, unit: e.target.value })}
-          />
-          <input
-            type="number"
-            placeholder="Quantity"
-            value={form.qty}
-            onChange={(e) => setForm({ ...form, qty: e.target.value })}
-          />
-          <input
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-          />
+      {/* FORM */}
+      <div className="measure-form">
 
-          <button onClick={handleAdd}>Add</button>
-        </div>
+        <input name="type" placeholder="Work Type" value={form.type} onChange={handleChange} />
+        <input name="location" placeholder="Location" value={form.location} onChange={handleChange} />
+
+        <input name="length" type="number" placeholder="Length" value={form.length} onChange={handleChange} />
+        <input name="width" type="number" placeholder="Width" value={form.width} onChange={handleChange} />
+        <input name="height" type="number" placeholder="Height" value={form.height} onChange={handleChange} />
+
+        <input name="nos" type="number" placeholder="Nos" value={form.nos} onChange={handleChange} />
+
+        <select name="unit" value={form.unit} onChange={handleChange}>
+          <option>m³</option>
+          <option>m²</option>
+          <option>nos</option>
+        </select>
+
+        <button onClick={handleAdd}>Add</button>
       </div>
 
-      {/* Table Card */}
-      <div className="ms-card">
-        <table className="ms-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Item</th>
-              <th>Unit</th>
-              <th>Quantity</th>
-              <th>Date</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {data.map((d, i) => (
-              <tr key={d.id}>
-                <td>{i + 1}</td>
-                <td>{d.item}</td>
-                <td>{d.unit}</td>
-                <td>{d.qty}</td>
-                <td>{d.date || "-"}</td>
+      {/* TABLE */}
+      <div className="measure-table">
+        {filteredData.length === 0 ? (
+          <p className="empty">No measurements</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Work</th>
+                <th>Location</th>
+                <th>Dimensions</th>
+                <th>Qty</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody>
+              {filteredData.map((d, i) => (
+                <tr key={i}>
+                  <td>{d.type}</td>
+                  <td>{d.location}</td>
+                  <td>{d.length}×{d.width}×{d.height} × {d.nos || 1}</td>
+                  <td>{d.qty} {d.unit}</td>
+
+                  <td className={`status ${d.status}`}>
+                    {d.status}
+                  </td>
+
+                  <td className="actions">
+                    {d.status === "pending" && (
+                      <>
+                        <button className="approve" onClick={() => approveItem(i)}>✔</button>
+                        <button className="reject" onClick={() => rejectItem(i)}>✖</button>
+                      </>
+                    )}
+
+                    <button className="boq" onClick={() => convertToBOQ(d)}>
+                      BOQ
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+
+          </table>
+        )}
       </div>
+
     </div>
   );
-}
+};
+
+export default Measurements;

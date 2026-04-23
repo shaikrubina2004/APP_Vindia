@@ -10,5 +10,5 @@ export const ProjectCoordinatorMenu = [
   { name: "Payments", path: "/project-coordinator/payments", icon: "credit-card" },
 
   // ✅ NEW
-  { name: "Tasks", path: "/project-coordinator/tasks", icon: "check-square" },
+  { name: "Tasks", path: "/project-coordinator/incidents?page=tasks", icon: "check-square" },
 ];
