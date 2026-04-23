@@ -12,6 +12,7 @@ import Reports from "../pages/Structural Engineer/Reports";
 import Coordination from "../pages/Structural Engineer/Coordination";
 import SEDailyUpdates from "../pages/Structural Engineer/SEDailyUpdates";
 import AppShell  from "../components/incidents/AppShell";
+import SEtoQSHandover from "../pages/Structural Engineer/SEtoQSHandover";
 function StructuralRoutes() {
   return (
     <StructuralEngineerLayout>
@@ -25,6 +26,7 @@ function StructuralRoutes() {
         <Route path="approvals" element={<Approvals />} />
         <Route path="reports" element={<Reports />} />
         <Route path="incidents" element={<AppShell />} />
+        <Route path="handover" element={<SEtoQSHandover />} />
         <Route path="coordination" element={<Coordination />} />
         <Route path="daily-updates" element={<SEDailyUpdates />} />
       </Routes>

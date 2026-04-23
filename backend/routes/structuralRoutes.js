@@ -163,4 +163,21 @@ router.get("/boq", async (req, res) => {
   }
 });
 
+
+router.put("/:projectId/submit-to-qs", async (req, res) => {
+  const { projectId } = req.params;
+
+  try {
+    await pool.query(
+      `UPDATE boq SET status = 'submitted_to_qs' WHERE project_id = $1`,
+      [projectId]
+    );
+
+    res.json({ message: "Submitted to QS successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 module.exports = router;
