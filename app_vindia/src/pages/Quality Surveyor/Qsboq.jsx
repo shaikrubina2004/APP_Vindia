@@ -1,4 +1,4 @@
-import "./QsBoq.css";
+import "./Qsboq.css";
 import { useState } from "react";
 
 export default function QsBoq() {

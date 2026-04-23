@@ -40,7 +40,7 @@ const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoute
 
 /* ── STRUCTURAL ENGINEER MODULES ───────────────────────────────── */
 const structuralRoutes = require("./routes/structuralRoutes");
-const seDailyRoutes = require("./routes/DailyUpdatesseRoutes");
+const seDailyRoutes = require("./routes/seDailyupdatesRoutes");
 const rfiRoutes = require("./routes/rfiRoutes");
 
 const app = express();
@@ -97,16 +97,15 @@ try {
   app.use("/api/cost-summary", costRoutes);
   app.use("/api/dashboard", dashboardRoutes);
 
-    /* ── Structural Engineer Modules ─────────────────────────────────────── */
-  app.use("/api/structural", structuralRoutes);
-  app.use("/api/se-daily-reports", seDailyRoutes);
-  app.use("/api/rfi", rfiRoutes); // Structural Engineer RFI
+/* ── Structural Engineer Modules ───────────────── */
+app.use("/api/structural", structuralRoutes);
+app.use("/api/se-daily-reports", seDailyRoutes);   // ✅ SE route
+app.use("/api/rfi", rfiRoutes);
 
-  /* ── Other Modules ─────────────────────────────────────── */
-
-  app.use("/api/timesheets", timesheetRoutes);
-  app.use("/api/daily-reports", dailyRoutes);
-  app.use("/api/analysis", analysisRoutes);
+/* ── Other Modules ───────────────── */
+app.use("/api/timesheets", timesheetRoutes);
+app.use("/api/daily-reports", dailyRoutes);        // ✅ normal route
+app.use("/api/analysis", analysisRoutes);
 
   /* ── Incident Module ───────────────────────────────────── */
   app.use("/api/incidents", incidentRoutes);
