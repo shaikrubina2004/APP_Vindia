@@ -401,6 +401,16 @@ const AppRoutes = () => {
           </QuantitySurveyorLayout>
         }
       />
+      
+
+      <Route
+        path="/quantity-surveyor/incident"
+        element={
+          <QuantitySurveyorLayout>
+            <AppShell />
+          </QuantitySurveyorLayout>
+        }
+      />
       <Route
         path="/quantity-surveyor/daily-updates"
         element={
