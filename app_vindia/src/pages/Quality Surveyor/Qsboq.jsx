@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./Qsboq.css";
 const Qsboq = () => {
-  const { project } = useProject();
+  
 
   const [drawings] = useState([
     { id: 1, name: "Foundation Plan.pdf" },
@@ -72,7 +72,7 @@ const Qsboq = () => {
       {/* HEADER */}
       <div className="qsboq-header">
         <h2>BOQ Preparation</h2>
-        <span>Project: {project}</span>
+     
       </div>
 
       {/* DRAWINGS */}

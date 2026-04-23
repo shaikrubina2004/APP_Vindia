@@ -1,9 +1,7 @@
 import { useState } from "react";
 import "./Measurements.css";
-import { useProject } from "../context/ProjectContext";
-
 const Measurements = () => {
-  const { project } = useProject();
+  
 
   const [data, setData] = useState([]);
   const [form, setForm] = useState({
@@ -65,8 +63,7 @@ const Measurements = () => {
     updated[index].status = "rejected";
     setData(updated);
   };
-
-  const convertToBOQ = (item) => {
+ const convertToBOQ = (item) => {
     console.log("Convert to BOQ:", item);
     // later connect with BOQ page
   };
@@ -79,7 +76,7 @@ const Measurements = () => {
       {/* HEADER */}
       <div className="measure-header">
         <h2>Measurements</h2>
-        <span>Project: {project}</span>
+       
       </div>
 
       {/* FORM */}

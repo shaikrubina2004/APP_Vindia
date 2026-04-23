@@ -1,46 +1,62 @@
 import "./Qsalerts.css";
+import { useNavigate } from "react-router-dom";
 
-const ALERTS = [
-  {
-    id: 1,
-    type: "delay",
-    message: "Foundation work delayed (Tower A)",
-  },
-  {
-    id: 2,
-    type: "cost",
-    message: "Steel exceeded budget",
-  },
-  {
-    id: 3,
-    type: "approval",
-    message: "3 submissions pending approval",
-  },
-];
+const Qsalerts = () => {
+  const navigate = useNavigate();
 
-export default function Qsalerts() {
+  const alerts = [
+    {
+      type: "danger",
+      message: "Steel exceeding budget",
+      time: "2h ago"
+    },
+    {
+      type: "warning",
+      message: "Pending approval (2 items)",
+      time: "4h ago"
+    },
+    {
+      type: "success",
+      message: "Foundation work on track",
+      time: "6h ago"
+    }
+  ];
+
   return (
-    <div className="alert-container">
-      <div className="alert-header">
+    <div className="qsalerts">
+
+      {/* HEADER */}
+      <div className="qsalerts-header">
         <h2>Alerts</h2>
-        <p>Project warnings and notifications</p>
+        <span onClick={() => navigate("/quantity-surveyor/dashboard")}>
+          Back →
+        </span>
       </div>
 
-      <div className="alert-list">
-        {ALERTS.map((a) => (
-          <div key={a.id} className={`alert-card ${a.type}`}>
+      {/* ALERT LIST */}
+      <div className="qsalerts-list">
+        {alerts.map((a, i) => (
+          <div key={i} className={`alert-item ${a.type}`}>
+
+            {/* ICON */}
             <div className="alert-icon">
-              {a.type === "delay" && "⚠"}
-              {a.type === "cost" && "💰"}
-              {a.type === "approval" && "⏳"}
+              {a.type === "danger" && "⚠"}
+              {a.type === "warning" && "⏳"}
+              {a.type === "success" && "✔"}
             </div>
 
+            {/* TEXT */}
             <div className="alert-text">
               <p>{a.message}</p>
+              <small>{a.time}</small>
             </div>
+
           </div>
         ))}
       </div>
+
     </div>
   );
-}
+};
+
+export default Qsalerts;

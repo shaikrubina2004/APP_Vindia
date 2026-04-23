@@ -11,7 +11,6 @@ const QuantitySurveyorMenu = [
 
   { name: "Quantity Report",  path: "/quantity-surveyor/quantity-report", icon: "bar-chart-2" },
   { name: "Cost Report",      path: "/quantity-surveyor/cost-report",     icon: "dollar-sign" },
-  
 
   // ✅ NEW
   { name: "Incident",         path: "/quantity-surveyor/incident",        icon: "alert-triangle" },
