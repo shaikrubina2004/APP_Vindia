@@ -997,7 +997,8 @@
   flex-direction: column;
   gap: 12px;
 }
-
+.prog-item {
+}
 .prog-header {
   display: flex;
   justify-content: space-between;

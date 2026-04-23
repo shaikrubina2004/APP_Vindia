@@ -49,12 +49,13 @@ import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
 import Qssubmissions from "../pages/Quality Surveyor/Qssubmissions";
 import Qsalerts from "../pages/Quality Surveyor/Qsalerts";
 
-/* OTHER ROLES */
+/* MEP ROLES */
 import MEPDashboard from "../pages/MEP Engineer/MEPDashboard";
 import MEPDailylog from "../pages/MEP Engineer/MEPDailylog";
 import MEPDrawings from "../pages/MEP Engineer/MEPDrawings";
 import MEPUploads from "../pages/MEP Engineer/MEPUploads";
 import MEPVerssionControll from "../pages/MEP Engineer/MEPVerssionControll";
+import MEPCoordination from "../pages/MEP Engineer/MEPCoordination";
 
 import PlanningEngineerDashboard from "../pages/Planning Engineer/PlanningEngineerDashboard";
 import QCDashboard from "../pages/QC Engineer/QCDashboard";
@@ -392,7 +393,7 @@ const AppRoutes = () => {
       />
 
       {/* QUANTITY SURVEYOR */}
-      
+
       <Route
         path="/quantity-surveyor/dashboard"
         element={
@@ -409,7 +410,6 @@ const AppRoutes = () => {
           </QuantitySurveyorLayout>
         }
       />
-      
 
       <Route
         path="/quantity-surveyor/incident"
@@ -519,7 +519,7 @@ const AppRoutes = () => {
         path="/mep/coordination"
         element={
           <MEPLayout>
-            <MEPUploads />
+            <MEPCoordination />
           </MEPLayout>
         }
       />
@@ -613,7 +613,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-     
+
       <Route
         path="/architect/projects"
         element={
