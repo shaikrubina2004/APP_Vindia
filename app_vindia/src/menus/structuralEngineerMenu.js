@@ -23,7 +23,7 @@ export const StructuralEngineerMenu = [
     icon: "alert-triangle",
   },
   
-  { name: "Tasks", path: "/structural-engineer/tasks", icon: "check-square" },
+  { name: "Tasks", path: "/structural-engineer/incidents?page=tasks", icon: "check-square" },
 
   {
     name: "Daily Updates",
