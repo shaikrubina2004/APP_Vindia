@@ -1,88 +1,148 @@
+import { useState } from "react";
 import "./Qscostreport.css";
 
-const DATA = [
-  { id: 1, item: "Concrete", planned: 500000, actual: 200000 },
-  { id: 2, item: "Steel", planned: 3000000, actual: 3300000 },
-];
+const Qscostreport = () => {
 
-export default function Qscostreport() {
-  // Totals
-  const totalPlanned = DATA.reduce((sum, d) => sum + d.planned, 0);
-  const totalActual = DATA.reduce((sum, d) => sum + d.actual, 0);
-  const variance = totalActual - totalPlanned;
+  const [budget] = useState(1000000);
 
-  const format = (num) => "₹" + num.toLocaleString();
+  const boqItems = [
+    { item: "Steel", qty: 85, rate: 70000, category: "Material" },
+    { item: "Concrete", qty: 120, rate: 5000, category: "Material" },
+    { item: "Labour Work", qty: 1, rate: 200000, category: "Labour" },
+    { item: "Excavator", qty: 10, rate: 8000, category: "Equipment" },
+  ];
+
+  const calculateTotal = (item) => item.qty * item.rate;
+
+  const totalCost = boqItems.reduce((sum, i) => sum + calculateTotal(i), 0);
+
+  const difference = budget - totalCost;
+
+  const getStatus = () => {
+    if (totalCost > budget) return "over";
+    if (totalCost > budget * 0.8) return "warning";
+    return "good";
+  };
+
+  const status = getStatus();
+
+  const categoryTotals = {
+    Material: 0,
+    Labour: 0,
+    Equipment: 0,
+  };
+
+  boqItems.forEach((i) => {
+    categoryTotals[i.category] += calculateTotal(i);
+  });
 
   return (
-    <div className="qscr-container">
-      
+    <div className="cost-container">
+
       {/* HEADER */}
-      <div className="qscr-header">
+      <div className="cost-header">
         <h2>Cost Report</h2>
-        <p>Financial overview</p>
+        <p>Project: Skyline Tower | Date: 23 Apr 2026</p>
       </div>
 
       {/* SUMMARY CARDS */}
-      <div className="qscr-cards">
+      <div className="cost-cards">
+
         <div className="card">
-          <h4>Planned</h4>
-          <h3>{format(totalPlanned)}</h3>
+          <h4>Total Budget</h4>
+          <p>₹{budget.toLocaleString()}</p>
         </div>
 
         <div className="card">
-          <h4>Actual</h4>
-          <h3>{format(totalActual)}</h3>
+          <h4>Total Cost</h4>
+          <p>₹{totalCost.toLocaleString()}</p>
         </div>
 
-        <div className={`card ${variance > 0 ? "over" : "under"}`}>
-          <h4>Variance</h4>
-          <h3>{format(variance)}</h3>
+        <div className={`card ${status}`}>
+          <h4>Status</h4>
+          <p>
+            {status === "over"
+              ? "Over Budget"
+              : status === "warning"
+              ? "Near Limit"
+              : "Within Budget"}
+          </p>
+        </div>
+
+        <div className="card">
+          <h4>Remaining</h4>
+          <p>₹{difference.toLocaleString()}</p>
+        </div>
+
+      </div>
+
+      {/* COST BREAKDOWN */}
+      <div className="cost-breakdown">
+        <h3>Cost Breakdown</h3>
+
+        <div className="breakdown-grid">
+          <div className="break-item material">
+            Material ₹{categoryTotals.Material.toLocaleString()}
+          </div>
+          <div className="break-item labour">
+            Labour ₹{categoryTotals.Labour.toLocaleString()}
+          </div>
+          <div className="break-item equipment">
+            Equipment ₹{categoryTotals.Equipment.toLocaleString()}
+          </div>
         </div>
       </div>
 
       {/* TABLE */}
-      <div className="table-wrapper">
-        <table className="cost-table">
+      <div className="cost-table">
+        <h3>BOQ Cost Details</h3>
+
+        <table>
           <thead>
             <tr>
-              <th>#</th>
               <th>Item</th>
-              <th>Planned</th>
-              <th>Actual</th>
-              <th>Remaining</th>
-              <th>Status</th>
+              <th>Qty</th>
+              <th>Rate</th>
+              <th>Total</th>
+              <th>Category</th>
             </tr>
           </thead>
 
           <tbody>
-            {DATA.map((d, i) => {
-              const remaining = d.planned - d.actual;
-              const isOver = d.actual > d.planned;
-
-              return (
-                <tr key={d.id}>
-                  <td>{i + 1}</td>
-                  <td>{d.item}</td>
-
-                  <td className="money">{format(d.planned)}</td>
-                  <td className="money">{format(d.actual)}</td>
-
-                  <td className={`money ${remaining < 0 ? "red" : "green"}`}>
-                    {format(remaining)}
-                  </td>
-
-                  <td>
-                    <span className={`badge ${isOver ? "red" : "green"}`}>
-                      {isOver ? "Over Budget" : "Under Budget"}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
+            {boqItems.map((i, index) => (
+              <tr key={index}>
+                <td>{i.item}</td>
+                <td>{i.qty}</td>
+                <td>₹{i.rate}</td>
+                <td>₹{calculateTotal(i)}</td>
+                <td>{i.category}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
 
+      {/* ALERTS */}
+      <div className="cost-alerts">
+        <h3>Alerts</h3>
+
+        {status === "over" && (
+          <p className="alert red">⚠ Cost exceeded budget!</p>
+        )}
+
+        {status === "warning" && (
+          <p className="alert yellow">⚠ Cost reaching budget limit</p>
+        )}
+
+        {status === "good" && (
+          <p className="alert green">✔ Cost under control</p>
+        )}
+      </div>
+
+    
+
     </div>
   );
-}
+};
+
+export default Qscostreport;
