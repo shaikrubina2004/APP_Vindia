@@ -1,75 +1,71 @@
+// pages/structural-engineer/RFIDetails.jsx
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchRFIById, submitRFIAnswer, QUERY_KEYS } from "../../api/structuralApi";
 import "./RFI.css";
 
 export default function RFIDetails() {
   const { id } = useParams();
-
-  const [rfi, setRfi] = useState(null);
+  const queryClient = useQueryClient();
   const [answer, setAnswer] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  // ✅ FETCH
-  useEffect(() => {
-    const fetchRFI = async () => {
-      try {
-        const res = await axios.get(`http://localhost:5000/rfis/${id}`);
-        setRfi(res.data);
-        setAnswer(res.data.response || "");
-      } catch (err) {
-        console.error(err);
-      }
-    };
+  // ✅ useQuery — fetches & caches this specific RFI
+  const {
+    data: rfi,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: QUERY_KEYS.rfi(id),
+    queryFn: () => fetchRFIById(id),
+    onSuccess: (data) => {
+      // Pre-fill textarea if answer already exists
+      setAnswer(data.response || "");
+    },
+  });
 
-    fetchRFI();
-  }, [id]);
-
-  // ✅ SUBMIT ANSWER
-  const submitAnswer = async () => {
-    if (!answer.trim()) return alert("Please enter response");
-
-    setLoading(true);
-
-    try {
-      const res = await axios.put(
-        `http://localhost:5000/rfis/${id}/answer`,
-        { response: answer }
-      );
-
-      setRfi(res.data); // 🔥 instant UI update
+  // ✅ useMutation — submit answer, update this RFI in cache + RFI list
+  const answerMutation = useMutation({
+    mutationFn: submitRFIAnswer,
+    onSuccess: (updated) => {
+      // Update this detail view
+      queryClient.setQueryData(QUERY_KEYS.rfi(id), updated);
+      // Also refresh the RFI list so status shows "Answered" there too
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.rfis });
       alert("✅ Answer submitted");
-    } catch (err) {
-      console.error(err);
-      alert("❌ Failed to submit");
-    }
+    },
+    onError: () => alert("❌ Failed to submit"),
+  });
 
-    setLoading(false);
+  const submitAnswer = () => {
+    if (!answer.trim()) { alert("Please enter response"); return; }
+    answerMutation.mutate({ id, response: answer });
   };
 
-  if (!rfi) return <div style={{ padding: 20 }}>Loading...</div>;
+  // ─── States ─────────────────────────────────────────────────────────────
+  if (isLoading) return <div style={{ padding: 20 }}>Loading...</div>;
+  if (isError)   return <div style={{ padding: 20, color: "#ef4444" }}>⚠️ Failed to load RFI</div>;
 
   return (
     <div className="rfi-details">
-      {/* HEADER */}
+      {/* ── HEADER ──────────────────────────────────────────────────── */}
       <div className="rfi-details-header">
         <h2>{rfi.rfi_code || `RFI-${rfi.id}`}</h2>
-
-        <span className={`status-badge ${rfi.status.toLowerCase()}`}>
+        <span className={`status-badge ${rfi.status?.toLowerCase()}`}>
           {rfi.status}
         </span>
       </div>
 
-      {/* INFO */}
+      {/* ── INFO ────────────────────────────────────────────────────── */}
       <div className="rfi-details-info">
-        <p><strong>Project:</strong> {rfi.project}</p>
-        <p><strong>Subject:</strong> {rfi.subject}</p>
-        <p><strong>Priority:</strong> {rfi.priority}</p>
-        <p><strong>Raised By:</strong> {rfi.raised_by || "You"}</p>
-        <p><strong>Date:</strong> {new Date(rfi.date).toLocaleDateString()}</p>
+        <p><strong>Project:</strong>    {rfi.project}</p>
+        <p><strong>Subject:</strong>    {rfi.subject}</p>
+        <p><strong>Priority:</strong>   {rfi.priority}</p>
+        <p><strong>Raised By:</strong>  {rfi.raised_by || "You"}</p>
+        <p><strong>Date:</strong>       {new Date(rfi.date).toLocaleDateString()}</p>
       </div>
 
-      {/* ✨ RESPONSE SECTION */}
+      {/* ── RESPONSE SECTION ────────────────────────────────────────── */}
       <div className="rfi-response-box">
         <h3>Response</h3>
 
@@ -84,9 +80,8 @@ export default function RFIDetails() {
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
             />
-
-            <button onClick={submitAnswer} disabled={loading}>
-              {loading ? "Saving..." : "Submit Answer"}
+            <button onClick={submitAnswer} disabled={answerMutation.isPending}>
+              {answerMutation.isPending ? "Saving..." : "Submit Answer"}
             </button>
           </>
         )}

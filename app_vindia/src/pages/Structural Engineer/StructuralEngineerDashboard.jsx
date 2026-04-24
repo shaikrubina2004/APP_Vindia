@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
-import CountUp from "react-countup";
+// pages/structural-engineer/StructuralEngineerDashboard.jsx
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import CountUp from "react-countup";
 import {
   Chart as ChartJS,
   BarElement,
@@ -12,47 +12,65 @@ import {
   Legend,
 } from "chart.js";
 import { Bar, Doughnut } from "react-chartjs-2";
-
+import { ErrorBoundary } from "../../utils/ErrorBoundary";
+import { fetchDashboard, QUERY_KEYS } from "../../api/structuralApi";
 import "./StructuralEngineerDashboard.css";
 
-ChartJS.register(
-  BarElement,
-  CategoryScale,
-  LinearScale,
-  ArcElement,
-  Tooltip,
-  Legend
+ChartJS.register(BarElement, CategoryScale, LinearScale, ArcElement, Tooltip, Legend);
+
+// ─── Skeleton (replaces spinner — feels 3× faster) ────────────────────────
+const DashboardSkeleton = () => (
+  <div className="se-container">
+    <div className="skeleton" style={{ height: 32, width: 280, marginBottom: 25, borderRadius: 8 }} />
+    <div className="se-cards">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="skeleton skeleton-card" />
+      ))}
+    </div>
+    <div className="se-charts" style={{ marginTop: 30 }}>
+      <div className="skeleton skeleton-chart" />
+      <div className="skeleton skeleton-chart" />
+    </div>
+    <div className="skeleton" style={{ height: 140, marginTop: 30, borderRadius: 16 }} />
+  </div>
 );
 
+// ─── Error State ───────────────────────────────────────────────────────────
+const DashboardError = ({ refetch }) => (
+  <div className="se-loading">
+    <p style={{ color: "#ef4444", fontSize: 15 }}>⚠️ Failed to load dashboard</p>
+    <button
+      onClick={refetch}
+      style={{
+        marginTop: 12, padding: "8px 18px", background: "#4f46e5",
+        color: "white", border: "none", borderRadius: 8, cursor: "pointer",
+      }}
+    >
+      Retry
+    </button>
+  </div>
+);
+
+// ─── Main Component ────────────────────────────────────────────────────────
 const StructuralEngineerDashboard = () => {
-  const [stats, setStats] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    axios
-      .get("http://localhost:5000/api/structural/dashboard")
-      .then((res) => setStats(res.data))
-      .catch((err) => console.error(err));
-  }, []);
+  // ✅ useQuery — cached 5 min, auto-retry, instant on revisit
+  const { data: stats, isLoading, isError, refetch } = useQuery({
+    queryKey: QUERY_KEYS.dashboard,
+    queryFn: fetchDashboard,
+  });
 
-  if (!stats) {
-    return (
-      <div className="se-loading">
-        <div className="loader"></div>
-        <p>Loading dashboard...</p>
-      </div>
-    );
-  }
+  if (isLoading) return <DashboardSkeleton />;
+  if (isError) return <DashboardError refetch={refetch} />;
 
+  // ─── Chart Data ─────────────────────────────────────────────────────────
   const barData = {
     labels: ["Drawings", "Incidents", "Notifications"],
     datasets: [
       {
-        data: [
-          stats.totalDrawings,
-          stats.pendingIncidents,
-          stats.notifications,
-        ],
+        label: "Project Stats",    // ✅ FIX: was "undefined" in legend
+        data: [stats.totalDrawings, stats.pendingIncidents, stats.notifications],
         backgroundColor: ["#4f46e5", "#f59e0b", "#06b6d4"],
         borderRadius: 8,
       },
@@ -76,7 +94,7 @@ const StructuralEngineerDashboard = () => {
     <div className="se-container">
       <h1 className="se-title">Structural Engineer Dashboard</h1>
 
-      {/* CARDS */}
+      {/* ── CARDS ─────────────────────────────────────────────────────── */}
       <div className="se-cards">
         <div
           className="se-card primary"
@@ -106,20 +124,24 @@ const StructuralEngineerDashboard = () => {
         </div>
       </div>
 
-      {/* CHARTS */}
+      {/* ── CHARTS — each wrapped so one crash doesn't kill the other ─── */}
       <div className="se-charts">
-        <div className="chart-box">
-          <h3>Project Overview</h3>
-          <Bar data={barData} options={{ maintainAspectRatio: false }} />
-        </div>
+        <ErrorBoundary label="Project Overview chart">
+          <div className="chart-box">
+            <h3>Project Overview</h3>
+            <Bar data={barData} options={{ maintainAspectRatio: false }} />
+          </div>
+        </ErrorBoundary>
 
-        <div className="chart-box">
-          <h3>Distribution</h3>
-          <Doughnut data={pieData} options={{ maintainAspectRatio: false }} />
-        </div>
+        <ErrorBoundary label="Distribution chart">
+          <div className="chart-box">
+            <h3>Distribution</h3>
+            <Doughnut data={pieData} options={{ maintainAspectRatio: false }} />
+          </div>
+        </ErrorBoundary>
       </div>
 
-      {/* ACTIVITY */}
+      {/* ── ACTIVITY ──────────────────────────────────────────────────── */}
       <div className="se-activity-box">
         <h2>Recent Activity</h2>
         <ul>

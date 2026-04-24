@@ -1,44 +1,41 @@
+// pages/structural-engineer/BOQ.jsx
 import "./BOQ.css";
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchBOQ, QUERY_KEYS } from "../../api/structuralApi";
 
 function BOQ() {
-  const [boqData, setBoqData] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
 
-  useEffect(() => {
-    const fetchBOQ = async () => {
-      try {
-        const res = await axios.get("http://localhost:5000/api/structural/boq");
-        setBoqData(res.data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBOQ();
-  }, []);
+  // ✅ useQuery — replaces useEffect + axios + loading state
+  const {
+    data: boqData = [],
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: QUERY_KEYS.boq,
+    queryFn: fetchBOQ,
+  });
 
-  const totalItems = boqData.length;
+  // ─── Derived counts ─────────────────────────────────────────────────────
+  const totalItems    = boqData.length;
   const approvedCount = boqData.filter((b) => b.status === "Approved").length;
-  const pendingCount = boqData.filter((b) => b.status === "Pending").length;
+  const pendingCount  = boqData.filter((b) => b.status === "Pending").length;
   const rejectedCount = boqData.filter((b) => b.status === "Rejected").length;
 
   const filteredData =
     filter === "All" ? boqData : boqData.filter((b) => b.status === filter);
 
   const cards = [
-    { label: "Total Items", value: totalItems, type: "total" },
-    { label: "Approved", value: approvedCount, type: "approved" },
-    { label: "Pending", value: pendingCount, type: "pending" },
-    { label: "Rejected", value: rejectedCount, type: "rejected" },
+    { label: "Total Items", value: totalItems,    type: "total"    },
+    { label: "Approved",    value: approvedCount, type: "approved" },
+    { label: "Pending",     value: pendingCount,  type: "pending"  },
+    { label: "Rejected",    value: rejectedCount, type: "rejected" },
   ];
 
   return (
     <div className="boq-wrapper">
-      {/* PAGE HEADER */}
+      {/* ── PAGE HEADER ─────────────────────────────────────────────── */}
       <div className="boq-header">
         <div className="boq-header-left">
           <span className="boq-breadcrumb">Structural Engineer / BOQ</span>
@@ -54,7 +51,7 @@ function BOQ() {
         </button>
       </div>
 
-      {/* SUMMARY CARDS */}
+      {/* ── SUMMARY CARDS ───────────────────────────────────────────── */}
       <div className="boq-cards-grid">
         {cards.map((card) => (
           <div
@@ -94,7 +91,7 @@ function BOQ() {
         ))}
       </div>
 
-      {/* TABLE SECTION */}
+      {/* ── TABLE SECTION ───────────────────────────────────────────── */}
       <div className="boq-table-section">
         <div className="boq-table-header">
           <div className="boq-table-title-row">
@@ -106,7 +103,6 @@ function BOQ() {
               </span>
             )}
           </div>
-          {/* Filter Tabs */}
           <div className="boq-filter-tabs">
             {["All", "Approved", "Pending", "Rejected"].map((tab) => (
               <button
@@ -121,10 +117,14 @@ function BOQ() {
         </div>
 
         <div className="boq-table-body">
-          {loading ? (
+          {isLoading ? (
             <div className="boq-loading">
               <div className="boq-spinner" />
               <p>Loading BOQ data...</p>
+            </div>
+          ) : isError ? (
+            <div className="boq-empty">
+              <p style={{ color: "#ef4444" }}>⚠️ Failed to load BOQ data</p>
             </div>
           ) : filteredData.length === 0 ? (
             <div className="boq-empty">
@@ -132,23 +132,16 @@ function BOQ() {
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
                 <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
               </svg>
               <p>No BOQ data found</p>
-              {filter !== "All" && (
-                <span>No {filter.toLowerCase()} items available</span>
-              )}
+              {filter !== "All" && <span>No {filter.toLowerCase()} items available</span>}
             </div>
           ) : (
             <table className="boq-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Project</th>
-                  <th>Item</th>
-                  <th>Quantity</th>
-                  <th>Unit</th>
-                  <th>Status</th>
+                  <th>#</th><th>Project</th><th>Item</th>
+                  <th>Quantity</th><th>Unit</th><th>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -171,7 +164,7 @@ function BOQ() {
           )}
         </div>
 
-        {!loading && filteredData.length > 0 && (
+        {!isLoading && filteredData.length > 0 && (
           <div className="boq-table-footer">
             Showing <strong>{filteredData.length}</strong> of <strong>{totalItems}</strong> items
           </div>

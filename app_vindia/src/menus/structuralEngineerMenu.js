@@ -22,9 +22,14 @@ export const StructuralEngineerMenu = [
     path: "/structural-engineer/incidents",
     icon: "alert-triangle",
   },
-  
-  { name: "Tasks", path: "/structural-engineer/incidents?page=tasks", icon: "check-square" },
 
+  {
+    name: "Tasks",
+    path: "/structural-engineer/incidents?page=tasks",
+    icon: "check-square",
+  },
+
+  { name: "Handover", path: "/structural-engineer/handover", icon: "send" },
   {
     name: "Daily Updates",
     path: "/structural-engineer/daily-updates",

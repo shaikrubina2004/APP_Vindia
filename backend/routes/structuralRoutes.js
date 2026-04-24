@@ -152,17 +152,13 @@ router.put("/drawings/:id/status", async (req, res) => {
 // ==============================
 router.get("/boq", async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM boq ORDER BY id DESC"
-    );
-
+    const result = await pool.query("SELECT * FROM boq ORDER BY id DESC");
     res.json(result.rows);
   } catch (err) {
-    console.error("BOQ ERROR:", err);
-    res.status(500).json({ error: "Server error" });
+    console.error("BOQ ERROR DETAIL:", err.message);  // ← check your terminal now
+    res.status(500).json({ error: err.message });     // ← also send it to browser
   }
 });
-
 
 router.put("/:projectId/submit-to-qs", async (req, res) => {
   const { projectId } = req.params;

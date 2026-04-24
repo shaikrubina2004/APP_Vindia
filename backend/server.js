@@ -100,7 +100,7 @@ try {
 /* ── Structural Engineer Modules ───────────────── */
 app.use("/api/structural", structuralRoutes);
 app.use("/api/se-daily-reports", seDailyRoutes);   // ✅ SE route
-app.use("/api/rfi", rfiRoutes);
+app.use("/rfis", rfiRoutes);
 
 /* ── Other Modules ───────────────── */
 app.use("/api/timesheets", timesheetRoutes);

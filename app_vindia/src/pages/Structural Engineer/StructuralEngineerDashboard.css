@@ -129,6 +129,35 @@
   animation: spin 1s linear infinite;
 }
 
+
+
+/* ─── Skeleton Loader ──────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #e2e8f0 25%,
+    #f1f5f9 50%,
+    #e2e8f0 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-card {
+  height: 118px;
+  border-radius: 16px;
+}
+
+.skeleton-chart {
+  height: 320px;
+  border-radius: 16px;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
