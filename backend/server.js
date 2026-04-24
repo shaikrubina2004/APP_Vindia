@@ -98,7 +98,8 @@ try {
   app.use("/api/wbs", wbsRoutes);
   app.use("/api/cost-summary", costRoutes);
   app.use("/api/dashboard", dashboardRoutes);
-
+ /* ── QS Modules ─────────────────────────────── */
+ app.use("/api/qs", qsRoutes);
 /* ── Structural Engineer Modules ───────────────── */
 app.use("/api/structural", structuralRoutes);
 app.use("/api/se-daily-reports", seDailyRoutes);   // ✅ SE route
