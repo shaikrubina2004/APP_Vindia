@@ -181,44 +181,48 @@ const ProjectCoordinatorDashboard = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [pageLoading, setPageLoading] = useState(true); // API loading
-  const [cardLoading, setCardLoading] = useState(null); // click loading
+  const [pageLoading, setPageLoading] = useState(true);
+  const [cardLoading, setCardLoading] = useState(null);
   const [panelKey, setPanelKey] = useState(0);
+  const [showAll, setShowAll] = useState(false); // ← NEW
 
   useEffect(() => {
-  const fetchProjects = async () => {
-    try {
-      const res = await getProjects();
-
-      console.log("API DATA:", res.data); // ✅ check console
-
-      setProjects(res.data);
-
-      if (res.data.length > 0) {
-        setSelected(res.data[0]);
+    const fetchProjects = async () => {
+      try {
+        const res = await getProjects();
+        console.log("API DATA:", res.data);
+        setProjects(res.data);
+        if (res.data.length > 0) {
+          setSelected(res.data[0]);
+        }
+      } catch (err) {
+        console.error("Error fetching projects:", err);
+      } finally {
+        setPageLoading(false);
       }
-
-    } catch (err) {
-      console.error("Error fetching projects:", err);
-    } finally {
-      setPageLoading(false);
-    }
-  };
-  setPageLoading(true);
-  fetchProjects();
-}, []);
+    };
+    setPageLoading(true);
+    fetchProjects();
+  }, []);
 
   const handleSelect = (proj) => {
-  if (!proj || proj.id === selected?.id) return;
+    if (!proj || proj.id === selected?.id) return;
+    setCardLoading(proj.id);
+    setTimeout(() => {
+      setSelected(proj);
+      setPanelKey(k => k + 1);
+      setCardLoading(null);
+    }, 300);
+  };
 
-  setCardLoading(proj.id);
-
-  setTimeout(() => {
-    setSelected(proj);
-    setPanelKey(k => k + 1);
-    setCardLoading(null);
-  }, 300);
-};
+  /* ── Card visibility logic ── */
+  // Priority: IN PROGRESS first, then others. Show first 3 by default.
+  const sortedProjects = [
+    ...projects.filter(p => p.status === "IN PROGRESS"),
+    ...projects.filter(p => p.status !== "IN PROGRESS"),
+  ];
+  const visibleProjects = showAll ? sortedProjects : sortedProjects.slice(0, 3);
+  const hasMore = sortedProjects.length > 3;
 
   const p      = selected?.progress || 0;
   const budget = Number(selected?.budget || 0);
@@ -250,23 +254,56 @@ const ProjectCoordinatorDashboard = () => {
       </div>
 
       {/* PROJECT CARDS */}
-<div className="coord-projects">
-  {pageLoading ? (
-    <p>Loading projects...</p>
-  ) : projects.length === 0 ? (
-    <p>No projects found</p>
-  ) : (
-    projects.map(proj => (
-      <CoordProjectCard
-        key={proj.id}
-        proj={proj}
-        isActive={selected?.id === proj.id}
-        isLoading={cardLoading === proj.id} // ✅ fixed
-        onClick={() => handleSelect(proj)}
-      />
-    ))
-  )}
-</div>
+      <div className="coord-projects">
+        {pageLoading ? (
+          <p>Loading projects...</p>
+        ) : projects.length === 0 ? (
+          <p>No projects found</p>
+        ) : (
+          visibleProjects.map(proj => (
+            <CoordProjectCard
+              key={proj.id}
+              proj={proj}
+              isActive={selected?.id === proj.id}
+              isLoading={cardLoading === proj.id}
+              onClick={() => handleSelect(proj)}
+            />
+          ))
+        )}
+      </div>
+
+      {/* SEE MORE / SEE LESS BUTTON */}
+      {!pageLoading && hasMore && (
+        <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:18, marginTop:-6 }}>
+          <button
+            onClick={() => setShowAll(v => !v)}
+            style={{
+              background: showAll ? "#f8fbff" : "#eff6ff",
+              border: "1.5px solid #bfdbfe",
+              color: "#2563eb",
+              fontFamily: "inherit",
+              fontSize: 12,
+              fontWeight: 700,
+              padding: "7px 22px",
+              borderRadius: 20,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              transition: "all .2s",
+              letterSpacing: ".02em",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background="#dbeafe"; e.currentTarget.style.transform="translateY(-1px)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background=showAll?"#f8fbff":"#eff6ff"; e.currentTarget.style.transform="translateY(0)"; }}
+          >
+            {showAll ? (
+              <>Show Less <span style={{ fontSize:14 }}>↑</span></>
+            ) : (
+              <>See More <span style={{ fontSize:14 }}>↓</span> ({sortedProjects.length - 3} more)</>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* DETAIL + CHART */}
       {selected && (
@@ -290,32 +327,28 @@ const ProjectCoordinatorDashboard = () => {
               </div>
 
               <div className="coord-budget-section">
-              <div className="coord-budget-bar-track">
-
-                <div
-                  className="coord-budget-bar-fill coord-budget-bar-fill--spent"
-                  style={{ width: `${Math.min(100, spentPercent)}%` }}
-                />
-
-                <div
-                  className="coord-budget-bar-fill coord-budget-bar-fill--paid"
-                  style={{ width: `${Math.min(100, paidPercent)}%` }}
-                />
-
+                <div className="coord-budget-bar-track">
+                  <div
+                    className="coord-budget-bar-fill coord-budget-bar-fill--spent"
+                    style={{ width: `${Math.min(100, spentPercent)}%` }}
+                  />
+                  <div
+                    className="coord-budget-bar-fill coord-budget-bar-fill--paid"
+                    style={{ width: `${Math.min(100, paidPercent)}%` }}
+                  />
+                </div>
+                <div className="coord-budget-legend">
+                  <span className="coord-budget-legend__item">
+                    <span className="dot dot--red" /> Spent {fmt(spent)}
+                  </span>
+                  <span className="coord-budget-legend__item">
+                    <span className="dot dot--green" /> Received {fmt(paid)}
+                  </span>
+                  <span className="coord-budget-legend__item">
+                    <span className="dot dot--blue" /> Remaining {fmt(remaining)}
+                  </span>
+                </div>
               </div>
-
-              <div className="coord-budget-legend">
-                <span className="coord-budget-legend__item">
-                  <span className="dot dot--red" /> Spent {fmt(spent)}
-                </span>
-                <span className="coord-budget-legend__item">
-                  <span className="dot dot--green" /> Received {fmt(paid)}
-                </span>
-                <span className="coord-budget-legend__item">
-                  <span className="dot dot--blue" /> Remaining {fmt(remaining)}
-                </span>
-              </div>
-            </div>
 
               <div className="coord-info-grid">
                 <DetailRow icon="📍" label="Location"      value={selected.location}/>

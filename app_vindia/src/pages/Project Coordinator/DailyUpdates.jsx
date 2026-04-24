@@ -213,50 +213,72 @@ const fetchProjects = async () => {
   const removeMeeting = (i) => set("meetings", form.meetings.filter((_, idx) => idx !== i));
 
   const handleSubmit = async () => {
-    if (!form.projectId) { showToast("error", "Please select a project."); return; }
-    if (!form.work.trim()) { showToast("error", "Please fill in Work Progress Summary."); return; }
-    if (!form.progress)    { showToast("error", "Please enter today's progress %."); return; }
 
-    setSubmit(true);
-    try {
-      const payload = {
-  ...form,
-  project_id: Number(form.projectId),
-  coordinator_id: 101,
-  date: todayStr,
-  day: todayDay,
+  // 🚨 PREVENT DUPLICATE SUBMISSION
+  if (todayLog && !editId) {
+    showToast("error", "Today's update already submitted. Please edit instead.");
+    return;
+  }
 
-  task_updates: JSON.stringify(form.taskUpdates),
-  meetings: JSON.stringify(form.meetings),
+  if (!form.projectId) { 
+    showToast("error", "Please select a project."); 
+    return; 
+  }
 
-  coord_notes: form.coordNotes,
-  milestone_status: form.milestoneStatus,
-  alerts: form.alerts,
-  approval_from: form.approvalFrom,
-};
+  if (!form.work.trim()) { 
+    showToast("error", "Please fill in Work Progress Summary."); 
+    return; 
+  }
 
-      if (editId) {
-      const res = await updateUpdate(editId, payload);
-      await fetchLogs(form.projectId); // ✅ ADD THIS
+  if (!form.progress) { 
+    showToast("error", "Please enter today's progress %."); 
+    return; 
+  }
+
+  setSubmit(true);
+
+  try {
+    const payload = {
+      ...form,
+      project_id: Number(form.projectId),
+      coordinator_id: 101,
+      date: todayStr,
+      day: todayDay,
+
+      task_updates: JSON.stringify(form.taskUpdates),
+      meetings: JSON.stringify(form.meetings),
+
+      coord_notes: form.coordNotes,
+      milestone_status: form.milestoneStatus,
+      alerts: form.alerts,
+      approval_from: form.approvalFrom,
+    };
+
+    if (editId) {
+      await updateUpdate(editId, payload);
+      await fetchLogs(form.projectId);
       setEditId(null);
       showToast("success", "Updated & re-submitted to Project Manager.");
     } else {
       await createUpdate(payload);
-      await fetchLogs(form.projectId); // ✅ ADD THIS
+      await fetchLogs(form.projectId);
       showToast("success", "Daily update submitted to Project Manager.");
     }
 
-      setForm(prev => ({
+    setForm(prev => ({
       ...EMPTY_FORM,
-      projectId: prev.projectId // keep selected project
+      projectId: prev.projectId
     }));
-      setActiveTab("history");
-    } catch (err) {
-      console.error(err);
-      showToast("error", "Server error — please try again.");
-    }
-    setSubmit(false);
-  };
+
+    setActiveTab("history");
+
+  } catch (err) {
+    console.error(err);
+    showToast("error", "Server error — please try again.");
+  }
+
+  setSubmit(false);
+};
 
   const mapLog = (d) => ({
     ...d,
@@ -395,8 +417,6 @@ const fetchProjects = async () => {
                 ...EMPTY_FORM,
                 projectId: id
               }));
-
-              if (id) fetchLogs(id);
             }}
             >
               <option value="">— Choose a project —</option>
