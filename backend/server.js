@@ -47,6 +47,7 @@ const seNotificationRoutes = require("./routes/seNotificationRoutes");
 /* ── QS MODULES ───────────────────────────────── */
 const qsRoutes = require("./routes/qsRoutes");
 
+
 const app = express();
 
 /* ═══════════════════════════════════════════════════════════
@@ -108,6 +109,7 @@ app.use("/rfis", rfiRoutes);
 app.use("/api/se-notifications", seNotificationRoutes);
 /* ── QS Modules ───────────────── */
 app.use("/api/qs", qsRoutes);
+
 /* ── Other Modules ───────────────── */
 app.use("/api/timesheets", timesheetRoutes);
 app.use("/api/daily-reports", dailyRoutes);        // ✅ normal route

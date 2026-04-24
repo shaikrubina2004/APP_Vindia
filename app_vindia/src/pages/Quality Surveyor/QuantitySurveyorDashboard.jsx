@@ -2,9 +2,25 @@
 
 import "./QuantitySurveyorDashboard.css";
 import { useNavigate } from "react-router-dom";
-
-export default function QuantitySurveyorDashboard({ notifications = [] }) {
+import { useEffect, useState } from "react";
+import axios from "axios";
+export default function QuantitySurveyorDashboard() {
   const navigate = useNavigate();
+const [dashboard, setDashboard] = useState(null);
+
+useEffect(() => {
+  fetchDashboard();
+}, []);
+
+const fetchDashboard = async () => {
+  try {
+    const res = await axios.get("http://localhost:5000/api/qs/dashboard");
+    setDashboard(res.data.data);
+  } catch (err) {
+    console.error(err);
+  }
+};
+  
   return (
     <div className="qsdb">
 
@@ -21,7 +37,7 @@ export default function QuantitySurveyorDashboard({ notifications = [] }) {
   <div className="top-card">
     <div>
       <p className="label">Total Projects</p>
-      <h2>12</h2>
+   <h2>{dashboard?.projects?.length || 0}</h2>
       <span className="sub purple-text">● Active Projects</span>
     </div>
     <div className="icon-box purple-bg">📁</div>
@@ -31,7 +47,7 @@ export default function QuantitySurveyorDashboard({ notifications = [] }) {
   <div className="top-card">
     <div>
       <p className="label">Quantity Progress</p>
-      <h2>70%</h2>
+      <h2>{dashboard?.progress?.[0]?.quantity_progress || 0}%</h2>
       <span className="sub green-text">+8% from last week</span>
     </div>
     <div className="icon-box green-bg">📈</div>
@@ -41,7 +57,7 @@ export default function QuantitySurveyorDashboard({ notifications = [] }) {
   <div className="top-card">
     <div>
       <p className="label">Cost Utilization</p>
-      <h2>55%</h2>
+     <h2>{dashboard?.progress?.[0]?.overall_progress || 0}%</h2>
       <span className="sub orange-text">On Budget</span>
     </div>
     <div className="icon-box orange-bg">💰</div>
@@ -113,8 +129,8 @@ export default function QuantitySurveyorDashboard({ notifications = [] }) {
     <h3>Alerts</h3>
   </div>
 
-  {notifications && notifications.length > 0 ? (
-    notifications.slice(0, 3).map((n) => {
+  {dashboard?.notifications?.length > 0 ? (
+   dashboard.notifications.slice(0, 3).map((n) => {
       let colorClass = "green";
 
       if (n.severity === "critical") colorClass = "red";
@@ -149,10 +165,10 @@ export default function QuantitySurveyorDashboard({ notifications = [] }) {
     <div className="overview-item">
       <div className="overview-top">
         <span>Quantity Work</span>
-        <span>70%</span>
+       <span>{dashboard?.progress?.[0]?.quantity_progress || 0}%</span>
       </div>
       <div className="progress-bar purple">
-        <div style={{ width: "70%" }}></div>
+       <div style={{ width: `${dashboard?.progress?.[0]?.quantity_progress || 0}%` }}></div>
       </div>
     </div>
 
