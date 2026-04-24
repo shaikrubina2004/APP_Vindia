@@ -1,24 +1,22 @@
-import axios from "axios";
-
-const API = "http://localhost:5000/api/pc-daily-updates";
+import API from "./authService";
 
 /* ================================
    CREATE DAILY UPDATE
 ================================ */
-export const createUpdate = async (data) => {
-  return axios.post(API, data);
+export const createUpdate = (data) => {
+  return API.post("/pc-daily-updates", data);
 };
 
 /* ================================
-   GET ALL UPDATES (for coordinator)
+   GET ALL UPDATES
 ================================ */
-export const getUpdates = async (projectId) => {
-  return axios.get(`${API}/project/${projectId}`);
+export const getUpdates = (projectId) => {
+  return API.get(`/pc-daily-updates/project/${projectId}`);
 };
 
 /* ================================
    UPDATE DAILY UPDATE
 ================================ */
-export const updateUpdate = async (id, data) => {
-  return axios.put(`${API}/${id}`, data);
+export const updateUpdate = (id, data) => {
+  return API.put(`/pc-daily-updates/${id}`, data);
 };
