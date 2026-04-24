@@ -4,7 +4,13 @@ require("dotenv").config();
 
 const pool = require("./config/db");
 const path = require("path");
+const fs = require("fs");
 
+const uploadDir = path.join(__dirname, "uploads");
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 /* ── EXISTING ROUTES ─────────────────────────────────────── */
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -37,7 +43,7 @@ const activityLogRoutes = require("./routes/activityLogRoutes");
 const progressRoutes = require("./routes/progressRoutes");
 const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoutes");
 
-/* ── SITE ENGINEER MODULES ───────────────────────────────── */
+/* ── ARCHITECT ───────────────────────────────── */
 const architectProjectsRoutes = require("./routes/architectProjects");
 
 /* ── STRUCTURAL ENGINEER MODULES ───────────────────────────────── */
@@ -125,7 +131,7 @@ app.use("/api/analysis", analysisRoutes);
 
   /* ── 🔥 Architect ─────────────────────── */
   app.use("/api/architect", architectProjectsRoutes);
-
+  
   /* ── Site Engineer Modules ─────────────────────────────── */
   app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes); // Site Engineer RFI
   app.use("/api/ncr", ncrRoutes);
