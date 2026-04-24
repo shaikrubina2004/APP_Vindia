@@ -37,6 +37,8 @@ const activityLogRoutes = require("./routes/activityLogRoutes");
 const progressRoutes = require("./routes/progressRoutes");
 const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoutes");
 
+/* ── SITE ENGINEER MODULES ───────────────────────────────── */
+const architectProjectsRoutes = require("./routes/architectProjects");
 
 /* ── STRUCTURAL ENGINEER MODULES ───────────────────────────────── */
 const structuralRoutes = require("./routes/structuralRoutes");
@@ -120,6 +122,9 @@ app.use("/api/analysis", analysisRoutes);
 
   /* ── 🔥 NEW: PC DAILY UPDATE ROUTE ─────────────────────── */
   app.use("/api/pc-daily-updates", pcDailyUpdateRoutes);
+
+  /* ── 🔥 Architect ─────────────────────── */
+  app.use("/api/architect", architectProjectsRoutes);
 
   /* ── Site Engineer Modules ─────────────────────────────── */
   app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes); // Site Engineer RFI
