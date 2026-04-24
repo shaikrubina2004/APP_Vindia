@@ -1,6 +1,6 @@
 import AppLayout from "./AppLayout";
 import { StructuralEngineerMenu } from "../menus/structuralEngineerMenu";
-import { SENotificationProvider } from "../context/SENotificationContext";
+import { SENotificationProvider } from "../context/SENotificationProvider";
 import SENotificationBell from "../components/notifications/SENotificationBell";
 
 function StructuralEngineerLayout({ children }) {
