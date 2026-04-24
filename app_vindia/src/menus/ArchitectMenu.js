@@ -39,7 +39,7 @@ export const ArchitectMenu = [
 
  {
     name: "Projects",
-    path: "/architect/project",
+    path: "/architect/projects",
     icon: "grid"
   }
 ];

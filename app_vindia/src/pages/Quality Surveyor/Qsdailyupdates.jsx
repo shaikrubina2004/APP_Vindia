@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import "./Qsdailyupdates.css";
 
 const EMPTY = {
@@ -26,12 +27,37 @@ export default function QSDailyUpdates() {
   "Hospital Block",
   "Residential Villa",
 ];
-  const [updates, setUpdates] = useState(SEED);
+  const [updates, setUpdates] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [filter, setFilter] = useState("All");
   const [toast, setToast] = useState(null);
   const [view, setView] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const fetchProjects = async () => {
+  try {
+    const res = await axios.get("http://localhost:5000/api/qs/projects");
+    setProjects(res.data.data);
+  } catch (err) {
+    console.error(err);
+  }
+};
+  useEffect(() => {
+  fetchUpdates();
+  fetchProjects();
+}, []);
+
+const fetchUpdates = async () => {
+  try {
+    const res = await axios.get("http://localhost:5000/api/qs/daily-updates");
+
+    console.log("DATA:", res.data); // check console
+
+    setUpdates(res.data.data);
+  } catch (err) {
+    console.error("Error:", err);
+  }
+};
 
   const show = (msg,type="ok")=>{ setToast({msg,type}); setTimeout(()=>setToast(null),3000); };
   const sf = (k,v)=>setForm(f=>({...f,[k]:v}));
@@ -42,7 +68,12 @@ export default function QSDailyUpdates() {
     setForm(EMPTY); setShowModal(false); show("Daily update submitted successfully!");
   };
 
-  const filtered = filter==="All" ? updates : updates.filter(u=>u.status===filter);
+  const normalize = (s) => s?.toLowerCase().replace(" ", "-");
+
+const filtered =
+  filter === "All"
+    ? updates
+    : updates.filter(u => normalize(u.status) === filter);
 
   return (
     <div className="qsd-page">
@@ -76,25 +107,25 @@ export default function QSDailyUpdates() {
             <div key={u.id} className={`qsdu-card qsdu-card--${u.status}`}>
               <div className="qsdu-top">
                 <div>
-                  <div className="qsdu-project">{u.project}</div>
+                  <div className="qsdu-project">{u.project_name}</div>
                   <div className="qsdu-meta">{u.phase} · {u.date} · 👷 {u.manpower} workers</div>
                 </div>
                 <div className="qsdu-top-right">
-                  <span className={`qs-badge ${SM[u.status].cls}`}>{SM[u.status].label}</span>
+                 <span className={`qs-badge ${(SM[u.status?.toLowerCase().replace(" ", "-")] || {}).cls}`}>{(SM[u.status?.toLowerCase().replace(" ", "-")] || {}).label || u.status}</span>
                   <span className="qsdu-submitted-to">→ {u.submittedTo}</span>
                 </div>
               </div>
               <div className="qsdu-activity">{u.activity}</div>
               <div className="qsdu-nums">
-                <span>📐 {u.qty} {u.unit}</span>
+                <span>📐 {u.quantity} {u.unit}</span>
                 {u.location&&<span>📍 {u.location}</span>}
               </div>
-              {u.issues&&<div className="qsdu-issue">⚠ {u.issues}</div>}
+             {u.remarks && <div className="qsdu-issue">⚠ {u.remarks}</div>}
               <div className="qsdu-prog-row">
                 <span className="qsdu-prog-label">Progress</span>
                 <div className="qs-prog" style={{flex:1}}>
                   <div className="qs-prog-track">
-                    <div className="qs-prog-fill" style={{width:`${u.progress}%`,background:pc(u.progress)}} />
+                    <div className="qs-prog-fill" style={{width:`${u.progress}%`,background:pc(Number(u.progress))}} />
                   </div>
                   <span className="qs-prog-lbl">{u.progress}%</span>
                 </div>
@@ -128,11 +159,11 @@ export default function QSDailyUpdates() {
 >
   <option value="">Select Project</option>
 
-  {PROJECTS.map((p, index) => (
-    <option key={index} value={p}>
-      {p}
-    </option>
-  ))}
+ {projects.map((p) => (
+  <option key={p.id} value={p.id}>
+    {p.name}
+  </option>
+))}
 </select>
                 </div>
                 <div className="qs-field">
@@ -197,14 +228,21 @@ export default function QSDailyUpdates() {
         <div className="qs-overlay" onClick={()=>setView(null)}>
           <div className="qs-modal" onClick={e=>e.stopPropagation()}>
             <div className="qs-modal-hdr" style={{borderBottom:`3px solid ${pc(view.progress)}`}}>
-              <span className="qs-modal-title">{view.project} — {view.date}</span>
+              <span className="qs-modal-title">{view.project_name} — {view.created_at}</span>
               <button className="qs-modal-close" onClick={()=>setView(null)}>✕</button>
             </div>
             <div className="qs-modal-body">
               <div className="qsdu-view-grid">
                 {[
                   {label:"Phase",    val:view.phase},
-                  {label:"Status",   val:<span className={`qs-badge ${SM[view.status].cls}`}>{SM[view.status].label}</span>},
+                 {
+  label:"Status",
+  val: (() => {
+    const key = view.status?.toLowerCase().replace(" ", "-");
+    const cfg = SM[key] || {};
+    return <span className={`qs-badge ${cfg.cls}`}>{cfg.label || view.status}</span>;
+  })()
+},
                   {label:"Activity", val:view.activity,full:true},
                   {label:"Quantity", val:`${view.qty} ${view.unit}`},
                   {label:"Location", val:view.location},
@@ -220,7 +258,7 @@ export default function QSDailyUpdates() {
                   <div className="qsdu-view-label">Progress</div>
                   <div className="qs-prog" style={{marginTop:6}}>
                     <div className="qs-prog-track" style={{height:10}}>
-                      <div className="qs-prog-fill" style={{width:`${view.progress}%`,background:pc(view.progress)}} />
+                      <div className="qs-prog-fill" style={{width: `${Number(view.progress)}%`,background:pc(view.progress)}} />
                     </div>
                     <span className="qs-prog-lbl">{view.progress}%</span>
                   </div>

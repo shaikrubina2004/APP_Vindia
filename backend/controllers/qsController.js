@@ -149,6 +149,62 @@ exports.createDailyUpdate = async (req, res) => {
     res.status(500).json({ success: false });
   }
 };
+exports.updateDailyUpdate = async (req, res) => {
+  const { id } = req.params;
+
+  const {
+    project_id,
+    phase,
+    status,
+    activity,
+    quantity,
+    unit,
+    location,
+    manpower,
+    progress,
+    boq_item,
+    cost_estimate,
+    cost_actual,
+    remarks
+  } = req.body;
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE qs_daily_updates SET
+        project_id=$1,
+        phase=$2,
+        status=$3,
+        activity=$4,
+        quantity=$5,
+        unit=$6,
+        location=$7,
+        manpower=$8,
+        progress=$9,
+        boq_item=$10,
+        cost_estimate=$11,
+        cost_actual=$12,
+        remarks=$13
+      WHERE id=$14
+      RETURNING *`,
+      [
+        project_id, phase, status, activity,
+        quantity, unit, location, manpower,
+        progress, boq_item, cost_estimate,
+        cost_actual, remarks, id
+      ]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: "Not found" });
+    }
+
+    res.json({ success: true, data: rows[0] });
+
+  } catch (err) {
+    console.error("🔥 UPDATE ERROR:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
 
 // UPDATE
 exports.updateDailyUpdate = async (req, res) => {
