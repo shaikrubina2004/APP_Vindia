@@ -42,6 +42,8 @@ const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoute
 const structuralRoutes = require("./routes/structuralRoutes");
 const seDailyRoutes = require("./routes/seDailyupdatesRoutes");
 const rfiRoutes = require("./routes/rfiRoutes");
+/* ── QS MODULES ───────────────────────────────── */
+const qsRoutes = require("./routes/qsRoutes");
 
 const app = express();
 
@@ -101,7 +103,8 @@ try {
 app.use("/api/structural", structuralRoutes);
 app.use("/api/se-daily-reports", seDailyRoutes);   // ✅ SE route
 app.use("/rfis", rfiRoutes);
-
+/* ── QS Modules ───────────────── */
+app.use("/api/qs", qsRoutes);
 /* ── Other Modules ───────────────── */
 app.use("/api/timesheets", timesheetRoutes);
 app.use("/api/daily-reports", dailyRoutes);        // ✅ normal route
