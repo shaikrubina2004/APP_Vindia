@@ -15,11 +15,6 @@ const QuantitySurveyorMenu = [
   // ✅ NEW
   { name: "Incident",         path: "/quantity-surveyor/incident",        icon: "alert-triangle" },
   { name: "Tasks", path: "/quantity-surveyor/incident?page=tasks", icon: "check-square" },
-  {
-  name: "Alerts",
-  path: "/quantity-surveyor/alerts",
-  icon: "bell",
-}
 ];
 
 

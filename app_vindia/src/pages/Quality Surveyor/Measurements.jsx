@@ -1,175 +1,143 @@
 import { useState } from "react";
 import "./Measurements.css";
 
-const Measurements = () => {
-  const [data, setData] = useState([]);
-
+function Measurements() {
   const [form, setForm] = useState({
-    type: "",
+    item: "",
     location: "",
-    qty: "",
-    unit: "m³",
     length: "",
     width: "",
     height: "",
     nos: "",
-    date: "",
+    unit: "m3"
   });
+
+  const [data, setData] = useState([]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const calculateQty = () => {
+  // ✅ Auto calculation
+  const calculateTotal = () => {
+    const { length, width, height, nos } = form;
     return (
-      Number(form.length || 0) *
-      Number(form.width || 0) *
-      Number(form.height || 0) *
-      Number(form.nos || 1)
-    );
+      (parseFloat(length || 0)) *
+      (parseFloat(width || 0)) *
+      (parseFloat(height || 0)) *
+      (parseFloat(nos || 0))
+    ).toFixed(2);
   };
 
-  const handleAdd = () => {
-    if (!form.type || !form.location) return;
+  const handleSubmit = (e) => {
+    e.preventDefault();
 
-    const quantity = form.qty || calculateQty();
-
-    const newItem = {
+    const newEntry = {
       ...form,
-      qty: Number(quantity),
-      status: "pending",
+      total: calculateTotal(),
+      id: Date.now()
     };
 
-    setData([newItem, ...data]);
+    setData([newEntry, ...data]);
 
+    // reset form
     setForm({
-      type: "",
+      item: "",
       location: "",
-      qty: "",
-      unit: "m³",
       length: "",
       width: "",
       height: "",
       nos: "",
-      date: "",
+      unit: "m3"
     });
   };
 
-  const updateStatus = (i, status) => {
-    const updated = [...data];
-    updated[i].status = status;
-    setData(updated);
-  };
-
   return (
-    <div className="measure-container">
+    <div className="measurement-container">
 
-      <h2 className="title">Measurement Management</h2>
+      {/* LEFT FORM */}
+      <div className="measurement-card">
+        <h2>📏 Measurement Entry (QS)</h2>
 
-      {/* CARDS */}
-     <div className="cards">
+        <form onSubmit={handleSubmit} className="measurement-form">
 
-  <div className="card purple">
-    <p>Total</p>
-    <h3>{data.length}</h3>
-  </div>
+          <input
+            name="item"
+            placeholder="BOQ Item (Concrete, Brickwork...)"
+            value={form.item}
+            onChange={handleChange}
+            required
+          />
 
-  <div className="card green">
-    <p>Approved</p>
-    <h3>{data.filter(d => d.status === "approved").length}</h3>
-  </div>
+          <input
+            name="location"
+            placeholder="Location (Floor, Area...)"
+            value={form.location}
+            onChange={handleChange}
+          />
 
-  <div className="card orange">
-    <p>Pending</p>
-    <h3>{data.filter(d => d.status === "pending").length}</h3>
-  </div>
+          <div className="row">
+            <input name="length" type="number" placeholder="Length" value={form.length} onChange={handleChange} />
+            <input name="width" type="number" placeholder="Width" value={form.width} onChange={handleChange} />
+            <input name="height" type="number" placeholder="Height" value={form.height} onChange={handleChange} />
+          </div>
 
-</div>
+          <input
+            name="nos"
+            type="number"
+            placeholder="No of Units"
+            value={form.nos}
+            onChange={handleChange}
+          />
 
-      {/* FORM */}
-      <div className="box">
-        <h3>Add Measurement</h3>
-
-        <div className="form-grid">
-          <input name="type" placeholder="Work Type" value={form.type} onChange={handleChange} />
-          <input name="location" placeholder="Location" value={form.location} onChange={handleChange} />
-          <input name="qty" type="number" placeholder="Manual Qty" value={form.qty} onChange={handleChange} />
           <select name="unit" value={form.unit} onChange={handleChange}>
-            <option>m³</option>
-            <option>m²</option>
-            <option>nos</option>
+            <option value="m3">m³</option>
+            <option value="m2">m²</option>
+            <option value="nos">Nos</option>
           </select>
 
-          <input name="length" type="number" placeholder="L" value={form.length} onChange={handleChange} />
-          <input name="width" type="number" placeholder="W" value={form.width} onChange={handleChange} />
-          <input name="height" type="number" placeholder="H" value={form.height} onChange={handleChange} />
-          <input name="nos" type="number" placeholder="Nos" value={form.nos} onChange={handleChange} />
+          <div className="result-box">
+            Total Quantity: <b>{calculateTotal()} {form.unit}</b>
+          </div>
 
-          <input name="date" type="date" value={form.date} onChange={handleChange} />
-
-          <button className="add-btn" onClick={handleAdd}>
-            Add Measurement
-          </button>
-        </div>
+          <button type="submit">Save Measurement</button>
+        </form>
       </div>
 
-      {/* TABLE */}
-      <div className="box">
-        <h3>Measurements</h3>
+      {/* RIGHT TABLE */}
+      <div className="measurement-table-card">
+        <h3>📋 Measurement Records</h3>
 
         {data.length === 0 ? (
-          <p className="empty">No measurements added</p>
+          <p>No measurements added</p>
         ) : (
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Work</th>
-                  <th>Location</th>
-                  <th>Qty</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th></th>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Location</th>
+                <th>Dimensions</th>
+                <th>Nos</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((d) => (
+                <tr key={d.id}>
+                  <td>{d.item}</td>
+                  <td>{d.location}</td>
+                  <td>{d.length} × {d.width} × {d.height}</td>
+                  <td>{d.nos}</td>
+                  <td>{d.total} {d.unit}</td>
                 </tr>
-              </thead>
-
-              <tbody>
-                {data.map((d, i) => (
-                  <tr key={i}>
-                    <td>{d.type}</td>
-                    <td>{d.location}</td>
-                    <td>{d.qty} {d.unit}</td>
-                    <td>{d.date || "-"}</td>
-
-                    <td>
-                      <span className={`status ${d.status}`}>
-                        {d.status}
-                      </span>
-                    </td>
-
-                    <td>
-                      {d.status === "pending" && (
-                        <>
-                        <button className="approve-btn" onClick={() => updateStatus(i, "approved")}>
-  Approve
-</button>
-
-<button className="reject-btn" onClick={() => updateStatus(i, "rejected")}>
-  Reject
-</button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
     </div>
   );
-};
+}
 
 export default Measurements;

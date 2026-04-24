@@ -3,8 +3,7 @@
 import "./QuantitySurveyorDashboard.css";
 import { useNavigate } from "react-router-dom";
 
-export default function QuantitySurveyorDashboard()
- {
+export default function QuantitySurveyorDashboard({ notifications = [] }) {
   const navigate = useNavigate();
   return (
     <div className="qsdb">
@@ -112,25 +111,30 @@ export default function QuantitySurveyorDashboard()
   <div className="card-box">
   <div className="card-header">
     <h3>Alerts</h3>
-    <span onClick={() => navigate("/quantity-surveyor/alerts")}>
-  View all
-</span>
   </div>
 
-  <div className="alert red">
-    <span>⚠ Steel exceeding budget</span>
-    <span>2h ago</span>
-  </div>
+  {notifications && notifications.length > 0 ? (
+    notifications.slice(0, 3).map((n) => {
+      let colorClass = "green";
 
-  <div className="alert yellow">
-    <span>⏳ Pending approval (2 items)</span>
-    <span>4h ago</span>
-  </div>
+      if (n.severity === "critical") colorClass = "red";
+      else if (n.severity === "warn") colorClass = "yellow";
 
-  <div className="alert green">
-    <span>✔ Foundation work on track</span>
-    <span>6h ago</span>
-  </div>
+      return (
+        <div key={n.id} className={`alert ${colorClass}`}>
+          <span>
+            {n.severity === "critical" && "⚠ "}
+            {n.severity === "warn" && "⏳ "}
+            {n.severity === "ok" && "✔ "}
+            {n.title}
+          </span>
+          <span>{n.time}</span>
+        </div>
+      );
+    })
+  ) : (
+    <p>No alerts available</p>
+  )}
 </div>
 
   {/* PROJECT OVERVIEW */}

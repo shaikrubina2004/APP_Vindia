@@ -7,20 +7,53 @@ import logo from "../../assets/logo.png.png";
 function Navbar() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  console.log("ROLE:", user?.role);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
-  const [userNotifications, setUserNotifications] = useState([]);
+ const [userNotifications, setUserNotifications] = useState([]);
 
 useEffect(() => {
-  if (user?.id) {
-    fetch(`/api/notifications/${user.id}`)
+if (user?.role === "quantity_surveyor") {
+    // 👉 Dummy QS notifications
+   setUserNotifications([
+  {
+    id: 1,
+    type: "work", // 👈 IMPORTANT
+    severity: "warn",
+    title: "BOQ mismatch detected",
+    desc: "Check measurement vs BOQ",
+    time: "2 min ago",
+    read: false
+  },
+  {
+    id: 2,
+    type: "payment",
+    severity: "critical",
+    title: "Steel cost exceeded",
+    desc: "Budget crossed by 12%",
+    time: "10 min ago",
+    read: false
+  },
+  {
+    id: 3,
+    type: "approval",
+    severity: "info",
+    title: "Measurement pending approval",
+    desc: "Waiting for manager approval",
+    time: "30 min ago",
+    read: false
+  }
+]);
+  } else if (user?.role) {
+    // 👉 Other roles → keep your backend call
+    fetch(`/api/notifications?role=${user.role}`)
       .then(res => res.json())
       .then(data => setUserNotifications(data))
       .catch(() => setUserNotifications([]));
   }
-}, [user?.id]);
+}, [user?.role]);
 
   const handleLogout = () => {
     setIsProfileOpen(false);

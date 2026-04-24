@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./NotificationBell.css";
 
 const TYPE_CFG = {
@@ -10,7 +10,11 @@ const TYPE_CFG = {
 export default function NotificationBell({ notifications = [] }) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("all");
-  const [notifs, setNotifs] = useState(notifications);
+const [notifs, setNotifs] = useState([]);
+
+useEffect(() => {
+  setNotifs(notifications);
+}, [notifications]);
 
   const unreadCount = notifs.filter(n => !n.read).length;
 
@@ -77,9 +81,11 @@ export default function NotificationBell({ notifications = [] }) {
 
             {/* List */}
             <div className="notif-list">
-              {shown.length === 0 && (
-                <p className="notif-empty">No notifications here.</p>
-              )}
+             {shown.length === 0 && (
+  <p className="notif-empty">
+    No alerts in this category.
+  </p>
+)}
               {shown.map(n => {
                 const tc = TYPE_CFG[n.type] || TYPE_CFG.work;
                 return (

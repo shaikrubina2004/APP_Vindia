@@ -20,6 +20,12 @@ const SEED = [
 ];
 
 export default function QSDailyUpdates() {
+  const PROJECTS = [
+  "Tower A",
+  "Mall Project",
+  "Hospital Block",
+  "Residential Villa",
+];
   const [updates, setUpdates] = useState(SEED);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -115,7 +121,19 @@ export default function QSDailyUpdates() {
                 </div>
                 <div className="qs-field">
                   <label className="qs-label">Project Name *</label>
-                  <input className="qs-input" placeholder="Tower A" value={form.project} onChange={e=>sf("project",e.target.value)} />
+                 <select
+  className="qs-select"
+  value={form.project}
+  onChange={(e) => sf("project", e.target.value)}
+>
+  <option value="">Select Project</option>
+
+  {PROJECTS.map((p, index) => (
+    <option key={index} value={p}>
+      {p}
+    </option>
+  ))}
+</select>
                 </div>
                 <div className="qs-field">
                   <label className="qs-label">Phase / Milestone</label>

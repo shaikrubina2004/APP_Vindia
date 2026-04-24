@@ -35,6 +35,7 @@
 }
 
 .qs-btn-secondary {
+   color: #0f172a; 
   background: #e2e8f0;
   border: none;
   padding: 10px 16px;
@@ -54,6 +55,7 @@
   border: 1px solid #cbd5f5;
   background: white;
   cursor: pointer;
+    color: #0f172a;
 }
 
 .qs-filter-pill.active {
