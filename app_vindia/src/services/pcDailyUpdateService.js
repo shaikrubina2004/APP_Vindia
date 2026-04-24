@@ -12,8 +12,8 @@ export const createUpdate = async (data) => {
 /* ================================
    GET ALL UPDATES (for coordinator)
 ================================ */
-export const getUpdates = async (coordinatorId) => {
-  return axios.get(`${API}/${coordinatorId}`);
+export const getUpdates = async (projectId) => {
+  return axios.get(`${API}/project/${projectId}`);
 };
 
 /* ================================

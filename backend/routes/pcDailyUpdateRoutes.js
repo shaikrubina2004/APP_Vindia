@@ -33,12 +33,12 @@ router.post("/", async (req, res) => {
       `INSERT INTO pc_daily_updates 
       (project_id, coordinator_id, date, day, work, progress, workers, absent,
        cement_used, steel_used, material_short, issues, severity,
-       delay_hours, delay_impact, pending, next, safety, approvals)
+       delay_hours, delay_impact, pending, next, safety, approvals, status)
        
        VALUES (
          $1,$2,$3,$4,$5,$6,$7,$8,
          $9,$10,$11,$12,$13,
-         $14,$15,$16,$17,$18,$19
+         $14,$15,$16,$17,$18,$19,'pending'
        )
        RETURNING *`,
       [
@@ -64,6 +64,14 @@ router.post("/", async (req, res) => {
       ]
     );
 
+    /* 🔥 AUTO UPDATE PROJECT PROGRESS */
+    await pool.query(
+      `UPDATE projects 
+       SET progress = $1 
+       WHERE id = $2`,
+      [progress || 0, project_id]
+    );
+
     res.status(201).json(result.rows[0]);
 
   } catch (err) {
@@ -73,17 +81,19 @@ router.post("/", async (req, res) => {
 });
 
 /* =========================================================
-   GET ALL UPDATES (for one Project Coordinator)
+   GET ALL UPDATES (by PROJECT)
    ========================================================= */
-router.get("/:coordinator_id", async (req, res) => {
+router.get("/project/:project_id", async (req, res) => {
   try {
-    const { coordinator_id } = req.params;
+    const { project_id } = req.params;
 
     const result = await pool.query(
-      `SELECT * FROM pc_daily_updates
-       WHERE coordinator_id = $1
-       ORDER BY date DESC`,
-      [coordinator_id]
+      `SELECT u.*, p.name AS project_name
+       FROM pc_daily_updates u
+       JOIN projects p ON u.project_id = p.id
+       WHERE u.project_id = $1
+       ORDER BY u.date DESC`,
+      [project_id]
     );
 
     res.json(result.rows);
@@ -100,6 +110,7 @@ router.get("/:coordinator_id", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
+
     const {
       work,
       progress,
@@ -115,7 +126,8 @@ router.put("/:id", async (req, res) => {
       pending,
       next,
       safety,
-      approvals
+      approvals,
+      project_id // 👈 needed for updating project progress
     } = req.body;
 
     const result = await pool.query(
@@ -158,6 +170,14 @@ router.put("/:id", async (req, res) => {
       ]
     );
 
+    /* 🔥 UPDATE PROJECT PROGRESS AGAIN */
+    if (project_id) {
+      await pool.query(
+        `UPDATE projects SET progress = $1 WHERE id = $2`,
+        [progress || 0, project_id]
+      );
+    }
+
     res.json(result.rows[0]);
 
   } catch (err) {
@@ -167,7 +187,7 @@ router.put("/:id", async (req, res) => {
 });
 
 /* =========================================================
-   DELETE (optional - if you want later)
+   DELETE DAILY UPDATE
    ========================================================= */
 router.delete("/:id", async (req, res) => {
   try {

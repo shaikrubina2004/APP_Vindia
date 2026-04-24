@@ -1,3 +1,4 @@
+import { getProjects } from "../../services/projectService";
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Coordinator.css";
@@ -6,35 +7,6 @@ import {
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
-const MOCK_PROJECTS = [
-  {
-    id: 3, name: "Eiffel Tower - Paris", client: "XBC Developers",
-    budget: 5000000, status: "IN PROGRESS", progress: 45,
-    start_date: "2026-03-01", end_date: "2028-12-31",
-    spent: "2000000.00", client_paid: "1500000.00",
-    location: "Paris", description: "High-rise commercial building",
-    building_type: "Commercial", floors: "G+20",
-    plot_size: "8000 sq ft", phone: "9123456780", site_engineer_name: "Nikhil",
-  },
-  {
-    id: 5, name: "NH-66", client: "Government Of India",
-    budget: 10000000, status: "Active", progress: null,
-    start_date: "2026-03-31", end_date: "2032-06-30",
-    spent: "0.00", client_paid: "0.00",
-    location: "Kerala", description: "National highway project",
-    building_type: "Infrastructure", floors: "N/A",
-    plot_size: "50 km stretch", phone: "9988776655", site_engineer_name: "Nikhil",
-  },
-  {
-    id: 6, name: "TAJMAHAL", client: "SHAJAHAAN",
-    budget: 100000000, status: "Active", progress: null,
-    start_date: "2026-04-01", end_date: "2028-03-15",
-    spent: "0.00", client_paid: "0.00",
-    location: "Agra", description: "Residential heritage project",
-    building_type: "Residential", floors: "G+2",
-    plot_size: "3000 sq ft", phone: "9090909090", site_engineer_name: "Nikhil",
-  },
-];
 
 const fmt = (n) =>
   Number(n) >= 10000000 ? `₹${(Number(n)/10000000).toFixed(1)}Cr`
@@ -45,10 +17,18 @@ const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "—";
 
 const buildTimeline = (proj) => {
+  if (!proj) return [];
+
   const p = proj.progress || 0;
+
   return ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day, i) => {
     const base = Math.round(p * ((i+1)/7));
-    return { day, completed: base, progress: Math.min(100, Math.round(base*1.1+i*2)), delay: Math.max(0, Math.round((100-base)*0.15-i)) };
+    return {
+      day,
+      completed: base,
+      progress: Math.min(100, Math.round(base*1.1+i*2)),
+      delay: Math.max(0, Math.round((100-base)*0.15-i))
+    };
   });
 };
 
@@ -199,30 +179,56 @@ const CoordProjectCard = ({ proj, isActive, isLoading, onClick }) => (
 ══════════════════════════════════════════ */
 const ProjectCoordinatorDashboard = () => {
   const navigate = useNavigate();
-  const [projects] = useState(MOCK_PROJECTS);
-  const [selected, setSelected] = useState(MOCK_PROJECTS[0]);
-  const [loading, setLoading] = useState(false);
-  const [loadingId, setLoadingId] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [pageLoading, setPageLoading] = useState(true); // API loading
+  const [cardLoading, setCardLoading] = useState(null); // click loading
   const [panelKey, setPanelKey] = useState(0);
 
-  const handleSelect = (proj) => {
-    if (proj.id === selected?.id) return;
-    setLoading(true);
-    setLoadingId(proj.id);
-    setTimeout(() => {
-      setSelected(proj);
-      setPanelKey(k => k+1);
-      setLoading(false);
-      setLoadingId(null);
-    }, 480);
+  useEffect(() => {
+  const fetchProjects = async () => {
+    try {
+      const res = await getProjects();
+
+      console.log("API DATA:", res.data); // ✅ check console
+
+      setProjects(res.data);
+
+      if (res.data.length > 0) {
+        setSelected(res.data[0]);
+      }
+
+    } catch (err) {
+      console.error("Error fetching projects:", err);
+    } finally {
+      setPageLoading(false);
+    }
   };
+  setPageLoading(true);
+  fetchProjects();
+}, []);
+
+  const handleSelect = (proj) => {
+  if (!proj || proj.id === selected?.id) return;
+
+  setCardLoading(proj.id);
+
+  setTimeout(() => {
+    setSelected(proj);
+    setPanelKey(k => k + 1);
+    setCardLoading(null);
+  }, 300);
+};
 
   const p      = selected?.progress || 0;
   const budget = Number(selected?.budget || 0);
   const spent  = Number(selected?.spent || 0);
   const paid   = Number(selected?.client_paid || 0);
-  const remaining = budget - spent;
-  const timelineData = buildTimeline(selected);
+  const remaining = Math.max(0, budget - spent);
+
+  const spentPercent = budget ? (spent / budget) * 100 : 0;
+  const paidPercent = budget ? (paid / budget) * 100 : 0;
+  const timelineData = selected ? buildTimeline(selected) : [];
 
   return (
     <div className="coord-dashboard">
@@ -244,20 +250,29 @@ const ProjectCoordinatorDashboard = () => {
       </div>
 
       {/* PROJECT CARDS */}
-      <div className="coord-projects">
-        {projects.map(proj => (
-          <CoordProjectCard key={proj.id} proj={proj}
-            isActive={selected?.id === proj.id}
-            isLoading={loadingId === proj.id}
-            onClick={() => handleSelect(proj)}/>
-        ))}
-      </div>
+<div className="coord-projects">
+  {pageLoading ? (
+    <p>Loading projects...</p>
+  ) : projects.length === 0 ? (
+    <p>No projects found</p>
+  ) : (
+    projects.map(proj => (
+      <CoordProjectCard
+        key={proj.id}
+        proj={proj}
+        isActive={selected?.id === proj.id}
+        isLoading={cardLoading === proj.id} // ✅ fixed
+        onClick={() => handleSelect(proj)}
+      />
+    ))
+  )}
+</div>
 
       {/* DETAIL + CHART */}
       {selected && (
         <div className="coord-main-grid" key={panelKey}>
 
-          {loading ? <DetailPanelSkeleton /> : (
+          {cardLoading ? <DetailPanelSkeleton /> : (
             <div className="coord-detail-panel coord-panel-enter">
               <div className="coord-detail-panel__header">
                 <div>
@@ -275,18 +290,32 @@ const ProjectCoordinatorDashboard = () => {
               </div>
 
               <div className="coord-budget-section">
-                <div className="coord-budget-bar-track">
-                  <div className="coord-budget-bar-fill coord-budget-bar-fill--spent"
-                    style={{ width:`${Math.min(100,(spent/budget)*100)}%` }}/>
-                  <div className="coord-budget-bar-fill coord-budget-bar-fill--paid"
-                    style={{ width:`${Math.min(100,(paid/budget)*100)}%` }}/>
-                </div>
-                <div className="coord-budget-legend">
-                  <span className="coord-budget-legend__item"><span className="dot dot--red"/>Spent {fmt(spent)}</span>
-                  <span className="coord-budget-legend__item"><span className="dot dot--green"/>Received {fmt(paid)}</span>
-                  <span className="coord-budget-legend__item"><span className="dot dot--blue"/>Remaining {fmt(remaining)}</span>
-                </div>
+              <div className="coord-budget-bar-track">
+
+                <div
+                  className="coord-budget-bar-fill coord-budget-bar-fill--spent"
+                  style={{ width: `${Math.min(100, spentPercent)}%` }}
+                />
+
+                <div
+                  className="coord-budget-bar-fill coord-budget-bar-fill--paid"
+                  style={{ width: `${Math.min(100, paidPercent)}%` }}
+                />
+
               </div>
+
+              <div className="coord-budget-legend">
+                <span className="coord-budget-legend__item">
+                  <span className="dot dot--red" /> Spent {fmt(spent)}
+                </span>
+                <span className="coord-budget-legend__item">
+                  <span className="dot dot--green" /> Received {fmt(paid)}
+                </span>
+                <span className="coord-budget-legend__item">
+                  <span className="dot dot--blue" /> Remaining {fmt(remaining)}
+                </span>
+              </div>
+            </div>
 
               <div className="coord-info-grid">
                 <DetailRow icon="📍" label="Location"      value={selected.location}/>
@@ -316,7 +345,7 @@ const ProjectCoordinatorDashboard = () => {
               <span className="coord-chart-legend__item"><span className="dot dot--red"/>Delay Risk</span>
             </div>
 
-            {loading ? <Skeleton h={220} r={10}/> : (
+            {cardLoading ? <Skeleton h={220} r={10}/> : (
               <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={timelineData} margin={{ top:10, right:12, left:-20, bottom:0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8"/>

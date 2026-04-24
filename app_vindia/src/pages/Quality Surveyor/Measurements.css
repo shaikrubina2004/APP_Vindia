@@ -1,45 +1,77 @@
 .measure-container {
   padding: 20px;
-  background: #f5f7fb;
+  background: #eef2f7;
   min-height: 100vh;
+
+  width: 100%;
+  max-width: 100%;
 }
 
-/* HEADER */
-.measure-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 15px;
+.title {
+  margin-bottom: 16px;
 }
 
-/* FORM */
-.measure-form {
+/* CARDS */
+.cards {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 10px;
-  background: white;
-  padding: 15px;
-  border-radius: 12px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
   margin-bottom: 20px;
 }
 
-.measure-form input,
-.measure-form select {
-  padding: 8px;
-  border-radius: 8px;
+.card {
+  padding: 18px;
+  border-radius: 14px;
+  color: white;
+  text-align: center;
+  width: 100%;
+}
+
+.card {
+  padding: 18px;
+  border-radius: 14px;
+  color: white;
+  text-align: center;
+}
+
+.purple { background: #6366f1; }
+.green { background: #22c55e; }
+.orange { background: #f59e0b; }
+
+/* BOX */
+.box {
+  background: white;
+  padding: 16px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+}
+
+/* FORM */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.form-grid input,
+.form-grid select {
+  padding: 10px;
+  border-radius: 10px;
   border: 1px solid #ddd;
 }
 
-.measure-form button {
-  background: #3b82f6;
+.add-btn {
+  grid-column: span 4;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
-  border-radius: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
 }
 
 /* TABLE */
-.measure-table {
-  background: white;
-  padding: 15px;
-  border-radius: 12px;
+.table-wrapper {
+  overflow-x: auto;
 }
 
 table {
@@ -47,31 +79,91 @@ table {
   border-collapse: collapse;
 }
 
+th {
+  background: #f1f5f9;
+  text-align: left;
+}
+
 th, td {
-  padding: 10px;
+  padding: 12px;
   border-bottom: 1px solid #eee;
 }
 
 /* STATUS */
-.status.pending { color: orange; }
-.status.approved { color: green; }
-.status.rejected { color: red; }
+.status {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+}
 
-/* ACTIONS */
-.actions button {
+.status.pending {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status.approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* BUTTONS */
+button {
   margin-right: 5px;
-  border: none;
-  padding: 5px 8px;
+  padding: 6px 10px;
   border-radius: 6px;
+  border: none;
   cursor: pointer;
 }
 
 .approve { background: #22c55e; color: white; }
 .reject { background: #ef4444; color: white; }
-.boq { background: #6366f1; color: white; }
 
-/* EMPTY */
 .empty {
   text-align: center;
   color: #999;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .cards {
+    flex-direction: column;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .add-btn {
+    grid-column: span 1;
+  }
+}
+.approve-btn {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+}
+
+.reject-btn {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+}
+
+.approve-btn:hover,
+.reject-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
