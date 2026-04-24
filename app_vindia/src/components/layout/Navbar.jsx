@@ -4,7 +4,7 @@ import { useAuth } from "../../context/useAuth";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import "../../styles/layout/Navbar.css";
 import logo from "../../assets/logo.png.png";
-function Navbar() {
+function Navbar({ notificationSlot }) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   console.log("ROLE:", user?.role);
@@ -12,48 +12,55 @@ function Navbar() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
- const [userNotifications, setUserNotifications] = useState([]);
+  const [userNotifications, setUserNotifications] = useState([]);
 
-useEffect(() => {
-if (user?.role === "quantity_surveyor") {
-    // 👉 Dummy QS notifications
-   setUserNotifications([
-  {
-    id: 1,
-    type: "work", // 👈 IMPORTANT
-    severity: "warn",
-    title: "BOQ mismatch detected",
-    desc: "Check measurement vs BOQ",
-    time: "2 min ago",
-    read: false
-  },
-  {
-    id: 2,
-    type: "payment",
-    severity: "critical",
-    title: "Steel cost exceeded",
-    desc: "Budget crossed by 12%",
-    time: "10 min ago",
-    read: false
-  },
-  {
-    id: 3,
-    type: "approval",
-    severity: "info",
-    title: "Measurement pending approval",
-    desc: "Waiting for manager approval",
-    time: "30 min ago",
-    read: false
-  }
-]);
-  } else if (user?.role) {
-    // 👉 Other roles → keep your backend call
-    fetch(`/api/notifications?role=${user.role}`)
-      .then(res => res.json())
-      .then(data => setUserNotifications(data))
-      .catch(() => setUserNotifications([]));
-  }
-}, [user?.role]);
+  // NEW — wrap everything in async function:
+  useEffect(() => {
+    const loadNotifications = async () => {
+      if (user?.role === "quantity_surveyor") {
+        setUserNotifications([
+          {
+            id: 1,
+            type: "work",
+            severity: "warn",
+            title: "BOQ mismatch detected",
+            desc: "Check measurement vs BOQ",
+            time: "2 min ago",
+            read: false,
+          },
+          {
+            id: 2,
+            type: "payment",
+            severity: "critical",
+            title: "Steel cost exceeded",
+            desc: "Budget crossed by 12%",
+            time: "10 min ago",
+            read: false,
+          },
+          {
+            id: 3,
+            type: "approval",
+            severity: "info",
+            title: "Measurement pending approval",
+            desc: "Waiting for manager approval",
+            time: "30 min ago",
+            read: false,
+          },
+        ]);
+      } else if (user?.role && user.role !== "structural_engineer") {
+        // SE has its own bell — skip fetch for SE
+        try {
+          const res = await fetch(`/api/notifications?role=${user.role}`);
+          const data = await res.json();
+          setUserNotifications(data);
+        } catch {
+          setUserNotifications([]);
+        }
+      }
+    };
+
+    loadNotifications();
+  }, [user?.role]);
 
   const handleLogout = () => {
     setIsProfileOpen(false);
@@ -96,29 +103,27 @@ if (user?.role === "quantity_surveyor") {
         </div>
       </div>
 
-    
-
       {/* Right Section - User Menu */}
       <div className="navbar-right">
         {/* Quick Add Button */}
-       <button
-  className="navbar-icon-btn timesheet-btn"
-  onClick={() => navigate("/timesheet")}
-  title="Timesheet"
->
-  <svg
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
-  </svg>
-  <span>Timesheet</span>
-</button>
+        <button
+          className="navbar-icon-btn timesheet-btn"
+          onClick={() => navigate("/timesheet")}
+          title="Timesheet"
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span>Timesheet</span>
+        </button>
         <div
           className="quick-add-wrapper"
           onMouseEnter={() => setIsQuickAddOpen(true)}
@@ -202,7 +207,11 @@ if (user?.role === "quantity_surveyor") {
         </div>
 
         {/* Notification Icon */}
-        <NotificationBell notifications={userNotifications} />
+        {notificationSlot ? (
+          notificationSlot
+        ) : (
+          <NotificationBell notifications={userNotifications} />
+        )}
 
         {/* Profile Dropdown */}
         <div

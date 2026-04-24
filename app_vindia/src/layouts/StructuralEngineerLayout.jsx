@@ -1,11 +1,18 @@
 import AppLayout from "./AppLayout";
 import { StructuralEngineerMenu } from "../menus/structuralEngineerMenu";
+import { SENotificationProvider } from "../context/SENotificationContext";
+import SENotificationBell from "../components/notifications/SENotificationBell";
 
 function StructuralEngineerLayout({ children }) {
   return (
-    <AppLayout menuItems={StructuralEngineerMenu}>
-      {children}
-    </AppLayout>
+    <SENotificationProvider>
+      <AppLayout
+        menuItems={StructuralEngineerMenu}
+        notificationSlot={<SENotificationBell />}
+      >
+        {children}
+      </AppLayout>
+    </SENotificationProvider>
   );
 }
 

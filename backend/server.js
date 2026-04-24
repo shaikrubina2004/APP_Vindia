@@ -42,6 +42,8 @@ const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoute
 const structuralRoutes = require("./routes/structuralRoutes");
 const seDailyRoutes = require("./routes/seDailyupdatesRoutes");
 const rfiRoutes = require("./routes/rfiRoutes");
+const seNotificationRoutes = require("./routes/seNotificationRoutes");
+
 /* ── QS MODULES ───────────────────────────────── */
 const qsRoutes = require("./routes/qsRoutes");
 
@@ -98,12 +100,12 @@ try {
   app.use("/api/wbs", wbsRoutes);
   app.use("/api/cost-summary", costRoutes);
   app.use("/api/dashboard", dashboardRoutes);
- /* ── QS Modules ─────────────────────────────── */
- app.use("/api/qs", qsRoutes);
+ 
 /* ── Structural Engineer Modules ───────────────── */
 app.use("/api/structural", structuralRoutes);
 app.use("/api/se-daily-reports", seDailyRoutes);   // ✅ SE route
 app.use("/rfis", rfiRoutes);
+app.use("/api/se-notifications", seNotificationRoutes);
 /* ── QS Modules ───────────────── */
 app.use("/api/qs", qsRoutes);
 /* ── Other Modules ───────────────── */
