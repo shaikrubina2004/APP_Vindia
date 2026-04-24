@@ -213,3 +213,20 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+
+/* Clickable item cursor */
+.se-notif-item.clickable {
+  cursor: pointer;
+}
+
+/* "Go to page →" hint */
+.se-notif-goto {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #2563eb;
+  font-weight: 500;
+}
+.se-notif-item.read .se-notif-goto {
+  color: #9ca3af;
+}
