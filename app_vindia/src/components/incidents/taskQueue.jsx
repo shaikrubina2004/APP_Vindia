@@ -286,29 +286,13 @@ export default function TaskQueue({
     const file = e.target.files[0];
     if (!file) return;
 
-    // Convert to base64
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const base64 = ev.target.result;
       try {
         await API.post(`/incidents/tasks/${taskId}/photos`, { url: base64 });
-        // Optimistic update
-        setIncidents((prev) =>
-          prev.map((inc) => ({
-            ...inc,
-            tasks: (inc.tasks ?? []).map((t) =>
-              t.id !== taskId
-                ? t
-                : {
-                    ...t,
-                    photos: [
-                      ...(t.photos ?? []),
-                      { id: Date.now(), url: base64, uploadedAt: new Date() },
-                    ],
-                  },
-            ),
-          })),
-        );
+        // Refresh all tasks to get updated photos from server
+        await refreshAllTasks();
       } catch (err) {
         console.error("handleTaskPhoto:", err);
         alert(

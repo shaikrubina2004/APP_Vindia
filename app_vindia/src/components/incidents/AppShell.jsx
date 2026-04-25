@@ -57,11 +57,11 @@ function normaliseTask(t) {
       text: c.body ?? c.text,
       time: new Date(c.created_at ?? c.time),
       type: c.comment_type ?? c.type ?? "comment",
-      photos: (t.photos ?? []).map((p) => ({
-        id: p.id,
-        url: p.url,
-        uploadedAt: new Date(p.uploaded_at ?? p.uploadedAt),
-      })),
+    })),
+    photos: (t.photos ?? []).map((p) => ({
+      id: p.id,
+      url: p.url,
+      uploadedAt: new Date(p.uploaded_at ?? p.uploadedAt),
     })),
   };
 }
