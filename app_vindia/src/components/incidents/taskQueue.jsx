@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { API } from "../../services/authService";
 import { useAuth } from "../../context/useAuth";
+import StandaloneTaskModal from "./StandaloneTaskModal";
+import { useRef } from "react";
 
 import {
   PRIORITY_CONFIG,
@@ -96,7 +98,13 @@ function BlockedReasonModal({ task, onConfirm, onCancel }) {
   );
 }
 
-export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
+export default function TaskQueue({
+  incidents,
+  setIncidents,
+  users,
+  onNavigateBack,
+  refreshAllTasks,
+}) {
   const { user: currentUser } = useAuth();
 
   const [filterRole, setFilterRole] = useState("All");
@@ -106,6 +114,8 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [blockingTask, setBlockingTask] = useState(null);
   const [commentText, setCommentText] = useState("");
+  const [showNewTask, setShowNewTask] = useState(false);
+  const taskFileRef = useRef(null);
 
   const allTasks = incidents.flatMap((inc) =>
     (inc.tasks ?? []).map((t) => ({
@@ -246,6 +256,70 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
     }
   };
 
+  const handleCreateStandaloneTask = async (task) => {
+    try {
+      const res = await API.post("/incidents/tasks/standalone", {
+        title: task.title,
+        note: task.note,
+        priority: task.priority,
+        assigned_to_user_id: task.assignedId,
+      });
+
+      // Upload photo if attached
+      if (task.photoPreview && res.data.data?.id) {
+        await API.post(`/incidents/tasks/${res.data.data.id}/photos`, {
+          url: task.photoPreview,
+        });
+      }
+
+      await refreshAllTasks();
+    } catch (err) {
+      console.error("createStandaloneTask:", err);
+      alert(
+        "Failed to create task: " +
+          (err.response?.data?.message ?? err.message),
+      );
+    }
+  };
+
+  const handleTaskPhoto = async (e, taskId) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result;
+      try {
+        await API.post(`/incidents/tasks/${taskId}/photos`, { url: base64 });
+        // Optimistic update
+        setIncidents((prev) =>
+          prev.map((inc) => ({
+            ...inc,
+            tasks: (inc.tasks ?? []).map((t) =>
+              t.id !== taskId
+                ? t
+                : {
+                    ...t,
+                    photos: [
+                      ...(t.photos ?? []),
+                      { id: Date.now(), url: base64, uploadedAt: new Date() },
+                    ],
+                  },
+            ),
+          })),
+        );
+      } catch (err) {
+        console.error("handleTaskPhoto:", err);
+        alert(
+          "Failed to upload photo: " +
+            (err.response?.data?.message ?? err.message),
+        );
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const stats = {
     total: allTasks.length,
     pending: allTasks.filter((t) => t.status === "Pending").length,
@@ -270,6 +344,25 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
             <h1>Task Queue</h1>
             <p>Tasks generated from incidents — assigned to team members</p>
           </div>
+        </div>
+        <div className="inc-header-actions">
+          <button
+            className="inc-create-btn"
+            onClick={() => setShowNewTask(true)}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            New Task
+          </button>
         </div>
       </div>
 
@@ -514,6 +607,9 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                         </svg>
                         {task.assignedName}
                       </span>
+                      <span className="inc-assignee">
+                        📤 {task.createdByName || "—"}
+                      </span>
                       <span className="inc-time">
                         {timeAgo(task.createdAt)}
                       </span>
@@ -603,6 +699,11 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                 { label: "Assigned Role", val: selectedTask.assignedTo || "—" },
                 { label: "Assignee", val: selectedTask.assignedName || "—" },
                 {
+                  label: "Assigned By",
+                  val: selectedTask.createdByName || "—",
+                },
+
+                {
                   label: "Task Priority",
                   val: (
                     <span
@@ -647,6 +748,47 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
                 <p className="inc-detail-desc">{selectedTask.note}</p>
               </div>
             )}
+
+            {/* Photos */}
+            <div className="inc-detail-section">
+              <span className="inc-section-title">
+                Photos ({(selectedTask.photos ?? []).length})
+              </span>
+              {(selectedTask.photos ?? []).length > 0 && (
+                <div className="inc-photos-grid">
+                  {(selectedTask.photos ?? []).map((p) => (
+                    <a key={p.id} href={p.url} target="_blank" rel="noreferrer">
+                      <img src={p.url} alt="task" className="inc-photo-thumb" />
+                    </a>
+                  ))}
+                </div>
+              )}
+              <div
+                className="inc-photo-upload"
+                onClick={() => taskFileRef.current.click()}
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                <span>Click to upload photo</span>
+              </div>
+              <input
+                ref={taskFileRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => handleTaskPhoto(e, selectedTask.id)}
+              />
+            </div>
 
             {/* Update Status */}
             <div className="inc-detail-section">
@@ -781,6 +923,13 @@ export default function TaskQueue({ incidents, setIncidents, onNavigateBack }) {
           task={blockingTask}
           onConfirm={handleBlockedConfirm}
           onCancel={() => setBlockingTask(null)}
+        />
+      )}
+      {showNewTask && (
+        <StandaloneTaskModal
+          users={users}
+          onClose={() => setShowNewTask(false)}
+          onSubmit={handleCreateStandaloneTask}
         />
       )}
     </div>

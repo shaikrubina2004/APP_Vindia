@@ -12,6 +12,7 @@ function normaliseIncident(inc) {
     description: inc.description ?? "",
     priority: inc.priority,
     status: inc.status,
+    createdByName: inc.created_by_name ?? "",
     assignedTo: inc.assigned_role ?? "",
     assignedName: inc.assigned_to_name ?? "",
     assignedId: inc.assigned_to_id ?? null,
@@ -44,6 +45,8 @@ function normaliseTask(t) {
     note: t.note ?? "",
     priority: t.priority,
     status: t.status,
+    createdById: t.created_by_id ?? null,
+    createdByName: t.created_by_name ?? "",
     assignedTo: t.role_name ?? t.assignedTo ?? "",
     assignedName: t.assignee_name ?? t.assignedName ?? "",
     assignedId: t.assignee_id ?? t.assignedId ?? null,
@@ -54,6 +57,11 @@ function normaliseTask(t) {
       text: c.body ?? c.text,
       time: new Date(c.created_at ?? c.time),
       type: c.comment_type ?? c.type ?? "comment",
+      photos: (t.photos ?? []).map((p) => ({
+        id: p.id,
+        url: p.url,
+        uploadedAt: new Date(p.uploaded_at ?? p.uploadedAt),
+      })),
     })),
   };
 }
@@ -258,6 +266,7 @@ export default function AppShell() {
           users={users}
           refreshIncident={refreshIncident}
           onNavigateBack={navigateToIncidents}
+          refreshAllTasks={fetchAllTasks}
         />
       )}
     </>

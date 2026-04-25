@@ -508,6 +508,9 @@ export default function IncidentManagement({
                     </svg>
                     {inc.assignedName || "—"}
                   </span>
+                  <span className="inc-assignee">
+                    📤 {inc.createdByName || "—"}
+                  </span>
                   <span className={`inc-deadline ${overdue ? "overdue" : ""}`}>
                     {["Resolved", "Closed"].includes(inc.status)
                       ? `✔ ${inc.status}`
@@ -617,6 +620,10 @@ export default function IncidentManagement({
                   ),
                 },
                 { label: "Created", val: timeAgo(selectedIncident.createdAt) },
+                {
+                  label: "Raised By",
+                  val: selectedIncident.createdByName || "—",
+                },
                 {
                   label: "Last Updated",
                   val: timeAgo(selectedIncident.updatedAt),

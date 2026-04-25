@@ -1739,3 +1739,24 @@
   background: #f0e6ff;
   color: #7c3aed;
 }
+
+.inc-photos-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.inc-photo-thumb {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.inc-photo-thumb:hover {
+  opacity: 0.8;
+}

@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import "../../styles/MEPEngineer.css";
 
+/* ═══════════════════════════════════════
+   DRAWINGS DATA
+═══════════════════════════════════════ */
 const DRAWINGS = [
   {
     id: 1,
@@ -160,17 +163,374 @@ const DRAWINGS = [
   },
 ];
 
+/* ═══════════════════════════════════════
+   VERSION DATA  (keyed by drawing id)
+   In production this comes from your API
+═══════════════════════════════════════ */
+const VERSION_DATA = {
+  1: [
+    {
+      rev: "Rev-4",
+      current: true,
+      date: "Today · 10:32 AM",
+      uploader: "MEP Engineer (You)",
+      title: "Duct sizing corrected after structural review",
+      note: "Revised duct dimensions in Zone C to avoid structural clash. All team members notified. Previous version archived.",
+      adds: ["Zone C duct resize"],
+      mods: ["AHU position adjusted"],
+      dels: [],
+    },
+    {
+      rev: "Rev-3",
+      current: false,
+      date: "3 days ago",
+      uploader: "MEP Engineer",
+      title: "Added exhaust ventilation for stairwell",
+      note: "New exhaust vent added as per Architect requirement. Coordinated with Structural for slab penetration.",
+      adds: ["Stairwell exhaust"],
+      mods: ["Riser routing updated"],
+      dels: [],
+    },
+    {
+      rev: "Rev-2",
+      current: false,
+      date: "1 week ago",
+      uploader: "MEP Engineer",
+      title: "Client comment — fresh air supply points added",
+      note: "Added fresh air supply points per client walkthrough comments.",
+      adds: ["Fresh air supply points"],
+      mods: [],
+      dels: [],
+    },
+    {
+      rev: "Rev-1",
+      current: false,
+      date: "2 weeks ago",
+      uploader: "MEP Engineer",
+      title: "Initial issue for coordination",
+      note: "First version issued for inter-discipline coordination review.",
+      adds: ["Initial drawing"],
+      mods: [],
+      dels: [],
+    },
+  ],
+  3: [
+    {
+      rev: "Rev-2",
+      current: false,
+      date: "5 days ago",
+      uploader: "MEP Engineer",
+      title: "Clash flagged — coordination pending",
+      note: "Structural beam conflict identified in Zone B. Drawing flagged pending resolution with Structural team.",
+      adds: [],
+      mods: ["Zone B routing adjusted"],
+      dels: [],
+    },
+    {
+      rev: "Rev-1",
+      current: false,
+      date: "2 weeks ago",
+      uploader: "MEP Engineer",
+      title: "Initial issue for coordination",
+      note: "First version issued for coordination.",
+      adds: ["Initial drawing"],
+      mods: [],
+      dels: [],
+    },
+  ],
+  8: [
+    {
+      rev: "Rev-3",
+      current: true,
+      date: "Today · 08:20 AM",
+      uploader: "MEP Engineer (You)",
+      title: "Pipe routing updated after beam layout change",
+      note: "Structural issued new beam positions. Pipe routes updated to avoid conflicts on Ground Floor.",
+      adds: [],
+      mods: ["Cold water main rerouted", "HW return loop"],
+      dels: [],
+    },
+    {
+      rev: "Rev-2",
+      current: false,
+      date: "4 days ago",
+      uploader: "MEP Engineer",
+      title: "Toilet block added — Type B unit",
+      note: "New toilet block added as per Architect layout Rev4.",
+      adds: ["Type B toilet block"],
+      mods: [],
+      dels: [],
+    },
+    {
+      rev: "Rev-1",
+      current: false,
+      date: "2 weeks ago",
+      uploader: "MEP Engineer",
+      title: "Initial issue",
+      note: "First version for coordination.",
+      adds: ["Initial drawing"],
+      mods: [],
+      dels: [],
+    },
+  ],
+};
+
+/* fallback versions for drawings without specific data */
+function getDefaultVersions(drawing) {
+  return [
+    {
+      rev: drawing.rev,
+      current: true,
+      date: drawing.date,
+      uploader: "MEP Engineer (You)",
+      title: `Latest revision — ${drawing.name}`,
+      note: "Updated after coordination review with Architect and Structural team.",
+      adds: [],
+      mods: ["Routing updated per latest coordination"],
+      dels: [],
+    },
+    {
+      rev: "Rev-2",
+      current: false,
+      date: "1 week ago",
+      uploader: "MEP Engineer",
+      title: "Intermediate revision",
+      note: "Changes incorporated after site inspection.",
+      adds: [],
+      mods: ["Minor adjustments"],
+      dels: [],
+    },
+    {
+      rev: "Rev-1",
+      current: false,
+      date: "3 weeks ago",
+      uploader: "MEP Engineer",
+      title: "Initial issue for coordination",
+      note: "First version issued for inter-discipline coordination review.",
+      adds: ["Initial drawing"],
+      mods: [],
+      dels: [],
+    },
+  ];
+}
+
 const DISC_ICON = { M: "🔧", E: "⚡", P: "🚿" };
+
 const FILTERS = [
-  { key: "all", label: "All (12)" },
-  { key: "M", label: "🔧 Mechanical (4)" },
-  { key: "E", label: "⚡ Electrical (3)" },
-  { key: "P", label: "🚿 Plumbing (5)" },
+  { key: "all", label: "All" },
+  { key: "M", label: "🔧 Mechanical" },
+  { key: "E", label: "⚡ Electrical" },
+  { key: "P", label: "🚿 Plumbing" },
 ];
 
+/* ═══════════════════════════════════════
+   CHANGE CHIP
+═══════════════════════════════════════ */
+function ChangeChip({ label, type }) {
+  const cls = type === "add" ? "cc-add" : type === "mod" ? "cc-mod" : "cc-del";
+  const pre = type === "add" ? "+ " : type === "mod" ? "~ " : "− ";
+  return (
+    <span className={`badge ${cls}`} style={{ fontSize: 9 }}>
+      {pre}
+      {label}
+    </span>
+  );
+}
+
+/* ═══════════════════════════════════════
+   SLIDE-OUT VERSIONS PANEL
+═══════════════════════════════════════ */
+function VersionsPanel({ drawing, onClose }) {
+  const versions = VERSION_DATA[drawing.id] || getDefaultVersions(drawing);
+
+  /* close on Escape key */
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <>
+      {/* dimmed backdrop — click to close */}
+      <div className="slideout-overlay" onClick={onClose} />
+
+      {/* panel */}
+      <div className="slideout-panel">
+        {/* head */}
+        <div className="slideout-head">
+          <div>
+            <h3>🗂️ Version History</h3>
+            <p>
+              <span
+                className={`badge ${drawing.discBadge}`}
+                style={{ marginRight: 6 }}
+              >
+                {drawing.discLabel}
+              </span>
+              {drawing.name} · {drawing.floor}
+            </p>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        {/* body */}
+        <div className="slideout-body">
+          {/* current version highlight box */}
+          <div
+            style={{
+              background: "rgba(30,90,150,0.06)",
+              border: "1px solid rgba(30,90,150,0.15)",
+              borderRadius: 10,
+              padding: "12px 14px",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--text-secondary)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.4px",
+                  marginBottom: 3,
+                }}
+              >
+                Current Version
+              </div>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: "var(--primary-blue)",
+                  fontFamily: "Monaco,monospace",
+                }}
+              >
+                {drawing.rev}
+              </div>
+            </div>
+            <div style={{ marginLeft: "auto", textAlign: "right" }}>
+              <span
+                className={`status-pill ${drawing.latest ? "pill-latest" : "pill-open"}`}
+              >
+                {drawing.latest ? "Latest" : "Outdated"}
+              </span>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "var(--text-secondary)",
+                  marginTop: 4,
+                }}
+              >
+                Last updated: {drawing.date}
+              </div>
+            </div>
+          </div>
+
+          {/* version count label */}
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "var(--text-secondary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.4px",
+              marginBottom: 10,
+            }}
+          >
+            Full Revision History — {versions.length} version
+            {versions.length > 1 ? "s" : ""}
+          </div>
+
+          {/* timeline */}
+          <div className="ver-timeline">
+            {versions.map((v, i) => (
+              <div className="ver-entry" key={v.rev}>
+                <div className="ver-spine">
+                  <div className={`ver-dot ${v.current ? "current" : "old"}`} />
+                  {i < versions.length - 1 && <div className="ver-connector" />}
+                </div>
+                <div className="ver-content">
+                  <div className="ver-head">
+                    <span className="ver-rev">{v.rev}</span>
+                    <span
+                      className={`status-pill ${v.current ? "pill-latest" : "pill-archived"}`}
+                    >
+                      {v.current ? "✓ Current" : "Archived"}
+                    </span>
+                    <span className="ver-date">{v.date}</span>
+                  </div>
+                  <div className="ver-uploader">👤 {v.uploader}</div>
+                  <div className="ver-title">{v.title}</div>
+                  <div className="ver-note">{v.note}</div>
+                  <div className="ver-changes">
+                    {v.adds.map((a) => (
+                      <ChangeChip key={a} label={a} type="add" />
+                    ))}
+                    {v.mods.map((m) => (
+                      <ChangeChip key={m} label={m} type="mod" />
+                    ))}
+                    {v.dels.map((d) => (
+                      <ChangeChip key={d} label={d} type="del" />
+                    ))}
+                  </div>
+                  <div className="ver-actions">
+                    <button
+                      className={v.current ? "btn-primary" : "btn-outline"}
+                      style={{ padding: "5px 12px", fontSize: 11 }}
+                    >
+                      📥 {v.current ? "Download Current" : "Download"}
+                    </button>
+                    <button
+                      className="btn-outline"
+                      style={{ padding: "5px 12px", fontSize: 11 }}
+                    >
+                      👁 View
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* foot */}
+        <div className="slideout-foot">
+          <a
+            href="/mep/version-control"
+            className="btn-outline"
+            style={{ flex: 1, justifyContent: "center" }}
+          >
+            Open Full Version Control
+          </a>
+          <a
+            href="/mep/upload"
+            className="btn-primary"
+            style={{ flex: 1, justifyContent: "center" }}
+          >
+            ⬆️ Upload New Version
+          </a>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════ */
 export default function MEPDrawings() {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [versionsFor, setVersionsFor] = useState(null); /* drawing obj | null */
 
   const visible = DRAWINGS.filter((d) => {
     const mDisc = filter === "all" || d.disc === filter;
@@ -180,9 +540,16 @@ export default function MEPDrawings() {
     return mDisc && mSearch;
   });
 
+  const counts = {
+    all: DRAWINGS.length,
+    M: DRAWINGS.filter((d) => d.disc === "M").length,
+    E: DRAWINGS.filter((d) => d.disc === "E").length,
+    P: DRAWINGS.filter((d) => d.disc === "P").length,
+  };
+
   return (
     <div className="mep-page">
-      {/* ── Header ── */}
+      {/* ── HEADER ── */}
       <div className="mep-header">
         <div>
           <h1>MEP Drawings</h1>
@@ -207,13 +574,33 @@ export default function MEPDrawings() {
         </div>
       </div>
 
-      {/* ── Stats ── */}
+      {/* ── STAT CARDS ── */}
       <div className="stats-row">
         {[
-          { icon: "📐", label: "Total Drawings", value: "24", ic: "ic-blue" },
-          { icon: "✅", label: "Latest Version", value: "18", ic: "ic-green" },
-          { icon: "🕐", label: "Pending Review", value: "6", ic: "ic-amber" },
-          { icon: "🚩", label: "Clash Flagged", value: "3", ic: "ic-red" },
+          {
+            icon: "📐",
+            label: "Total Drawings",
+            value: DRAWINGS.length,
+            ic: "ic-blue",
+          },
+          {
+            icon: "✅",
+            label: "Latest Version",
+            value: DRAWINGS.filter((d) => d.latest).length,
+            ic: "ic-green",
+          },
+          {
+            icon: "🕐",
+            label: "Outdated",
+            value: DRAWINGS.filter((d) => !d.latest).length,
+            ic: "ic-amber",
+          },
+          {
+            icon: "🚩",
+            label: "Clash Flagged",
+            value: DRAWINGS.filter((d) => d.flag).length,
+            ic: "ic-red",
+          },
         ].map((s) => (
           <div className="stat-card" key={s.label}>
             <div className={`stat-icon-wrap ${s.ic}`}>{s.icon}</div>
@@ -225,7 +612,7 @@ export default function MEPDrawings() {
         ))}
       </div>
 
-      {/* ── Filter / Search Bar ── */}
+      {/* ── FILTER + SEARCH BAR ── */}
       <div className="controls-bar">
         <div className="filter-chips">
           {FILTERS.map((f) => (
@@ -234,7 +621,7 @@ export default function MEPDrawings() {
               className={`filter-chip${filter === f.key ? " active" : ""}`}
               onClick={() => setFilter(f.key)}
             >
-              {f.label}
+              {f.label} ({counts[f.key]})
             </button>
           ))}
         </div>
@@ -254,14 +641,14 @@ export default function MEPDrawings() {
           </svg>
           <input
             type="text"
-            placeholder="Search drawings..."
+            placeholder="Search by name or floor..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
 
-      {/* ── Drawing Rows (attendance-style) ── */}
+      {/* ── DRAWING ROWS ── */}
       <div className="records-list">
         {visible.length === 0 && (
           <div className="no-records">
@@ -272,30 +659,45 @@ export default function MEPDrawings() {
         {visible.map((d) => (
           <div
             key={d.id}
-            className={`record-row ${d.disc === "M" ? "bl-blue" : d.disc === "E" ? "bl-purple" : "bl-green"}`}
+            className={`record-row ${
+              d.disc === "M"
+                ? "bl-blue"
+                : d.disc === "E"
+                  ? "bl-purple"
+                  : "bl-green"
+            }`}
           >
-            {/* Icon avatar */}
+            {/* discipline avatar */}
             <div className="row-avatar">
               <span className="row-avatar-icon">{DISC_ICON[d.disc]}</span>
             </div>
 
-            {/* Name + discipline pill */}
-            <div className="row-main" style={{ width: 220, flex: "none" }}>
+            {/* name + tags */}
+            <div className="row-main" style={{ width: 230, flex: "none" }}>
               <span className="row-name">{d.name}</span>
-              <div style={{ display: "flex", gap: 5, marginTop: 3 }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 5,
+                  marginTop: 3,
+                  flexWrap: "wrap",
+                }}
+              >
                 <span className={`badge ${d.discBadge}`}>{d.discLabel}</span>
                 {d.flag && <span className="badge badge-red">🚩 Clash</span>}
               </div>
             </div>
 
             <div className="row-divider" />
-            <div className="row-meta" style={{ width: 90 }}>
+
+            <div className="row-meta" style={{ width: 96 }}>
               <span className="row-meta-label">Floor</span>
-              <span className="row-meta-value row-meta-mono">{d.floor}</span>
+              <span className="row-meta-value">{d.floor}</span>
             </div>
 
             <div className="row-divider" />
-            <div className="row-meta" style={{ width: 70 }}>
+
+            <div className="row-meta" style={{ width: 68 }}>
               <span className="row-meta-label">Revision</span>
               <span className="row-meta-value row-meta-mono row-meta-blue">
                 {d.rev}
@@ -303,19 +705,22 @@ export default function MEPDrawings() {
             </div>
 
             <div className="row-divider" />
-            <div className="row-meta" style={{ width: 60 }}>
+
+            <div className="row-meta" style={{ width: 58 }}>
               <span className="row-meta-label">Size</span>
               <span className="row-meta-value row-meta-mono">{d.size}</span>
             </div>
 
             <div className="row-divider" />
-            <div className="row-meta" style={{ width: 80 }}>
+
+            <div className="row-meta" style={{ width: 86 }}>
               <span className="row-meta-label">Uploaded</span>
               <span className="row-meta-value">{d.date}</span>
             </div>
 
             <div className="row-divider" />
-            <div className="row-meta" style={{ width: 70 }}>
+
+            <div className="row-meta" style={{ width: 66 }}>
               <span className="row-meta-label">Status</span>
               <span
                 className={`status-pill ${d.latest ? "pill-latest" : "pill-open"}`}
@@ -326,6 +731,7 @@ export default function MEPDrawings() {
 
             <div className="row-spacer" />
 
+            {/* actions */}
             <div className="row-actions">
               <button
                 className="btn-outline"
@@ -339,9 +745,11 @@ export default function MEPDrawings() {
               >
                 ⬇ Download
               </button>
+              {/* ── Versions button opens slide-out panel ── */}
               <button
                 className="btn-primary"
                 style={{ padding: "7px 14px", fontSize: 11 }}
+                onClick={() => setVersionsFor(d)}
               >
                 🗂 Versions
               </button>
@@ -349,6 +757,14 @@ export default function MEPDrawings() {
           </div>
         ))}
       </div>
+
+      {/* ── SLIDE-OUT VERSIONS PANEL ── */}
+      {versionsFor && (
+        <VersionsPanel
+          drawing={versionsFor}
+          onClose={() => setVersionsFor(null)}
+        />
+      )}
     </div>
   );
 }

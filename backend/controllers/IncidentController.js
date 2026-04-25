@@ -283,6 +283,45 @@ exports.createIncident = async (req, res) => {
   }
 };
 
+exports.createStandaloneTask = async (req, res) => {
+  const { title, note, priority = "P2", assigned_to_user_id } = req.body;
+  const created_by = req.user?.id ?? null;
+
+  if (!title?.trim())
+    return res
+      .status(400)
+      .json({ success: false, message: "Title is required" });
+  if (!assigned_to_user_id)
+    return res
+      .status(400)
+      .json({ success: false, message: "Assignee is required" });
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { rows } = await client.query(
+      `INSERT INTO tasks (title, note, priority, assigned_to, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [title.trim(), note ?? null, priority, assigned_to_user_id, created_by],
+    );
+
+    await client.query("COMMIT");
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("createStandaloneTask:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create task",
+      detail: err.message,
+    });
+  } finally {
+    client.release();
+  }
+};
+
 // PATCH /api/incidents/:id
 exports.updateIncident = async (req, res) => {
   const { id } = req.params;
@@ -476,9 +515,11 @@ exports.getAllTasks = async (req, res) => {
     let idx = 1;
 
     // ── Scope to current user (assignee only for task queue) ──
+    // Scope to tasks assigned TO the current user OR created BY the current user
     if (userId !== null) {
-      conditions.push(`assignee_id = $${idx++}`);
-      params.push(userId);
+      conditions.push(`(assignee_id = $${idx} OR created_by_id = $${idx + 1})`);
+      params.push(userId, userId);
+      idx += 2;
     }
 
     if (role) {
@@ -771,6 +812,30 @@ exports.addTaskComment = async (req, res) => {
   } catch (err) {
     console.error("addTaskComment:", err);
     res.status(500).json({ success: false, message: "Failed to add comment" });
+  }
+};
+
+exports.addTaskPhoto = async (req, res) => {
+  const { taskId } = req.params;
+  const { url } = req.body;
+  const uploaded_by = req.user?.id ?? null;
+
+  if (!url?.trim())
+    return res
+      .status(400)
+      .json({ success: false, message: "Photo URL is required" });
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO task_photos (task_id, url, uploaded_by)
+       VALUES ($1, $2, $3)
+       RETURNING id, url, uploaded_at`,
+      [taskId, url.trim(), uploaded_by],
+    );
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error("addTaskPhoto:", err);
+    res.status(500).json({ success: false, message: "Failed to add photo" });
   }
 };
 

@@ -14,10 +14,13 @@ router.get("/roles/:roleId/users", c.getUsersByRole);
 router.get("/stats", c.getStats);
 
 // ── Task queue (before /:id) ──────────────────────────────────
+// ── Task queue (before /:id) ──────────────────────────────────
 router.get("/tasks", c.getAllTasks);
+router.post("/tasks/standalone", c.createStandaloneTask); // ← MUST BE FIRST
 router.patch("/tasks/:taskId/status", c.updateTaskStatus);
 router.delete("/tasks/:taskId", c.deleteTask);
 router.post("/tasks/:taskId/comments", c.addTaskComment);
+router.post("/tasks/:taskId/photos", c.addTaskPhoto);
 
 // ── Incidents ─────────────────────────────────────────────────
 router.get("/", c.getAllIncidents);
