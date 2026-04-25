@@ -1,3 +1,7 @@
+/* ============================= */
+/* MEP ENGINEER — SHARED STYLES  */
+/* ============================= */
+
 :root {
   --primary-blue: #1e5a96;
   --secondary-blue: #2b7abc;
@@ -1490,65 +1494,6 @@
   background: rgba(30, 90, 150, 0.03);
 }
 
-/* ----- RESPONSIVE INCIDENT TABLE (Mobile-Friendly Card Layout) ----- */
-@media (max-width: 768px) {
-  .incidents-table thead {
-    display: none;
-  }
-  .incidents-table tbody tr {
-    display: block;
-    margin-bottom: 16px;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    background: white;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-    transition: all 0.2s ease;
-  }
-  .incidents-table tbody tr:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 14px rgba(30, 90, 150, 0.1);
-  }
-  .incidents-table td {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--border-color);
-    font-size: 11px;
-    flex-wrap: wrap;
-  }
-  .incidents-table td:last-child {
-    border-bottom: none;
-  }
-  .incidents-table td::before {
-    content: attr(data-label);
-    font-weight: 700;
-    color: var(--text-secondary);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    flex-shrink: 0;
-    width: 90px;
-  }
-  .incidents-table td[data-label="Title"] {
-    font-weight: 600;
-    font-size: 12px;
-    background: #f9fafb;
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
-  }
-  .incidents-table td[data-label="Title"]::before {
-    color: var(--primary-blue);
-  }
-  .incidents-table .badge,
-  .incidents-table .status-pill {
-    margin-left: auto;
-    white-space: normal;
-    text-align: right;
-  }
-}
-
 /* ============================= */
 /* ALERT BANNERS                 */
 /* ============================= */
@@ -2617,7 +2562,7 @@
 }
 
 /* ============================= */
-/* RESPONSIVE (GLOBAL OVERRIDES) */
+/* RESPONSIVE                    */
 /* ============================= */
 
 @media (max-width: 1200px) {
