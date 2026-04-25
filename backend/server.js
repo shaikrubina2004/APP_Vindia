@@ -46,6 +46,7 @@ const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoute
 
 /* ── ARCHITECT ───────────────────────────────── */
 const architectProjectsRoutes = require("./routes/architectProjects");
+const architectDailyLogRoutes = require("./routes/architectDailyLogRoutes");
 
 /* ── STRUCTURAL ENGINEER MODULES ───────────────────────────────── */
 const structuralRoutes = require("./routes/structuralRoutes");
@@ -133,7 +134,7 @@ app.use("/api/analysis", analysisRoutes);
 
   /* ── 🔥 Architect ─────────────────────── */
   app.use("/api/architect", architectProjectsRoutes);
-  
+  app.use("/api/architect-daily-log", architectDailyLogRoutes);
   /* ── Site Engineer Modules ─────────────────────────────── */
   app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes); // Site Engineer RFI
   app.use("/api/ncr", ncrRoutes);

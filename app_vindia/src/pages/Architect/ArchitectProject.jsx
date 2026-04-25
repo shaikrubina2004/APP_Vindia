@@ -255,7 +255,7 @@ const fetchProjects = async () => {
 
   modules: {
     tasks: { count: 0, urgent: 0, label: "" },
-    dailyLogs: { count: 0, urgent: 0, label: "" },
+    dailyLogs: { count: p.daily_log_count ?? 0, urgent: 0, label: "" },
     designs: { count: 0, urgent: 0, label: "" },
     incidents: { count: 0, urgent: 0, label: "" },
     coordination: { count: 0, urgent: 0, label: "" },

@@ -566,14 +566,12 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/architect/tasks"
+    <Route
+        path="/architect/incidents"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
             <ArchitectLayout>
-              <ArchitectTasks />
+              <AppShell />
             </ArchitectLayout>
-          </ProtectedRoute>
         }
       />
       <Route

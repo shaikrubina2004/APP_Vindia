@@ -7,9 +7,8 @@ export const ArchitectMenu = [
   { 
     /* This is where you handle task assigning */
     name: "Tasks", 
-    path: "/architect/tasks", 
+    path: "/architect/incidents?page=tasks", 
     icon: "file-text" 
-   
   },
 
   { 

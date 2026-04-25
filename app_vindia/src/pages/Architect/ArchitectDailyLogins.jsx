@@ -1,500 +1,773 @@
-import { useState, useEffect, useRef} from "react";
+import { useState, useEffect, useRef } from "react";
 import "./ArchitectDailyLogins.css";
 import { getArchitectProjects } from "../../services/architectprojectService";
-import { submitDailyLog } from "../../services/architectDailyLogService";
-/* ══════════════════════════════════════════════════════
-   ARCHITECT DAILY LOG — Focused ERP Module
-   Sections: Basic Info · Tasks · Work Done ·
-             Issues / Blockers · Attachments · Submit
-══════════════════════════════════════════════════════ */
+import { submitDailyLog, getDailyLog } from "../../services/architectDailyLogService";
 
-/* ─── Constants ─── */
+const STATUSES = ["To Do", "In Progress", "Under Review", "Done"];
 
+const ISSUE_TYPES = [
+  "Design Issue",
+  "Missing Info",
+  "Structural Conflict",
+  "MEP Conflict",
+  "Site Issue",
+  "Client Change",
+];
 
-const TASK_STATUS = ["To Do", "In Progress", "Under Review", "Done"];
-const ISSUE_TYPES = ["Design Issue", "Missing Info", "Structural Conflict", "MEP Conflict", "Site Issue", "Client Change"];
-const SEVERITIES  = ["P3", "P2", "P1"];
+const SEVERITIES = ["P3", "P2", "P1"];
 
+const todayISO = () => new Date().toISOString().slice(0, 10);
 
-/* ─── Helpers ─── */
-const sevDot  = s => s === "P1" ? "sd-h" : s === "P2" ? "sd-m" : "sd-l";
-const sevChip = s => s === "P1" ? "on-danger" : s === "P2" ? "on-warn" : "on-ok";
-
-/* ══════════════════════════════════════════════════════
-   COMPONENT
-══════════════════════════════════════════════════════ */
-export default function DailyLogPage() {
-  const [user] = useState(() =>
-    JSON.parse(localStorage.getItem("user") || "{}")
-  );
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-  const [projects, setProjects] = useState([]);
-  const [attachments, setAttachments] = useState([]);
-
-  const [toast, setToast] = useState({ msg: "", show: false });
-  const toastTimer = useRef(null);
-  const toast_ = (msg) => {
-  setToast({ msg, show: true });
-
-  if (toastTimer.current) clearTimeout(toastTimer.current);
-
-  toastTimer.current = setTimeout(() => {
-    setToast({ msg: "", show: false });
-  }, 2500);
-};
-
-  const [logStatus, setLogStatus] = useState("Draft");
-
-  const [basic, setBasic] = useState({
-    date: new Date().toISOString().slice(0, 10),
-    project: "",
-    architect: user?.name ?? "Not Logged In",
+const longDate = () =>
+  new Date().toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 
-  // ✅ FILE UPLOAD FUNCTION (THIS WAS MISSING / MISPLACED)
-const handleFileUpload = async (e) => {
-  const files = Array.from(e.target.files);
+const shortDate = () =>
+  new Date().toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 
-  for (let file of files) {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    console.log("UPLOAD URL:", `${API_BASE}/api/upload`);
-
-    const res = await fetch(`${API_BASE}/api/upload`, {
-      method: "POST",
-      body: formData
-    });
-
-    if (!res.ok) {
-      console.error("Upload failed:", res.status);
-      return;
-    }
-
-    const data = await res.json();
-
-    setAttachments(prev => [
-      ...prev,
-      {
-        id: Date.now() + Math.random(),
-        name: data.file_name,
-        type: data.file_type,
-        url: data.file_url
-      }
-    ]);
-  }
-
-  toast_(`${files.length} file(s) uploaded ✓`);
+const chipClass = (s, active) => {
+  if (!active) return "adu-status-chip";
+  return (
+    {
+      "To Do": "adu-status-chip s-todo",
+      "In Progress": "adu-status-chip s-progress",
+      "Under Review": "adu-status-chip s-review",
+      Done: "adu-status-chip s-done",
+    }[s] || "adu-status-chip s-progress"
+  );
 };
 
-  // ❌ REMOVE THIS (it was WRONG in your code):
-  // setAttachments(prev => [...prev, ...formatted]);
-  // toast_(`${files.length} file(s) added ✓`);
+const sevClass = (s, active) => {
+  if (!active) return "adu-sev";
+  return (
+    {
+      P3: "adu-sev active-p3",
+      P2: "adu-sev active-p2",
+      P1: "adu-sev active-p1",
+    }[s] || "adu-sev"
+  );
+};
 
+const issueCardClass = (sev) =>
+  ({ P1: "adu-issue-card p1", P2: "adu-issue-card p2", P3: "adu-issue-card p3" }[sev] ||
+    "adu-issue-card p3");
 
+const Icon = {
+  Check: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
+  Plus: () => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  ),
+  Send: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  ),
+  Edit: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  ),
+  Alert: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  ),
+  List: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  ),
+  Close: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  ),
+  ChevronDown: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  ),
+  ChevronRight: () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  ),
+};
 
-  const [tasks,       setTasks]       = useState([ { id: 1, name: "", status: "In Progress" }]);
-  const [workDone,    setWorkDone]    = useState("");
-  const [issues,      setIssues]      = useState([]);
+// ─── Daily Logs Panel ─────────────────────────────────────────────────────────
 
-
+function DailyLogsPanel({ userId, projects, onClose }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState(null);
 useEffect(() => {
-  if (!user?.id) return;
+  if (!userId || !projects.length) return;
 
-  const loadProjects = async () => {
+  const today = todayISO();
+  let ignore = false;
+
+  const fetchAll = async () => {
+    setLoading(true);
+
     try {
-      const architectId = user.id;
+      const responses = await Promise.all(
+        projects.map(async (p) => {
+          const pid = String(p.project_id || p.id);
+          try {
+            const res = await getDailyLog(userId, pid, today);
+            const log = res?.data;
+            return log ? { ...log, project_name: p.project_name || p.name } : null;
+          } catch {
+            return null;
+          }
+        })
+      );
 
-      console.log("ARCHITECT ID:", architectId);
-
-      const res = await getArchitectProjects(architectId);
-
-      console.log("PROJECT RESPONSE:", res);
-
-      // ✅ FIX HERE (important)
-      setProjects(res.data || res || []);
-    } catch (err) {
-      console.error("Failed to load projects", err);
+      if (!ignore) {
+        setLogs(responses.filter(Boolean));
+      }
+    } finally {
+      if (!ignore) setLoading(false);
     }
   };
 
-  loadProjects();
-}, [user]);
+  fetchAll();
+  return () => {
+    ignore = true;
+  };
+}, [userId, projects]);
+  const approvalClass = (status) => {
+    const s = (status || "").toLowerCase();
+    if (s === "approved") return "adu-approval-tag approved";
+    if (s === "rejected") return "adu-approval-tag rejected";
+    return "adu-approval-tag pending";
+  };
 
-useEffect(() => {
-  if (projects.length > 0 && !basic.project) {
-    setBasic(p => ({
-      ...p,
-      project: projects[0].project_id
-    }));
-  }
-}, [projects]);
-  /* ── Task helpers ── */
-  const addTask = () =>
-    setTasks(p => [...p, { id: Date.now(), name: "", status: "In Progress" }]);
-  const updTask = (id, k, v) =>
-    setTasks(p => p.map(t => t.id === id ? { ...t, [k]: v } : t));
-  const remTask = id =>
-    setTasks(p => p.filter(t => t.id !== id));
-
-  /* ── Issue helpers ── */
-  const addIssue = () =>
-    setIssues(p => [...p, { id: Date.now(), title: "", type: "Design Issue", severity: "P2", desc: "" }]);
-  const updIssue = (id, k, v) =>
-    setIssues(p => p.map(i => i.id === id ? { ...i, [k]: v } : i));
-  const remIssue = id =>
-    setIssues(p => p.filter(i => i.id !== id));
-
-  const remAtt = id => setAttachments(p => p.filter(a => a.id !== id));
-
-  /* ── Submit ── */
-  const handleSubmit = async (status) => {
-  if (!basic.date || !basic.project || !basic.architect.trim()) {
-    toast_("Fill in required Basic Info fields.");
-    return;
-  }
-
-  if (tasks.every(t => !t.name.trim())) {
-    toast_("Add at least one task.");
-    return;
-  }
-
-  if (!workDone.trim()) {
-    toast_("Describe the work done today.");
-    return;
-  }
-   // 🔥 ADD THIS DEBUG HERE
-  console.log("SUBMIT PAYLOAD:", {
-    date: basic.date,
-    project_id: basic.project,
-    architect_id: user?.id,
-  });
-
-  const payload = {
-  date: basic.date,
-  project_id: basic.project,
-  architect_id: user.id,   // IMPORTANT (you currently don't send this properly)
-  role: "Architect",
-  status,
-  work_done: workDone,
-
-  tasks: tasks.filter(t => t.name.trim()).map(t => ({
-    task_name: t.name,
-    status: t.status
-  })),
-
-  issues: issues.map(i => ({
-    title: i.title,
-    type: i.type,
-    severity: i.severity,
-    description: i.description,
-  })),
-
-  attachments: attachments.map(a => ({
-  file_name: a.name,
-  file_type: a.type,
-  file_url: a.url
-}))
-};
-
-  try {
-    await submitDailyLog(payload);
-    setLogStatus(status);
-    toast_(status === "Submitted" ? "Daily log submitted ✓" : "Saved as draft");
-  } catch (err) {
-    console.error(err);
-    toast_("Failed to submit log");
-  }
-};
-
-  /* ── Section completion flags ── */
-  const basicDone = !!(basic.date && basic.project && basic.architect.trim());
-  const tasksDone = tasks.some(t => t.name.trim());
-  const workDone_ = workDone.trim().length > 0;
-
-  /* ════════════════════════════════════════════════════
-     RENDER
-  ════════════════════════════════════════════════════ */
   return (
-    <>
-      {/* ── TOPBAR ── */}
-     
+    <div className="adu-logs-overlay" onClick={onClose}>
+      <div className="adu-logs-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="adu-logs-header">
+          <div className="adu-logs-title-row">
+            <Icon.List />
+            <span className="adu-logs-title">Daily Logs — {shortDate()}</span>
+          </div>
+          <button className="adu-logs-close" onClick={onClose} type="button">
+            <Icon.Close />
+          </button>
+        </div>
 
-      {/* ── SHELL ── */}
-      <div className="shell">
+        <div className="adu-logs-body">
+          {loading && (
+            <div className="adu-logs-empty">
+              <span className="adu-logs-spinner" />
+              Loading your logs…
+            </div>
+          )}
 
-        {/* PAGE HEADER */}
-        <div className="page-head">
-          <div>
-            <div className="page-title">Daily Log</div>
-            <div className="page-sub">
-              {new Date().toLocaleDateString("en-IN", {
-                weekday: "long", day: "numeric", month: "long", year: "numeric",
-              })}
+          {!loading && logs.length === 0 && (
+            <div className="adu-logs-empty">No logs submitted for today yet.</div>
+          )}
+
+          {!loading && logs.map((log) => {
+            const isOpen = expandedId === log.id;
+            return (
+              <div key={log.id} className={`adu-log-card ${isOpen ? "open" : ""}`}>
+                <button
+                  className="adu-log-card-header"
+                  onClick={() => setExpandedId(isOpen ? null : log.id)}
+                  type="button"
+                >
+                  <div className="adu-log-card-left">
+                    <span className="adu-log-project">{log.project_name}</span>
+                    <span className="adu-log-meta">
+                      {(log.tasks || []).length} task{(log.tasks || []).length !== 1 ? "s" : ""}
+                      {(log.issues || []).length > 0 &&
+                        ` · ${log.issues.length} issue${log.issues.length !== 1 ? "s" : ""}`}
+                    </span>
+                  </div>
+                  <div className="adu-log-card-right">
+                    <span className={approvalClass(log.approval_status)}>
+                      {log.approval_status || "Pending"}
+                    </span>
+                    <span className="adu-log-chevron">
+                      {isOpen ? <Icon.ChevronDown /> : <Icon.ChevronRight />}
+                    </span>
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="adu-log-card-body">
+                    {log.work_done && (
+                      <div className="adu-log-section">
+                        <div className="adu-log-section-label">Work Summary</div>
+                        <p className="adu-log-summary">{log.work_done}</p>
+                      </div>
+                    )}
+
+                    {(log.tasks || []).length > 0 && (
+                      <div className="adu-log-section">
+                        <div className="adu-log-section-label">Tasks</div>
+                        <div className="adu-log-tasks">
+                          {log.tasks.map((t, i) => (
+                            <div key={t.id || i} className="adu-log-task-row">
+                              <span className="adu-log-task-num">{i + 1}</span>
+                              <span className="adu-log-task-name">{t.task_name}</span>
+                              <span className={chipClass(t.status, true)}>{t.status}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(log.issues || []).length > 0 && (
+                      <div className="adu-log-section">
+                        <div className="adu-log-section-label">Issues & Blockers</div>
+                        <div className="adu-log-issues-list">
+                          {log.issues.map((issue, i) => (
+                            <div key={issue.id || i}
+                              className={issueCardClass(issue.severity)}
+                              style={{ padding: "10px 14px" }}>
+                              <div className="adu-log-issue-top">
+                                <span className={sevClass(issue.severity, true)}>{issue.severity}</span>
+                                <span className="adu-log-issue-type">{issue.type}</span>
+                                {issue.title && (
+                                  <span className="adu-log-issue-title">{issue.title}</span>
+                                )}
+                              </div>
+                              {issue.description && (
+                                <p className="adu-log-issue-desc">{issue.description}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={`adu-log-approval-callout ${(log.approval_status || "pending").toLowerCase()}`}>
+                      <strong>PM Approval:</strong>{" "}
+                      {log.approval_status === "Approved"
+                        ? "Your log has been approved by the Project Manager."
+                        : log.approval_status === "Rejected"
+                        ? "Your log was rejected. Please edit and re-submit."
+                        : "Awaiting Project Manager review."}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function ArchitectDailyUpdate() {
+  const [user] = useState(() => JSON.parse(localStorage.getItem("user") || "{}"));
+
+  const [projects, setProjects] = useState([]);
+  const [logStatus, setLogStatus] = useState("draft"); // "draft" | "submitted" | "editing"
+  const [approvalStatus, setApprovalStatus] = useState("Pending");
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [toast, setToast] = useState({ msg: "", show: false, type: "neutral" });
+  const [showLogsPanel, setShowLogsPanel] = useState(false);
+
+  const [project, setProject] = useState("");
+  const [date] = useState(todayISO());
+  const [summary, setSummary] = useState("");
+  const [tasks, setTasks] = useState([{ id: crypto.randomUUID(), name: "", status: "In Progress" }]);
+  const [issues, setIssues] = useState([]);
+  const [loadingLog, setLoadingLog] = useState(false);
+  const [loadedLogId, setLoadedLogId] = useState(null);
+
+  const toastRef = useRef(null);
+  const originalRef = useRef(null);
+  const requestRef = useRef(0);
+
+  const architectName = user?.name || "Not Logged In";
+
+  const toast_ = (msg, type = "neutral") => {
+    setToast({ msg, show: true, type });
+    if (toastRef.current) clearTimeout(toastRef.current);
+    toastRef.current = setTimeout(() => {
+      setToast({ msg: "", show: false, type: "neutral" });
+    }, 2800);
+  };
+
+  // Load projects
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        const res = await getArchitectProjects(user.id);
+        const list = res?.data || res || [];
+        setProjects(list);
+        if (list.length > 0) {
+          setProject((prev) => prev || String(list[0].project_id || list[0].id || ""));
+        }
+      } catch {
+        toast_("Could not load projects", "error");
+      }
+    })();
+  }, [user?.id]);
+
+  // Reset form to blank draft state
+  const resetForm = () => {
+    setLoadedLogId(null);
+    setSummary("");
+    setTasks([{ id: crypto.randomUUID(), name: "", status: "In Progress" }]);
+    setIssues([]);
+    setLogStatus("draft");
+    setApprovalStatus("Pending");
+    originalRef.current = null;
+  };
+
+  // Load log for the selected project
+  useEffect(() => {
+    if (!user?.id || !project) return;
+
+    resetForm();
+
+    const reqId = ++requestRef.current;
+    let ignore = false;
+
+    const load = async () => {
+      setLoadingLog(true);
+      try {
+        const res = await getDailyLog(user.id, project, date);
+        if (ignore || reqId !== requestRef.current) return;
+
+        const log = res?.data || null;
+        if (!log) { resetForm(); return; }
+
+        const loadedTasks = log.tasks?.length
+          ? log.tasks.map((t) => ({ id: crypto.randomUUID(), name: t.task_name || "", status: t.status || "In Progress" }))
+          : [{ id: crypto.randomUUID(), name: "", status: "In Progress" }];
+
+        const loadedIssues = (log.issues || []).map((i) => ({
+          id: crypto.randomUUID(),
+          title: i.title || "",
+          type: i.type || "Design Issue",
+          severity: i.severity || "P2",
+          desc: i.description || "",
+        }));
+
+        setLoadedLogId(log.id || null);
+        setApprovalStatus(log?.approval_status ?? "Pending");
+        setLogStatus("submitted");
+        setSummary(log.work_done || "");
+        setTasks(loadedTasks);
+        setIssues(loadedIssues);
+
+        originalRef.current = {
+          project,
+          date,
+          approvalStatus: log?.approval_status ?? "Pending",
+          summary: log.work_done || "",
+          tasks: loadedTasks,
+          issues: loadedIssues,
+          logStatus: "submitted",
+          loadedLogId: log.id || null,
+        };
+      } catch (e) {
+        console.error(e);
+        if (!ignore && reqId === requestRef.current) resetForm();
+      } finally {
+        if (!ignore && reqId === requestRef.current) setLoadingLog(false);
+      }
+    };
+
+    load();
+    return () => { ignore = true; };
+  }, [user?.id, project]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const addTask = () => setTasks((p) => [...p, { id: crypto.randomUUID(), name: "", status: "In Progress" }]);
+  const updTask = (id, k, v) => setTasks((p) => p.map((t) => (t.id === id ? { ...t, [k]: v } : t)));
+  const remTask = (id) => setTasks((p) => p.filter((t) => t.id !== id));
+
+  const addIssue = () =>
+    setIssues((p) => [...p, { id: crypto.randomUUID(), title: "", type: "Design Issue", severity: "P2", desc: "" }]);
+  const updIssue = (id, k, v) => setIssues((p) => p.map((i) => (i.id === id ? { ...i, [k]: v } : i)));
+  const remIssue = (id) => setIssues((p) => p.filter((i) => i.id !== id));
+
+  const validate = () => {
+    if (!project) return toast_("Select a project", "error"), false;
+    if (!tasks.some((t) => t.name.trim())) return toast_("Add at least one activity", "error"), false;
+    if (!summary.trim()) return toast_("Write a brief work summary", "error"), false;
+    return true;
+  };
+
+  const doSubmit = async () => {
+    if (!validate()) return;
+
+    const payload = {
+      id: loadedLogId,
+      date,
+      project_id: project,
+      architect_id: user?.id,
+      role: "Architect",
+      status: "Submitted",
+      approval_status: "Pending", // always reset on (re-)submit
+      work_done: summary,
+      tasks: tasks.filter((t) => t.name.trim()).map((t) => ({
+        task_name: t.name.trim(),
+        status: t.status,
+      })),
+      issues: issues.map((i) => ({
+        title: i.title.trim(),
+        type: i.type,
+        severity: i.severity,
+        description: i.desc.trim(),
+      })),
+    };
+
+    try {
+      const saved = await submitDailyLog(payload);
+      const savedId = saved?.id || saved?.log_id || loadedLogId;
+
+      setLoadedLogId(savedId);
+      setApprovalStatus("Pending");
+      // FIX 1: After re-submit, lock the form (no double-submit possible).
+      // To submit again they must press "Edit Log" → re-submit.
+      setLogStatus("submitted");
+
+      originalRef.current = {
+        project,
+        date,
+        approvalStatus: "Pending",
+        summary,
+        tasks: structuredClone(tasks),
+        issues: structuredClone(issues),
+        logStatus: "submitted",
+        loadedLogId: savedId,
+      };
+
+      setShowConfirm(false);
+      toast_("Daily update submitted ✓", "success");
+    } catch (err) {
+      console.error(err);
+      toast_("Submission failed — please retry", "error");
+    }
+  };
+
+  const isLocked = logStatus === "submitted";
+  const isEditing = logStatus === "editing";
+
+  const handleEdit = () => { if (isLocked) setLogStatus("editing"); };
+
+  const handleCancelEdit = () => {
+    const orig = originalRef.current;
+    if (orig) {
+      setProject(orig.project);
+      setSummary(orig.summary);
+      setTasks(structuredClone(orig.tasks));
+      setIssues(structuredClone(orig.issues));
+      setApprovalStatus(orig.approvalStatus);
+      setLoadedLogId(orig.loadedLogId);
+      setLogStatus(orig.logStatus);
+    } else {
+      setLogStatus("draft");
+    }
+  };
+
+  const currentProjectName =
+    projects.find((p) => String(p.project_id || p.id) === project)?.project_name || "this project";
+
+  return (
+    <div className="adu-page">
+      <div className="adu-content">
+
+        {/* ── Page header ── */}
+        <div className="adu-page-header">
+         
+          <button className="adu-view-logs-btn" onClick={() => setShowLogsPanel(true)} type="button">
+            <Icon.List />
+            Daily Logs
+          </button>
+        </div>
+
+        {/* ── Submitted banner ── */}
+        {isLocked && !isEditing && (
+          <div className="adu-submitted-banner">
+            <div className="adu-submitted-check">✓</div>
+            <div className="adu-submitted-text">
+              <h3>Update submitted!</h3>
+              <p>
+                Log saved for <strong>{currentProjectName}</strong>.
+                Select another project to log for a different one, or click Edit to make changes.
+              </p>
+            </div>
+            <button className="adu-edit-link" onClick={handleEdit} type="button">
+              <Icon.Edit /> Edit
+            </button>
+          </div>
+        )}
+
+        {/* ── Editing banner ── */}
+        {isEditing && (
+          <div className="adu-edit-bar">
+            <span className="adu-edit-bar-icon">✏️</span>
+            <div className="adu-edit-bar-text">
+              <strong>You are editing a submitted log</strong>
+              <span>Re-submitting will replace the existing record for this project.</span>
+            </div>
+            <button className="adu-cancel-edit" onClick={handleCancelEdit} type="button">Cancel</button>
+          </div>
+        )}
+
+        {/* ── Form card ── */}
+        <div className="adu-form">
+          <div className="adu-form-top">
+            <span className="adu-form-heading">Daily Log</span>
+            <div className="adu-top-right">
+              <span className="adu-form-date">{shortDate()}</span>
+              <span className={`adu-approval-tag ${(approvalStatus || "").replace(/\s/g, "-").toLowerCase()}`}>
+                {approvalStatus}
+              </span>
             </div>
           </div>
 
-          {logStatus === "Submitted" && (
-            <div className="success-banner">
-              <span className="sb-icon"></span>
-              <div>
-                <div className="sb-title">Log Submitted</div>
-                <div className="sb-sub">Pending PM review</div>
+          <div className="adu-form-body">
+            <div className="adu-row-2">
+              <div className="adu-field">
+                <label className="adu-label">Architect Name</label>
+                <input className="adu-input readonly" value={architectName} readOnly />
               </div>
-              <button className="btn btn-g btn-sm" onClick={() => setLogStatus("Draft")}>
-                Edit
-              </button>
-            </div>
-          )}
-        </div>
 
-        {/* ── TWO-COLUMN GRID ── */}
-        <div className="grid">
-
-          {/* ════════════ LEFT COLUMN ════════════ */}
-          <div className="col">
-
-            {/* 1 · BASIC INFORMATION */}
-            <div className="sec">
-              <div className="sec-head">
-                <div className={`sn${basicDone ? " done" : ""}`}>
-                  {basicDone ? "✓" : "1"}
-                </div>
-                <span className="sec-label">Basic Information</span>
-              </div>
-              <div className="sec-body" style={{ display: "flex", flexDirection: "column" }}>
-                <div className="g3" style={{ marginBottom: 10 }}>
-                  <div className="field">
-                    <div className="lbl">Date <span className="req">*</span></div>
-                    <input
-                      className="fi"
-                      type="date"
-                      value={basic.date}
-                      onChange={e => setBasic(p => ({ ...p, date: e.target.value }))}
-                    />
-                  </div>
-                  <div className="field">
-                    <div className="lbl">Project <span className="req">*</span></div>
-                   <select
-  className="fs"
-  value={basic.project}
-  onChange={e => setBasic(p => ({ ...p, project: e.target.value }))}
->
-  <option value="">Select project</option>
-
-  {projects.map(p => (
-    <option key={p.project_id || p.id} value={p.project_id || p.id}>
-  {p.project_name || p.name}
-</option>
-  ))}
-</select>
-                  </div>
-                  
-                </div>
-                <div className="field">
-                  <div className="lbl">Architect Name <span className="req">*</span></div>
-                  <input
-  className="fi"
-  value={basic.architect}
-  readOnly
-/>
-                </div>
+              <div className="adu-field">
+                <label className="adu-label">Project <span className="req">*</span></label>
+                {/*
+                  FIX 2: selector is always enabled (only disabled while actively
+                  editing so you don't accidentally change project mid-edit).
+                  When submitted, changing project loads that project's log (or
+                  a fresh blank form), so the user can fill in another project.
+                */}
+                <select
+                  className="adu-select"
+                  value={project}
+                  onChange={(e) => setProject(e.target.value)}
+                  disabled={isEditing}
+                >
+                  <option value="">Select project…</option>
+                  {projects.map((p) => (
+                    <option key={p.project_id || p.id} value={String(p.project_id || p.id)}>
+                      {p.project_name || p.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* 2 · TASKS WORKED ON */}
-            <div className="sec ">
-              <div className="sec-head">
-                <div className={`sn${tasksDone ? " done" : ""}`}>
-                  {tasksDone ? "✓" : "2"}
-                </div>
-                <span className="sec-label">Tasks Worked On</span>
+            {loadingLog ? (
+              <div className="adu-loading-row">
+                <span className="adu-logs-spinner" />
+                Loading log for this project…
               </div>
-              <div className="sec-body">
-                {tasks.map((t, idx) => (
-                  <div key={t.id} className="task-row">
-                    <span className="task-num">{idx + 1}</span>
-                    <input
-                      className="task-fi"
-                      placeholder="Task name…"
-                      value={t.name}
-                      onChange={e => updTask(t.id, "name", e.target.value)}
-                    />
-                    <div className="chip-row" style={{ flexShrink: 0 }}>
-                      {TASK_STATUS.map(s => (
-                        <span
-                          key={s}
-                          className={`chip${t.status === s ? " on" : ""}`}
-                          onClick={() => updTask(t.id, "status", s)}
-                        >
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                    {tasks.length > 1 && (
-                      <button className="task-rm" onClick={() => remTask(t.id)}>✕</button>
+            ) : (
+              <>
+                <div className="adu-divider">Activities</div>
+                <div className="adu-field">
+                  <label className="adu-label">Tasks <span className="req">*</span></label>
+                  <div className="adu-activities">
+                    {tasks.map((t, i) => (
+                      <div key={t.id} className="adu-activity-row">
+                        <span className="adu-act-num">{i + 1}</span>
+                        <input
+                          className="adu-act-input"
+                          value={t.name}
+                          placeholder="Describe activity…"
+                          onChange={(e) => updTask(t.id, "name", e.target.value)}
+                          disabled={isLocked && !isEditing}
+                        />
+                        {!isLocked || isEditing ? (
+                          <div className="adu-status-group">
+                            {STATUSES.map((s) => (
+                              <button type="button" key={s}
+                                className={chipClass(s, t.status === s)}
+                                onClick={() => updTask(t.id, "status", s)}>
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className={chipClass(t.status, true)} style={{ pointerEvents: "none" }}>{t.status}</span>
+                        )}
+                        {(!isLocked || isEditing) && tasks.length > 1 && (
+                          <button className="adu-act-del" onClick={() => remTask(t.id)} type="button">✕</button>
+                        )}
+                      </div>
+                    ))}
+                    {(!isLocked || isEditing) && (
+                      <button className="adu-add-row" onClick={addTask} type="button">
+                        <Icon.Plus /> Add activity
+                      </button>
                     )}
                   </div>
-                ))}
-                <button className="add-row" onClick={addTask}>＋ Add task</button>
-              </div>
-            </div>
-
-            {/* 3 · WORK DONE TODAY */}
-            <div className="sec work ">
-              <div className="sec-head">
-                <div className={`sn${workDone_ ? " done" : ""}`}>
-                  {workDone_ ? "✓" : "3"}
                 </div>
-                <span className="sec-label">Work Done Today</span>
-              </div>
-              <div className="sec-body" style={{ display: "flex", flexDirection: "column" }}>
-                <textarea
-                  className="fta"
-                  style={{ resize: "none" }}
-                  placeholder="Describe what was completed today — drawings finished, revisions made, models updated, coordination done, decisions taken…"
-                  value={workDone}
-                  onChange={e => setWorkDone(e.target.value)}
-                />
-              </div>
-            </div>
 
-          </div>{/* end left col */}
-
-          {/* ════════════ RIGHT COLUMN ════════════ */}
-          <div className="col">
-
-            {/* 4 · ISSUES / BLOCKERS */}
-            <div className="sec issues ">
-              <div className="sec-head">
-                <div className={`sn${issues.length > 0 ? " warn" : ""}`}>
-                  {issues.length > 0 ? issues.length : "4"}
+                <div className="adu-divider">Summary</div>
+                <div className="adu-field">
+                  <label className="adu-label">Work done today <span className="req">*</span></label>
+                  <textarea
+                    className="adu-textarea"
+                    value={summary}
+                    onChange={(e) => setSummary(e.target.value)}
+                    disabled={isLocked && !isEditing}
+                    rows={4}
+                    placeholder="Summarise what was accomplished today…"
+                  />
                 </div>
-                <span className="sec-label">Issues / Blockers</span>
-                <span className="opt">Optional</span>
-              </div>
-              <div className="sec-body">
-                {issues.map(issue => (
-                  <div key={issue.id} className="issue-row">
-                    <div className="issue-top">
-                      <div className={`sev-dot ${sevDot(issue.severity)}`} />
-                      <select
-                        className="fs"
-                        style={{ flex: 1 }}
-                        value={issue.type}
-                        onChange={e => updIssue(issue.id, "type", e.target.value)}
-                      >
-                        {ISSUE_TYPES.map(t => <option key={t}>{t}</option>)}
-                      </select>
-                      <div className="chip-row">
-                        {SEVERITIES.map(s => (
-                          <span
-                            key={s}
-                            className={`chip${issue.severity === s ? " " + sevChip(s) : ""}`}
-                            onClick={() => updIssue(issue.id, "severity", s)}
-                          >
-                            {s}
-                          </span>
-                        ))}
+
+                <div className="adu-divider">Issues & Blockers</div>
+                <div className="adu-issues">
+                  {issues.length === 0 && !isLocked && !isEditing && (
+                    <div className="adu-no-issues">No issues logged — tap below to add one</div>
+                  )}
+                  {issues.length === 0 && isLocked && !isEditing && (
+                    <div className="adu-no-issues">No issues were logged for this update</div>
+                  )}
+                  {issues.map((issue) => (
+                    <div key={issue.id} className={issueCardClass(issue.severity)}>
+                      <div className="adu-issue-top">
+                        <select className="adu-issue-type" value={issue.type}
+                          onChange={(e) => updIssue(issue.id, "type", e.target.value)}
+                          disabled={isLocked && !isEditing}>
+                          {ISSUE_TYPES.map((t) => <option key={t}>{t}</option>)}
+                        </select>
+                        <input className="adu-issue-title-input" placeholder="Issue title…"
+                          value={issue.title}
+                          onChange={(e) => updIssue(issue.id, "title", e.target.value)}
+                          disabled={isLocked && !isEditing} />
+                        {!isLocked || isEditing ? (
+                          <div className="adu-sev-group">
+                            {SEVERITIES.map((s) => (
+                              <button type="button" key={s}
+                                className={sevClass(s, issue.severity === s)}
+                                onClick={() => updIssue(issue.id, "severity", s)}>
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className={sevClass(issue.severity, true)} style={{ pointerEvents: "none" }}>{issue.severity}</span>
+                        )}
+                        {(!isLocked || isEditing) && (
+                          <button className="adu-act-del" onClick={() => remIssue(issue.id)} type="button">✕</button>
+                        )}
                       </div>
-                      <button className="irm" onClick={() => remIssue(issue.id)}>✕</button>
+                      <textarea className="adu-issue-desc-input" placeholder="Description"
+                        value={issue.desc}
+                        onChange={(e) => updIssue(issue.id, "desc", e.target.value)}
+                        disabled={isLocked && !isEditing} />
                     </div>
-                    <input
-                      className="fi"
-                      style={{ marginBottom: 7 }}
-                      placeholder="Issue title…"
-                      value={issue.title}
-                      onChange={e => updIssue(issue.id, "title", e.target.value)}
-                    />
-                    <textarea
-                      className="fta"
-                      style={{ minHeight: 52, resize: "none" }}
-                      placeholder="Describe impact on today's work…"
-                      value={issue.desc}
-                      onChange={e => updIssue(issue.id, "desc", e.target.value)}
-                    />
-                  </div>
-                ))}
-                <button className="add-row" onClick={addIssue}>
-                  ＋ Log an issue or blocker
-                </button>
-              </div>
-            </div>
-
-           <div className="sec attach">
-  <div className="sec-head">
-    <div className={`sn${attachments.length > 0 ? " info" : ""}`}>
-      {attachments.length > 0 ? attachments.length : "5"}
-    </div>
-    <span className="sec-label">Attachments</span>
-    <span className="opt">Optional</span>
-  </div>
-
-  <div className="sec-body">
-
-    {attachments.map(a => (
-      <div key={a.id} className="att-row">
-        <span className="att-icon">📎</span>
-        <span className="att-name">{a.name}</span>
-        <span className="att-type">
-          {a.file?.type || a.type}
-        </span>
-        <button className="att-rm" onClick={() => remAtt(a.id)}>✕</button>
-      </div>
-    ))}
-
-    <div className="upload-zone">
-  <input
-    type="file"
-    multiple
-    onChange={handleFileUpload}
-    style={{ display: "none" }}
-    id="fileUpload"
-  />
-
-  <label htmlFor="fileUpload" style={{ cursor: "pointer", width: "100%" }}>
-    <div className="upz-icon">📎</div>
-    <div className="upz-text">Click to attach files</div>
-    <div className="upz-sub">DWG · PDF · JPG · PNG · XLSX</div>
-  </label>
-</div>
-
-  </div>
-</div>
-
-            {/* SUBMIT */}
-            <div className="submit-card">
-              <div className="status-row">
-                <div
-                  className="sdot"
-                  style={{ background: logStatus === "Submitted" ? "var(--ok)" : "var(--warn)" }}
-                />
-                <div>
-                  <div className="slabel">{logStatus}</div>
-                  <div className="ssub">
-                    {logStatus === "Draft"
-                      ? "Save to continue later or submit when done"
-                      : "Submitted to Project Manager for review"}
-                  </div>
+                  ))}
+                  {(!isLocked || isEditing) && (
+                    <button className="adu-add-issue" onClick={addIssue} type="button">
+                      <Icon.Plus /> Log an issue
+                    </button>
+                  )}
                 </div>
-              </div>
-              <div className="sbtns">
-                <button className="btn btn-s" onClick={() => handleSubmit("Draft")}>
-                  Save Draft
+              </>
+            )}
+          </div>
+
+          <div className="adu-form-footer">
+            <div className="adu-footer-actions">
+              {logStatus === "draft" && !loadingLog && (
+                <button className="adu-btn adu-btn-primary"
+                  onClick={() => { if (!validate()) return; setShowConfirm(true); }}
+                  type="button">
+                  <Icon.Send /> Submit Update
                 </button>
-                <button className="btn btn-p" onClick={() => handleSubmit("Submitted")}>
-                  Submit Log
+              )}
+              {isEditing && (
+                <>
+                  <button className="adu-btn adu-btn-ghost" onClick={handleCancelEdit} type="button">Cancel</button>
+                  <button className="adu-btn adu-btn-primary"
+                    onClick={() => { if (!validate()) return; setShowConfirm(true); }}
+                    type="button">
+                    <Icon.Send /> Re-submit Update
+                  </button>
+                </>
+              )}
+              {isLocked && !isEditing && (
+                <button className="adu-btn adu-btn-ghost" onClick={handleEdit} type="button">
+                  <Icon.Edit /> Edit Log
                 </button>
-              </div>
+              )}
             </div>
+          </div>
+        </div>
+      </div>
 
-          </div>{/* end right col */}
+      {/* ── Confirm modal ── */}
+      {showConfirm && (
+        <div className="adu-confirm-overlay" onClick={() => setShowConfirm(false)}>
+          <div className="adu-confirm-box" onClick={(e) => e.stopPropagation()}>
+            <div className="adu-confirm-icon"><Icon.Send /></div>
+            <h3>{isEditing ? "Re-submit daily update?" : "Submit daily update?"}</h3>
+            <p>
+              {isEditing
+                ? "This will replace your previously submitted log for this project. The Project Manager will see the updated version."
+                : "This will submit today's log for the selected project."}
+            </p>
+            <div className="adu-confirm-actions">
+              <button className="adu-btn adu-btn-ghost" onClick={() => setShowConfirm(false)} type="button">Cancel</button>
+              <button className="adu-btn adu-btn-primary" onClick={doSubmit} type="button">
+                {isEditing ? "Re-submit" : "Yes, Submit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-        </div>{/* end .grid */}
-      </div>{/* end .shell */}
+      {/* ── Daily Logs panel ── */}
+      {showLogsPanel && (
+        <DailyLogsPanel userId={user?.id} projects={projects} onClose={() => setShowLogsPanel(false)} />
+      )}
 
-      {/* TOAST */}
-      <div className={`toast ${toast.show ? "s" : "h"}`}>{toast.msg}</div>
-    </>
+      {/* ── Toast ── */}
+      <div className={`adu-toast ${toast.show ? "show" : ""} ${toast.type}`}>
+        {toast.type === "success" && <Icon.Check />}
+        {toast.type === "error" && <Icon.Alert />}
+        {toast.msg}
+      </div>
+    </div>
   );
 }
