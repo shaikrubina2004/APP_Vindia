@@ -3,6 +3,7 @@ const router = express.Router();
 const wbs = require("../controllers/wbsController");
 
 // ── WBS Tree ──────────────────────────────────────────────
+router.post("/auto-plan", wbs.autoPlanWBS);
 router.get("/:projectId", wbs.getWBSByProject); // GET full tree for project
 
 // ── WBS Items ─────────────────────────────────────────────

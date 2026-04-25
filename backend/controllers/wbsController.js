@@ -18,7 +18,7 @@ exports.getWBSByProject = async (req, res) => {
     const allRows = wbsResult.rows; // flat list
 
     // 2. Separate top-level (parent_id IS NULL) from children
-    const topLevel = allRows.filter((r) => r.parent_id === null);
+    const topLevel = allRows.filter((r) => !r.parent_id);
     const children = allRows.filter((r) => r.parent_id !== null);
 
     // 3. For each child task, fetch its cost details
@@ -96,10 +96,8 @@ exports.createWBSItem = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO wbs (project_id, code, name, parent_id, status, progress)
-       VALUES ($1, $2, $3, NULL, 'Pending', 0)
-       RETURNING *`,
-      [project_id, code, name],
+      `DELETE FROM wbs WHERE id = $1 OR parent_id = $1`,
+      [id]
     );
 
     // Return with empty tasks array so frontend can use directly
@@ -277,5 +275,48 @@ exports.deleteMiscellaneous = async (req, res) => {
     return res.status(200).json({ message: "Deleted" });
   } catch (err) {
     return res.status(500).json({ error: err.message });
+  }
+};
+
+
+// ─────────────────────────────────────────────
+// POST /api/wbs/auto-plan
+// Auto create WBS from template (frontend)
+// ─────────────────────────────────────────────
+exports.autoPlanWBS = async (req, res) => {
+  const { project_id, items } = req.body;
+
+  try {
+    // 1. Delete existing WBS for project
+    await pool.query(
+      "DELETE FROM wbs WHERE project_id = $1",
+      [project_id]
+    );
+
+    // 2. Map for parent-child relation
+    const map = {};
+
+    // 3. Insert items
+    for (let item of items) {
+      const parentId = item.parent_id
+        ? map[item.parent_id]
+        : null;
+
+      const result = await pool.query(
+        `INSERT INTO wbs 
+        (project_id, code, name, parent_id, status, progress, budget, spent)
+        VALUES ($1, $2, $3, $4, 'Pending', 0, 0, 0)
+        RETURNING id`,
+        [project_id, item.code, item.name, parentId]
+      );
+
+      map[item.temp_id] = result.rows[0].id;
+    }
+
+    res.status(200).json({ message: "WBS auto-planned successfully" });
+
+  } catch (err) {
+    console.error("AUTO PLAN ERROR:", err.message);
+    res.status(500).json({ error: "Auto plan failed" });
   }
 };

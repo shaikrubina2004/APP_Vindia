@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   RadialBarChart,
   RadialBar,
@@ -6,245 +6,6 @@ import {
   Tooltip,
 } from "recharts";
 import "./Milestone.css";
-
-/* ─────────────────────────────────────────
-   TEMPLATE DATA  (single source of truth)
-───────────────────────────────────────── */
-const DEFAULT_TEMPLATE = {
-  id: "T001",
-  code: "STD-CONST",
-  name: "Standard Construction Template",
-  tasks: [
-    {
-      id: "1", code: "1", title: "Site Preparation", isMilestone: true,
-      subtasks: [
-        { id: "1.1", code: "1.1", title: "Site Clearance" },
-        { id: "1.2", code: "1.2", title: "Site Layout & Setting Out" },
-        { id: "1.3", code: "1.3", title: "Mobilization" },
-      ],
-    },
-    {
-      id: "2", code: "2", title: "Earthwork & Foundation", isMilestone: true,
-      subtasks: [
-        { id: "2.1", code: "2.1", title: "Excavation" },
-        { id: "2.2", code: "2.2", title: "Foundation Construction" },
-        { id: "2.3", code: "2.3", title: "Plinth Beam Construction" },
-        { id: "2.4", code: "2.4", title: "Backfilling & Compaction" },
-      ],
-    },
-    {
-      id: "3", code: "3", title: "Superstructure Construction", isMilestone: true,
-      subtasks: [
-        { id: "3.1", code: "3.1", title: "Structural Frame" },
-        { id: "3.2", code: "3.2", title: "Masonry Work" },
-        { id: "3.3", code: "3.3", title: "Roofing & Enclosure" },
-      ],
-    },
-    {
-      id: "4", code: "4", title: "MEP Works", isMilestone: true,
-      subtasks: [
-        { id: "4.1", code: "4.1", title: "First Fix (Rough-in)" },
-        { id: "4.2", code: "4.2", title: "Second Fix (Finishing)" },
-      ],
-    },
-    {
-      id: "5", code: "5", title: "Finishing Works", isMilestone: true,
-      subtasks: [
-        { id: "5.1", code: "5.1", title: "Interior Finishes" },
-        { id: "5.2", code: "5.2", title: "Exterior Finishes" },
-        { id: "5.3", code: "5.3", title: "External Works" },
-      ],
-    },
-    {
-      id: "6", code: "6", title: "Project Completion", isMilestone: true,
-      subtasks: [
-        { id: "6.1", code: "6.1", title: "Final Inspection (Punch List)" },
-        { id: "6.2", code: "6.2", title: "Rectification Works" },
-        { id: "6.3", code: "6.3", title: "Handover & Certification" },
-      ],
-    },
-  ],
-};
-
-/* ─────────────────────────────────────────
-   MOCK DATA — each milestone = one template task
-   nextPlan.subtasks = subtasks of next milestone
-───────────────────────────────────────── */
-const MOCK_MILESTONES = [
-  /* ── Eiffel Tower: Task 1 – Site Preparation (completed) ── */
-  {
-    id: 1,
-    templateTaskId: "1",
-    title: "Site Preparation",
-    project: "Eiffel Tower – Paris",
-    phase: "Pre-Construction",
-    description: "Complete full site clearance, layout, and mobilisation for the Eiffel Tower construction zone.",
-    startDate: "2025-04-01",
-    dueDate: "2025-04-25",
-    progress: 100,
-    assignedTo: "Nikhil (Site Engineer)",
-    risks: "None",
-    dependencies: "None",
-    budget: 1500000,
-    subtasks: [
-      { id: "s1", code: "1.1", title: "Site Clearance",            status: "completed" },
-      { id: "s2", code: "1.2", title: "Site Layout & Setting Out", status: "completed" },
-      { id: "s3", code: "1.3", title: "Mobilization",              status: "completed" },
-    ],
-    payment: { amount: 1500000, status: "paid", paidOn: "2025-04-28", method: "Bank Transfer", invoiceNo: "INV-2025-001" },
-    nextPlan: {
-      title: "Earthwork & Foundation",
-      startDate: "2025-05-01",
-      notes: "Begin excavation immediately after site clearance sign-off. Ensure soil test reports are ready.",
-      subtasks: [
-        { id: "ns1", code: "2.1", title: "Excavation",               status: "not-started" },
-        { id: "ns2", code: "2.2", title: "Foundation Construction",  status: "not-started" },
-        { id: "ns3", code: "2.3", title: "Plinth Beam Construction", status: "not-started" },
-        { id: "ns4", code: "2.4", title: "Backfilling & Compaction", status: "not-started" },
-      ],
-    },
-    visibleToClient: true,
-  },
-
-  /* ── Eiffel Tower: Task 2 – Earthwork & Foundation (completed) ── */
-  {
-    id: 2,
-    templateTaskId: "2",
-    title: "Earthwork & Foundation",
-    project: "Eiffel Tower – Paris",
-    phase: "Structural",
-    description: "Complete all earthwork and foundation including excavation, concrete pouring, plinth beam and backfilling for Block A and B.",
-    startDate: "2025-05-01",
-    dueDate: "2025-06-10",
-    progress: 100,
-    assignedTo: "Nikhil (Site Engineer)",
-    risks: "None",
-    dependencies: "Site Preparation",
-    budget: 4200000,
-    subtasks: [
-      { id: "s4", code: "2.1", title: "Excavation",               status: "completed" },
-      { id: "s5", code: "2.2", title: "Foundation Construction",  status: "completed" },
-      { id: "s6", code: "2.3", title: "Plinth Beam Construction", status: "completed" },
-      { id: "s7", code: "2.4", title: "Backfilling & Compaction", status: "completed" },
-    ],
-    payment: { amount: 4200000, status: "paid", paidOn: "2025-06-12", method: "Bank Transfer", invoiceNo: "INV-2025-002" },
-    nextPlan: {
-      title: "Superstructure Construction",
-      startDate: "2025-06-15",
-      notes: "Begin column casting for Block A immediately after foundation curing. Ensure steel procurement is complete.",
-      subtasks: [
-        { id: "ns5", code: "3.1", title: "Structural Frame",    status: "not-started" },
-        { id: "ns6", code: "3.2", title: "Masonry Work",        status: "not-started" },
-        { id: "ns7", code: "3.3", title: "Roofing & Enclosure", status: "not-started" },
-      ],
-    },
-    visibleToClient: true,
-  },
-
-  /* ── Eiffel Tower: Task 3 – Superstructure (delayed) ── */
-  {
-    id: 3,
-    templateTaskId: "3",
-    title: "Superstructure Construction",
-    project: "Eiffel Tower – Paris",
-    phase: "Structural",
-    description: "Complete full structural work — columns, beams, slab, masonry walls, and roofing for Block A.",
-    startDate: "2025-06-15",
-    dueDate: "2025-07-15",
-    progress: 45,
-    assignedTo: "Nikhil (Site Engineer)",
-    risks: "Material delay risk — steel procurement pending",
-    dependencies: "Earthwork & Foundation",
-    budget: 8700000,
-    subtasks: [
-      { id: "s8",  code: "3.1", title: "Structural Frame",    status: "completed"   },
-      { id: "s9",  code: "3.2", title: "Masonry Work",        status: "in-progress" },
-      { id: "s10", code: "3.3", title: "Roofing & Enclosure", status: "not-started" },
-    ],
-    payment: { amount: 3915000, status: "partial", paidOn: "2025-07-01", method: "Cheque", invoiceNo: "INV-2025-003" },
-    nextPlan: {
-      title: "MEP Works",
-      startDate: "2025-07-25",
-      notes: "MEP rough-in to begin once structural frame is fully complete and inspected.",
-      subtasks: [
-        { id: "ns8", code: "4.1", title: "First Fix (Rough-in)",   status: "not-started" },
-        { id: "ns9", code: "4.2", title: "Second Fix (Finishing)", status: "not-started" },
-      ],
-    },
-    visibleToClient: true,
-  },
-
-  /* ── NH-66: Task 1 – Site Preparation (delayed) ── */
-  {
-    id: 4,
-    templateTaskId: "1",
-    title: "Site Preparation",
-    project: "NH-66",
-    phase: "Pre-Construction",
-    description: "Site clearance, layout and mobilisation for the 5km NH-66 highway stretch.",
-    startDate: "2025-05-01",
-    dueDate: "2025-05-20",
-    progress: 60,
-    assignedTo: "Nikhil (Site Engineer)",
-    risks: "Weather dependency — monsoon risk",
-    dependencies: "Survey and alignment approval",
-    budget: 2000000,
-    subtasks: [
-      { id: "s11", code: "1.1", title: "Site Clearance",            status: "completed"   },
-      { id: "s12", code: "1.2", title: "Site Layout & Setting Out", status: "completed"   },
-      { id: "s13", code: "1.3", title: "Mobilization",              status: "in-progress" },
-    ],
-    payment: { amount: 0, status: "overdue", paidOn: null, method: "Bank Transfer", invoiceNo: "INV-2025-004" },
-    nextPlan: {
-      title: "Earthwork & Foundation",
-      startDate: "2025-06-01",
-      notes: "Excavation and base course laying to begin after mobilisation and government inspector sign-off.",
-      subtasks: [
-        { id: "ns10", code: "2.1", title: "Excavation",               status: "not-started" },
-        { id: "ns11", code: "2.2", title: "Foundation Construction",  status: "not-started" },
-        { id: "ns12", code: "2.3", title: "Plinth Beam Construction", status: "not-started" },
-        { id: "ns13", code: "2.4", title: "Backfilling & Compaction", status: "not-started" },
-      ],
-    },
-    visibleToClient: true,
-  },
-
-  /* ── Tajmahal: Task 1 – Site Preparation (not started) ── */
-  {
-    id: 5,
-    templateTaskId: "1",
-    title: "Site Preparation",
-    project: "Tajmahal",
-    phase: "Pre-Construction",
-    description: "Complete full site clearance, leveling, boundary marking and mobilisation.",
-    startDate: "2025-06-20",
-    dueDate: "2025-07-05",
-    progress: 0,
-    assignedTo: "Nikhil (Site Engineer)",
-    risks: "Permit approval delay",
-    dependencies: "None",
-    budget: 500000,
-    subtasks: [
-      { id: "s14", code: "1.1", title: "Site Clearance",            status: "not-started" },
-      { id: "s15", code: "1.2", title: "Site Layout & Setting Out", status: "not-started" },
-      { id: "s16", code: "1.3", title: "Mobilization",              status: "not-started" },
-    ],
-    payment: { amount: 0, status: "pending", paidOn: null, method: "Cheque", invoiceNo: "INV-2025-005" },
-    nextPlan: {
-      title: "Earthwork & Foundation",
-      startDate: "2025-07-10",
-      notes: "Soil testing and foundation survey to begin after site clearance and permit approval.",
-      subtasks: [
-        { id: "ns14", code: "2.1", title: "Excavation",               status: "not-started" },
-        { id: "ns15", code: "2.2", title: "Foundation Construction",  status: "not-started" },
-        { id: "ns16", code: "2.3", title: "Plinth Beam Construction", status: "not-started" },
-        { id: "ns17", code: "2.4", title: "Backfilling & Compaction", status: "not-started" },
-      ],
-    },
-    visibleToClient: false,
-  },
-];
-
 /* ─── helpers ─── */
 const today = new Date();
 
@@ -293,6 +54,48 @@ const StatusBadge = ({ status }) => {
     </span>
   );
 };
+
+
+
+const convertWBS = (wbsData, selectedProject) => {
+  return wbsData.map((milestone) => {
+    const subtasks = milestone.tasks.map((task) => ({
+      id: task.id,
+      code: task.code,
+      title: task.name,
+      status: task.progress === 100
+        ? "completed"
+        : task.progress > 0
+        ? "in-progress"
+        : "not-started"
+    }));
+
+    // calculate progress
+    const total = subtasks.length;
+    const completed = subtasks.filter(s => s.status === "completed").length;
+    const progress = total ? Math.round((completed / total) * 100) : 0;
+
+    return {
+      id: milestone.id,
+      title: milestone.name,
+      project: selectedProject,
+      phase: "Execution",
+      description: "",
+      startDate: null,
+      dueDate: null,
+      progress,
+      assignedTo: "",
+      risks: "None",
+      dependencies: "",
+      budget: milestone.budget || 0,
+      subtasks,
+      payment: { amount: 0, status: "pending" },
+      nextPlan: { title: "", subtasks: [] },
+      visibleToClient: true
+    };
+  });
+};
+
 
 const PayBadge = ({ status }) => {
   const c = PAY_CFG[status] || PAY_CFG.pending;
@@ -378,17 +181,44 @@ const SubtaskTracker = ({ subtasks, title = "Subtasks" }) => {
 /* ══════════════════════════════════════════
    MILESTONE PLANNING POPUP
 ══════════════════════════════════════════ */
-const MilestonePlanningPopup = ({ projects, onClose }) => {
+const MilestonePlanningPopup = ({ projects, templates, selectedTemplate, onClose, onSave }) => {
   const [step,            setStep]            = useState(1);
   const [selectedProject, setSelectedProject] = useState("");
   const [wbsTasks,        setWbsTasks]        = useState(null);
   const [editMode,        setEditMode]        = useState(false);
   const [expandedTasks,   setExpandedTasks]   = useState({});
 
-  const handleAddTemplate = () => {
-    setWbsTasks(JSON.parse(JSON.stringify(DEFAULT_TEMPLATE.tasks)));
-    setStep(2);
-  };
+  const handleAddTemplate = async () => {
+  const res = await fetch(
+    `http://localhost:5000/api/templates/${selectedTemplate}`
+  );
+
+  const data = await res.json();
+
+  // convert flat → nested
+  const map = {};
+  const tasks = [];
+
+  data.forEach(item => {
+    map[item.id] = {
+      id: item.id,
+      code: item.code,
+      title: item.name,
+      subtasks: []
+    };
+  });
+
+  data.forEach(item => {
+    if (item.parent_id) {
+      map[item.parent_id]?.subtasks.push(map[item.id]);
+    } else {
+      tasks.push(map[item.id]);
+    }
+  });
+
+  setWbsTasks(tasks);
+  setStep(2);
+};
 
   const toggleExpand      = (id)         => setExpandedTasks(p => ({ ...p, [id]: !p[id] }));
   const handleDeleteTask  = (taskId)     => setWbsTasks(prev => prev.filter(t => t.id !== taskId));
@@ -410,7 +240,7 @@ const MilestonePlanningPopup = ({ projects, onClose }) => {
   const handleRenameSub   = (tid, sid, title)  => setWbsTasks(prev =>
     prev.map(t => t.id === tid ? { ...t, subtasks: t.subtasks.map(s => s.id === sid ? { ...s, title } : s) } : t));
 
-  const realProjects = projects.filter(p => p !== "All");
+  const realProjects = projects;
 
   return (
     <div className="ms-popup-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -445,10 +275,18 @@ const MilestonePlanningPopup = ({ projects, onClose }) => {
           <div className="ms-popup__body">
             <div className="ms-popup__field">
               <label className="ms-popup__label">Select Project</label>
-              <select className="ms-popup__select" value={selectedProject}
-                onChange={e => setSelectedProject(e.target.value)}>
+              <select
+                className="ms-popup__select"
+                value={selectedProject}
+                onChange={(e) => setSelectedProject(e.target.value)}
+              >
                 <option value="">— Choose a project —</option>
-                {realProjects.map(p => <option key={p} value={p}>{p}</option>)}
+
+                {realProjects.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -457,10 +295,12 @@ const MilestonePlanningPopup = ({ projects, onClose }) => {
               <div className="ms-template-card">
                 <div className="ms-template-card__icon">📋</div>
                 <div className="ms-template-card__info">
-                  <p className="ms-template-card__name">{DEFAULT_TEMPLATE.name}</p>
+                  <p className="ms-template-card__name">
+                    {templates[0]?.name || "Standard Template"}
+                  </p>
+
                   <p className="ms-template-card__meta">
-                    {DEFAULT_TEMPLATE.tasks.length} milestones ·{" "}
-                    {DEFAULT_TEMPLATE.tasks.reduce((s, t) => s + t.subtasks.length, 0)} subtasks
+                    {templates.length > 0 ? "Template Loaded from DB" : "No template"}
                   </p>
                   <p className="ms-template-card__desc">
                     Standard construction workflow: Site Prep → Foundation → Superstructure → MEP → Finishing → Handover.
@@ -471,8 +311,15 @@ const MilestonePlanningPopup = ({ projects, onClose }) => {
             </div>
 
             <div className="ms-popup__footer">
-              <button className="ms-btn ms-btn--ghost" onClick={onClose}>Cancel</button>
-              <button className="ms-btn ms-btn--primary" disabled={!selectedProject} onClick={handleAddTemplate}>
+              <button className="ms-btn ms-btn--ghost" onClick={onClose}>
+                Cancel
+              </button>
+
+              <button
+                className="ms-btn ms-btn--primary"
+                disabled={!selectedProject}
+                onClick={handleAddTemplate}
+              >
                 Next — Review Tasks →
               </button>
             </div>
@@ -555,9 +402,35 @@ const MilestonePlanningPopup = ({ projects, onClose }) => {
 
             <div className="ms-popup__footer">
               <button className="ms-btn ms-btn--ghost" onClick={() => setStep(1)}>← Back</button>
-              <button className="ms-btn ms-btn--primary" onClick={onClose}>
-                ✓ Save & Auto-Plan Milestones
-              </button>
+              <button
+              className="ms-btn ms-btn--primary"
+              onClick={async () => {
+                try {
+                  console.log("Saving WBS...", wbsTasks);
+
+                  await fetch("http://localhost:5000/api/wbs", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      project_id: selectedProject,
+                      tasks: wbsTasks,
+                    }),
+                  });
+
+                  console.log("Saved!");
+
+                  onSave(selectedProject); // 🔥 important
+                  onClose();
+
+                } catch (err) {
+                  console.error("Save error:", err);
+                }
+              }}
+            >
+              ✓ Save & Auto-Plan Milestones
+            </button>
             </div>
           </div>
         )}
@@ -571,31 +444,99 @@ const MilestonePlanningPopup = ({ projects, onClose }) => {
    MAIN COMPONENT
 ══════════════════════════════════════════ */
 export default function Milestone() {
-  const milestones = MOCK_MILESTONES.map(m => ({ ...m, status: getStatus(m) }));
 
-  const [activeTab,     setActiveTab]     = useState("All");
-  const [expandedId,    setExpanded]      = useState(null);
-  const [filterProj,    setFilterProj]    = useState("All");
-  const [clientView,    setClientView]    = useState(false);
+  // MAIN STATES
+  const [milestones, setMilestones] = useState([]);
+  const [activeTab, setActiveTab] = useState("All");
+  const [expandedId, setExpanded] = useState(null);
+  const [filterProj, setFilterProj] = useState("All");
+  const [clientView, setClientView] = useState(false);
   const [activeSection, setActiveSection] = useState({});
-  const [showPlanning,  setShowPlanning]  = useState(false);
+  const [showPlanning, setShowPlanning] = useState(false);
 
-  const projects = ["All", ...new Set(milestones.map(m => m.project))];
+  // ✅ ADD HERE
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [projects, setProjects] = useState([]);
 
-  const visibleMilestones = clientView ? milestones.filter(m => m.visibleToClient) : milestones;
+  // ─── FETCH TEMPLATES ────────────────────
 
-  /* project filter drives stats + list */
-  const projFiltered = filterProj === "All"
-    ? visibleMilestones
-    : visibleMilestones.filter(m => m.project === filterProj);
+  useEffect(() => {
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/projects");
+      const data = await res.json();
+
+      setProjects(data); // store full objects
+    } catch (err) {
+      console.error("Project fetch error:", err);
+    }
+  };
+
+  fetchProjects();
+}, []);
+  
+useEffect(() => {
+  const fetchTemplates = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/templates");
+      const data = await res.json();
+      setTemplates(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  fetchTemplates();
+}, []);
+
+// FETCH WBS
+const fetchWBS = async () => {
+  if (!selectedProject) return;
+
+  try {
+    const res = await fetch(`http://localhost:5000/api/wbs/${selectedProject}`);
+    const data = await res.json();
+
+    const formatted = convertWBS(data, selectedProject);
+    setMilestones(formatted);
+
+  } catch (err) {
+    console.error("WBS error:", err);
+  }
+};
+
+useEffect(() => {
+  if (templates.length > 0) {
+    setSelectedTemplate(templates[0].id);
+  }
+}, [templates]);
+useEffect(() => {
+  fetchWBS();
+}, [selectedProject]);
+
+
+  // ─── DERIVED DATA ───────────────────────
+  const projectOptions = ["All", ...new Set(milestones.map(m => m.project))];
+
+  const visibleMilestones = clientView
+    ? milestones.filter(m => m.visibleToClient)
+    : milestones;
+
+  const projFiltered =
+    filterProj === "All"
+      ? visibleMilestones
+      : visibleMilestones.filter(m => m.project === filterProj);
 
   const filtered = projFiltered.filter(m =>
     activeTab === "All" ||
     (activeTab === "In Progress" && m.status === "in-progress") ||
-    (activeTab === "Completed"   && m.status === "completed")   ||
-    (activeTab === "Delayed"     && m.status === "delayed")     ||
+    (activeTab === "Completed" && m.status === "completed") ||
+    (activeTab === "Delayed" && m.status === "delayed") ||
     (activeTab === "Not Started" && m.status === "not-started")
   );
+
 
   const counts = {
     total:      projFiltered.length,
@@ -626,7 +567,15 @@ export default function Milestone() {
     <div className="ms-page">
 
       {showPlanning && (
-        <MilestonePlanningPopup projects={projects} onClose={() => setShowPlanning(false)} />
+        <MilestonePlanningPopup 
+        projects={projects}
+        templates={templates}
+        selectedTemplate={selectedTemplate}
+        onClose={() => setShowPlanning(false)}
+        onSave={(projectId) => {
+          setSelectedProject(projectId); // 🔥 triggers fetchWBS
+        }}
+      />
       )}
 
       {/* ════════════════════════════════
@@ -649,9 +598,9 @@ export default function Milestone() {
           </div>
 
           <select className="ms-select" value={filterProj}
-            onChange={e => setFilterProj(e.target.value)}>
-            {projects.map(p => <option key={p}>{p}</option>)}
-          </select>
+          onChange={e => setFilterProj(e.target.value)}>
+          {projectOptions.map(p => <option key={p}>{p}</option>)}
+        </select>
         </div>
       </div>
 

@@ -32,8 +32,9 @@ const analysisRoutes = require("./routes/analysis");
 /* ── INCIDENT MODULE ─────────────────────────────────────── */
 const incidentRoutes = require("./routes/IncidentRoutes");
 
-/* ── 🔥 NEW: PC DAILY UPDATE ROUTE ───────────────────────── */
+/* ── PROJECT COORDINATOR ───────────────────────── */
 const pcDailyUpdateRoutes = require("./routes/pcDailyUpdateRoutes");
+const templateRoutes = require("./routes/templateRoutes");
 
 /* ── SITE ENGINEER MODULES ───────────────────────────────── */
 const siteEngineerRfiRoutes = require("./routes/siteEngineerRfiRoutes");
@@ -126,8 +127,9 @@ app.use("/api/analysis", analysisRoutes);
   /* ── Incident Module ───────────────────────────────────── */
   app.use("/api/incidents", incidentRoutes);
 
-  /* ── 🔥 NEW: PC DAILY UPDATE ROUTE ─────────────────────── */
+  /* ── PROJECT COORDINATOR ─────────────────────── */
   app.use("/api/pc-daily-updates", pcDailyUpdateRoutes);
+  app.use("/api/templates", templateRoutes);
 
   /* ── 🔥 Architect ─────────────────────── */
   app.use("/api/architect", architectProjectsRoutes);
