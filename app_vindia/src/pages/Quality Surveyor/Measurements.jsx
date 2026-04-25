@@ -1,143 +1,141 @@
 import { useState } from "react";
 import "./Measurements.css";
 
-function Measurements() {
-  const [form, setForm] = useState({
-    item: "",
-    location: "",
-    length: "",
-    width: "",
-    height: "",
-    nos: "",
-    unit: "m3"
-  });
+export default function Measurements() {
 
-  const [data, setData] = useState([]);
+  const [elements, setElements] = useState([
+    {
+      id: 1,
+      name: "COLUMNS",
+      drawingRef: "STR-01",
+      unit: "m³",
+      rows: [
+        { id: 1, desc: "300×1200 mm", nos: 4, l: 0.3, b: 1.2, h: 3 }
+      ],
+      rate: 6800
+    }
+  ]);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const calcQty = (r) => {
+    return r.nos * r.l * r.b * r.h;
   };
 
-  // ✅ Auto calculation
-  const calculateTotal = () => {
-    const { length, width, height, nos } = form;
-    return (
-      (parseFloat(length || 0)) *
-      (parseFloat(width || 0)) *
-      (parseFloat(height || 0)) *
-      (parseFloat(nos || 0))
-    ).toFixed(2);
+  const totalQty = (el) => el.rows.reduce((s, r) => s + calcQty(r), 0);
+
+  const grandTotal = elements.reduce(
+    (s, el) => s + totalQty(el) * el.rate,
+    0
+  );
+
+  const update = (elId, rowId, field, value) => {
+    setElements(prev =>
+      prev.map(el =>
+        el.id === elId
+          ? {
+              ...el,
+              rows: el.rows.map(r =>
+                r.id === rowId ? { ...r, [field]: value } : r
+              )
+            }
+          : el
+      )
+    );
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    const newEntry = {
-      ...form,
-      total: calculateTotal(),
-      id: Date.now()
-    };
-
-    setData([newEntry, ...data]);
-
-    // reset form
-    setForm({
-      item: "",
-      location: "",
-      length: "",
-      width: "",
-      height: "",
-      nos: "",
-      unit: "m3"
-    });
+  const addRow = (elId) => {
+    setElements(prev =>
+      prev.map(el =>
+        el.id === elId
+          ? {
+              ...el,
+              rows: [
+                ...el.rows,
+                { id: Date.now(), desc: "New", nos: 1, l: 0, b: 0, h: 0 }
+              ]
+            }
+          : el
+      )
+    );
   };
 
   return (
-    <div className="measurement-container">
+    <div className="measure-page">
 
-      {/* LEFT FORM */}
-      <div className="measurement-card">
-        <h2>📏 Measurement Entry (QS)</h2>
+      <h2>📐 QS Measurement (Based on Structural Drawing)</h2>
 
-        <form onSubmit={handleSubmit} className="measurement-form">
+      {elements.map((el, index) => (
+        <div className="card" key={el.id}>
 
-          <input
-            name="item"
-            placeholder="BOQ Item (Concrete, Brickwork...)"
-            value={form.item}
-            onChange={handleChange}
-            required
-          />
-
-          <input
-            name="location"
-            placeholder="Location (Floor, Area...)"
-            value={form.location}
-            onChange={handleChange}
-          />
-
-          <div className="row">
-            <input name="length" type="number" placeholder="Length" value={form.length} onChange={handleChange} />
-            <input name="width" type="number" placeholder="Width" value={form.width} onChange={handleChange} />
-            <input name="height" type="number" placeholder="Height" value={form.height} onChange={handleChange} />
+          <div className="card-header">
+            <h3>{index + 1}. {el.name}</h3>
+            <span>Drawing: {el.drawingRef}</span>
           </div>
 
-          <input
-            name="nos"
-            type="number"
-            placeholder="No of Units"
-            value={form.nos}
-            onChange={handleChange}
-          />
-
-          <select name="unit" value={form.unit} onChange={handleChange}>
-            <option value="m3">m³</option>
-            <option value="m2">m²</option>
-            <option value="nos">Nos</option>
-          </select>
-
-          <div className="result-box">
-            Total Quantity: <b>{calculateTotal()} {form.unit}</b>
-          </div>
-
-          <button type="submit">Save Measurement</button>
-        </form>
-      </div>
-
-      {/* RIGHT TABLE */}
-      <div className="measurement-table-card">
-        <h3>📋 Measurement Records</h3>
-
-        {data.length === 0 ? (
-          <p>No measurements added</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Location</th>
-                <th>Dimensions</th>
-                <th>Nos</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((d) => (
-                <tr key={d.id}>
-                  <td>{d.item}</td>
-                  <td>{d.location}</td>
-                  <td>{d.length} × {d.width} × {d.height}</td>
-                  <td>{d.nos}</td>
-                  <td>{d.total} {d.unit}</td>
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th>Nos</th>
+                  <th>L</th>
+                  <th>B</th>
+                  <th>H</th>
+                  <th>Qty</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+
+              <tbody>
+                {el.rows.map(r => (
+                  <tr key={r.id}>
+                    <td>
+                      <input value={r.desc}
+                        onChange={e => update(el.id, r.id, "desc", e.target.value)} />
+                    </td>
+
+                    <td>
+                      <input type="number" value={r.nos}
+                        onChange={e => update(el.id, r.id, "nos", e.target.value)} />
+                    </td>
+
+                    <td>
+                      <input type="number" value={r.l}
+                        onChange={e => update(el.id, r.id, "l", e.target.value)} />
+                    </td>
+
+                    <td>
+                      <input type="number" value={r.b}
+                        onChange={e => update(el.id, r.id, "b", e.target.value)} />
+                    </td>
+
+                    <td>
+                      <input type="number" value={r.h}
+                        onChange={e => update(el.id, r.id, "h", e.target.value)} />
+                    </td>
+
+                    <td>{calcQty(r).toFixed(3)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <button className="add-btn" onClick={() => addRow(el.id)}>
+              + Add Row
+            </button>
+          </div>
+
+          <div className="summary">
+            Total Qty: <b>{totalQty(el).toFixed(3)} {el.unit}</b>  
+            | Rate: ₹ {el.rate}  
+            | Amount: ₹ {(totalQty(el) * el.rate).toLocaleString()}
+          </div>
+
+        </div>
+      ))}
+
+      <div className="grand-total">
+        Grand Total: ₹ {grandTotal.toLocaleString()}
       </div>
 
     </div>
   );
 }
-
-export default Measurements;
