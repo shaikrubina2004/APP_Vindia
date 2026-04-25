@@ -115,6 +115,7 @@ export default function TaskQueue({
   const [blockingTask, setBlockingTask] = useState(null);
   const [commentText, setCommentText] = useState("");
   const [showNewTask, setShowNewTask] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
   const taskFileRef = useRef(null);
 
   const allTasks = incidents.flatMap((inc) =>
@@ -741,9 +742,14 @@ export default function TaskQueue({
               {(selectedTask.photos ?? []).length > 0 && (
                 <div className="inc-photos-grid">
                   {(selectedTask.photos ?? []).map((p) => (
-                    <a key={p.id} href={p.url} target="_blank" rel="noreferrer">
-                      <img src={p.url} alt="task" className="inc-photo-thumb" />
-                    </a>
+                    <img
+                      key={p.id}
+                      src={p.url}
+                      alt="task"
+                      className="inc-photo-thumb"
+                      onClick={() => setLightboxUrl(p.url)}
+                      style={{ cursor: "pointer" }}
+                    />
                   ))}
                 </div>
               )}
@@ -915,6 +921,39 @@ export default function TaskQueue({
           onClose={() => setShowNewTask(false)}
           onSubmit={handleCreateStandaloneTask}
         />
+      )}
+      {lightboxUrl && (
+        <div
+          className="inc-modal-overlay"
+          onClick={() => setLightboxUrl(null)}
+          style={{ zIndex: 1000 }}
+        >
+          <div
+            style={{
+              position: "relative",
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+            }}
+          >
+            <button
+              className="inc-modal-close"
+              onClick={() => setLightboxUrl(null)}
+              style={{
+                position: "absolute",
+                top: -10,
+                right: -10,
+                zIndex: 1001,
+              }}
+            >
+              ×
+            </button>
+            <img
+              src={lightboxUrl}
+              alt="preview"
+              style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 8 }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

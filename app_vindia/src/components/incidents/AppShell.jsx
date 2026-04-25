@@ -30,7 +30,11 @@ function normaliseIncident(inc) {
       time: new Date(c.created_at),
     })),
     tasks: (inc.tasks ?? []).map(normaliseTask),
-    photos: inc.photos ?? [],
+    photos: (inc.photos ?? []).map((p) => ({
+      id: p.id,
+      url: p.url,
+      uploadedAt: new Date(p.uploaded_at ?? p.uploadedAt),
+    })),
   };
 }
 

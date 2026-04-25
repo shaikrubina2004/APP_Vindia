@@ -31,7 +31,9 @@ export default function IncidentManagement({
   const [commentText, setCommentText] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
   const fileRef = React.useRef(null);
+  const incFileRef = React.useRef(null);
 
   const [form, setForm] = useState({
     title: "",
@@ -83,7 +85,17 @@ export default function IncidentManagement({
         priority: form.priority,
         assigned_to_user_id: form.assignedId,
       });
-      await refreshIncident(res.data.data.id);
+
+      const newIncidentId = res.data.data.id;
+
+      // Upload photo if attached
+      if (photoPreview && newIncidentId) {
+        await API.post(`/incidents/${newIncidentId}/photos`, {
+          url: photoPreview,
+        });
+      }
+
+      await refreshIncident(newIncidentId);
       setForm({
         title: "",
         description: "",
@@ -197,6 +209,26 @@ export default function IncidentManagement({
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => setPhotoPreview(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleIncidentPhoto = async (e, incidentId) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result;
+      try {
+        await API.post(`/incidents/${incidentId}/photos`, { url: base64 });
+        await refreshIncident(incidentId);
+      } catch (err) {
+        console.error("handleIncidentPhoto:", err);
+        alert(
+          "Failed to upload photo: " +
+            (err.response?.data?.message ?? err.message),
+        );
+      }
+    };
     reader.readAsDataURL(file);
   };
 
@@ -640,7 +672,51 @@ export default function IncidentManagement({
               <span className="inc-section-title">Description</span>
               <p className="inc-detail-desc">{selectedIncident.description}</p>
             </div>
-
+            {/* Photos */}
+            <div className="inc-detail-section">
+              <span className="inc-section-title">
+                Photos ({(selectedIncident.photos ?? []).length})
+              </span>
+              {(selectedIncident.photos ?? []).length > 0 && (
+                <div className="inc-photos-grid">
+                  {(selectedIncident.photos ?? []).map((p) => (
+                    <img
+                      key={p.id}
+                      src={p.url}
+                      alt="incident"
+                      className="inc-photo-thumb"
+                      onClick={() => setLightboxUrl(p.url)}
+                      style={{ cursor: "pointer" }}
+                    />
+                  ))}
+                </div>
+              )}
+              <div
+                className="inc-photo-upload"
+                onClick={() => incFileRef.current.click()}
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                <span>Click to upload photo</span>
+              </div>
+              <input
+                ref={incFileRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => handleIncidentPhoto(e, selectedIncident.id)}
+              />
+            </div>
             {/* Tasks */}
             {(selectedIncident.tasks?.length ?? 0) > 0 && (
               <div className="inc-detail-section">
@@ -995,6 +1071,39 @@ export default function IncidentManagement({
           onClose={() => setConvertingId(null)}
           onConvert={handleConvertToTasks}
         />
+      )}
+      {lightboxUrl && (
+        <div
+          className="inc-modal-overlay"
+          onClick={() => setLightboxUrl(null)}
+          style={{ zIndex: 1000 }}
+        >
+          <div
+            style={{
+              position: "relative",
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+            }}
+          >
+            <button
+              className="inc-modal-close"
+              onClick={() => setLightboxUrl(null)}
+              style={{
+                position: "absolute",
+                top: -10,
+                right: -10,
+                zIndex: 1001,
+              }}
+            >
+              ×
+            </button>
+            <img
+              src={lightboxUrl}
+              alt="preview"
+              style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 8 }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
