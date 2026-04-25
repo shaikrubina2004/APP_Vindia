@@ -190,9 +190,22 @@ exports.getIncidentById = async (req, res) => {
       taskComments = rows;
     }
 
+    let taskPhotos = [];
+    if (taskIds.length) {
+      const { rows: tpRows } = await client.query(
+        `SELECT tp.id, tp.task_id, tp.url, tp.uploaded_at
+     FROM task_photos tp
+     WHERE tp.task_id = ANY($1)
+     ORDER BY tp.uploaded_at ASC`,
+        [taskIds],
+      );
+      taskPhotos = tpRows;
+    }
+
     const tasksWithComments = tasks.map((t) => ({
       ...t,
       comments: taskComments.filter((c) => c.task_id === t.id),
+      photos: taskPhotos.filter((p) => p.task_id === t.id),
     }));
 
     res.json({
@@ -563,9 +576,23 @@ exports.getAllTasks = async (req, res) => {
       comments = cRows;
     }
 
+    const photoTaskIds = rows.map((t) => t.id);
+    let photos = [];
+    if (photoTaskIds.length) {
+      const { rows: pRows } = await pool.query(
+        `SELECT tp.id, tp.task_id, tp.url, tp.uploaded_at
+     FROM task_photos tp
+     WHERE tp.task_id = ANY($1)
+     ORDER BY tp.uploaded_at ASC`,
+        [photoTaskIds],
+      );
+      photos = pRows;
+    }
+
     const data = rows.map((t) => ({
       ...t,
       comments: comments.filter((c) => c.task_id === t.id),
+      photos: photos.filter((p) => p.task_id === t.id),
     }));
 
     res.json({ success: true, data });

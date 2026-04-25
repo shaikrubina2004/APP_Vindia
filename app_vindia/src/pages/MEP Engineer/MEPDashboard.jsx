@@ -633,7 +633,7 @@ export default function MEPDashboard() {
         </div>
       </div>
 
-      {/* ── OPEN INCIDENTS TABLE ── */}
+      {/* ── OPEN INCIDENTS (Enhanced Responsive Table) ── */}
       <div className="mep-card">
         <div className="mep-card-head">
           <span className="card-title">⚠️ Open Incidents</span>
@@ -649,7 +649,7 @@ export default function MEPDashboard() {
           </div>
         </div>
         <div className="mep-table-wrap">
-          <table className="mep-table">
+          <table className="mep-table incidents-table">
             <thead>
               <tr>
                 <th>#</th>
@@ -663,7 +663,7 @@ export default function MEPDashboard() {
             <tbody>
               {INCIDENTS.map((inc) => (
                 <tr key={inc.id}>
-                  <td>
+                  <td data-label="#">
                     <span
                       style={{
                         fontFamily: "Monaco,Courier New,monospace",
@@ -675,19 +675,25 @@ export default function MEPDashboard() {
                       {inc.id}
                     </span>
                   </td>
-                  <td style={{ fontWeight: 600, fontSize: 12 }}>{inc.title}</td>
-                  <td>
+                  <td
+                    data-label="Title"
+                    style={{ fontWeight: 600, fontSize: 12 }}
+                  >
+                    {inc.title}
+                  </td>
+                  <td data-label="Team">
                     <span className={`badge ${inc.tb}`}>{inc.team}</span>
                   </td>
-                  <td>
+                  <td data-label="Priority">
                     <span className={`badge ${inc.pb}`}>{inc.pri}</span>
                   </td>
-                  <td>
+                  <td data-label="Status">
                     <span className={`status-pill ${inc.sb}`}>
                       {inc.status}
                     </span>
                   </td>
                   <td
+                    data-label="Raised"
                     style={{
                       color: "var(--text-secondary)",
                       fontSize: 11,
