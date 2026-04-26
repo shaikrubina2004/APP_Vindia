@@ -27,6 +27,7 @@ import Travel from "../pages/hr/Travel";
 /* PROJECT MANAGER */
 import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
 import AppShell from "../components/incidents/AppShell";
+import SharedDrawingPage from "../components/project/SharedDrawingPage";
 import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
 import Reports from "../pages/projects/projectmanager/Reports";
 
@@ -78,7 +79,6 @@ import ProjectCoordinatorDashboard from "../pages/Project Coordinator/ProjectCoo
 import DailyUpdatesPC from "../pages/Project Coordinator/DailyUpdates";
 import Milestone from "../pages/Project Coordinator/Milestone";
 import Payment from "../pages/Project Coordinator/Payment";
-
 
 /* LAYOUTS */
 import CEOLayout from "../layouts/CEOLayout";
@@ -452,7 +452,7 @@ const AppRoutes = () => {
           </QuantitySurveyorLayout>
         }
       />
-     
+
       <Route
         path="/quantity-surveyor/boq"
         element={
@@ -486,6 +486,15 @@ const AppRoutes = () => {
         element={
           <MEPLayout>
             <MEPDrawings />
+          </MEPLayout>
+        }
+      />
+
+      <Route
+        path="mep/shared/drawings"
+        element={
+          <MEPLayout>
+            <SharedDrawingPage />
           </MEPLayout>
         }
       />
@@ -566,12 +575,12 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-    <Route
+      <Route
         path="/architect/incidents"
         element={
-            <ArchitectLayout>
-              <AppShell />
-            </ArchitectLayout>
+          <ArchitectLayout>
+            <AppShell />
+          </ArchitectLayout>
         }
       />
       <Route
@@ -651,10 +660,10 @@ const AppRoutes = () => {
       />
 
       <Route
-        path= "/project-coordinator/incidents"
+        path="/project-coordinator/incidents"
         element={
           <ProjectCoordinatorLayout>
-            <AppShell/>
+            <AppShell />
           </ProjectCoordinatorLayout>
         }
       />

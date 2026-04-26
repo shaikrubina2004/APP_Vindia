@@ -5,6 +5,8 @@ export const MEPMenu = [
 
   { name: "Drawings", path: "/mep/drawings", icon: "file-text" },
 
+  { name: "Shared Drawings", path: "mep/shared/drawings", icon: "layers" },
+
   { name: "Version Control", path: "/mep/version-control", icon: "git-branch" },
 
   { name: "Incidents", path: "/mep/incidents", icon: "alert-triangle" },
