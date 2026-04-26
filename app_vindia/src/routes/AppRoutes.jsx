@@ -58,6 +58,8 @@ import MEPUploads from "../pages/MEP Engineer/MEPUploads";
 import MEPVerssionControll from "../pages/MEP Engineer/MEPVerssionControll";
 import MEPCoordination from "../pages/MEP Engineer/MEPCoordination";
 
+import MEPRoutes from "./MepRoutes";
+
 import PlanningEngineerDashboard from "../pages/Planning Engineer/PlanningEngineerDashboard";
 import QCDashboard from "../pages/QC Engineer/QCDashboard";
 import SafetyOfficerDashboard from "../pages/Safety Officer/SafetyOfficerDashboard";
@@ -463,77 +465,7 @@ const AppRoutes = () => {
       />
 
       {/* MEP */}
-      <Route
-        path="/mep/dashboard"
-        element={
-          <MEPLayout>
-            <MEPDashboard />
-          </MEPLayout>
-        }
-      />
-
-      <Route
-        path="/mep/daily-log"
-        element={
-          <MEPLayout>
-            <MEPDailylog />
-          </MEPLayout>
-        }
-      />
-
-      <Route
-        path="/mep/drawings"
-        element={
-          <MEPLayout>
-            <MEPDrawings />
-          </MEPLayout>
-        }
-      />
-
-      <Route
-        path="mep/shared/drawings"
-        element={
-          <MEPLayout>
-            <SharedDrawingPage />
-          </MEPLayout>
-        }
-      />
-
-      <Route
-        path="/mep/version-control"
-        element={
-          <MEPLayout>
-            <MEPVerssionControll />
-          </MEPLayout>
-        }
-      />
-
-      <Route
-        path="/mep/incidents"
-        element={
-          <MEPLayout>
-            <AppShell />
-          </MEPLayout>
-        }
-      />
-
-      <Route
-        path="/mep/coordination"
-        element={
-          <MEPLayout>
-            <MEPCoordination />
-          </MEPLayout>
-        }
-      />
-
-      <Route
-        path="/mep/upload"
-        element={
-          <MEPLayout>
-            <MEPUploads />
-          </MEPLayout>
-        }
-      />
+      <Route path="/mep/*" element={<MEPRoutes />} />
 
       <Route
         path="/planning-engineer/dashboard"

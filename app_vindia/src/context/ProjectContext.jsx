@@ -1,15 +1,39 @@
 import { createContext, useContext, useState } from "react";
 
-const ProjectContext = createContext();
+export const PROJECTS = [
+  {
+    id: "p1",
+    code: "VIN-001",
+    name: "VIndia Tower Block A",
+    location: "Bengaluru",
+  },
+  {
+    id: "p2",
+    code: "VIN-002",
+    name: "VIndia Commercial Hub",
+    location: "Hyderabad",
+  },
+  {
+    id: "p3",
+    code: "VIN-003",
+    name: "VIndia Residential Phase 2",
+    location: "Chennai",
+  },
+];
 
-export const ProjectProvider = ({ children }) => {
-  const [project, setProject] = useState("Skyline Tower");
+const ProjectContext = createContext(null);
 
+export function ProjectProvider({ children }) {
+  const [activeProject, setActiveProject] = useState(PROJECTS[0]);
   return (
-    <ProjectContext.Provider value={{ project, setProject }}>
+    <ProjectContext.Provider
+      value={{ activeProject, setActiveProject, PROJECTS }}
+    >
       {children}
     </ProjectContext.Provider>
   );
-};
+}
 
-export const useProject = () => useContext(ProjectContext);
+export function useProject() {
+  return useContext(ProjectContext);
+}
