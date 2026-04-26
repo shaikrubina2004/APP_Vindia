@@ -1,20 +1,24 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useProject } from "../../context/ProjectContext";
+import ProjectSwitcher from "../../components/project/ProjectSwitcher";
 import "../../styles/MEPEngineer.css";
 
-const PROJECTS = [
-  { id: "p1", name: "Vindia Tower — Block A" },
-  { id: "p2", name: "Greenfield Mall — Phase 2" },
-  { id: "p3", name: "Metro Station — Sector 14" },
-];
-
-const DRAWINGS_LIST = [
-  "HVAC Layout — Level 3 (Rev-5)",
-  "Plumbing GF (Rev-3)",
-  "Electrical SLD (Rev-5)",
-  "Drainage L2 (Rev-4)",
-  "Conduit Routing GF (Rev-2)",
-  "Chiller Plant Layout (Rev-1)",
-];
+const DRAWINGS_LIST = {
+  p1: [
+    "HVAC Layout — Level 3 (Rev-5)",
+    "Plumbing GF (Rev-3)",
+    "Electrical SLD (Rev-5)",
+    "Drainage L2 (Rev-4)",
+    "Conduit Routing GF (Rev-2)",
+    "Chiller Plant Layout (Rev-1)",
+  ],
+  p2: [
+    "HVAC Layout GF (Rev-2)",
+    "Electrical SLD (Rev-1)",
+    "Plumbing GF (Rev-2)",
+  ],
+  p3: ["HVAC Schematic (Rev-1)", "Plumbing Schematic (Rev-1)"],
+};
 
 const TEAM_OPTIONS = [
   {
@@ -54,216 +58,599 @@ const TEAM_OPTIONS = [
   },
 ];
 
-const TEAMS = [
-  {
-    key: "arch",
-    icon: "🏛️",
-    avatarCls: "si-blue",
-    name: "Architect",
-    role: "Person 3",
-    lastSeen: "1h ago",
-    items: [
-      {
-        label: "Floor Plan Rev4 compatibility",
-        badge: "badge-amber",
-        badgeLabel: "Pending",
-      },
-      {
-        label: "Ceiling grid MEP clearance",
-        badge: "badge-green",
-        badgeLabel: "OK",
-      },
-      {
-        label: "Conduit shaft — #INC-038",
-        badge: "badge-red",
-        badgeLabel: "Open",
-      },
-    ],
-  },
-  {
-    key: "struct",
-    icon: "🏗️",
-    avatarCls: "si-purple",
-    name: "Structural Engineer",
-    role: "Person 4",
-    lastSeen: "30min ago",
-    items: [
-      {
-        label: "Beam B-14 clash — Level 3",
-        badge: "badge-red",
-        badgeLabel: "High",
-      },
-      {
-        label: "Slab S-7 MEP penetrations",
-        badge: "badge-green",
-        badgeLabel: "Approved",
-      },
-      {
-        label: "New beam layout review",
-        badge: "badge-amber",
-        badgeLabel: "Due",
-      },
-    ],
-  },
-  {
-    key: "coord",
-    icon: "📋",
-    avatarCls: "si-green",
-    name: "Project Coordinator",
-    role: "Person 1",
-    lastSeen: "2h ago",
-    items: [
-      {
-        label: "MEP Level 2 schedule",
-        badge: "badge-green",
-        badgeLabel: "Approved",
-      },
-      {
-        label: "Daily log reminder sent",
-        badge: "badge-green",
-        badgeLabel: "Done",
-      },
-      {
-        label: "Resource request — Level 3",
-        badge: "badge-amber",
-        badgeLabel: "Pending",
-      },
-    ],
-  },
-];
+/* ═══════════════════════════════════════
+   TEAMS  (keyed by project)
+═══════════════════════════════════════ */
+const TEAMS = {
+  p1: [
+    {
+      key: "arch",
+      icon: "🏛️",
+      avatarCls: "si-blue",
+      name: "Architect",
+      role: "Person 3",
+      lastSeen: "1h ago",
+      items: [
+        {
+          label: "Floor Plan Rev4 compatibility",
+          badge: "badge-amber",
+          badgeLabel: "Pending",
+        },
+        {
+          label: "Ceiling grid MEP clearance",
+          badge: "badge-green",
+          badgeLabel: "OK",
+        },
+        {
+          label: "Conduit shaft — #INC-038",
+          badge: "badge-red",
+          badgeLabel: "Open",
+        },
+      ],
+    },
+    {
+      key: "struct",
+      icon: "🏗️",
+      avatarCls: "si-purple",
+      name: "Structural Engineer",
+      role: "Person 4",
+      lastSeen: "30min ago",
+      items: [
+        {
+          label: "Beam B-14 clash — Level 3",
+          badge: "badge-red",
+          badgeLabel: "High",
+        },
+        {
+          label: "Slab S-7 MEP penetrations",
+          badge: "badge-green",
+          badgeLabel: "Approved",
+        },
+        {
+          label: "New beam layout review",
+          badge: "badge-amber",
+          badgeLabel: "Due",
+        },
+      ],
+    },
+    {
+      key: "coord",
+      icon: "📋",
+      avatarCls: "si-green",
+      name: "Project Coordinator",
+      role: "Person 1",
+      lastSeen: "2h ago",
+      items: [
+        {
+          label: "MEP Level 2 schedule",
+          badge: "badge-green",
+          badgeLabel: "Approved",
+        },
+        {
+          label: "Daily log reminder sent",
+          badge: "badge-green",
+          badgeLabel: "Done",
+        },
+        {
+          label: "Resource request — Level 3",
+          badge: "badge-amber",
+          badgeLabel: "Pending",
+        },
+      ],
+    },
+  ],
+  p2: [
+    {
+      key: "arch",
+      icon: "🏛️",
+      avatarCls: "si-blue",
+      name: "Architect",
+      role: "Person 7",
+      lastSeen: "3h ago",
+      items: [
+        {
+          label: "Mall facade MEP penetrations",
+          badge: "badge-amber",
+          badgeLabel: "Pending",
+        },
+        {
+          label: "Food court exhaust routing",
+          badge: "badge-red",
+          badgeLabel: "Open",
+        },
+        {
+          label: "Roof plant room access",
+          badge: "badge-green",
+          badgeLabel: "OK",
+        },
+      ],
+    },
+    {
+      key: "struct",
+      icon: "🏗️",
+      avatarCls: "si-purple",
+      name: "Structural Engineer",
+      role: "Person 8",
+      lastSeen: "1h ago",
+      items: [
+        {
+          label: "Slab opening — Zone B",
+          badge: "badge-amber",
+          badgeLabel: "Review",
+        },
+        {
+          label: "Column grid clearance check",
+          badge: "badge-green",
+          badgeLabel: "Approved",
+        },
+        {
+          label: "Basement MEP coordination",
+          badge: "badge-amber",
+          badgeLabel: "Due",
+        },
+      ],
+    },
+    {
+      key: "coord",
+      icon: "📋",
+      avatarCls: "si-green",
+      name: "Project Coordinator",
+      role: "Person 5",
+      lastSeen: "45min ago",
+      items: [
+        {
+          label: "Phase 2 MEP schedule",
+          badge: "badge-green",
+          badgeLabel: "Approved",
+        },
+        {
+          label: "Contractor site access",
+          badge: "badge-amber",
+          badgeLabel: "Pending",
+        },
+        {
+          label: "Weekly progress report",
+          badge: "badge-green",
+          badgeLabel: "Done",
+        },
+      ],
+    },
+  ],
+  p3: [
+    {
+      key: "arch",
+      icon: "🏛️",
+      avatarCls: "si-blue",
+      name: "Architect",
+      role: "Person 9",
+      lastSeen: "2h ago",
+      items: [
+        {
+          label: "Platform MEP integration",
+          badge: "badge-amber",
+          badgeLabel: "Pending",
+        },
+        {
+          label: "Tunnel ventilation layout",
+          badge: "badge-red",
+          badgeLabel: "Open",
+        },
+        {
+          label: "Concourse ceiling clearance",
+          badge: "badge-green",
+          badgeLabel: "OK",
+        },
+      ],
+    },
+    {
+      key: "struct",
+      icon: "🏗️",
+      avatarCls: "si-purple",
+      name: "Structural Engineer",
+      role: "Person 10",
+      lastSeen: "4h ago",
+      items: [
+        {
+          label: "Tunnel wall penetrations",
+          badge: "badge-red",
+          badgeLabel: "High",
+        },
+        {
+          label: "Platform slab MEP ducts",
+          badge: "badge-amber",
+          badgeLabel: "Review",
+        },
+        {
+          label: "Station roof MEP load",
+          badge: "badge-green",
+          badgeLabel: "Approved",
+        },
+      ],
+    },
+    {
+      key: "coord",
+      icon: "📋",
+      avatarCls: "si-green",
+      name: "Project Coordinator",
+      role: "Person 2",
+      lastSeen: "30min ago",
+      items: [
+        {
+          label: "MEP tender package",
+          badge: "badge-amber",
+          badgeLabel: "Pending",
+        },
+        {
+          label: "Authority submission docs",
+          badge: "badge-red",
+          badgeLabel: "Urgent",
+        },
+        {
+          label: "Site survey coordination",
+          badge: "badge-green",
+          badgeLabel: "Done",
+        },
+      ],
+    },
+  ],
+};
 
-const INITIAL_THREADS = [
-  {
-    id: 1,
-    title: "Beam B-14 clash resolution — Level 3",
-    teams: [
-      { cls: "badge-purple", label: "Structural" },
-      { cls: "badge-mep-m", label: "MEP" },
-      { cls: "badge-red", label: "High" },
-    ],
-    drawing: "HVAC Layout — Level 3 (Rev-5)",
-    disc: "Mechanical",
-    priority: "High",
-    status: "open",
-    resolution: null,
-    messages: [
-      {
-        av: "av-struct",
-        initials: "SE",
-        name: "Structural Eng",
-        time: "Today 11:00 AM",
-        text: "New beam layout uploaded — Beam B-14 has moved 200mm east. Please check if your pipe route is still conflicting.",
-        isDecision: false,
-        isMine: false,
-      },
-      {
-        av: "av-me",
-        initials: "ME",
-        name: "MEP Engineer (You)",
-        time: "Today 09:15 AM",
-        text: "Checked — conflict still exists at our 100mm CW main. Raising incident #INC-041. We need a 300mm clear passage minimum.",
-        isDecision: false,
-        isMine: true,
-      },
-      {
-        av: "av-struct",
-        initials: "SE",
-        name: "Structural Eng",
-        time: "Today 09:30 AM",
-        text: "Understood. Will discuss with design team. Can we schedule a call this afternoon?",
-        isDecision: false,
-        isMine: false,
-      },
-    ],
-  },
-  {
-    id: 2,
-    title: "Floor Plan Rev4 — MEP compatibility check",
-    teams: [
-      { cls: "badge-blue", label: "Architect" },
-      { cls: "badge-mep-p", label: "Plumbing" },
-      { cls: "badge-amber", label: "Medium" },
-    ],
-    drawing: "Plumbing GF (Rev-3)",
-    disc: "Plumbing",
-    priority: "Medium",
-    status: "awaiting",
-    resolution: null,
-    messages: [
-      {
-        av: "av-arch",
-        initials: "AR",
-        name: "Architect",
-        time: "Today 08:45 AM",
-        text: "Floor Plan Rev4 has been uploaded. Key change — toilet block on Level 2 moved 1.5m north. Please review your plumbing layout for compatibility.",
-        isDecision: false,
-        isMine: false,
-      },
-      {
-        av: "av-me",
-        initials: "ME",
-        name: "MEP Engineer (You)",
-        time: "Today 09:00 AM",
-        text: "Noted. Will review plumbing drawing and update by end of day. The waste pipe slope may be affected — will confirm after assessment.",
-        isDecision: false,
-        isMine: true,
-      },
-    ],
-  },
-  {
-    id: 3,
-    title: "Conduit shaft routing — Ground Floor conflict",
-    teams: [
-      { cls: "badge-blue", label: "Architect" },
-      { cls: "badge-purple", label: "Structural" },
-      { cls: "badge-grey", label: "Low" },
-    ],
-    drawing: "Conduit Routing GF (Rev-2)",
-    disc: "Electrical",
-    priority: "Low",
-    status: "resolved",
-    resolution:
-      "Conduit route shifted 500mm west as agreed. MEP to issue Rev-3 of Conduit Routing GF drawing. Structural confirmed no impact on beam positions. Architect updated shaft opening dimensions accordingly.",
-    messages: [
-      {
-        av: "av-arch",
-        initials: "AR",
-        name: "Architect",
-        time: "2 days ago",
-        text: "The conduit shaft on GF clashes with the proposed staircase enclosure. We need to reroute before construction starts.",
-        isDecision: false,
-        isMine: false,
-      },
-      {
-        av: "av-me",
-        initials: "ME",
-        name: "MEP Engineer (You)",
-        time: "2 days ago",
-        text: "Agreed. We can shift the conduit 500mm west without affecting the distribution board clearance. Structural, does that impact any beams?",
-        isDecision: false,
-        isMine: true,
-      },
-      {
-        av: "av-struct",
-        initials: "SE",
-        name: "Structural Eng",
-        time: "2 days ago",
-        text: "No impact on beams. 500mm west shift is fine from structural perspective.",
-        isDecision: false,
-        isMine: false,
-      },
-      {
-        av: "av-me",
-        initials: "ME",
-        name: "MEP Engineer (You)",
-        time: "2 days ago",
-        text: "Conduit route shifted 500mm west. All parties agreed. Will issue updated drawing Rev-3.",
-        isDecision: true,
-        isMine: true,
-      },
-    ],
-  },
-];
+/* ═══════════════════════════════════════
+   THREADS  (keyed by project)
+═══════════════════════════════════════ */
+const INITIAL_THREADS = {
+  p1: [
+    {
+      id: 1,
+      title: "Beam B-14 clash resolution — Level 3",
+      teams: [
+        { cls: "badge-purple", label: "Structural" },
+        { cls: "badge-mep-m", label: "MEP" },
+        { cls: "badge-red", label: "High" },
+      ],
+      drawing: "HVAC Layout — Level 3 (Rev-5)",
+      disc: "Mechanical",
+      priority: "High",
+      status: "open",
+      resolution: null,
+      messages: [
+        {
+          av: "av-struct",
+          initials: "SE",
+          name: "Structural Eng",
+          time: "Today 11:00 AM",
+          text: "New beam layout uploaded — Beam B-14 has moved 200mm east. Please check if your pipe route is still conflicting.",
+          isDecision: false,
+          isMine: false,
+        },
+        {
+          av: "av-me",
+          initials: "ME",
+          name: "MEP Engineer (You)",
+          time: "Today 09:15 AM",
+          text: "Checked — conflict still exists at our 100mm CW main. Raising incident #INC-041. We need a 300mm clear passage minimum.",
+          isDecision: false,
+          isMine: true,
+        },
+        {
+          av: "av-struct",
+          initials: "SE",
+          name: "Structural Eng",
+          time: "Today 09:30 AM",
+          text: "Understood. Will discuss with design team. Can we schedule a call this afternoon?",
+          isDecision: false,
+          isMine: false,
+        },
+      ],
+    },
+    {
+      id: 2,
+      title: "Floor Plan Rev4 — MEP compatibility check",
+      teams: [
+        { cls: "badge-blue", label: "Architect" },
+        { cls: "badge-mep-p", label: "Plumbing" },
+        { cls: "badge-amber", label: "Medium" },
+      ],
+      drawing: "Plumbing GF (Rev-3)",
+      disc: "Plumbing",
+      priority: "Medium",
+      status: "awaiting",
+      resolution: null,
+      messages: [
+        {
+          av: "av-arch",
+          initials: "AR",
+          name: "Architect",
+          time: "Today 08:45 AM",
+          text: "Floor Plan Rev4 has been uploaded. Key change — toilet block on Level 2 moved 1.5m north. Please review your plumbing layout for compatibility.",
+          isDecision: false,
+          isMine: false,
+        },
+        {
+          av: "av-me",
+          initials: "ME",
+          name: "MEP Engineer (You)",
+          time: "Today 09:00 AM",
+          text: "Noted. Will review plumbing drawing and update by end of day. The waste pipe slope may be affected — will confirm after assessment.",
+          isDecision: false,
+          isMine: true,
+        },
+      ],
+    },
+    {
+      id: 3,
+      title: "Conduit shaft routing — Ground Floor conflict",
+      teams: [
+        { cls: "badge-blue", label: "Architect" },
+        { cls: "badge-purple", label: "Structural" },
+        { cls: "badge-grey", label: "Low" },
+      ],
+      drawing: "Conduit Routing GF (Rev-2)",
+      disc: "Electrical",
+      priority: "Low",
+      status: "resolved",
+      resolution:
+        "Conduit route shifted 500mm west as agreed. MEP to issue Rev-3 of Conduit Routing GF drawing. Structural confirmed no impact on beam positions. Architect updated shaft opening dimensions accordingly.",
+      messages: [
+        {
+          av: "av-arch",
+          initials: "AR",
+          name: "Architect",
+          time: "2 days ago",
+          text: "The conduit shaft on GF clashes with the proposed staircase enclosure. We need to reroute before construction starts.",
+          isDecision: false,
+          isMine: false,
+        },
+        {
+          av: "av-me",
+          initials: "ME",
+          name: "MEP Engineer (You)",
+          time: "2 days ago",
+          text: "Agreed. We can shift the conduit 500mm west without affecting the distribution board clearance. Structural, does that impact any beams?",
+          isDecision: false,
+          isMine: true,
+        },
+        {
+          av: "av-struct",
+          initials: "SE",
+          name: "Structural Eng",
+          time: "2 days ago",
+          text: "No impact on beams. 500mm west shift is fine from structural perspective.",
+          isDecision: false,
+          isMine: false,
+        },
+        {
+          av: "av-me",
+          initials: "ME",
+          name: "MEP Engineer (You)",
+          time: "2 days ago",
+          text: "Conduit route shifted 500mm west. All parties agreed. Will issue updated drawing Rev-3.",
+          isDecision: true,
+          isMine: true,
+        },
+      ],
+    },
+  ],
+  p2: [
+    {
+      id: 1,
+      title: "Food court exhaust duct — ceiling clash",
+      teams: [
+        { cls: "badge-blue", label: "Architect" },
+        { cls: "badge-mep-m", label: "MEP" },
+        { cls: "badge-red", label: "High" },
+      ],
+      drawing: "HVAC Layout GF (Rev-2)",
+      disc: "Mechanical",
+      priority: "High",
+      status: "open",
+      resolution: null,
+      messages: [
+        {
+          av: "av-arch",
+          initials: "AR",
+          name: "Architect",
+          time: "Today 10:00 AM",
+          text: "The food court exhaust duct shown in HVAC Rev-2 conflicts with the feature ceiling at GL-4. Ceiling height is 3.2m but duct drops to 2.9m.",
+          isDecision: false,
+          isMine: false,
+        },
+        {
+          av: "av-me",
+          initials: "ME",
+          name: "MEP Engineer (You)",
+          time: "Today 10:30 AM",
+          text: "Acknowledged. We can reduce duct depth by 150mm using a flat oval section. Will update drawing and reissue. Structural please confirm beam soffit at GL-4.",
+          isDecision: false,
+          isMine: true,
+        },
+      ],
+    },
+    {
+      id: 2,
+      title: "Basement slab opening — Zone B drainage",
+      teams: [
+        { cls: "badge-purple", label: "Structural" },
+        { cls: "badge-mep-p", label: "Plumbing" },
+        { cls: "badge-amber", label: "Medium" },
+      ],
+      drawing: "Plumbing GF (Rev-2)",
+      disc: "Plumbing",
+      priority: "Medium",
+      status: "awaiting",
+      resolution: null,
+      messages: [
+        {
+          av: "av-me",
+          initials: "ME",
+          name: "MEP Engineer (You)",
+          time: "Yesterday 03:00 PM",
+          text: "We need a 300×300mm slab opening at Grid B3 for the basement drainage stack. Please confirm if this conflicts with any rebar arrangement.",
+          isDecision: false,
+          isMine: true,
+        },
+        {
+          av: "av-struct",
+          initials: "SE",
+          name: "Structural Eng",
+          time: "Yesterday 04:15 PM",
+          text: "Checking drawing. Will revert by tomorrow morning. Preliminary view — should be fine but need to verify rebar layout.",
+          isDecision: false,
+          isMine: false,
+        },
+      ],
+    },
+    {
+      id: 3,
+      title: "Roof plant room — electrical cable tray route",
+      teams: [
+        { cls: "badge-blue", label: "Architect" },
+        { cls: "badge-mep-e", label: "Electrical" },
+        { cls: "badge-grey", label: "Low" },
+      ],
+      drawing: "Electrical SLD (Rev-1)",
+      disc: "Electrical",
+      priority: "Low",
+      status: "resolved",
+      resolution:
+        "Cable tray route revised to run along north parapet wall. Architect confirmed no visual impact from mall atrium. MEP to issue Rev-2 of Electrical SLD.",
+      messages: [
+        {
+          av: "av-arch",
+          initials: "AR",
+          name: "Architect",
+          time: "3 days ago",
+          text: "The proposed cable tray on the roof is visible from the mall atrium skylight. Can it be rerouted along the parapet?",
+          isDecision: false,
+          isMine: false,
+        },
+        {
+          av: "av-me",
+          initials: "ME",
+          name: "MEP Engineer (You)",
+          time: "3 days ago",
+          text: "Yes — we can run it along the north parapet wall. Cable run increases by 8m but no technical issues. Will update the drawing.",
+          isDecision: true,
+          isMine: true,
+        },
+      ],
+    },
+  ],
+  p3: [
+    {
+      id: 1,
+      title: "Tunnel ventilation — structural wall penetration",
+      teams: [
+        { cls: "badge-purple", label: "Structural" },
+        { cls: "badge-mep-m", label: "MEP" },
+        { cls: "badge-red", label: "High" },
+      ],
+      drawing: "HVAC Schematic (Rev-1)",
+      disc: "Mechanical",
+      priority: "High",
+      status: "open",
+      resolution: null,
+      messages: [
+        {
+          av: "av-me",
+          initials: "ME",
+          name: "MEP Engineer (You)",
+          time: "Today 09:00 AM",
+          text: "We require two 800×600mm openings through the diaphragm wall at Station North end for tunnel ventilation fans. Please review structural implications.",
+          isDecision: false,
+          isMine: true,
+        },
+        {
+          av: "av-struct",
+          initials: "SE",
+          name: "Structural Eng",
+          time: "Today 09:45 AM",
+          text: "This is a critical structural element. We will need to introduce lintels and check water-tightness. Please issue a formal RFI so we can log this properly.",
+          isDecision: false,
+          isMine: false,
+        },
+      ],
+    },
+    {
+      id: 2,
+      title: "Platform slab — MEP duct coordination",
+      teams: [
+        { cls: "badge-purple", label: "Structural" },
+        { cls: "badge-mep-m", label: "MEP" },
+        { cls: "badge-amber", label: "Medium" },
+      ],
+      drawing: "HVAC Schematic (Rev-1)",
+      disc: "Mechanical",
+      priority: "Medium",
+      status: "awaiting",
+      resolution: null,
+      messages: [
+        {
+          av: "av-struct",
+          initials: "SE",
+          name: "Structural Eng",
+          time: "2 days ago",
+          text: "Platform slab structural drawing issued. Please overlay your MEP ducts and check for conflicts before we finalise rebar positions.",
+          isDecision: false,
+          isMine: false,
+        },
+        {
+          av: "av-me",
+          initials: "ME",
+          name: "MEP Engineer (You)",
+          time: "2 days ago",
+          text: "Will overlay and revert within 48 hours. Initial review shows possible conflict at Grid S-3 with the supply air duct.",
+          isDecision: false,
+          isMine: true,
+        },
+      ],
+    },
+    {
+      id: 3,
+      title: "Authority submission — MEP drawings sign-off",
+      teams: [
+        { cls: "badge-green", label: "Coordinator" },
+        { cls: "badge-mep-m", label: "MEP" },
+        { cls: "badge-grey", label: "Low" },
+      ],
+      drawing: "Plumbing Schematic (Rev-1)",
+      disc: "Plumbing",
+      priority: "Low",
+      status: "resolved",
+      resolution:
+        "All MEP drawings stamped and submitted to authority on 22 Apr. Coordinator confirmed receipt. Approval expected within 15 working days.",
+      messages: [
+        {
+          av: "av-coord",
+          initials: "PC",
+          name: "Project Coordinator",
+          time: "4 days ago",
+          text: "Authority submission deadline is next Monday. Please confirm which MEP drawings are ready for stamping and submission.",
+          isDecision: false,
+          isMine: false,
+        },
+        {
+          av: "av-me",
+          initials: "ME",
+          name: "MEP Engineer (You)",
+          time: "4 days ago",
+          text: "HVAC and Plumbing schematics are ready. Stamped copies will be with you by Friday EOD.",
+          isDecision: false,
+          isMine: true,
+        },
+        {
+          av: "av-me",
+          initials: "ME",
+          name: "MEP Engineer (You)",
+          time: "3 days ago",
+          text: "Stamped drawings submitted to coordinator. All MEP disciplines covered for this submission package.",
+          isDecision: true,
+          isMine: true,
+        },
+      ],
+    },
+  ],
+};
 
 const STATUS_INFO = {
   open: { label: "Open", pill: "pill-open" },
@@ -278,8 +665,7 @@ const PRIORITY_BADGE = {
 };
 
 /* ── Inline New Thread Form ───────────────────────── */
-function NewThreadForm({ onClose, onAdd, projectId }) {
-  const projectName = PROJECTS.find((p) => p.id === projectId)?.name || "";
+function NewThreadForm({ onClose, onAdd, projectName, drawingsList }) {
   const [subject, setSubject] = useState("");
   const [disc, setDisc] = useState("");
   const [drawing, setDrawing] = useState("");
@@ -358,7 +744,6 @@ function NewThreadForm({ onClose, onAdd, projectId }) {
         className="mep-card-body"
         style={{ display: "flex", flexDirection: "column", gap: 14 }}
       >
-        {/* Subject */}
         <div className="form-group">
           <label>
             Thread Subject <span style={{ color: "var(--danger)" }}>*</span>
@@ -372,7 +757,6 @@ function NewThreadForm({ onClose, onAdd, projectId }) {
           />
         </div>
 
-        {/* Disc + Priority + Drawing */}
         <div className="form-row">
           <div className="form-group">
             <label>
@@ -410,14 +794,13 @@ function NewThreadForm({ onClose, onAdd, projectId }) {
               onChange={(e) => setDrawing(e.target.value)}
             >
               <option value="">Select drawing (optional)</option>
-              {DRAWINGS_LIST.map((d) => (
+              {drawingsList.map((d) => (
                 <option key={d}>{d}</option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* Teams */}
         <div className="form-group">
           <label>
             Teams Involved <span style={{ color: "var(--danger)" }}>*</span>
@@ -457,7 +840,6 @@ function NewThreadForm({ onClose, onAdd, projectId }) {
           </div>
         </div>
 
-        {/* Note */}
         <div className="form-group">
           <label>Opening Note</label>
           <textarea
@@ -468,7 +850,6 @@ function NewThreadForm({ onClose, onAdd, projectId }) {
           />
         </div>
 
-        {/* Validation hint */}
         {!canSubmit && (subject || disc || anyTeam) && (
           <div className="alert alert-amber" style={{ padding: "8px 12px" }}>
             <span className="alert-icon">⚠️</span>
@@ -499,7 +880,7 @@ function NewThreadForm({ onClose, onAdd, projectId }) {
   );
 }
 
-/* ── Resolve Form (inline) ────────────────────────── */
+/* ── Resolve Form ─────────────────────────────────── */
 function ResolveForm({ thread, onClose, onResolve }) {
   const [text, setText] = useState("");
   return (
@@ -591,7 +972,6 @@ function CoordThread({ thread, onResolve }) {
 
   return (
     <div className="coord-thread">
-      {/* Head */}
       <div className="ct-head" onClick={() => setExpanded((v) => !v)}>
         <span style={{ fontSize: 14, flexShrink: 0 }}>{discIcon}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -626,7 +1006,6 @@ function CoordThread({ thread, onResolve }) {
 
       {expanded && (
         <>
-          {/* Meta row */}
           <div className="ct-status-bar">
             <div className="ct-status-left">
               <span>📐 {thread.drawing}</span>
@@ -637,7 +1016,6 @@ function CoordThread({ thread, onResolve }) {
             </div>
           </div>
 
-          {/* Resolution */}
           {thread.resolution && (
             <div className="ct-resolution" style={{ margin: "10px 14px" }}>
               <div className="ct-resolution-label">✅ Resolution</div>
@@ -645,7 +1023,6 @@ function CoordThread({ thread, onResolve }) {
             </div>
           )}
 
-          {/* Messages */}
           <div className="ct-messages">
             {messages.map((m, i) => (
               <div key={i} className={`msg${m.isMine ? " me" : ""}`}>
@@ -667,7 +1044,6 @@ function CoordThread({ thread, onResolve }) {
             ))}
           </div>
 
-          {/* Resolve form inline */}
           {showResolve && (
             <ResolveForm
               thread={thread}
@@ -676,7 +1052,6 @@ function CoordThread({ thread, onResolve }) {
             />
           )}
 
-          {/* Reply */}
           {thread.status !== "resolved" && !showResolve && (
             <div className="reply-box">
               <input
@@ -704,7 +1079,6 @@ function CoordThread({ thread, onResolve }) {
             </div>
           )}
 
-          {/* Footer */}
           <div
             className="ct-status-bar"
             style={{
@@ -742,25 +1116,39 @@ function CoordThread({ thread, onResolve }) {
 }
 
 /* ── Main Page ────────────────────────────────────── */
-export default function MEPCoordination({ projectId = "p1" }) {
-  const [threads, setThreads] = useState(INITIAL_THREADS);
+export default function MEPCoordination() {
+  const { activeProject } = useProject();
+
+  const [threadsByProject, setThreadsByProject] = useState(INITIAL_THREADS);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState("all");
 
-  const projectName =
-    PROJECTS.find((p) => p.id === projectId)?.name || "Active Project";
+  // Reset filter and close form when project switches
+  useEffect(() => {
+    setFilter("all");
+    setShowForm(false);
+  }, [activeProject.id]);
+
+  const threads = threadsByProject[activeProject.id] || [];
+  const teams = TEAMS[activeProject.id] || [];
+  const drawingsList = DRAWINGS_LIST[activeProject.id] || [];
 
   const addThread = (t) => {
-    setThreads((prev) => [t, ...prev]);
+    setThreadsByProject((prev) => ({
+      ...prev,
+      [activeProject.id]: [t, ...(prev[activeProject.id] || [])],
+    }));
     setShowForm(false);
   };
 
-  const resolveThread = (id, resolution) =>
-    setThreads((prev) =>
-      prev.map((t) =>
+  const resolveThread = (id, resolution) => {
+    setThreadsByProject((prev) => ({
+      ...prev,
+      [activeProject.id]: (prev[activeProject.id] || []).map((t) =>
         t.id === id ? { ...t, status: "resolved", resolution } : t,
       ),
-    );
+    }));
+  };
 
   const openCount = threads.filter((t) => t.status !== "resolved").length;
   const resolvedCount = threads.filter((t) => t.status === "resolved").length;
@@ -773,13 +1161,15 @@ export default function MEPCoordination({ projectId = "p1" }) {
 
   return (
     <div className="mep-page">
-      {/* Top Bar */}
       <div className="mep-header">
         <div>
           <h1>Cross-Team Coordination</h1>
-          <p>{projectName} · Architect · Structural · Design Integration</p>
+          <p>
+            {activeProject.name} · Architect · Structural · Design Integration
+          </p>
         </div>
         <div className="mep-header-actions">
+          <ProjectSwitcher />
           <button
             type="button"
             className="btn-primary"
@@ -801,18 +1191,17 @@ export default function MEPCoordination({ projectId = "p1" }) {
         </div>
       </div>
 
-      {/* Inline New Thread Form */}
       {showForm && (
         <NewThreadForm
           onClose={() => setShowForm(false)}
           onAdd={addThread}
-          projectId={projectId}
+          projectName={activeProject.name}
+          drawingsList={drawingsList}
         />
       )}
 
-      {/* Team Panels */}
       <div className="team-grid">
-        {TEAMS.map((team) => (
+        {teams.map((team) => (
           <div className="team-card" key={team.key}>
             <div className="tc-head">
               <div className={`tc-avatar ${team.avatarCls}`}>{team.icon}</div>
@@ -848,7 +1237,6 @@ export default function MEPCoordination({ projectId = "p1" }) {
         ))}
       </div>
 
-      {/* Threads Card */}
       <div className="mep-card">
         <div className="mep-card-head">
           <span className="card-title">💬 Active Coordination Threads</span>
@@ -858,7 +1246,6 @@ export default function MEPCoordination({ projectId = "p1" }) {
           </div>
         </div>
 
-        {/* Filters */}
         <div
           style={{
             padding: "10px 16px",

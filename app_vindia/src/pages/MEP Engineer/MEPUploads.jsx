@@ -226,7 +226,21 @@ export default function MEPUpload() {
               <span className="card-title">📋 Drawing Details</span>
             </div>
             <div className="mep-card-body">
-              <div className="edit-form-grid">
+              <div
+                className="edit-form-grid"
+                style={{ gridTemplateColumns: "repeat(5, 1fr)" }}
+              >
+                <div className="edit-form-group">
+                  <label>
+                    Project <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+                  <select className="edit-form-input">
+                    <option value="">Select project</option>
+                    <option>Vindia Tower — Block A</option>
+                    <option>Greenfield Mall — Phase 2</option>
+                    <option>Metro Station — Sector 14</option>
+                  </select>
+                </div>
                 <div className="edit-form-group">
                   <label>
                     Discipline <span style={{ color: "var(--danger)" }}>*</span>
