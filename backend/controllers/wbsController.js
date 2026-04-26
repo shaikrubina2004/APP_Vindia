@@ -1,322 +1,344 @@
 const pool = require("../config/db");
 
-// ─────────────────────────────────────────────
-// GET /api/wbs/:projectId
-// Returns full WBS tree for a project
-// Structure: [ { ...wbs_row, tasks: [ {..., details: {labour,material,equipment,miscellaneous} } ] } ]
-// ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   GET /api/wbs/:projectId  — nested tree
+──────────────────────────────────────────────*/
 exports.getWBSByProject = async (req, res) => {
   const { projectId } = req.params;
-
   try {
-    // 1. Fetch all wbs rows for this project
-    const wbsResult = await pool.query(
+    const { rows } = await pool.query(
       `SELECT * FROM wbs WHERE project_id = $1 ORDER BY created_at ASC`,
-      [projectId],
+      [projectId]
     );
+    const top  = rows.filter((r) => !r.parent_id);
+    const kids = rows.filter((r) => r.parent_id);
+    const ids  = kids.map((k) => k.id);
 
-    const allRows = wbsResult.rows; // flat list
-
-    // 2. Separate top-level (parent_id IS NULL) from children
-    const topLevel = allRows.filter((r) => !r.parent_id);
-    const children = allRows.filter((r) => r.parent_id !== null);
-
-    // 3. For each child task, fetch its cost details
-    const taskIds = children.map((c) => c.id);
-
-    let labourMap = {};
-    let materialMap = {};
-    let equipmentMap = {};
-    let miscMap = {};
-
-    if (taskIds.length > 0) {
-      const [labourRes, materialRes, equipRes, miscRes] = await Promise.all([
-        pool.query(`SELECT * FROM wbs_labour WHERE task_id = ANY($1)`, [
-          taskIds,
-        ]),
-        pool.query(`SELECT * FROM wbs_material WHERE task_id = ANY($1)`, [
-          taskIds,
-        ]),
-        pool.query(`SELECT * FROM wbs_equipment WHERE task_id = ANY($1)`, [
-          taskIds,
-        ]),
-        pool.query(`SELECT * FROM wbs_miscellaneous WHERE task_id = ANY($1)`, [
-          taskIds,
-        ]),
+    let labourMap = {}, materialMap = {}, equipMap = {}, miscMap = {};
+    if (ids.length) {
+      const [lR, mR, eR, xR] = await Promise.all([
+        pool.query(`SELECT * FROM wbs_labour        WHERE task_id = ANY($1)`, [ids]),
+        pool.query(`SELECT * FROM wbs_material      WHERE task_id = ANY($1)`, [ids]),
+        pool.query(`SELECT * FROM wbs_equipment     WHERE task_id = ANY($1)`, [ids]),
+        pool.query(`SELECT * FROM wbs_miscellaneous WHERE task_id = ANY($1)`, [ids]),
       ]);
-
-      labourRes.rows.forEach((r) => {
-        labourMap[r.task_id] = [...(labourMap[r.task_id] || []), r];
-      });
-      materialRes.rows.forEach((r) => {
-        materialMap[r.task_id] = [...(materialMap[r.task_id] || []), r];
-      });
-      equipRes.rows.forEach((r) => {
-        equipmentMap[r.task_id] = [...(equipmentMap[r.task_id] || []), r];
-      });
-      miscRes.rows.forEach((r) => {
-        miscMap[r.task_id] = [...(miscMap[r.task_id] || []), r];
-      });
+      const bucket = (map, row) => { map[row.task_id] = [...(map[row.task_id] || []), row]; };
+      lR.rows.forEach((r) => bucket(labourMap,   r));
+      mR.rows.forEach((r) => bucket(materialMap, r));
+      eR.rows.forEach((r) => bucket(equipMap,    r));
+      xR.rows.forEach((r) => bucket(miscMap,     r));
     }
 
-    // 4. Build nested structure expected by frontend
-    const wbsTree = topLevel.map((parent) => ({
+    const tree = top.map((parent) => ({
       ...parent,
-      tasks: children
-        .filter((c) => c.parent_id === parent.id)
+      tasks: kids
+        .filter((k) => k.parent_id === parent.id)
         .map((task) => ({
           ...task,
           details: {
-            labour: labourMap[task.id] || [],
-            material: materialMap[task.id] || [],
-            equipment: equipmentMap[task.id] || [],
-            miscellaneous: miscMap[task.id] || [],
+            labour:        labourMap[task.id]  || [],
+            material:      materialMap[task.id] || [],
+            equipment:     equipMap[task.id]    || [],
+            miscellaneous: miscMap[task.id]     || [],
           },
         })),
     }));
 
-    return res.status(200).json(wbsTree);
+    return res.json(tree);
   } catch (err) {
     console.error("GET WBS ERROR:", err.message);
     return res.status(500).json({ error: "Failed to fetch WBS" });
   }
 };
 
-// ─────────────────────────────────────────────
-// POST /api/wbs
-// Create a top-level WBS item (Task)
-// Body: { project_id, code, name }
-// ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   GET /api/wbs  — flat list of all rows
+──────────────────────────────────────────────*/
+exports.getAllWBS = async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM wbs ORDER BY project_id, created_at ASC");
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+/* ─────────────────────────────────────────────
+   POST /api/wbs  — create top-level item
+──────────────────────────────────────────────*/
 exports.createWBSItem = async (req, res) => {
   const { project_id, code, name } = req.body;
-
-  if (!project_id || !name) {
-    return res.status(400).json({ error: "project_id and name are required" });
-  }
-
+  if (!project_id || !name) return res.status(400).json({ error: "project_id and name required" });
   try {
-    const result = await pool.query(
-      `DELETE FROM wbs WHERE id = $1 OR parent_id = $1`,
-      [id]
+    const { rows } = await pool.query(
+      `INSERT INTO wbs (project_id, code, name, parent_id, status, progress, budget, spent)
+       VALUES ($1,$2,$3,NULL,'Not Started',0,0,0) RETURNING *`,
+      [project_id, code || "", name]
     );
-
-    // Return with empty tasks array so frontend can use directly
-    return res.status(201).json({ ...result.rows[0], tasks: [] });
+    return res.status(201).json({ ...rows[0], tasks: [] });
   } catch (err) {
-    console.error("CREATE WBS ERROR:", err.message);
-    return res.status(500).json({ error: "Failed to create WBS item" });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ─────────────────────────────────────────────
-// POST /api/wbs/task
-// Create a child task (subtask) under a WBS item
-// Body: { project_id, parent_id, code, name }
-// ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   POST /api/wbs/task  — create child
+──────────────────────────────────────────────*/
 exports.createWBSTask = async (req, res) => {
   const { project_id, parent_id, code, name } = req.body;
-
-  if (!project_id || !parent_id || !name) {
-    return res
-      .status(400)
-      .json({ error: "project_id, parent_id and name are required" });
-  }
-
+  if (!project_id || !parent_id || !name) return res.status(400).json({ error: "project_id, parent_id and name required" });
   try {
-    const result = await pool.query(
+    const { rows } = await pool.query(
       `INSERT INTO wbs (project_id, code, name, parent_id, status, progress)
-       VALUES ($1, $2, $3, $4, 'Pending', 0)
-       RETURNING *`,
-      [project_id, code, name, parent_id],
+       VALUES ($1,$2,$3,$4,'Not Started',0) RETURNING *`,
+      [project_id, code, name, parent_id]
     );
-
-    // Return with empty details so frontend can use directly
-    return res.status(201).json({
-      ...result.rows[0],
-      details: { labour: [], material: [], equipment: [], miscellaneous: [] },
-    });
+    return res.status(201).json({ ...rows[0], details: { labour:[], material:[], equipment:[], miscellaneous:[] } });
   } catch (err) {
-    console.error("CREATE TASK ERROR:", err.message);
-    return res.status(500).json({ error: "Failed to create task" });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ─────────────────────────────────────────────
-// DELETE /api/wbs/:id
-// Delete a WBS item or task (cascades to detail tables via FK)
-// ─────────────────────────────────────────────
-exports.deleteWBSItem = async (req, res) => {
+/* ─────────────────────────────────────────────
+   PATCH /api/wbs/:id
+   Update any subset of: status, progress, budget,
+   spent, due_date, start_date, description,
+   assigned_to, phase, dependencies, risks
+──────────────────────────────────────────────*/
+exports.updateWBSItem = async (req, res) => {
   const { id } = req.params;
+  const allowed = ["status","progress","budget","spent","due_date","start_date","description","assigned_to","phase","dependencies","risks"];
+  const fields  = [];
+  const values  = [];
+  let   n = 1;
+
+  allowed.forEach((key) => {
+    if (req.body[key] !== undefined) {
+      fields.push(`${key} = $${n++}`);
+      values.push(req.body[key]);
+    }
+  });
+
+  if (!fields.length) return res.status(400).json({ error: "No valid fields to update" });
+  values.push(id);
 
   try {
-    // If top-level, also delete all children first
-    await pool.query(`DELETE FROM wbs WHERE parent_id = $1`, [id]);
-    const result = await pool.query(
-      `DELETE FROM wbs WHERE id = $1 RETURNING *`,
-      [id],
+    const { rows } = await pool.query(
+      `UPDATE wbs SET ${fields.join(", ")} WHERE id = $${n} RETURNING *`,
+      values
     );
+    if (!rows.length) return res.status(404).json({ error: "WBS item not found" });
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "WBS item not found" });
+    // Auto-update parent milestone status when a subtask changes
+    if (req.body.status !== undefined) {
+      const updated = rows[0];
+      if (updated.parent_id) {
+        await syncParentStatus(updated.parent_id);
+      }
     }
 
-    return res.status(200).json({ message: "Deleted successfully" });
+    return res.json(rows[0]);
   } catch (err) {
-    console.error("DELETE WBS ERROR:", err.message);
-    return res.status(500).json({ error: "Failed to delete WBS item" });
+    console.error("PATCH WBS ERROR:", err.message);
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COST DETAIL ROUTES  (labour / material / equipment / miscellaneous)
-// ─────────────────────────────────────────────────────────────────────────────
+/* helper — recalculate parent milestone status from its children */
+async function syncParentStatus(parentId) {
+  try {
+    const { rows: children } = await pool.query(
+      `SELECT status FROM wbs WHERE parent_id = $1`,
+      [parentId]
+    );
+    if (!children.length) return;
 
-// POST /api/wbs/labour
+    const statuses = children.map((c) => (c.status || "Not Started").toLowerCase());
+    const all      = statuses.length;
+    const done     = statuses.filter((s) => s === "completed").length;
+    const active   = statuses.filter((s) => s === "in progress" || s === "in-progress").length;
+    const delayed  = statuses.filter((s) => s === "delayed").length;
+
+    let newStatus  = "Not Started";
+    let progress   = 0;
+
+    if (done === all)    { newStatus = "Completed"; progress = 100; }
+    else if (delayed > 0){ newStatus = "Delayed";   progress = Math.round(done/all*100); }
+    else if (active > 0 || done > 0) { newStatus = "In Progress"; progress = Math.round(done/all*100); }
+
+    await pool.query(
+      `UPDATE wbs SET status = $1, progress = $2 WHERE id = $3`,
+      [newStatus, progress, parentId]
+    );
+  } catch (err) {
+    console.error("syncParentStatus error:", err.message);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   DELETE /api/wbs/:id
+──────────────────────────────────────────────*/
+exports.deleteWBSItem = async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query(`DELETE FROM wbs WHERE parent_id = $1`, [id]);
+    const { rows } = await pool.query(`DELETE FROM wbs WHERE id = $1 RETURNING *`, [id]);
+    if (!rows.length) return res.status(404).json({ message: "Not found" });
+    return res.json({ message: "Deleted" });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────
+   POST /api/wbs/auto-plan
+──────────────────────────────────────────────*/
+exports.autoPlanWBS = async (req, res) => {
+  const { project_id, items } = req.body;
+  try {
+    await pool.query(`DELETE FROM wbs WHERE project_id = $1`, [project_id]);
+    const map = {};
+    for (const item of items) {
+      const parentId = item.parent_id ? map[item.parent_id] : null;
+      const { rows }  = await pool.query(
+        `INSERT INTO wbs (project_id,code,name,parent_id,status,progress,budget,spent)
+         VALUES ($1,$2,$3,$4,'Not Started',0,0,0) RETURNING id`,
+        [project_id, item.code, item.name, parentId]
+      );
+      map[item.temp_id] = rows[0].id;
+    }
+    res.json({ message: "WBS auto-planned successfully" });
+  } catch (err) {
+    console.error("AUTO PLAN ERROR:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────
+   POST /api/wbs/sync-from-se
+   Body: { report_id, matches: [{ milestone_id, subtask_id? }] }
+   Called from Milestone page SE sync banner.
+   For each match it sets the WBS row to "In Progress"
+   (unless already Completed), then re-syncs the parent.
+──────────────────────────────────────────────*/
+exports.syncFromSEReport = async (req, res) => {
+  const { report_id, matches } = req.body;
+  if (!Array.isArray(matches) || !matches.length) {
+    return res.status(400).json({ error: "No matches provided" });
+  }
+
+  try {
+    const updated = [];
+
+    for (const m of matches) {
+      // Update subtask if provided
+      if (m.subtask_id) {
+        const { rows } = await pool.query(
+          `SELECT status FROM wbs WHERE id = $1`, [m.subtask_id]
+        );
+        if (rows.length && rows[0].status?.toLowerCase() !== "completed") {
+          await pool.query(
+            `UPDATE wbs SET status = 'In Progress' WHERE id = $1`,
+            [m.subtask_id]
+          );
+          updated.push({ type: "subtask", id: m.subtask_id });
+        }
+      }
+
+      // Update parent milestone
+      if (m.milestone_id) {
+        const { rows } = await pool.query(
+          `SELECT status FROM wbs WHERE id = $1`, [m.milestone_id]
+        );
+        if (rows.length && rows[0].status?.toLowerCase() === "not started") {
+          await pool.query(
+            `UPDATE wbs SET status = 'In Progress' WHERE id = $1`,
+            [m.milestone_id]
+          );
+          updated.push({ type: "milestone", id: m.milestone_id });
+        }
+        // Always re-sync parent from children
+        await syncParentStatus(m.milestone_id);
+      }
+    }
+
+    // Record the sync against the SE report (optional audit column)
+    // Only if the column exists — won't fail if not
+    try {
+      await pool.query(
+        `UPDATE se_daily_reports SET wbs_synced = true, wbs_synced_at = NOW() WHERE id = $1`,
+        [report_id]
+      );
+    } catch (_) { /* column may not exist yet — non-fatal */ }
+
+    res.json({ message: "Synced successfully", updated });
+  } catch (err) {
+    console.error("SYNC FROM SE ERROR:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────
+   COST DETAIL ROUTES
+──────────────────────────────────────────────*/
 exports.addLabour = async (req, res) => {
   const { task_id, name, role, hours, rate } = req.body;
   try {
-    const cost = (parseFloat(hours) || 0) * (parseFloat(rate) || 0);
-    const result = await pool.query(
-      `INSERT INTO wbs_labour (task_id, name, role, hours, rate, cost)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [task_id, name, role, hours, rate, cost],
+    const cost = (parseFloat(hours)||0) * (parseFloat(rate)||0);
+    const { rows } = await pool.query(
+      `INSERT INTO wbs_labour (task_id,name,role,hours,rate,cost) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [task_id, name, role, hours, rate, cost]
     );
-    return res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: err.message });
-  }
+    return res.status(201).json(rows[0]);
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 };
-
-// DELETE /api/wbs/labour/:id
 exports.deleteLabour = async (req, res) => {
-  const { id } = req.params;
-  try {
-    await pool.query(`DELETE FROM wbs_labour WHERE id = $1`, [id]);
-    return res.status(200).json({ message: "Deleted" });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+  try { await pool.query(`DELETE FROM wbs_labour WHERE id=$1`,[req.params.id]); res.json({message:"Deleted"}); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 };
 
-// POST /api/wbs/material
 exports.addMaterial = async (req, res) => {
   const { task_id, name, quantity, unit, price, vendor } = req.body;
   try {
-    const total = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
-    const result = await pool.query(
-      `INSERT INTO wbs_material (task_id, name, quantity, unit, price, total, vendor)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [task_id, name, quantity, unit, price, total, vendor],
+    const total = (parseFloat(quantity)||0) * (parseFloat(price)||0);
+    const { rows } = await pool.query(
+      `INSERT INTO wbs_material (task_id,name,quantity,unit,price,total,vendor) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [task_id, name, quantity, unit, price, total, vendor]
     );
-    return res.status(201).json(result.rows[0]);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+    return res.status(201).json(rows[0]);
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 };
-
-// DELETE /api/wbs/material/:id
 exports.deleteMaterial = async (req, res) => {
-  const { id } = req.params;
-  try {
-    await pool.query(`DELETE FROM wbs_material WHERE id = $1`, [id]);
-    return res.status(200).json({ message: "Deleted" });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+  try { await pool.query(`DELETE FROM wbs_material WHERE id=$1`,[req.params.id]); res.json({message:"Deleted"}); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 };
 
-// POST /api/wbs/equipment
 exports.addEquipment = async (req, res) => {
   const { task_id, name, duration, unit, cost } = req.body;
   try {
-    const result = await pool.query(
-      `INSERT INTO wbs_equipment (task_id, name, duration, unit, cost)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [task_id, name, duration, unit, cost],
+    const { rows } = await pool.query(
+      `INSERT INTO wbs_equipment (task_id,name,duration,unit,cost) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [task_id, name, duration, unit, cost]
     );
-    return res.status(201).json(result.rows[0]);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+    return res.status(201).json(rows[0]);
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 };
-
-// DELETE /api/wbs/equipment/:id
 exports.deleteEquipment = async (req, res) => {
-  const { id } = req.params;
-  try {
-    await pool.query(`DELETE FROM wbs_equipment WHERE id = $1`, [id]);
-    return res.status(200).json({ message: "Deleted" });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+  try { await pool.query(`DELETE FROM wbs_equipment WHERE id=$1`,[req.params.id]); res.json({message:"Deleted"}); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 };
 
-// POST /api/wbs/miscellaneous
 exports.addMiscellaneous = async (req, res) => {
   const { task_id, name, cost, note } = req.body;
   try {
-    const result = await pool.query(
-      `INSERT INTO wbs_miscellaneous (task_id, name, cost, note)
-       VALUES ($1,$2,$3,$4) RETURNING *`,
-      [task_id, name, cost, note],
+    const { rows } = await pool.query(
+      `INSERT INTO wbs_miscellaneous (task_id,name,cost,note) VALUES ($1,$2,$3,$4) RETURNING *`,
+      [task_id, name, cost, note]
     );
-    return res.status(201).json(result.rows[0]);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+    return res.status(201).json(rows[0]);
+  } catch (err) { return res.status(500).json({ error: err.message }); }
 };
-
-// DELETE /api/wbs/miscellaneous/:id
 exports.deleteMiscellaneous = async (req, res) => {
-  const { id } = req.params;
-  try {
-    await pool.query(`DELETE FROM wbs_miscellaneous WHERE id = $1`, [id]);
-    return res.status(200).json({ message: "Deleted" });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-};
-
-
-// ─────────────────────────────────────────────
-// POST /api/wbs/auto-plan
-// Auto create WBS from template (frontend)
-// ─────────────────────────────────────────────
-exports.autoPlanWBS = async (req, res) => {
-  const { project_id, items } = req.body;
-
-  try {
-    // 1. Delete existing WBS for project
-    await pool.query(
-      "DELETE FROM wbs WHERE project_id = $1",
-      [project_id]
-    );
-
-    // 2. Map for parent-child relation
-    const map = {};
-
-    // 3. Insert items
-    for (let item of items) {
-      const parentId = item.parent_id
-        ? map[item.parent_id]
-        : null;
-
-      const result = await pool.query(
-        `INSERT INTO wbs 
-        (project_id, code, name, parent_id, status, progress, budget, spent)
-        VALUES ($1, $2, $3, $4, 'Pending', 0, 0, 0)
-        RETURNING id`,
-        [project_id, item.code, item.name, parentId]
-      );
-
-      map[item.temp_id] = result.rows[0].id;
-    }
-
-    res.status(200).json({ message: "WBS auto-planned successfully" });
-
-  } catch (err) {
-    console.error("AUTO PLAN ERROR:", err.message);
-    res.status(500).json({ error: "Auto plan failed" });
-  }
+  try { await pool.query(`DELETE FROM wbs_miscellaneous WHERE id=$1`,[req.params.id]); res.json({message:"Deleted"}); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 };

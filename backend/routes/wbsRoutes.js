@@ -1,27 +1,37 @@
 const express = require("express");
-const router = express.Router();
-const wbs = require("../controllers/wbsController");
+const router  = express.Router();
+const wbs     = require("../controllers/wbsController");
 
-// ── WBS Tree ──────────────────────────────────────────────
-router.post("/auto-plan", wbs.autoPlanWBS);
-router.get("/:projectId", wbs.getWBSByProject); // GET full tree for project
+// ── IMPORTANT: specific named routes MUST come before /:id params ──
 
-// ── WBS Items ─────────────────────────────────────────────
-router.post("/", wbs.createWBSItem); // POST top-level task
-router.post("/task", wbs.createWBSTask); // POST subtask (child)
-router.delete("/:id", wbs.deleteWBSItem); // DELETE wbs item
+// Auto-plan (replace all WBS for a project)
+router.post("/auto-plan",            wbs.autoPlanWBS);
 
-// ── Cost Details ──────────────────────────────────────────
-router.post("/labour", wbs.addLabour);
-router.delete("/labour/:id", wbs.deleteLabour);
+// Sync from SE daily report
+router.post("/sync-from-se",         wbs.syncFromSEReport);
 
-router.post("/material", wbs.addMaterial);
-router.delete("/material/:id", wbs.deleteMaterial);
+// Child task
+router.post("/task",                 wbs.createWBSTask);
 
-router.post("/equipment", wbs.addEquipment);
-router.delete("/equipment/:id", wbs.deleteEquipment);
+// Cost detail creates
+router.post("/labour",               wbs.addLabour);
+router.post("/material",             wbs.addMaterial);
+router.post("/equipment",            wbs.addEquipment);
+router.post("/miscellaneous",        wbs.addMiscellaneous);
 
-router.post("/miscellaneous", wbs.addMiscellaneous);
-router.delete("/miscellaneous/:id", wbs.deleteMiscellaneous);
+// Cost detail deletes
+router.delete("/labour/:id",         wbs.deleteLabour);
+router.delete("/material/:id",       wbs.deleteMaterial);
+router.delete("/equipment/:id",      wbs.deleteEquipment);
+router.delete("/miscellaneous/:id",  wbs.deleteMiscellaneous);
+
+// ── Generic WBS CRUD ──
+router.get("/",                      wbs.getAllWBS);           // flat list — used for existingProjectIds check
+router.get("/:projectId",            wbs.getWBSByProject);    // nested tree for one project
+
+router.post("/",                     wbs.createWBSItem);       // create top-level milestone
+
+router.patch("/:id",                 wbs.updateWBSItem);       // update status/progress/fields
+router.delete("/:id",                wbs.deleteWBSItem);       // delete milestone or subtask
 
 module.exports = router;
