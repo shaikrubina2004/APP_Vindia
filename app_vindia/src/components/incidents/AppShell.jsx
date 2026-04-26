@@ -78,6 +78,7 @@ export default function AppShell() {
   const [incidents, setIncidents] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [error, setError] = useState(null);
 
   // Sync page state when URL query param changes
@@ -185,9 +186,18 @@ export default function AppShell() {
   }, []);
 
   useEffect(() => {
+    if (initialLoadDone) {
+      // Already loaded before — refresh in background without showing spinner
+      Promise.all([fetchIncidents(), fetchUsers()]).then(() => fetchAllTasks());
+      return;
+    }
+    // First load — show spinner
     Promise.all([fetchIncidents(), fetchUsers()])
       .then(() => fetchAllTasks())
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setInitialLoadDone(true);
+      });
   }, [fetchIncidents, fetchUsers, fetchAllTasks]);
 
   /* ── Re-fetch a single incident after mutation and merge it in ── */
@@ -241,9 +251,11 @@ export default function AppShell() {
             onClick={() => {
               setError(null);
               setLoading(true);
-              Promise.all([fetchIncidents(), fetchUsers()])
-                .then(() => fetchAllTasks())
-                .finally(() => setLoading(false));
+              Promise.all([
+                fetchIncidents(),
+                fetchUsers(),
+                fetchAllTasks(),
+              ]).finally(() => setLoading(false));
             }}
           >
             Retry

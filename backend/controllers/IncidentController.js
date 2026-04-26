@@ -490,21 +490,51 @@ exports.addIncidentComment = async (req, res) => {
 
 exports.addIncidentPhoto = async (req, res) => {
   const { id } = req.params;
-  const { url } = req.body;
   const uploaded_by = req.user?.id ?? null;
 
-  if (!url?.trim())
+  if (!req.body.url?.trim())
     return res
       .status(400)
-      .json({ success: false, message: "Photo URL is required" });
+      .json({ success: false, message: "Photo data is required" });
 
   try {
+    const supabase = require("../config/supabase");
+
+    // Convert base64 to buffer
+    const base64Data = req.body.url.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+
+    // Detect image type
+    const mimeMatch = req.body.url.match(/^data:(image\/\w+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const ext = mimeType.split("/")[1];
+
+    // Upload to Supabase Storage
+    const fileName = `incidents/${id}/${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("incident-photos")
+      .upload(fileName, buffer, {
+        contentType: mimeType,
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from("incident-photos")
+      .getPublicUrl(fileName);
+
+    const publicUrl = urlData.publicUrl;
+
+    // Save URL to DB (not base64)
     const { rows } = await pool.query(
       `INSERT INTO incident_photos (incident_id, url, uploaded_by)
        VALUES ($1, $2, $3)
        RETURNING id, url, uploaded_at`,
-      [id, url.trim(), uploaded_by],
+      [id, publicUrl, uploaded_by],
     );
+
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
     console.error("addIncidentPhoto:", err);
@@ -844,21 +874,51 @@ exports.addTaskComment = async (req, res) => {
 
 exports.addTaskPhoto = async (req, res) => {
   const { taskId } = req.params;
-  const { url } = req.body;
   const uploaded_by = req.user?.id ?? null;
 
-  if (!url?.trim())
+  if (!req.body.url?.trim())
     return res
       .status(400)
-      .json({ success: false, message: "Photo URL is required" });
+      .json({ success: false, message: "Photo data is required" });
 
   try {
+    const supabase = require("../config/supabase");
+
+    // Convert base64 to buffer
+    const base64Data = req.body.url.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+
+    // Detect image type
+    const mimeMatch = req.body.url.match(/^data:(image\/\w+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const ext = mimeType.split("/")[1];
+
+    // Upload to Supabase Storage
+    const fileName = `tasks/${taskId}/${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("incident-photos")
+      .upload(fileName, buffer, {
+        contentType: mimeType,
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from("incident-photos")
+      .getPublicUrl(fileName);
+
+    const publicUrl = urlData.publicUrl;
+
+    // Save URL to DB
     const { rows } = await pool.query(
       `INSERT INTO task_photos (task_id, url, uploaded_by)
        VALUES ($1, $2, $3)
        RETURNING id, url, uploaded_at`,
-      [taskId, url.trim(), uploaded_by],
+      [taskId, publicUrl, uploaded_by],
     );
+
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
     console.error("addTaskPhoto:", err);

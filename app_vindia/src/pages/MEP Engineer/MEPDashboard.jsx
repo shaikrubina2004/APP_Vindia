@@ -1,91 +1,11 @@
 import { useState, useEffect, useRef } from "react";
+import { useProject } from "../../context/ProjectContext";
+import ProjectSwitcher from "../../components/project/ProjectSwitcher";
 import "../../styles/MEPEngineer.css";
 
 /* ═══════════════════════════════════════
    PROJECT SWITCHER
 ═══════════════════════════════════════ */
-const PROJECTS = [
-  {
-    id: "p1",
-    code: "VIN-001",
-    name: "VIndia Tower Block A",
-    location: "Bengaluru",
-  },
-  {
-    id: "p2",
-    code: "VIN-002",
-    name: "VIndia Commercial Hub",
-    location: "Hyderabad",
-  },
-  {
-    id: "p3",
-    code: "VIN-003",
-    name: "VIndia Residential Phase 2",
-    location: "Chennai",
-  },
-];
-
-function ProjectSwitcher({ active, onChange }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  return (
-    <div className="project-switcher-wrap" ref={ref}>
-      <button
-        className="project-switcher-btn"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <div className="ps-icon">🏗️</div>
-        <div className="ps-info">
-          <span className="ps-code">{active.code}</span>
-          <span className="ps-name">{active.name}</span>
-        </div>
-        <svg
-          className={`ps-chevron${open ? " open" : ""}`}
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="ps-dropdown">
-          <div className="ps-dropdown-label">Switch Project</div>
-          {PROJECTS.map((p) => (
-            <div
-              key={p.id}
-              className={`ps-option${p.id === active.id ? " active" : ""}`}
-              onClick={() => {
-                onChange(p);
-                setOpen(false);
-              }}
-            >
-              <div className="ps-option-top">
-                <span className="ps-option-code">{p.code}</span>
-                {p.id === active.id && <span className="ps-active-dot" />}
-              </div>
-              <div className="ps-option-name">{p.name}</div>
-              <div className="ps-option-meta">{p.location}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════
    MILESTONE DATA  (per project)
@@ -321,7 +241,7 @@ const QUICK = [
 ═══════════════════════════════════════ */
 export default function MEPDashboard() {
   const [dateStr, setDateStr] = useState("");
-  const [activeProject, setProject] = useState(PROJECTS[0]);
+  const { activeProject } = useProject();
   const [openDisc, setOpenDisc] = useState("M");
 
   useEffect(() => {
@@ -403,7 +323,7 @@ export default function MEPDashboard() {
           flexWrap: "wrap",
         }}
       >
-        <ProjectSwitcher active={activeProject} onChange={setProject} />
+        <ProjectSwitcher />
         <div
           style={{
             flex: 1,

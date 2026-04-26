@@ -1,59 +1,97 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useProject } from "../../context/ProjectContext";
+import ProjectSwitcher from "../../components/project/ProjectSwitcher";
 import "../../styles/MEPEngineer.css";
 
 /* ═══════════════════════════════════════
    FILE LIST
 ═══════════════════════════════════════ */
-const FILES = [
-  {
-    key: "hvac3",
-    name: "HVAC Level 3",
-    sub: "Rev-5 · Today",
-    badge: "badge-mep-m",
-  },
-  {
-    key: "plumb",
-    name: "Plumbing GF",
-    sub: "Rev-3 · Today",
-    badge: "badge-mep-p",
-  },
-  {
-    key: "elec",
-    name: "Electrical SLD",
-    sub: "Rev-5 · Yesterday",
-    badge: "badge-mep-e",
-  },
-  {
-    key: "drain",
-    name: "Drainage L2",
-    sub: "Rev-4 · Yesterday",
-    badge: "badge-mep-p",
-  },
-  {
-    key: "hvac1",
-    name: "HVAC Level 1",
-    sub: "Rev-3 · 2 days ago",
-    badge: "badge-mep-m",
-  },
-  {
-    key: "cond",
-    name: "Conduit GF",
-    sub: "Rev-2 · 3 days ago",
-    badge: "badge-mep-e",
-  },
-  {
-    key: "chiller",
-    name: "Chiller Plant",
-    sub: "Rev-1 · 1 week ago",
-    badge: "badge-mep-m",
-  },
-  {
-    key: "fire",
-    name: "Fire Fighting",
-    sub: "Rev-1 · 2 weeks ago",
-    badge: "badge-mep-p",
-  },
-];
+const FILES = {
+  p1: [
+    {
+      key: "hvac3",
+      name: "HVAC Level 3",
+      sub: "Rev-5 · Today",
+      badge: "badge-mep-m",
+    },
+    {
+      key: "plumb",
+      name: "Plumbing GF",
+      sub: "Rev-3 · Today",
+      badge: "badge-mep-p",
+    },
+    {
+      key: "elec",
+      name: "Electrical SLD",
+      sub: "Rev-5 · Yesterday",
+      badge: "badge-mep-e",
+    },
+    {
+      key: "drain",
+      name: "Drainage L2",
+      sub: "Rev-4 · Yesterday",
+      badge: "badge-mep-p",
+    },
+    {
+      key: "hvac1",
+      name: "HVAC Level 1",
+      sub: "Rev-3 · 2 days ago",
+      badge: "badge-mep-m",
+    },
+    {
+      key: "cond",
+      name: "Conduit GF",
+      sub: "Rev-2 · 3 days ago",
+      badge: "badge-mep-e",
+    },
+    {
+      key: "chiller",
+      name: "Chiller Plant",
+      sub: "Rev-1 · 1 week ago",
+      badge: "badge-mep-m",
+    },
+    {
+      key: "fire",
+      name: "Fire Fighting",
+      sub: "Rev-1 · 2 weeks ago",
+      badge: "badge-mep-p",
+    },
+  ],
+  p2: [
+    {
+      key: "hvac_gf",
+      name: "HVAC Layout GF",
+      sub: "Rev-2 · 3 days ago",
+      badge: "badge-mep-m",
+    },
+    {
+      key: "elec_sld",
+      name: "Electrical SLD",
+      sub: "Rev-1 · 5 days ago",
+      badge: "badge-mep-e",
+    },
+    {
+      key: "plumb_gf",
+      name: "Plumbing GF",
+      sub: "Rev-2 · 4 days ago",
+      badge: "badge-mep-p",
+    },
+  ],
+  p3: [
+    {
+      key: "hvac_sch",
+      name: "HVAC Schematic",
+      sub: "Rev-1 · 1 week ago",
+      badge: "badge-mep-m",
+    },
+    {
+      key: "plumb_sch",
+      name: "Plumbing Schematic",
+      sub: "Rev-1 · 1 week ago",
+      badge: "badge-mep-p",
+    },
+  ],
+};
 
 /* ═══════════════════════════════════════
    VERSION DATA  (keyed by file key)
@@ -402,13 +440,23 @@ function ChangeChip({ label, type }) {
    MAIN COMPONENT
 ═══════════════════════════════════════ */
 export default function MEPVersionControl() {
+  const { activeProject } = useProject();
+  const files = FILES[activeProject.id] || [];
+
   const [sel, setSel] = useState("hvac3");
   const [notified, setNotif] = useState(false);
   const [search, setSearch] = useState("");
 
+  useEffect(() => {
+    const projectFiles = FILES[activeProject.id] || [];
+    if (projectFiles.length > 0) {
+      setSel(projectFiles[0].key);
+    }
+  }, [activeProject.id]);
+
   const data = VERSIONS[sel] || VERSIONS.hvac3;
 
-  const filteredFiles = FILES.filter((f) =>
+  const filteredFiles = files.filter((f) =>
     f.name.toLowerCase().includes(search.toLowerCase()),
   );
 
@@ -427,25 +475,14 @@ export default function MEPVersionControl() {
       <div className="mep-header">
         <div>
           <h1>Version Control</h1>
-          <p>
-            MEP Drawing Revisions — Ensure team always uses the latest version
-          </p>
+          <p>MEP Drawing Revisions — Team always uses the latest version</p>
         </div>
-        <a href="/mep/upload" className="btn-primary">
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <polyline points="16 16 12 12 8 16" />
-            <line x1="12" y1="12" x2="12" y2="21" />
-            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-          </svg>
-          Upload New Version
-        </a>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <ProjectSwitcher />
+          <a href="/mep/upload" className="btn-primary">
+            ⬆️ Upload New Version
+          </a>
+        </div>
       </div>
 
       {/* ── NEW VERSION ALERT ── */}
@@ -464,13 +501,13 @@ export default function MEPVersionControl() {
           {
             icon: "📁",
             label: "Total Files",
-            value: FILES.length,
+            value: files.length,
             ic: "ic-blue",
           },
           {
             icon: "✅",
             label: "Up to Date",
-            value: FILES.length,
+            value: files.length,
             ic: "ic-green",
           },
           { icon: "🔔", label: "Notified Today", value: "3", ic: "ic-amber" },
@@ -507,7 +544,7 @@ export default function MEPVersionControl() {
                 fontWeight: 600,
               }}
             >
-              {FILES.length} files
+              {files.length} files
             </span>
           </div>
 
