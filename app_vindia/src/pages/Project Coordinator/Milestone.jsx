@@ -8,6 +8,7 @@ import "./Milestone.css";
 ══════════════════════════════════════════ */
 const API = "http://localhost:5000";
 const today = new Date();
+today.setHours(0, 0, 0, 0); // normalize to midnight for accurate date comparisons
 
 const STATUS_CFG = {
   "completed":   { label: "Completed",   bg: "#d1fae5", color: "#065f46", border: "#10b981", bar: "#10b981" },
@@ -43,8 +44,24 @@ const fmtCr = (n) => {
   if (v >= 100000)   return `₹${(v / 100000).toFixed(1)}L`;
   return `₹${v.toLocaleString()}`;
 };
-const daysLeft = (due) =>
-  due ? Math.ceil((new Date(due) - today) / 86400000) : null;
+
+/* FIX 2 & 3: Accurate days-left calculation using midnight-normalized dates */
+const daysLeft = (due) => {
+  if (!due) return null;
+  const dueDate = new Date(due);
+  dueDate.setHours(0, 0, 0, 0);
+  return Math.ceil((dueDate - today) / 86400000);
+};
+
+/* FIX 3: Auto-detect if a milestone should be delayed based on due date */
+const computeEffectiveStatus = (status, dueDate) => {
+  if (status === "completed") return "completed";
+  if (dueDate) {
+    const days = daysLeft(dueDate);
+    if (days !== null && days < 0 && status !== "completed") return "delayed";
+  }
+  return status;
+};
 
 const toInputDate = (v) => {
   if (!v) return "";
@@ -88,16 +105,23 @@ const convertWBS = (data, projects) => {
       progress = Math.round(subtasks.filter((s) => s.status === "completed").length / subtasks.length * 100);
     }
 
+    /* FIX 3: Apply auto-delay based on due date */
+    const effectiveStatus = computeEffectiveStatus(status, ms.due_date);
+
+    /* FIX 4: visibleToClient defaults to false unless explicitly true */
+    const visibleToClient = ms.visible_to_client === true || ms.visible_to_client === "true" || ms.visible_to_client === 1;
+
     return {
       id: ms.id, title: ms.name, code: ms.code,
       project:      getName(ms.project_id),
       project_id:   ms.project_id,
-      status, progress,
+      status:       effectiveStatus,
+      progress,
       budget:       parseFloat(ms.budget) || 0,
       spent:        parseFloat(ms.spent)  || 0,
       subtasks,
       payment:      { amount: parseFloat(ms.spent) || 0 },
-      visibleToClient: true,
+      visibleToClient,
       dueDate:      ms.due_date    || null,
       startDate:    ms.start_date  || null,
       description:  ms.description || "",
@@ -127,10 +151,6 @@ const flattenForBackend = (tasks, parentId = null) => {
 
 /* ══════════════════════════════════════════
    usePortalDropdown
-   Single hook used by ALL dropdowns.
-   Menu is rendered via createPortal into document.body —
-   completely escapes every overflow/transform/z-index parent.
-   Position is recalculated on every open and on scroll/resize.
 ══════════════════════════════════════════ */
 function usePortalDropdown() {
   const [open,  setOpen]  = useState(false);
@@ -149,12 +169,10 @@ function usePortalDropdown() {
 
   const close = useCallback(() => setOpen(false), []);
 
-  /* outside click → close */
   useEffect(() => {
     if (!open) return;
     const h = (e) => {
       if (triggerRef.current && !triggerRef.current.contains(e.target)) {
-        /* tiny delay lets click handler on menu items fire first */
         setTimeout(close, 80);
       }
     };
@@ -162,7 +180,6 @@ function usePortalDropdown() {
     return () => document.removeEventListener("mousedown", h);
   }, [open, close]);
 
-  /* keep position fresh while open */
   useEffect(() => {
     if (!open) return;
     window.addEventListener("scroll", recalc, true);
@@ -191,6 +208,7 @@ const StatusBadge = ({ status }) => {
 
 /* ══════════════════════════════════════════
    PROJECT DROPDOWN
+   FIX 1: Ensure onChange fires with correct project_id
 ══════════════════════════════════════════ */
 const ProjectDropdown = ({ projects, selectedProject, onChange }) => {
   const { open, toggle, close, triggerRef, btnRect } = usePortalDropdown();
@@ -222,7 +240,7 @@ const ProjectDropdown = ({ projects, selectedProject, onChange }) => {
         >
           <div
             className={`ms-portal-item ${(!selectedProject || selectedProject === "All") ? "active" : ""}`}
-            onClick={() => { onChange("All"); close(); }}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onChange("All"); close(); }}
           >
             <span className="ms-portal-dot" style={{ background: "#94a3b8" }} />
             All Projects
@@ -231,7 +249,7 @@ const ProjectDropdown = ({ projects, selectedProject, onChange }) => {
             <div
               key={p.id}
               className={`ms-portal-item ${String(selectedProject) === String(p.id) ? "active" : ""}`}
-              onClick={() => { onChange(p.id); close(); }}
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onChange(String(p.id)); close(); }}
             >
               <span className="ms-portal-dot" style={{ background: "#2563eb" }} />
               {p.name}
@@ -274,7 +292,7 @@ const StatusChanger = ({ milestoneId, currentStatus, onStatusChange }) => {
             <div
               key={s}
               className={`ms-portal-item ${currentStatus === normalizeStatus(s) ? "active" : ""}`}
-              onClick={() => { onStatusChange(milestoneId, s); close(); }}
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onStatusChange(milestoneId, s); close(); }}
             >
               <span className="ms-portal-dot" style={{ background: dotColors[s] }} />
               {s}
@@ -352,7 +370,73 @@ const EditableField = ({ label, value, fieldKey, milestoneId, type = "text", onS
 };
 
 /* ══════════════════════════════════════════
-   SUBTASK TRACKER — interactive checkboxes
+   FIX 4: VISIBLE TO CLIENT DROPDOWN
+   Default: No. Dropdown to toggle Yes/No.
+══════════════════════════════════════════ */
+const VisibleToClientDropdown = ({ milestoneId, value, onSave }) => {
+  const { open, toggle, close, triggerRef, btnRect } = usePortalDropdown();
+  const [saving, setSaving] = useState(false);
+
+  const handleSelect = async (newVal) => {
+    close();
+    if (newVal === value) return;
+    setSaving(true);
+    try {
+      await onSave(milestoneId, "visible_to_client", newVal);
+    } catch (e) { console.error(e); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="ms-detail-block">
+      <p className="ms-detail-label">Visible to Client</p>
+      <div className="ms-vtc-wrap">
+        <button
+          ref={triggerRef}
+          className={`ms-vtc-btn ${value ? "ms-vtc-btn--yes" : "ms-vtc-btn--no"}`}
+          onClick={toggle}
+          disabled={saving}
+          title="Click to change visibility"
+        >
+          <span className="ms-vtc-dot" style={{ background: value ? "#10b981" : "#94a3b8" }} />
+          {saving ? "Saving…" : value ? "Yes — visible" : "No — hidden"}
+          <span className="ms-vtc-arrow">▾</span>
+        </button>
+
+        {open && btnRect && createPortal(
+          <div
+            className="ms-portal-menu"
+            style={{
+              top:   btnRect.bottom + 4,
+              left:  btnRect.left,
+              minWidth: Math.max(btnRect.width, 180),
+            }}
+          >
+            <p className="ms-portal-heading">Client Visibility</p>
+            <div
+              className={`ms-portal-item ${!value ? "active" : ""}`}
+              onMouseDown={(e) => { e.preventDefault(); handleSelect(false); }}
+            >
+              <span className="ms-portal-dot" style={{ background: "#94a3b8" }} />
+              No — hidden from client
+            </div>
+            <div
+              className={`ms-portal-item ${value ? "active" : ""}`}
+              onMouseDown={(e) => { e.preventDefault(); handleSelect(true); }}
+            >
+              <span className="ms-portal-dot" style={{ background: "#10b981" }} />
+              Yes — visible to client
+            </div>
+          </div>,
+          document.body
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   SUBTASK TRACKER
 ══════════════════════════════════════════ */
 const SubtaskTracker = ({ subtasks = [], title = "Subtasks", milestoneId, onToggle }) => {
   const done = subtasks.filter((s) => s.status === "completed").length;
@@ -406,17 +490,16 @@ const SubtaskTracker = ({ subtasks = [], title = "Subtasks", milestoneId, onTogg
 
 /* ══════════════════════════════════════════
    SE ALERT BANNER
-   Polls /api/wbs/se-alerts?project_id=X for
-   unread alerts generated when SE engineers
-   submit daily reports mentioning a milestone/subtask.
-   Shows a notification-style list; project coordinator
-   clicks "Update Milestone" to apply the change.
+   Now reads from site_engineer_daily_updates table.
+   Shows alerts when SE mentions a milestone/subtask
+   in their daily report. Project coordinator can
+   apply or dismiss the suggested status update.
 ══════════════════════════════════════════ */
 const SEAlertBanner = ({ projectId, milestones, onApply }) => {
   const [alerts,   setAlerts]   = useState([]);
   const [loading,  setLoading]  = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [applying, setApplying] = useState(null); // alert id being applied
+  const [applying, setApplying] = useState(null);
 
   const load = useCallback(async () => {
     if (!projectId || projectId === "All") return;
@@ -437,7 +520,7 @@ const SEAlertBanner = ({ projectId, milestones, onApply }) => {
       await fetch(`${API}/api/wbs/se-alerts/${alert.id}/apply`, { method: "POST" });
       await load();
       onApply();
-    } catch (e) { alert("Apply failed: " + e.message); }
+    } catch (e) { window.alert("Apply failed: " + e.message); }
     finally { setApplying(null); }
   };
 
@@ -462,7 +545,7 @@ const SEAlertBanner = ({ projectId, milestones, onApply }) => {
             {unread.length > 0 && <span className="ms-alert-banner__badge">{unread.length}</span>}
           </div>
           <div>
-            <p className="ms-alert-banner__title">Site Engineer Updates</p>
+            <p className="ms-alert-banner__title">Site Engineer Daily Updates</p>
             <p className="ms-alert-banner__sub">
               {loading ? "Loading…" : unread.length > 0
                 ? `${unread.length} pending milestone update${unread.length > 1 ? "s" : ""} from SE daily reports`
@@ -544,7 +627,7 @@ const PlanningPopup = ({ projects, templates, selectedTemplate, existingProjectI
       data.forEach((item) => { map[item.id] = { id: item.id, code: item.code, title: item.name, subtasks: [] }; });
       data.forEach((item) => { item.parent_id ? map[item.parent_id]?.subtasks.push(map[item.id]) : roots.push(map[item.id]); });
       setTasks(roots); setStep(2);
-    } catch (e) { alert("Template load failed: " + e.message); }
+    } catch (e) { window.alert("Template load failed: " + e.message); }
   };
 
   const loadExisting = async () => {
@@ -553,7 +636,7 @@ const PlanningPopup = ({ projects, templates, selectedTemplate, existingProjectI
       const data = await res.json();
       const t = data.map((p) => ({ id: p.id, code: p.code, title: p.name, subtasks: (p.tasks||[]).map((s) => ({ id: s.id, code: s.code, title: s.name })) }));
       setTasks(t); setEditMode(true); setStep(2);
-    } catch (e) { alert("Load failed: " + e.message); }
+    } catch (e) { window.alert("Load failed: " + e.message); }
   };
 
   const save = async () => {
@@ -566,7 +649,7 @@ const PlanningPopup = ({ projects, templates, selectedTemplate, existingProjectI
       });
       if (!res.ok) throw new Error((await res.json()).error || "Failed");
       onSave(null); setTimeout(() => onSave(projId), 120); onClose();
-    } catch (e) { alert(e.message); }
+    } catch (e) { window.alert(e.message); }
     finally { setSaving(false); }
   };
 
@@ -729,7 +812,6 @@ export default function Milestone() {
   const [loading,           setLoading]           = useState(false);
   const [existingProjIds,   setExistingProjIds]   = useState([]);
 
-  /* ── fetch projects & templates once ── */
   useEffect(() => {
     fetch(`${API}/api/projects`).then(r=>r.json()).then(d=>setProjects(Array.isArray(d)?d:[])).catch(console.error);
     fetch(`${API}/api/templates`).then(r=>r.json()).then(d=>{
@@ -739,7 +821,6 @@ export default function Milestone() {
     }).catch(console.error);
   }, []);
 
-  /* ── which projects already have WBS ── */
   const refreshExisting = useCallback(async () => {
     try {
       const res  = await fetch(`${API}/api/wbs`);
@@ -749,21 +830,30 @@ export default function Milestone() {
   }, []);
   useEffect(() => { refreshExisting(); }, [refreshExisting]);
 
-  /* ── fetch WBS ── */
+  /* FIX 1: fetchWBS now correctly handles project filtering */
   const fetchWBS = useCallback(async (pid) => {
     setLoading(true);
     try {
-      const url = (!pid || pid==="All") ? `${API}/api/wbs` : `${API}/api/wbs/${pid}`;
-      const res  = await fetch(url);
-      const data = await res.json();
+      let data;
+      if (!pid || pid === "All") {
+        const res = await fetch(`${API}/api/wbs`);
+        data = await res.json();
+      } else {
+        const res = await fetch(`${API}/api/wbs/${pid}`);
+        data = await res.json();
+      }
       setMilestones(Array.isArray(data) ? convertWBS(data, projects) : []);
     } catch(e) { console.error(e); setMilestones([]); }
     finally { setLoading(false); }
   }, [projects]);
 
-  useEffect(() => { fetchWBS(selectedProject); }, [selectedProject, fetchWBS]);
+  /* FIX 1: re-fetch when selectedProject or projects list changes */
+  useEffect(() => {
+    if (projects.length > 0) {
+      fetchWBS(selectedProject);
+    }
+  }, [selectedProject, projects, fetchWBS]);
 
-  /* ── PATCH single WBS row ── */
   const patchWBS = useCallback(async (id, body) => {
     const res = await fetch(`${API}/api/wbs/${id}`, {
       method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body),
@@ -772,7 +862,6 @@ export default function Milestone() {
     return res.json();
   }, []);
 
-  /* ── subtask toggle ── */
   const handleSubtaskToggle = useCallback(async (subId, newStatus, msId) => {
     try {
       await patchWBS(subId, { status: newStatus });
@@ -781,25 +870,38 @@ export default function Milestone() {
         const subs    = m.subtasks.map((s) => s.id===subId ? {...s,status:normalizeStatus(newStatus)} : s);
         const done    = subs.filter((s)=>s.status==="completed").length;
         const progress= subs.length ? Math.round(done/subs.length*100) : 0;
-        const status  = done===subs.length && subs.length ? "completed" : done>0 ? "in-progress" : m.status;
+        /* FIX 3: Re-apply auto-delay after subtask toggle */
+        const rawStatus = done===subs.length && subs.length ? "completed" : done>0 ? "in-progress" : m.status;
+        const status = computeEffectiveStatus(rawStatus, m.dueDate);
         return {...m, subtasks:subs, progress, status};
       }));
-    } catch(e) { alert("Subtask update failed: "+e.message); }
+    } catch(e) { window.alert("Subtask update failed: "+e.message); }
   }, [patchWBS]);
 
-  /* ── milestone field save ── */
   const handleFieldSave = useCallback(async (msId, fieldKey, value) => {
     await patchWBS(msId, {[fieldKey]:value});
-    const jsKey = {due_date:"dueDate",start_date:"startDate",assigned_to:"assignedTo"}[fieldKey] || fieldKey;
-    setMilestones((prev)=>prev.map((m)=>m.id===msId?{...m,[jsKey]:value}:m));
+    const jsKey = {
+      due_date:"dueDate",
+      start_date:"startDate",
+      assigned_to:"assignedTo",
+      visible_to_client:"visibleToClient",
+    }[fieldKey] || fieldKey;
+    setMilestones((prev) => prev.map((m) => {
+      if (m.id !== msId) return m;
+      const updated = {...m, [jsKey]: value};
+      /* FIX 3: Re-apply auto-delay if due_date changed */
+      if (fieldKey === "due_date") {
+        updated.status = computeEffectiveStatus(m.status, value);
+      }
+      return updated;
+    }));
   }, [patchWBS]);
 
-  /* ── milestone status change ── */
   const handleStatusChange = useCallback(async (msId, newStatus) => {
     try {
       await patchWBS(msId, {status:newStatus});
       setMilestones((prev)=>prev.map((m)=>m.id===msId?{...m,status:normalizeStatus(newStatus)}:m));
-    } catch(e) { alert("Status update failed: "+e.message); }
+    } catch(e) { window.alert("Status update failed: "+e.message); }
   }, [patchWBS]);
 
   /* ── derived ── */
@@ -831,7 +933,6 @@ export default function Milestone() {
   const getSec = (id) => activeSection[id] || "details";
   const setSec = (id,s) => setActiveSection((p)=>({...p,[id]:s}));
 
-  /* ════════════ RENDER ════════════ */
   return (
     <div className="ms-page">
       {showPlanning && (
@@ -981,7 +1082,6 @@ export default function Milestone() {
                     )}
                   </div>
                   <p className="ms-card__project">{m.project}</p>
-                  {/* ── info row: NO budget, only Subtasks + Due + Left ── */}
                   <div className="ms-card__info-row">
                     <span className="ms-info-item">
                       <span className="ms-info-lbl">Subtasks</span>
@@ -995,9 +1095,18 @@ export default function Milestone() {
                       </span>
                       <span className="ms-info-sep">·</span>
                       <span className="ms-info-item">
-                        <span className="ms-info-lbl">{isOverdue?"Overdue":"Left"}</span>
-                        <span className="ms-info-val" style={{color:isOverdue?"#ef4444":days<=7?"#f59e0b":"#0a2540"}}>
-                          {days!==null?(isOverdue?`${Math.abs(days)}d`:days>0?`${days}d`:"Today"):"—"}
+                        {/* FIX 2: Correct overdue label and days */}
+                        <span className="ms-info-lbl">{days !== null && days < 0 ? "Overdue" : "Left"}</span>
+                        <span className="ms-info-val" style={{
+                          color: days !== null && days < 0 ? "#ef4444" : days !== null && days <= 7 ? "#f59e0b" : "#0a2540"
+                        }}>
+                          {days !== null
+                            ? days < 0
+                              ? `${Math.abs(days)}d overdue`
+                              : days === 0
+                                ? "Due today"
+                                : `${days}d left`
+                            : "—"}
                         </span>
                       </span>
                     </>}
@@ -1037,12 +1146,12 @@ export default function Milestone() {
                           <EditableField label="Phase"        value={m.phase}        fieldKey="phase"        milestoneId={m.id}                 onSave={handleFieldSave} />
                           <EditableField label="Dependencies" value={m.dependencies} fieldKey="dependencies" milestoneId={m.id}                 onSave={handleFieldSave} />
                           <EditableField label="Risks/Issues" value={m.risks}        fieldKey="risks"        milestoneId={m.id}                 onSave={handleFieldSave} />
-                          <div className="ms-detail-block">
-                            <p className="ms-detail-label">Visible to Client</p>
-                            <p className="ms-detail-val" style={{color:m.visibleToClient?"#10b981":"#94a3b8",fontWeight:700}}>
-                              {m.visibleToClient?"Yes — visible":"No — internal only"}
-                            </p>
-                          </div>
+                          {/* FIX 4: Replaced static text with interactive dropdown */}
+                          <VisibleToClientDropdown
+                            milestoneId={m.id}
+                            value={m.visibleToClient}
+                            onSave={handleFieldSave}
+                          />
                         </div>
                       </div>
                     </div>

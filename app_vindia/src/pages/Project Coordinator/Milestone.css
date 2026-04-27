@@ -44,7 +44,6 @@
 
 /* ══════════════════════
    PROJECT DROPDOWN TRIGGER
-   (menu is in .ms-portal-menu below)
 ══════════════════════ */
 .ms-proj-dd { position:relative; }
 .ms-proj-dd__btn {
@@ -58,12 +57,9 @@
 
 /* ══════════════════════
    PORTAL MENUS
-   Shared by ProjectDropdown + StatusChanger.
-   position:fixed is set inline via JS so the menu
-   always appears directly below its trigger button.
 ══════════════════════ */
 .ms-portal-menu {
-  position:fixed;                    /* coords set inline from getBoundingClientRect */
+  position:fixed;
   background:#fff;
   border:1.5px solid #dbeafe;
   border-radius:14px;
@@ -209,7 +205,7 @@
 .ms-list { display:flex; flex-direction:column; gap:8px; animation:fadeUp .4s .14s ease both; }
 .ms-card {
   background:#fff; border:1px solid #e8edf5; border-radius:14px;
-  display:flex; flex-direction:column;       /* column so accent is top stripe */
+  display:flex; flex-direction:column;
   transition:border-color .2s,box-shadow .2s;
 }
 .ms-card:hover,.ms-card.open { border-color:#bfdbfe; box-shadow:0 6px 20px rgba(37,99,235,.1); }
@@ -219,7 +215,6 @@
 .ms-card--current    { border:2px solid #2563eb !important; box-shadow:0 8px 30px rgba(37,99,235,.18),0 0 0 3px rgba(37,99,235,.06) !important; animation:glow 3s ease-in-out infinite; }
 .ms-card--upcoming   { opacity:.58; }
 
-/* top colour accent bar */
 .ms-card__accent { height:4px; width:100%; border-radius:13px 13px 0 0; flex-shrink:0; }
 
 .ms-card__header { display:flex; align-items:flex-start; gap:12px; padding:12px 14px; cursor:pointer; }
@@ -251,7 +246,6 @@
    EXPANDED BODY
 ══════════════════════ */
 .ms-card__body { border-top:1px solid #e2eaf4; padding:0 18px 20px; background:#fafcff; animation:slideD .2s ease both; }
-/* overflow:visible ensures portal menus inside aren't visually clipped */
 .ms-inner-tabs { display:flex; gap:4px; padding:14px 0 12px; border-bottom:1px solid #e2eaf4; margin-bottom:16px; align-items:center; }
 .ms-inner-tab  { padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; font-family:inherit; border:1.5px solid #e2eaf4; background:#fff; color:#64748b; cursor:pointer; transition:all .2s; }
 .ms-inner-tab:hover  { border-color:#bfdbfe; color:#2563eb; }
@@ -278,6 +272,29 @@
 .ms-ef-ok      { padding:5px 12px; border-radius:7px; background:#2563eb; color:#fff; border:none; font-size:12px; font-weight:700; cursor:pointer; }
 .ms-ef-ok:disabled { opacity:.5; cursor:not-allowed; }
 .ms-ef-cancel  { padding:5px 10px; border-radius:7px; background:#f1f5f9; color:#64748b; border:none; font-size:12px; cursor:pointer; }
+
+/* ══════════════════════
+   FIX 4: VISIBLE TO CLIENT DROPDOWN
+══════════════════════ */
+.ms-vtc-wrap { position:relative; }
+.ms-vtc-btn {
+  display:inline-flex; align-items:center; gap:7px;
+  padding:6px 12px; border-radius:8px;
+  font-size:13px; font-weight:700; font-family:inherit;
+  cursor:pointer; border:1.5px solid; transition:all .2s;
+  background:#fff; width:100%;
+}
+.ms-vtc-btn--yes {
+  color:#065f46; border-color:#10b981; background:#f0fdf4;
+}
+.ms-vtc-btn--yes:hover { background:#d1fae5; border-color:#059669; }
+.ms-vtc-btn--no  {
+  color:#475569; border-color:#e2eaf4; background:#f8fafc;
+}
+.ms-vtc-btn--no:hover  { border-color:#94a3b8; background:#f1f5f9; }
+.ms-vtc-btn:disabled   { opacity:.5; cursor:not-allowed; }
+.ms-vtc-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.ms-vtc-arrow{ font-size:10px; color:#94a3b8; margin-left:auto; }
 
 /* ══════════════════════
    SUBTASK TRACKER

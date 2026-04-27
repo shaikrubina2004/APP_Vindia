@@ -65,14 +65,15 @@ exports.getAllWBS = async (req, res) => {
 
 /* ─────────────────────────────────────────────
    POST /api/wbs  — create top-level item
+   FIX 4: visible_to_client defaults to false
 ──────────────────────────────────────────────*/
 exports.createWBSItem = async (req, res) => {
   const { project_id, code, name } = req.body;
   if (!project_id || !name) return res.status(400).json({ error: "project_id and name required" });
   try {
     const { rows } = await pool.query(
-      `INSERT INTO wbs (project_id, code, name, parent_id, status, progress, budget, spent)
-       VALUES ($1,$2,$3,NULL,'Not Started',0,0,0) RETURNING *`,
+      `INSERT INTO wbs (project_id, code, name, parent_id, status, progress, budget, spent, visible_to_client)
+       VALUES ($1,$2,$3,NULL,'Not Started',0,0,0,false) RETURNING *`,
       [project_id, code || "", name]
     );
     return res.status(201).json({ ...rows[0], tasks: [] });
@@ -101,13 +102,18 @@ exports.createWBSTask = async (req, res) => {
 
 /* ─────────────────────────────────────────────
    PATCH /api/wbs/:id
-   Update any subset of: status, progress, budget,
-   spent, due_date, start_date, description,
-   assigned_to, phase, dependencies, risks
+   FIX 4: Added visible_to_client to allowed fields
+   FIX 3: Auto-delay logic lives in frontend; backend
+          accepts any status including "Delayed" directly.
 ──────────────────────────────────────────────*/
 exports.updateWBSItem = async (req, res) => {
   const { id } = req.params;
-  const allowed = ["status","progress","budget","spent","due_date","start_date","description","assigned_to","phase","dependencies","risks"];
+  const allowed = [
+    "status","progress","budget","spent",
+    "due_date","start_date","description",
+    "assigned_to","phase","dependencies","risks",
+    "visible_to_client",   // FIX 4
+  ];
   const fields  = [];
   const values  = [];
   let   n = 1;
@@ -129,7 +135,6 @@ exports.updateWBSItem = async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ error: "WBS item not found" });
 
-    // Auto-update parent milestone status when a subtask changes
     if (req.body.status !== undefined) {
       const updated = rows[0];
       if (updated.parent_id) {
@@ -192,6 +197,7 @@ exports.deleteWBSItem = async (req, res) => {
 
 /* ─────────────────────────────────────────────
    POST /api/wbs/auto-plan
+   FIX 4: includes visible_to_client = false by default
 ──────────────────────────────────────────────*/
 exports.autoPlanWBS = async (req, res) => {
   const { project_id, items } = req.body;
@@ -201,8 +207,8 @@ exports.autoPlanWBS = async (req, res) => {
     for (const item of items) {
       const parentId = item.parent_id ? map[item.parent_id] : null;
       const { rows }  = await pool.query(
-        `INSERT INTO wbs (project_id,code,name,parent_id,status,progress,budget,spent)
-         VALUES ($1,$2,$3,$4,'Not Started',0,0,0) RETURNING id`,
+        `INSERT INTO wbs (project_id,code,name,parent_id,status,progress,budget,spent,visible_to_client)
+         VALUES ($1,$2,$3,$4,'Not Started',0,0,0,false) RETURNING id`,
         [project_id, item.code, item.name, parentId]
       );
       map[item.temp_id] = rows[0].id;
@@ -215,11 +221,119 @@ exports.autoPlanWBS = async (req, res) => {
 };
 
 /* ─────────────────────────────────────────────
-   POST /api/wbs/sync-from-se
-   Body: { report_id, matches: [{ milestone_id, subtask_id? }] }
-   Called from Milestone page SE sync banner.
-   For each match it sets the WBS row to "In Progress"
-   (unless already Completed), then re-syncs the parent.
+   SE ALERT SYSTEM
+   Reads from site_engineer_daily_updates table.
+
+   TABLE SCHEMA (run this SQL if not yet created):
+   ─────────────────────────────────────────────
+   CREATE TABLE site_engineer_daily_updates (
+     id            SERIAL PRIMARY KEY,
+     project_id    INTEGER NOT NULL REFERENCES projects(id),
+     submitted_by  VARCHAR(255) NOT NULL,     -- SE name or user_id
+     report_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+     milestone_id  INTEGER REFERENCES wbs(id),
+     subtask_id    INTEGER REFERENCES wbs(id),
+     note          TEXT,                       -- what the SE wrote about progress
+     suggested_status VARCHAR(50),            -- "In Progress" | "Completed" | "Delayed"
+     applied       BOOLEAN DEFAULT false,      -- project coord approved the update
+     dismissed     BOOLEAN DEFAULT false,      -- project coord dismissed it
+     created_at    TIMESTAMPTZ DEFAULT NOW()
+   );
+   ─────────────────────────────────────────────
+
+   GET /api/wbs/se-alerts?project_id=X
+   Returns unread alerts (not applied, not dismissed)
+   derived from site_engineer_daily_updates for a project.
+──────────────────────────────────────────────*/
+exports.getSEAlerts = async (req, res) => {
+  const { project_id } = req.query;
+  if (!project_id) return res.status(400).json({ error: "project_id required" });
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM site_engineer_daily_updates
+       WHERE project_id = $1
+         AND applied   = false
+         AND dismissed = false
+       ORDER BY created_at DESC`,
+      [project_id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("GET SE ALERTS ERROR:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────
+   POST /api/wbs/se-alerts/:id/apply
+   Project coordinator approves an SE alert:
+   - Updates the WBS milestone/subtask status to suggested_status
+   - Re-syncs the parent milestone
+   - Marks the alert as applied
+──────────────────────────────────────────────*/
+exports.applySEAlert = async (req, res) => {
+  const { id } = req.params;
+  try {
+    /* Fetch the alert */
+    const { rows: alertRows } = await pool.query(
+      `SELECT * FROM site_engineer_daily_updates WHERE id = $1`,
+      [id]
+    );
+    if (!alertRows.length) return res.status(404).json({ error: "Alert not found" });
+    const alert = alertRows[0];
+
+    /* Apply status to subtask first (if provided), then milestone */
+    if (alert.subtask_id && alert.suggested_status) {
+      await pool.query(
+        `UPDATE wbs SET status = $1 WHERE id = $2`,
+        [alert.suggested_status, alert.subtask_id]
+      );
+    }
+
+    if (alert.milestone_id && alert.suggested_status) {
+      /* Only update milestone directly if no subtask; otherwise syncParentStatus handles it */
+      if (!alert.subtask_id) {
+        await pool.query(
+          `UPDATE wbs SET status = $1 WHERE id = $2`,
+          [alert.suggested_status, alert.milestone_id]
+        );
+      } else {
+        /* Re-sync parent from children */
+        await syncParentStatus(alert.milestone_id);
+      }
+    }
+
+    /* Mark as applied */
+    await pool.query(
+      `UPDATE site_engineer_daily_updates SET applied = true WHERE id = $1`,
+      [id]
+    );
+
+    res.json({ message: "Alert applied successfully" });
+  } catch (err) {
+    console.error("APPLY SE ALERT ERROR:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────
+   POST /api/wbs/se-alerts/:id/dismiss
+──────────────────────────────────────────────*/
+exports.dismissSEAlert = async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query(
+      `UPDATE site_engineer_daily_updates SET dismissed = true WHERE id = $1`,
+      [id]
+    );
+    res.json({ message: "Alert dismissed" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────
+   POST /api/wbs/sync-from-se  (kept for backward compat)
 ──────────────────────────────────────────────*/
 exports.syncFromSEReport = async (req, res) => {
   const { report_id, matches } = req.body;
@@ -231,7 +345,6 @@ exports.syncFromSEReport = async (req, res) => {
     const updated = [];
 
     for (const m of matches) {
-      // Update subtask if provided
       if (m.subtask_id) {
         const { rows } = await pool.query(
           `SELECT status FROM wbs WHERE id = $1`, [m.subtask_id]
@@ -245,7 +358,6 @@ exports.syncFromSEReport = async (req, res) => {
         }
       }
 
-      // Update parent milestone
       if (m.milestone_id) {
         const { rows } = await pool.query(
           `SELECT status FROM wbs WHERE id = $1`, [m.milestone_id]
@@ -257,13 +369,10 @@ exports.syncFromSEReport = async (req, res) => {
           );
           updated.push({ type: "milestone", id: m.milestone_id });
         }
-        // Always re-sync parent from children
         await syncParentStatus(m.milestone_id);
       }
     }
 
-    // Record the sync against the SE report (optional audit column)
-    // Only if the column exists — won't fail if not
     try {
       await pool.query(
         `UPDATE se_daily_reports SET wbs_synced = true, wbs_synced_at = NOW() WHERE id = $1`,
