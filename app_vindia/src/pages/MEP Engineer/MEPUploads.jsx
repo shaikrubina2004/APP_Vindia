@@ -59,6 +59,11 @@ const GUIDELINES = [
     text: "Old versions are archived — team is directed to latest automatically",
   },
 ];
+const DISCIPLINE_MAP = {
+  MEP: ["Mechanical", "Electrical", "Plumbing"],
+  ARCH: ["Architectural"],
+  STR: ["Structural"],
+};
 
 const FILE_ICONS = { dwg: "📐", dxf: "📐", pdf: "📄", rvt: "🏗️", ifc: "📐" };
 
@@ -68,6 +73,7 @@ export default function MEPUpload() {
   const [formData, setFormData] = useState({
     name: "",
     discipline: "",
+    sub_discipline: "",
     drawing_number: "",
     drawing_type: "Layout",
     revision_number: "",
@@ -95,6 +101,8 @@ export default function MEPUpload() {
   const [toast, setToast] = useState(false);
   const fileRef = useRef(null);
 
+  if (!activeProject) return null;
+
   const addFiles = (files) => {
     const items = Array.from(files).map((f) => ({
       file: f, // keep actual File object
@@ -104,6 +112,7 @@ export default function MEPUpload() {
     }));
     setQueued((p) => [...p, ...items]);
   };
+
   const removeFile = (i) => setQueued((p) => p.filter((_, idx) => idx !== i));
 
   const startUpload = async () => {
@@ -116,14 +125,13 @@ export default function MEPUpload() {
     data.append("project_id", activeProject.id);
     data.append("name", formData.name || queued[0].name);
     data.append("discipline", formData.discipline);
-    data.append("sub_discipline", formData.discipline);
+    data.append("sub_discipline", formData.sub_discipline);
     data.append("drawing_number", formData.drawing_number);
     data.append("drawing_type", formData.drawing_type);
     data.append("floor_id", formData.floor_id);
     data.append("revision_number", formData.revision_number);
     data.append("title", formData.title || formData.name);
     data.append("change_notes", formData.change_notes);
-    data.append("uploaded_by", 1); // replace with auth user id
 
     try {
       // Simulate progress while uploading
@@ -271,7 +279,7 @@ export default function MEPUpload() {
             <div className="mep-card-body">
               <div
                 className="edit-form-grid"
-                style={{ gridTemplateColumns: "repeat(5, 1fr)" }}
+                style={{ gridTemplateColumns: "repeat(4, 1fr)" }}
               >
                 <div className="edit-form-group">
                   <label>Project</label>
@@ -285,22 +293,91 @@ export default function MEPUpload() {
                     }}
                   />
                 </div>
+
+                <div className="edit-form-group">
+                  <label>
+                    Drawing Name{" "}
+                    <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="edit-form-input"
+                    placeholder="e.g. HVAC Layout — Level 3"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData((p) => ({ ...p, name: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="edit-form-group">
+                  <label>
+                    Drawing Number{" "}
+                    <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="edit-form-input"
+                    placeholder="e.g. MEP-HVAC-GF-001"
+                    value={formData.drawing_number}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        drawing_number: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
                 <div className="edit-form-group">
                   <label>
                     Discipline <span style={{ color: "var(--danger)" }}>*</span>
                   </label>
-                  <select className="edit-form-input">
+                  <select
+                    className="edit-form-input"
+                    value={formData.discipline}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        discipline: e.target.value,
+                        sub_discipline: "",
+                      }))
+                    }
+                  >
                     <option value="">Select</option>
-                    {[
-                      "Mechanical (HVAC)",
-                      "Electrical",
-                      "Plumbing",
-                      "All MEP",
-                    ].map((d) => (
-                      <option key={d}>{d}</option>
+                    {Object.keys(DISCIPLINE_MAP).map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
                     ))}
                   </select>
                 </div>
+
+                <div className="edit-form-group">
+                  <label>
+                    Sub-discipline{" "}
+                    <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+                  <select
+                    className="edit-form-input"
+                    value={formData.sub_discipline}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        sub_discipline: e.target.value,
+                      }))
+                    }
+                    disabled={!formData.discipline}
+                  >
+                    <option value="">Select</option>
+                    {(DISCIPLINE_MAP[formData.discipline] || []).map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="edit-form-group">
                   <label>
                     Revision Number{" "}
@@ -309,9 +386,17 @@ export default function MEPUpload() {
                   <input
                     type="text"
                     className="edit-form-input"
-                    placeholder="e.g. Rev-5"
+                    placeholder="e.g. Rev-1"
+                    value={formData.revision_number}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        revision_number: e.target.value,
+                      }))
+                    }
                   />
                 </div>
+
                 <div className="edit-form-group">
                   <label>
                     Zone / Floor{" "}
@@ -332,6 +417,44 @@ export default function MEPUpload() {
                     ))}
                   </select>
                 </div>
+
+                <div className="edit-form-group">
+                  <label>Drawing Type</label>
+                  <select
+                    className="edit-form-input"
+                    value={formData.drawing_type}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        drawing_type: e.target.value,
+                      }))
+                    }
+                  >
+                    {[
+                      "Layout",
+                      "Floor Plan",
+                      "Section",
+                      "Elevation",
+                      "Detail",
+                      "Schematic",
+                      "Single Line",
+                      "Routing",
+                      "Drainage",
+                      "Foundation",
+                      "Column Layout",
+                      "Beam Layout",
+                      "Slab Detail",
+                      "Wall Detail",
+                      "Ceiling Plan",
+                      "Riser Diagram",
+                    ].map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="edit-form-group">
                   <label>Drawing Status</label>
                   <select className="edit-form-input" disabled>
@@ -348,6 +471,10 @@ export default function MEPUpload() {
                   className="edit-form-input"
                   style={{ minHeight: 76, resize: "vertical" }}
                   placeholder="Describe what changed in this revision — location, scope, reason..."
+                  value={formData.change_notes}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, change_notes: e.target.value }))
+                  }
                 />
               </div>
 

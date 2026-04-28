@@ -19,9 +19,8 @@ exports.uploadDrawing = async (req, res) => {
       revision_number,
       title,
       change_notes,
-      uploaded_by,
     } = req.body;
-
+    const uploaded_by = req.user?.id;
     // Basic validation
     if (
       !project_id ||
@@ -358,12 +357,10 @@ exports.flagClash = async (req, res) => {
       !description ||
       !raised_by
     ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "drawing_id_1, drawing_id_2, clash_type, description and raised_by are required",
-        });
+      return res.status(400).json({
+        error:
+          "drawing_id_1, drawing_id_2, clash_type, description and raised_by are required",
+      });
     }
 
     if (drawing_id_1 === drawing_id_2) {
