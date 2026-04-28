@@ -17,7 +17,6 @@ const userRoutes = require("./routes/userRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
-const drawingRoutes = require("./routes/drawingRoutes");
 
 /* ── PROJECT MODULE ──────────────────────────────────────── */
 const projectRoutes = require("./routes/projectRoutes");
@@ -58,6 +57,7 @@ const seNotificationRoutes = require("./routes/seNotificationRoutes");
 
 /* ── QS MODULES ───────────────────────────────── */
 const qsRoutes = require("./routes/qsRoutes");
+const qsController = require("./controllers/qsController");
 
 const app = express();
 
@@ -112,19 +112,21 @@ try {
   app.use("/api/wbs", wbsRoutes);
   app.use("/api/cost-summary", costRoutes);
   app.use("/api/dashboard", dashboardRoutes);
-
-  /* ── Structural Engineer Modules ───────────────── */
-  app.use("/api/structural", structuralRoutes);
-  app.use("/api/se-daily-reports", seDailyRoutes); // ✅ SE route
-  app.use("/rfis", rfiRoutes);
-  app.use("/api/se-notifications", require("./routes/seNotificationRoutes"));
-  /* ── QS Modules ───────────────── */
-  app.use("/api/qs", qsRoutes);
-
-  /* ── Other Modules ───────────────── */
-  app.use("/api/timesheets", timesheetRoutes);
-  app.use("/api/daily-reports", dailyRoutes); // ✅ normal route
-  app.use("/api/analysis", analysisRoutes);
+ 
+/* ── Structural Engineer Modules ───────────────── */
+app.use("/api/structural", structuralRoutes);
+app.use("/api/se-daily-reports", seDailyRoutes);   // ✅ SE route
+app.use("/rfis", rfiRoutes);
+app.use("/api/se-notifications", require("./routes/seNotificationRoutes"));
+/* ── QS Modules ───────────────── */
+app.use("/api/qs", qsRoutes);
+app.use("/api/qs", qsRoutes);
+app.get("/api/boq", qsController.getBoq);
+app.post("/api/boq", qsController.createBoq);
+/* ── Other Modules ───────────────── */
+app.use("/api/timesheets", timesheetRoutes);
+app.use("/api/daily-reports", dailyRoutes);        // ✅ normal route
+app.use("/api/analysis", analysisRoutes);
 
   /* ── Incident Module ───────────────────────────────────── */
   app.use("/api/incidents", incidentRoutes);
@@ -144,7 +146,7 @@ try {
   app.use("/api/activity-log", activityLogRoutes);
   app.use("/api/progress", progressRoutes);
   app.use("/api/site-engineer-dashboard", siteEngineerDashboardRoutes);
-  app.use("/api/drawings", drawingRoutes);
+
 } catch (err) {
   console.error("❌ Route loading error:", err.message);
 }

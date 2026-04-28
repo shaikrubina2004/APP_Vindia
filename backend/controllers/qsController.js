@@ -5,27 +5,95 @@ const pool = require("../config/db");
 ═══════════════════════════════════════════════════════ */
 exports.getDashboard = async (req, res) => {
   try {
+    const taskResult = await pool.query(`
+  SELECT status, COUNT(*) as count
+  FROM tasks
+  GROUP BY status
+`);
+
+let taskCounts = {
+  pending: 0,
+  inProgress: 0,
+  done: 0,
+  blocked: 0
+};
+
+taskResult.rows.forEach(t => {
+  const status = t.status.toLowerCase();
+
+  if (status === "pending") taskCounts.pending = Number(t.count);
+  else if (status === "in progress") taskCounts.inProgress = Number(t.count);
+  else if (status === "done") taskCounts.done = Number(t.count);
+  else if (status === "blocked") taskCounts.blocked = Number(t.count);
+});
     const role = "quantity_surveyor";
 
-    const { rows: notifications } = await pool.query(
-      `SELECT * FROM notifications 
-       WHERE role=$1 
-       ORDER BY created_at DESC LIMIT 5`,
-      [role]
-    );
+   // ✅ Recent Activities (REAL DATA)
+const { rows: activities } = await pool.query(`
+  SELECT * FROM (
+    SELECT 'Daily Update Submitted' AS title, activity AS description, created_at
+    FROM qs_daily_updates
 
-    const { rows: projects } = await pool.query(
-      `SELECT * FROM projects LIMIT 5`
-    );
+    UNION ALL
+
+    SELECT 'BOQ Submitted' AS title, description AS description, created_at
+    FROM boq_updates
+
+    UNION ALL
+
+    SELECT 'Cost Alert' AS title, message AS description, created_at
+    FROM cost_alerts
+  ) t
+  ORDER BY created_at DESC
+  LIMIT 5
+`);
+
+const { rows: projects } = await pool.query(
+  `SELECT * FROM projects`
+);
+const totalProjects = projects.length;
 
     const { rows: progress } = await pool.query(
       `SELECT * FROM progress LIMIT 5`
     );
+    
+const { rows: taskRows } = await pool.query(`
+  SELECT status, COUNT(*) as count
+  FROM tasks
+  GROUP BY status
+`);
 
-    res.json({
-      success: true,
-      data: { notifications, projects, progress },
-    });
+let taskData = {
+  pending: 0,
+  inProgress: 0,
+  completed: 0
+};
+
+taskRows.forEach(t => {
+  const status = t.status.trim().toLowerCase();
+
+  if (status.includes("block")) {
+    taskData.pending += parseInt(t.count);
+  }
+
+  else if (status.includes("progress")) {
+    taskData.inProgress += parseInt(t.count);
+  }
+
+  else if (status.includes("done")) {
+    taskData.completed += parseInt(t.count);
+  }
+});
+  res.json({
+  success: true,
+ data: { 
+  activities,   // ✅ new
+  projects, 
+  progress,
+  totalProjects,
+   tasks: taskCounts 
+},
+});
 
   } catch (err) {
     console.error("QS Dashboard Error:", err);
