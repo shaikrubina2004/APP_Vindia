@@ -116,7 +116,7 @@ try {
 app.use("/api/structural", structuralRoutes);
 app.use("/api/se-daily-reports", seDailyRoutes);   // ✅ SE route
 app.use("/rfis", rfiRoutes);
-app.use("/api/se-notifications", seNotificationRoutes);
+app.use("/api/se-notifications", require("./routes/seNotificationRoutes"));
 /* ── QS Modules ───────────────── */
 app.use("/api/qs", qsRoutes);
 

@@ -4,33 +4,24 @@ import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
 import Dashboard from "../pages/Structural Engineer/StructuralEngineerDashboard";
 import Projects from "../pages/Structural Engineer/Projects";
 import Drawings from "../pages/Structural Engineer/Drawings";
-import Analysis from "../pages/Structural Engineer/Analysis";
 import BOQ from "../pages/Structural Engineer/BOQ";
 import RFI from "../pages/Structural Engineer/RFI";
-import Approvals from "../pages/Structural Engineer/Approvals";
-import Reports from "../pages/Structural Engineer/Reports";
-import Coordination from "../pages/Structural Engineer/Coordination";
 import SEDailyUpdates from "../pages/Structural Engineer/SEDailyUpdates";
-import AppShell  from "../components/incidents/AppShell";
-import SEtoQSHandover from "../pages/Structural Engineer/SEtoQSHandover";
+import AppShell from "../components/incidents/AppShell";
+
 function StructuralRoutes() {
   return (
-    <StructuralEngineerLayout>
-      <Routes>
+    <Routes>
+      <Route path="/" element={<StructuralEngineerLayout />}>
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
         <Route path="drawings" element={<Drawings />} />
-        <Route path="analysis" element={<Analysis />} />
         <Route path="boq" element={<BOQ />} />
         <Route path="rfi" element={<RFI />} />
-        <Route path="approvals" element={<Approvals />} />
-        <Route path="reports" element={<Reports />} />
         <Route path="incidents" element={<AppShell />} />
-        <Route path="handover" element={<SEtoQSHandover />} />
-        <Route path="coordination" element={<Coordination />} />
         <Route path="daily-updates" element={<SEDailyUpdates />} />
-      </Routes>
-    </StructuralEngineerLayout>
+      </Route>
+    </Routes>
   );
 }
 

@@ -9,8 +9,28 @@ exports.updateDrawingStatus = async (req, res) => {
       return res.status(404).json({ message: "Drawing not found" });
     }
 
+    // 🧼 Clean input
+    const cleanStatus = status?.trim();
+
+    console.log("DRAWING STATUS:", JSON.stringify(cleanStatus));
+
+    const allowedStatuses = [
+      "Pending",
+      "In Progress",
+      "Done",
+      "Blocked",
+      "pending",
+      "open"
+    ];
+
+    if (!allowedStatuses.includes(cleanStatus)) {
+      return res.status(400).json({
+        message: `Invalid status value: ${cleanStatus}`
+      });
+    }
+
     // 🔥 UPDATE ONLY THAT ROLE
-    drawing.status[role] = status;
+    drawing.status[role] = cleanStatus;
 
     await drawing.save();
 
