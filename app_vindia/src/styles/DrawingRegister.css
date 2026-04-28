@@ -1059,3 +1059,498 @@
     font-size: 20px;
   }
 }
+/* ═══════════════════════════════════════════════════════════
+   DRAWING REGISTER — CSS ADDITIONS
+   Append these rules to your existing DrawingRegister.css
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Clash pill in version timeline ── */
+.drp-clash {
+  background: #fcebeb;
+  color: #791f1f;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+/* ── Clash flag button (unflagged state) ── */
+.dr-btn-clash {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #fcebeb;
+  color: #791f1f;
+  border: 1px solid #f7c1c1;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.dr-btn-clash:hover {
+  background: #f7c1c1;
+  border-color: #f09595;
+}
+
+/* ── Clash flag button (already flagged / active state) ── */
+.dr-btn-clash-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #eaf3de;
+  color: #27500a;
+  border: 1px solid #c0dd97;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.dr-btn-clash-active:hover {
+  background: #c0dd97;
+}
+
+/* ── Clash flag submit button (inside modal) ── */
+.dr-btn-clash-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #a32d2d;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.dr-btn-clash-submit:hover:not(:disabled) {
+  background: #791f1f;
+}
+.dr-btn-clash-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Version history label ── */
+.dr-ver-history-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 10px;
+}
+
+/* ── Red alert variant ── */
+.dr-alert-red {
+  background: #fcebeb;
+  border: 1px solid #f7c1c1;
+  color: #791f1f;
+}
+
+/* ══════════════════════════════════════
+   CLASH FLAG MODAL
+   ══════════════════════════════════════ */
+
+/* Overlay — sits above the slide-out panel */
+.dr-clash-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 300;
+}
+
+/* Modal card */
+.dr-clash-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  background: var(--bg-primary, #fff);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+  z-index: 301;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Modal head */
+.dr-clash-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.dr-clash-modal-head h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.dr-clash-modal-head p {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Modal body */
+.dr-clash-modal-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Field wrapper */
+.dr-clash-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dr-clash-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Clash type chips */
+.dr-clash-type-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dr-clash-type-chip {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 20px;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.dr-clash-type-chip:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+.dr-clash-type-chip.selected {
+  background: #fcebeb;
+  border-color: #f09595;
+  color: #791f1f;
+  font-weight: 600;
+}
+
+/* Textarea */
+.dr-clash-textarea {
+  width: 100%;
+  padding: 9px 11px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-primary, #fff);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 7px;
+  resize: vertical;
+  min-height: 88px;
+  outline: none;
+  line-height: 1.5;
+  transition: border-color 0.15s;
+}
+.dr-clash-textarea:focus {
+  border-color: #378add;
+}
+
+/* Info strip */
+.dr-clash-info-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 7px;
+  padding: 9px 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.dr-clash-info-strip strong {
+  color: var(--text-primary);
+}
+
+/* Modal foot */
+.dr-clash-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* ── Approve button (card row — small) ── */
+.dr-btn-approve-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #eaf3de;
+  color: #27500a;
+  border: 1px solid #c0dd97;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.dr-btn-approve-sm:hover {
+  background: #c0dd97;
+}
+.dr-btn-approve-sm.approved {
+  background: #27500a;
+  color: #fff;
+  border-color: #27500a;
+}
+
+/* ── Approve / View Status button (panel footer) ── */
+.dr-btn-approve {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #1d9e75 0%, #158a62 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(21, 138, 98, 0.25);
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.1s;
+  letter-spacing: 0.1px;
+}
+.dr-btn-approve:hover {
+  background: linear-gradient(135deg, #158a62 0%, #0e6b4c 100%);
+  box-shadow: 0 3px 10px rgba(21, 138, 98, 0.35);
+  transform: translateY(-1px);
+}
+.dr-btn-approve:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(21, 138, 98, 0.2);
+}
+
+/* ── Finalized pill ── */
+.drp-finalized {
+  background: linear-gradient(135deg, #1d9e75, #158a62);
+  color: #fff;
+  font-weight: 600;
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+
+/* ── Finalized badge (on card row) ── */
+.drb-finalized {
+  background: linear-gradient(135deg, #1d9e75, #158a62);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* ── Finalized row highlight ── */
+.dr-row.row-finalized {
+  border-left-color: #1d9e75 !important;
+  background: linear-gradient(
+    to right,
+    rgba(29, 158, 117, 0.04),
+    transparent 40%
+  );
+}
+
+/* ── Green alert variant ── */
+.dr-alert-green {
+  background: #eaf3de;
+  border: 1px solid #c0dd97;
+  color: #27500a;
+}
+
+/* ── Approval badges row (on card) ── */
+.dr-approval-badges {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+.dr-approval-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 500;
+}
+.chip-approved {
+  background: #eaf3de;
+  color: #27500a;
+  border: 1px solid #c0dd97;
+}
+.chip-pending {
+  background: var(--color-background-secondary, #f5f5f5);
+  color: var(--color-text-secondary, #888);
+  border: 1px solid var(--color-border-tertiary, #e0e0e0);
+}
+
+/* ── Approval checklist (inside modal) ── */
+.dr-approval-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.dr-approval-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+.dr-approval-row.row-approved {
+  background: #eaf3de;
+  border-color: #c0dd97;
+}
+.dr-approval-row.row-pending {
+  background: var(--color-background-secondary, #f5f5f5);
+  border-color: var(--color-border-tertiary, #e0e0e0);
+}
+.dr-approval-row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dr-approval-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-approved {
+  background: #1d9e75;
+}
+.dot-pending {
+  background: #ccc;
+}
+.dr-approval-role-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ── Approval progress bar ── */
+.dr-approval-progress-wrap {
+  height: 5px;
+  background: var(--color-border-tertiary, #e0e0e0);
+  border-radius: 20px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+.dr-approval-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #1d9e75, #27c490);
+  border-radius: 20px;
+  transition: width 0.4s ease;
+}
+/* ── Issue for Coordination button ── */
+.dr-btn-status-coord {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #378add 0%, #185fa5 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(24, 95, 165, 0.25);
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.1s;
+}
+.dr-btn-status-coord:hover {
+  background: linear-gradient(135deg, #185fa5 0%, #0c447c 100%);
+  box-shadow: 0 3px 10px rgba(24, 95, 165, 0.35);
+  transform: translateY(-1px);
+}
+
+/* ── Issue for Construction button ── */
+.dr-btn-status-construct {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ba7517 0%, #8c5610 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(140, 86, 16, 0.25);
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.1s;
+}
+.dr-btn-status-construct:hover {
+  background: linear-gradient(135deg, #8c5610 0%, #6b4010 100%);
+  box-shadow: 0 3px 10px rgba(140, 86, 16, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Issued for Coordination — blue */
+.drp-coord {
+  background: #e6f1fb;
+  color: #0c447c;
+  font-weight: 600;
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+
+/* Issued for Construction — amber */
+.drp-construct {
+  background: #faeeda;
+  color: #633806;
+  font-weight: 600;
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 20px;
+}

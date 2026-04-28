@@ -441,6 +441,8 @@ function ChangeChip({ label, type }) {
 ═══════════════════════════════════════ */
 export default function MEPVersionControl() {
   const { activeProject } = useProject();
+  if (!activeProject) return null; // ← add this line
+
   const files = FILES[activeProject.id] || [];
 
   const [sel, setSel] = useState("hvac3");

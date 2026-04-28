@@ -1118,6 +1118,7 @@ function CoordThread({ thread, onResolve }) {
 /* ── Main Page ────────────────────────────────────── */
 export default function MEPCoordination() {
   const { activeProject } = useProject();
+  if (!activeProject) return null; // ← add this line
 
   const [threadsByProject, setThreadsByProject] = useState(INITIAL_THREADS);
   const [showForm, setShowForm] = useState(false);

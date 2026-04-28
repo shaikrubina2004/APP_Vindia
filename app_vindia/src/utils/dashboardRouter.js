@@ -8,6 +8,7 @@ export const getDashboardRoute = (role) => {
       return "/dashboard";
 
     case ROLES.HR:
+    case ROLES.HR_MANAGER: // ✅ added
       return "/hr";
 
     case ROLES.PROJECT_MANAGER:
@@ -39,6 +40,17 @@ export const getDashboardRoute = (role) => {
 
     case ROLES.ARCHITECT:
       return "/architect/dashboard";
+
+    // ✅ NEW ROLES
+
+    case ROLES.CLIENT:
+      return "client/dashboard"; // or create "/client/dashboard" later
+
+    case ROLES.SOFTWARE_ENGINEER:
+      return "softwareEngineer/dashboard"; // or "/it/dashboard" if you create one
+
+    case ROLES.TESTER:
+      return "tester/dashboard"; // same as above
 
     default:
       return "/";

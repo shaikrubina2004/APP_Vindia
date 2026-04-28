@@ -615,6 +615,8 @@ function VersionsPanel({ drawing, onClose }) {
 ═══════════════════════════════════════ */
 export default function MEPDrawings() {
   const { activeProject } = useProject();
+  if (!activeProject) return null; // ← add this line
+
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
 

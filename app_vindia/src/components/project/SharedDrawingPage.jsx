@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import ProjectSwitcher from "../../components/project/ProjectSwitcher";
+import { useProject } from "../../context/ProjectContext";
 import "../../styles/DrawingRegister.css";
 
 /* ═══════════════════════════════════════
    ROLE CONFIG
-   In production replace currentRole with
-   value from your auth context
-   e.g. const { role } = useAuth()
 ═══════════════════════════════════════ */
 const ROLE_META = {
   mep: { label: "MEP Engineer", icon: "🔧", cls: "dr-role-mep" },
@@ -13,6 +12,29 @@ const ROLE_META = {
   str: { label: "Structural Engineer", icon: "🏗️", cls: "dr-role-str" },
 };
 
+/*
+  APPROVAL RULES
+  MEP drawing   → needs ARCH + STR approval
+  ARCH drawing  → needs MEP  + STR approval
+  STR drawing   → needs MEP  + ARCH approval
+  The drawing owner cannot approve their own drawing.
+*/
+const APPROVAL_ROLES = {
+  MEP: ["arch", "str"],
+  ARCH: ["mep", "str"],
+  STR: ["mep", "arch"],
+};
+
+/*
+  STATUS TRANSITION RULES
+  After finalized:
+  - Owner can push to "Issued for Coordination"
+  - Only Architect can push to "Issued for Construction" (all disciplines)
+*/
+const STATUS_TRANSITIONS = {
+  "Issued for Coordination": (role, disc) => canUpload(role, disc), // owner only
+  "Issued for Construction": (role, _disc) => role === "arch", // architect only
+};
 /* ═══════════════════════════════════════
    MEP DRAWINGS
 ═══════════════════════════════════════ */
@@ -59,7 +81,7 @@ const MEP_DRAWINGS = [
     number: "MEP-HVAC-L2-001",
     rev: "Rev-2",
     latest: false,
-    status: "For Review",
+    status: "Issued for Coordination",
     date: "2026-04-20",
     uploadedBy: "MEP Engineer",
     size: "1.9 MB",
@@ -209,7 +231,7 @@ const ARCH_DRAWINGS = [
     number: "A-RCP-GF-001",
     rev: "R1",
     latest: true,
-    status: "For Review",
+    status: "Issued for Coordination",
     date: "2026-04-18",
     uploadedBy: "Architect Team",
     size: "2.5 MB",
@@ -241,7 +263,7 @@ const ARCH_DRAWINGS = [
     number: "A-SEC-AA-001",
     rev: "R1",
     latest: false,
-    status: "For Review",
+    status: "Issued for Coordination",
     date: "2026-04-15",
     uploadedBy: "Architect Team",
     size: "1.6 MB",
@@ -343,7 +365,7 @@ const STR_DRAWINGS = [
     number: "S-RW-001",
     rev: "R1",
     latest: false,
-    status: "For Review",
+    status: "Issued for Coordination",
     date: "2026-04-14",
     uploadedBy: "Structural Team",
     size: "1.5 MB",
@@ -351,10 +373,34 @@ const STR_DRAWINGS = [
   },
 ];
 
-const ALL_DRAWINGS = [...MEP_DRAWINGS, ...ARCH_DRAWINGS, ...STR_DRAWINGS];
+/* ═══════════════════════════════════════
+   DRAWINGS BY PROJECT
+═══════════════════════════════════════ */
+const DRAWINGS_BY_PROJECT = {
+  p1: [...MEP_DRAWINGS, ...ARCH_DRAWINGS, ...STR_DRAWINGS],
+  p2: [
+    MEP_DRAWINGS[0],
+    MEP_DRAWINGS[1],
+    MEP_DRAWINGS[3],
+    MEP_DRAWINGS[5],
+    ARCH_DRAWINGS[0],
+    ARCH_DRAWINGS[1],
+    ARCH_DRAWINGS[3],
+    STR_DRAWINGS[0],
+    STR_DRAWINGS[1],
+    STR_DRAWINGS[3],
+  ],
+  p3: [
+    MEP_DRAWINGS[0],
+    MEP_DRAWINGS[3],
+    ARCH_DRAWINGS[0],
+    ARCH_DRAWINGS[2],
+    STR_DRAWINGS[0],
+  ],
+};
 
 /* ═══════════════════════════════════════
-   VERSION DATA (keyed by drawing id)
+   VERSION DATA
 ═══════════════════════════════════════ */
 const VERSION_DATA = {
   "M-001": [
@@ -448,7 +494,7 @@ function getDefaultVersions(drawing) {
       note: "Updated after coordination review.",
     },
     {
-      rev: "R1",
+      rev: drawing.rev === "R1" ? "R0" : "R1",
       current: false,
       date: "2026-04-01",
       uploader: drawing.uploadedBy,
@@ -459,22 +505,32 @@ function getDefaultVersions(drawing) {
 }
 
 /* ═══════════════════════════════════════
+   CLASH TYPES
+═══════════════════════════════════════ */
+const CLASH_TYPES = [
+  "HVAC vs Structural",
+  "Pipe vs Beam",
+  "Conduit vs Duct",
+  "Structural vs MEP",
+  "Arch vs MEP",
+  "Other",
+];
+
+/* ═══════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════ */
 const DISC_ICON = { MEP: "🔧", ARCH: "🏛️", STR: "🏗️" };
 const DISC_ROW = { MEP: "disc-mep", ARCH: "disc-arch", STR: "disc-str" };
 const DISC_AVA = { MEP: "dra-mep", ARCH: "dra-arch", STR: "dra-str" };
 const DISC_BADGE = { MEP: "drb-mep", ARCH: "drb-arch", STR: "drb-str" };
-const DISC_LABEL = { MEP: "MEP", ARCH: "Arch", STR: "Struct" };
 
 const STATUS_PILL = {
   Approved: "drp-approved",
   "Issued for Construction": "drp-issued",
   "Issued for Coordination": "drp-issued",
-  "For Review": "drp-review",
+  Finalized: "drp-finalized",
 };
 
-/* can this role upload drawings of this discipline */
 function canUpload(role, disc) {
   if (role === "mep" && disc === "MEP") return true;
   if (role === "arch" && disc === "ARCH") return true;
@@ -482,12 +538,361 @@ function canUpload(role, disc) {
   return false;
 }
 
+function canApprove(role, disc) {
+  return APPROVAL_ROLES[disc]?.includes(role) ?? false;
+}
+
+function getApprovals(drawingId, disc, approvals) {
+  const roles = APPROVAL_ROLES[disc] ?? [];
+  const record = approvals[drawingId] ?? {};
+  return roles.map((r) => ({
+    role: r,
+    label: ROLE_META[r]?.label ?? r,
+    approved: !!record[r],
+  }));
+}
+
+function isFullyApproved(drawingId, disc, approvals) {
+  const roles = APPROVAL_ROLES[disc] ?? [];
+  const record = approvals[drawingId] ?? {};
+  return roles.every((r) => !!record[r]);
+}
+
+/* ═══════════════════════════════════════
+   APPROVAL BADGES — inline on each card
+═══════════════════════════════════════ */
+function ApprovalBadges({ drawingId, disc, approvals }) {
+  const items = getApprovals(drawingId, disc, approvals);
+  return (
+    <div className="dr-approval-badges">
+      {items.map((item) => (
+        <span
+          key={item.role}
+          className={`dr-approval-chip ${item.approved ? "chip-approved" : "chip-pending"}`}
+          title={
+            item.approved
+              ? `${item.label} — Approved`
+              : `${item.label} — Pending`
+          }
+        >
+          {item.approved ? "✓" : "○"} {item.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   CLASH FLAG MODAL
+═══════════════════════════════════════ */
+function ClashFlagModal({ drawing, onSubmit, onClose }) {
+  const [clashType, setClashType] = useState("");
+  const [reason, setReason] = useState("");
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const canSubmit = clashType.trim() && reason.trim();
+
+  return (
+    <>
+      <div className="dr-clash-modal-overlay" onClick={onClose} />
+      <div className="dr-clash-modal">
+        <div className="dr-clash-modal-head">
+          <div>
+            <h3>🚩 Flag Clash</h3>
+            <p>
+              <span
+                className={`dr-badge ${DISC_BADGE[drawing.disc]}`}
+                style={{ marginRight: 6 }}
+              >
+                {drawing.subDisc}
+              </span>
+              {drawing.name} · {drawing.floor} ·{" "}
+              <span style={{ fontFamily: "Monaco,monospace", fontSize: 11 }}>
+                {drawing.rev}
+              </span>
+            </p>
+          </div>
+          <button className="dr-modal-close" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        <div className="dr-clash-modal-body">
+          <div className="dr-clash-field">
+            <label className="dr-clash-label">
+              Clash type <span style={{ color: "#c0392b" }}>*</span>
+            </label>
+            <div className="dr-clash-type-chips">
+              {CLASH_TYPES.map((t) => (
+                <button
+                  key={t}
+                  className={`dr-clash-type-chip${clashType === t ? " selected" : ""}`}
+                  onClick={() => setClashType(t)}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="dr-clash-field">
+            <label className="dr-clash-label">
+              Description of clash <span style={{ color: "#c0392b" }}>*</span>
+            </label>
+            <textarea
+              className="dr-clash-textarea"
+              rows={4}
+              placeholder="Describe the coordination conflict — e.g. HVAC duct at Level 3 conflicts with Beam B-14 shifted 200mm east."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </div>
+
+          <div className="dr-clash-info-strip">
+            <span>
+              <strong>Drawing No.:</strong> {drawing.number}
+            </span>
+            <span>
+              <strong>Revision:</strong> {drawing.rev}
+            </span>
+            <span>
+              <strong>Floor:</strong> {drawing.floor}
+            </span>
+            <span>
+              <strong>Uploaded by:</strong> {drawing.uploadedBy}
+            </span>
+          </div>
+        </div>
+
+        <div className="dr-clash-modal-foot">
+          <button className="dr-btn-outline" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="dr-btn-clash-submit"
+            disabled={!canSubmit}
+            onClick={() => canSubmit && onSubmit({ clashType, reason })}
+          >
+            🚩 Submit Clash Flag
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════
+   APPROVAL MODAL
+═══════════════════════════════════════ */
+function ApprovalModal({
+  drawing,
+  role,
+  approvals,
+  onApprove,
+  onWithdraw,
+  onClose,
+}) {
+  const approverRoles = APPROVAL_ROLES[drawing.disc] ?? [];
+  const isApprover = approverRoles.includes(role);
+  const myApproval = approvals[drawing.id]?.[role] ?? false;
+  const fullyApproved = isFullyApproved(drawing.id, drawing.disc, approvals);
+  const items = getApprovals(drawing.id, drawing.disc, approvals);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <>
+      <div className="dr-clash-modal-overlay" onClick={onClose} />
+      <div className="dr-clash-modal" style={{ maxWidth: 460 }}>
+        {/* head */}
+        <div className="dr-clash-modal-head">
+          <div>
+            <h3>✅ Approval Status</h3>
+            <p>
+              <span
+                className={`dr-badge ${DISC_BADGE[drawing.disc]}`}
+                style={{ marginRight: 6 }}
+              >
+                {drawing.subDisc}
+              </span>
+              {drawing.name} · {drawing.rev}
+            </p>
+          </div>
+          <button className="dr-modal-close" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        {/* body */}
+        <div className="dr-clash-modal-body">
+          {/* finalized banner */}
+          {fullyApproved && (
+            <div
+              className="dr-alert dr-alert-green"
+              style={{ marginBottom: 14 }}
+            >
+              <span className="dr-alert-icon">🏆</span>
+              <span>
+                <strong>Drawing Finalized</strong> — All required approvals
+                received.
+              </span>
+            </div>
+          )}
+
+          {/* owner cannot approve notice */}
+          {!isApprover && (
+            <div
+              className="dr-alert dr-alert-amber"
+              style={{ marginBottom: 14 }}
+            >
+              <span className="dr-alert-icon">ℹ️</span>
+              <span>
+                You created this drawing and{" "}
+                <strong>cannot approve it yourself</strong>. Approvals must come
+                from {items.map((i) => i.label).join(" and ")}.
+              </span>
+            </div>
+          )}
+
+          {/* approval rule */}
+          <div className="dr-clash-info-strip" style={{ marginBottom: 14 }}>
+            <span style={{ width: "100%" }}>
+              <strong>Rule:</strong> This {drawing.subDisc} drawing requires
+              approval from {items.map((i) => i.label).join(" and ")} before it
+              can be finalized.
+            </span>
+          </div>
+
+          {/* checklist */}
+          <div className="dr-ver-history-label" style={{ marginBottom: 8 }}>
+            Approval checklist
+          </div>
+          <div className="dr-approval-checklist">
+            {items.map((item) => (
+              <div
+                key={item.role}
+                className={`dr-approval-row ${item.approved ? "row-approved" : "row-pending"}`}
+              >
+                <div className="dr-approval-row-left">
+                  <span
+                    className={`dr-approval-dot ${item.approved ? "dot-approved" : "dot-pending"}`}
+                  />
+                  <span className="dr-approval-role-label">{item.label}</span>
+                </div>
+                <span
+                  className={`dr-pill ${item.approved ? "drp-approved" : "drp-review"}`}
+                >
+                  {item.approved ? "✓ Approved" : "Pending"}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* progress bar */}
+          <div className="dr-approval-progress-wrap">
+            <div
+              className="dr-approval-progress-bar"
+              style={{
+                width: `${(items.filter((i) => i.approved).length / items.length) * 100}%`,
+              }}
+            />
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--text-secondary)",
+              marginTop: 4,
+            }}
+          >
+            {items.filter((i) => i.approved).length} of {items.length} approvals
+            received
+            {fullyApproved ? " — Drawing finalized ✓" : ""}
+          </div>
+        </div>
+
+        {/* foot */}
+        <div className="dr-clash-modal-foot">
+          <button className="dr-btn-outline" onClick={onClose}>
+            Close
+          </button>
+
+          {isApprover && !fullyApproved && !myApproval && (
+            <button
+              className="dr-btn-approve"
+              onClick={() => {
+                onApprove(drawing.id, role);
+                onClose();
+              }}
+            >
+              ✅ Approve Drawing
+            </button>
+          )}
+          {isApprover && myApproval && !fullyApproved && (
+            <button
+              className="dr-btn-outline"
+              style={{ color: "#a32d2d", borderColor: "#f7c1c1" }}
+              onClick={() => {
+                onWithdraw(drawing.id, role);
+                onClose();
+              }}
+            >
+              ✕ Withdraw Approval
+            </button>
+          )}
+          {fullyApproved && (
+            <span
+              className="dr-pill drp-finalized"
+              style={{ padding: "7px 16px", fontSize: 12 }}
+            >
+              🏆 Finalized
+            </span>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ═══════════════════════════════════════
    VERSIONS SLIDE-OUT PANEL
 ═══════════════════════════════════════ */
-function VersionsPanel({ drawing, role, onClose }) {
+function VersionsPanel({
+  drawing,
+  role,
+  clashFlags,
+  approvals,
+  drawingStatuses,
+  onClose,
+  onOpenClashModal,
+  onRemoveClash,
+  onOpenApproval,
+  onStatusChange,
+}) {
   const versions = VERSION_DATA[drawing.id] || getDefaultVersions(drawing);
   const owned = canUpload(role, drawing.disc);
+  const isNonMEP = drawing.disc !== "MEP";
+  const clashInfo = clashFlags[drawing.id];
+  const isFlagged = !!(drawing.flag || clashInfo);
+  const fullyApproved = isFullyApproved(drawing.id, drawing.disc, approvals);
+  const currentStatus = drawingStatuses[drawing.id] ?? drawing.status;
+  const isFinalized = fullyApproved;
+  const canIssueConstruct =
+    isFinalized &&
+    role === "arch" &&
+    currentStatus === "Issued for Coordination";
 
   useEffect(() => {
     const handler = (e) => {
@@ -520,7 +925,6 @@ function VersionsPanel({ drawing, role, onClose }) {
           </button>
         </div>
 
-        {/* body */}
         <div className="dr-slideout-body">
           {/* current version highlight */}
           <div className="dr-ver-highlight">
@@ -540,9 +944,9 @@ function VersionsPanel({ drawing, role, onClose }) {
             <div className="dr-ver-hl-block">
               <span className="dr-ver-hl-label">Status</span>
               <span
-                className={`dr-pill ${STATUS_PILL[drawing.status] || "drp-review"}`}
+                className={`dr-pill ${STATUS_PILL[currentStatus] || "drp-review"}`}
               >
-                {drawing.status}
+                {currentStatus}
               </span>
             </div>
             <div className="dr-ver-hl-block" style={{ marginLeft: "auto" }}>
@@ -551,7 +955,31 @@ function VersionsPanel({ drawing, role, onClose }) {
             </div>
           </div>
 
-          {/* read-only notice for non-owners */}
+          {/* approval summary */}
+          <div style={{ marginBottom: 14 }}>
+            <div className="dr-ver-history-label" style={{ marginBottom: 6 }}>
+              Approvals
+            </div>
+            <ApprovalBadges
+              drawingId={drawing.id}
+              disc={drawing.disc}
+              approvals={approvals}
+            />
+          </div>
+
+          {/* clash banner */}
+          {isFlagged && clashInfo && (
+            <div className="dr-alert dr-alert-red" style={{ marginBottom: 14 }}>
+              <span className="dr-alert-icon">🚩</span>
+              <div>
+                <strong>Clash flagged</strong> — {clashInfo.clashType}
+                <br />
+                <span style={{ fontSize: 11 }}>{clashInfo.reason}</span>
+              </div>
+            </div>
+          )}
+
+          {/* read-only notice */}
           {!owned && (
             <div
               className="dr-alert dr-alert-amber"
@@ -561,83 +989,118 @@ function VersionsPanel({ drawing, role, onClose }) {
               <span>
                 You have <strong>read-only access</strong> to {drawing.subDisc}{" "}
                 drawings. Only the {drawing.uploadedBy} can upload new versions.
+                {isNonMEP && " You can flag clashes on the latest version."}
               </span>
             </div>
           )}
 
-          {/* timeline label */}
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--text-secondary)",
-              textTransform: "uppercase",
-              letterSpacing: "0.4px",
-              marginBottom: 10,
-            }}
-          >
+          <div className="dr-ver-history-label">
             Full Revision History — {versions.length} version
             {versions.length > 1 ? "s" : ""}
           </div>
 
           {/* timeline */}
           <div className="dr-ver-timeline">
-            {versions.map((v, i) => (
-              <div className="dr-ver-entry" key={v.rev}>
-                <div className="dr-ver-spine">
-                  <div
-                    className={`dr-ver-dot ${v.current ? "current" : "old"}`}
-                  />
-                  {i < versions.length - 1 && (
-                    <div className="dr-ver-connector" />
-                  )}
-                </div>
-                <div className="dr-ver-content">
-                  <div className="dr-ver-head">
-                    <span className="dr-ver-rev">{v.rev}</span>
-                    <span
-                      className={`dr-pill ${v.current ? "drp-latest" : "drp-readonly"}`}
-                    >
-                      {v.current ? "✓ Current" : "Archived"}
-                    </span>
-                    <span className="dr-ver-date">{v.date}</span>
+            {versions.map((v, i) => {
+              const showClashBtn = isNonMEP && v.current;
+              return (
+                <div className="dr-ver-entry" key={v.rev}>
+                  <div className="dr-ver-spine">
+                    <div
+                      className={`dr-ver-dot ${v.current ? "current" : "old"}`}
+                    />
+                    {i < versions.length - 1 && (
+                      <div className="dr-ver-connector" />
+                    )}
                   </div>
-                  <div className="dr-ver-uploader">👤 {v.uploader}</div>
-                  <div className="dr-ver-title">{v.title}</div>
-                  <div className="dr-ver-note">{v.note}</div>
-                  <div className="dr-ver-actions">
-                    <button
-                      className={
-                        v.current ? "dr-btn-primary" : "dr-btn-outline"
-                      }
-                      style={{ padding: "5px 12px", fontSize: 11 }}
-                    >
-                      📥 {v.current ? "Download Current" : "Download"}
-                    </button>
-                    <button
-                      className="dr-btn-outline"
-                      style={{ padding: "5px 12px", fontSize: 11 }}
-                    >
-                      👁 View
-                    </button>
+                  <div className="dr-ver-content">
+                    <div className="dr-ver-head">
+                      <span className="dr-ver-rev">{v.rev}</span>
+                      <span
+                        className={`dr-pill ${v.current ? "drp-latest" : "drp-readonly"}`}
+                      >
+                        {v.current ? "✓ Current" : "Archived"}
+                      </span>
+                      {v.current && isFlagged && (
+                        <span className="dr-pill drp-clash">
+                          🚩 Clash Flagged
+                        </span>
+                      )}
+                      {v.current && fullyApproved && (
+                        <span className="dr-pill drp-finalized">
+                          🏆 Finalized
+                        </span>
+                      )}
+                      <span className="dr-ver-date">{v.date}</span>
+                    </div>
+                    <div className="dr-ver-uploader">👤 {v.uploader}</div>
+                    <div className="dr-ver-title">{v.title}</div>
+                    <div className="dr-ver-note">{v.note}</div>
+                    <div className="dr-ver-actions">
+                      <button
+                        className={
+                          v.current ? "dr-btn-primary" : "dr-btn-outline"
+                        }
+                        style={{ padding: "5px 12px", fontSize: 11 }}
+                      >
+                        📥 {v.current ? "Download Current" : "Download"}
+                      </button>
+                      <button
+                        className="dr-btn-outline"
+                        style={{ padding: "5px 12px", fontSize: 11 }}
+                      >
+                        👁 View
+                      </button>
+
+                      {showClashBtn &&
+                        (isFlagged ? (
+                          <button
+                            className="dr-btn-clash-active"
+                            style={{ padding: "5px 12px", fontSize: 11 }}
+                            onClick={() => onRemoveClash(drawing)}
+                          >
+                            ✓ Clash Flagged — Remove
+                          </button>
+                        ) : (
+                          <button
+                            className="dr-btn-clash"
+                            style={{ padding: "5px 12px", fontSize: 11 }}
+                            onClick={() => onOpenClashModal(drawing)}
+                          >
+                            🚩 Flag Clash
+                          </button>
+                        ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
         {/* foot */}
-        <div className="dr-slideout-foot">
+        <div className="dr-slideout-foot" style={{ flexWrap: "wrap", gap: 8 }}>
           {owned ? (
             <>
-              <a
-                href="/mep/upload"
+              <button
                 className="dr-btn-outline"
                 style={{ flex: 1, justifyContent: "center" }}
+                onClick={() => onOpenApproval(drawing)}
               >
-                Open Version Control
-              </a>
+                ✅ View Approvals
+              </button>
+
+              {canIssueConstruct && (
+                <button
+                  className="dr-btn-status-construct"
+                  style={{ flex: 1, justifyContent: "center" }}
+                  onClick={() =>
+                    onStatusChange(drawing.id, "Issued for Construction")
+                  }
+                >
+                  🏗️ Issue for Construction
+                </button>
+              )}
               <a
                 href="/mep/upload"
                 className="dr-btn-primary"
@@ -647,13 +1110,35 @@ function VersionsPanel({ drawing, role, onClose }) {
               </a>
             </>
           ) : (
-            <button
-              className="dr-btn-outline"
-              style={{ flex: 1, justifyContent: "center" }}
-              onClick={onClose}
-            >
-              Close
-            </button>
+            <>
+              <button
+                className="dr-btn-outline"
+                style={{ flex: 1, justifyContent: "center" }}
+                onClick={onClose}
+              >
+                Close
+              </button>
+              {canApprove(role, drawing.disc) && (
+                <button
+                  className="dr-btn-approve"
+                  style={{ flex: 1, justifyContent: "center" }}
+                  onClick={() => onOpenApproval(drawing)}
+                >
+                  ✅ Approve / View Status
+                </button>
+              )}
+              {canIssueConstruct && (
+                <button
+                  className="dr-btn-status-construct"
+                  style={{ flex: 1, justifyContent: "center" }}
+                  onClick={() =>
+                    onStatusChange(drawing.id, "Issued for Construction")
+                  }
+                >
+                  🏗️ Issue for Construction
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -665,37 +1150,41 @@ function VersionsPanel({ drawing, role, onClose }) {
    MAIN COMPONENT
 ═══════════════════════════════════════ */
 export default function DrawingRegister({ currentRole = "mep" }) {
-  /*
-    currentRole prop comes from your auth system.
-    Pass it like: <DrawingRegister currentRole={user.role} />
-    Accepted values: "mep" | "arch" | "str"
-  */
-
+  const { activeProject } = useProject();
   const [discFilter, setDiscFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [floorFilter, setFloorFilter] = useState("all");
   const [versionsFor, setVersionsFor] = useState(null);
+  const [clashModal, setClashModal] = useState(null);
+  const [approvalModal, setApprovalModal] = useState(null);
+  const [clashFlags, setClashFlags] = useState({});
+  /*
+    approvals shape: { [drawingId]: { mep?: bool, arch?: bool, str?: bool } }
+    Only the two non-owner roles are ever set per drawing.
+  */
+  const [approvals, setApprovals] = useState({});
+  const [drawingStatuses, setDrawingStatuses] = useState({}); // { [drawingId]: "Issued for Coordination" | "Issued for Construction" }
   const [toast, setToast] = useState("");
+  if (!activeProject) return null;
 
   const roleMeta = ROLE_META[currentRole] || ROLE_META.mep;
 
-  /* ── counts per discipline ── */
+  const drawings = DRAWINGS_BY_PROJECT[activeProject.id] ?? [];
+
   const counts = {
-    all: ALL_DRAWINGS.length,
-    MEP: MEP_DRAWINGS.length,
-    ARCH: ARCH_DRAWINGS.length,
-    STR: STR_DRAWINGS.length,
+    all: drawings.length,
+    MEP: drawings.filter((d) => d.disc === "MEP").length,
+    ARCH: drawings.filter((d) => d.disc === "ARCH").length,
+    STR: drawings.filter((d) => d.disc === "STR").length,
   };
 
-  /* ── unique floors ── */
   const floors = [
     "all",
-    ...Array.from(new Set(ALL_DRAWINGS.map((d) => d.floor))).sort(),
+    ...Array.from(new Set(drawings.map((d) => d.floor))).sort(),
   ];
 
-  /* ── filtered list ── */
-  const visible = ALL_DRAWINGS.filter((d) => {
+  const visible = drawings.filter((d) => {
     const mDisc = discFilter === "all" || d.disc === discFilter;
     const mStatus = statusFilter === "all" || d.status === statusFilter;
     const mFloor = floorFilter === "all" || d.floor === floorFilter;
@@ -707,12 +1196,13 @@ export default function DrawingRegister({ currentRole = "mep" }) {
     return mDisc && mStatus && mFloor && mSearch;
   });
 
-  /* ── stat counts ── */
-  const latestCount = ALL_DRAWINGS.filter((d) => d.latest).length;
-  const outdatedCount = ALL_DRAWINGS.filter((d) => !d.latest).length;
-  const flaggedCount = ALL_DRAWINGS.filter((d) => d.flag).length;
+  const flaggedCount = drawings.filter(
+    (d) => d.flag || clashFlags[d.id],
+  ).length;
+  const finalizedCount = drawings.filter((d) =>
+    isFullyApproved(d.id, d.disc, approvals),
+  ).length;
 
-  /* ── tab active class ── */
   const tabCls = (key) => {
     if (discFilter !== key) return "dr-disc-tab";
     if (key === "all") return "dr-disc-tab active-all";
@@ -727,6 +1217,59 @@ export default function DrawingRegister({ currentRole = "mep" }) {
     setTimeout(() => setToast(""), 3000);
   };
 
+  /* ── clash handlers ── */
+  const handleClashSubmit = ({ clashType, reason }) => {
+    const drawing = clashModal;
+    setClashFlags((prev) => ({
+      ...prev,
+      [drawing.id]: {
+        clashType,
+        reason,
+        date: new Date().toISOString().slice(0, 10),
+      },
+    }));
+    setClashModal(null);
+    showToast(`🚩 Clash flagged on ${drawing.name} — ${clashType}`);
+  };
+
+  const handleRemoveClash = (drawing) => {
+    setClashFlags((prev) => {
+      const n = { ...prev };
+      delete n[drawing.id];
+      return n;
+    });
+    showToast(`Clash flag removed from ${drawing.name}`);
+  };
+
+  /* ── approval handlers ── */
+  const handleApprove = (drawingId, role) => {
+    const newApprovals = {
+      ...approvals,
+      [drawingId]: { ...(approvals[drawingId] ?? {}), [role]: true },
+    };
+    setApprovals(newApprovals);
+    const d = drawings.find((x) => x.id === drawingId);
+    if (isFullyApproved(drawingId, d?.disc, newApprovals)) {
+      showToast(`🏆 ${d?.name} is now Finalized — all approvals received!`);
+    } else {
+      showToast(`✅ Approval recorded for ${d?.name}`);
+    }
+  };
+  const handleStatusChange = (drawingId, newStatus) => {
+    setDrawingStatuses((prev) => ({ ...prev, [drawingId]: newStatus }));
+    const d = drawings.find((x) => x.id === drawingId);
+    showToast(`📋 ${d?.name} status updated to "${newStatus}"`);
+  };
+
+  const handleWithdraw = (drawingId, role) => {
+    setApprovals((prev) => ({
+      ...prev,
+      [drawingId]: { ...(prev[drawingId] ?? {}), [role]: false },
+    }));
+    const d = drawings.find((x) => x.id === drawingId);
+    showToast(`Approval withdrawn from ${d?.name}`);
+  };
+
   return (
     <div className="dr-page">
       {/* ── HEADER ── */}
@@ -736,19 +1279,16 @@ export default function DrawingRegister({ currentRole = "mep" }) {
           <p>Central drawing library — All disciplines · All roles</p>
         </div>
         <div className="dr-header-actions">
-          {/* current role indicator */}
           <span className={`dr-role-badge ${roleMeta.cls}`}>
             {roleMeta.icon} {roleMeta.label}
           </span>
-
+          <ProjectSwitcher />
           <button
             className="dr-btn-outline"
             onClick={() => showToast("📥 Preparing download...")}
           >
             📥 Download All
           </button>
-
-          {/* Upload button — only shown for own discipline */}
           {currentRole === "mep" && (
             <a href="/mep/upload" className="dr-btn-primary">
               ⬆️ Upload MEP Drawing
@@ -783,7 +1323,7 @@ export default function DrawingRegister({ currentRole = "mep" }) {
           {
             icon: "📁",
             label: "Total Drawings",
-            value: ALL_DRAWINGS.length,
+            value: drawings.length,
             ic: "dsi-blue",
           },
           {
@@ -803,6 +1343,12 @@ export default function DrawingRegister({ currentRole = "mep" }) {
             icon: "🏗️",
             label: "STR Drawings",
             value: counts.STR,
+            ic: "dsi-green",
+          },
+          {
+            icon: "🏆",
+            label: "Finalized",
+            value: finalizedCount,
             ic: "dsi-green",
           },
           {
@@ -848,7 +1394,6 @@ export default function DrawingRegister({ currentRole = "mep" }) {
 
       {/* ── CONTROLS BAR ── */}
       <div className="dr-controls">
-        {/* search */}
         <div className="dr-search">
           <svg
             width="13"
@@ -868,8 +1413,6 @@ export default function DrawingRegister({ currentRole = "mep" }) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-
-        {/* floor filter */}
         <select
           className="dr-filter-select"
           value={floorFilter}
@@ -881,8 +1424,6 @@ export default function DrawingRegister({ currentRole = "mep" }) {
             </option>
           ))}
         </select>
-
-        {/* status filter */}
         <select
           className="dr-filter-select"
           value={statusFilter}
@@ -896,9 +1437,7 @@ export default function DrawingRegister({ currentRole = "mep" }) {
           <option value="Issued for Coordination">
             Issued for Coordination
           </option>
-          <option value="For Review">For Review</option>
         </select>
-
         <div className="dr-spacer" />
         <span className="dr-count">
           {visible.length} drawing{visible.length !== 1 ? "s" : ""}
@@ -916,23 +1455,32 @@ export default function DrawingRegister({ currentRole = "mep" }) {
 
         {visible.map((d) => {
           const owned = canUpload(currentRole, d.disc);
-          const discIcon = DISC_ICON[d.disc];
+          const canApproveThis = canApprove(currentRole, d.disc);
+          const isFlagged = d.flag || !!clashFlags[d.id];
+          const fullyApproved = isFullyApproved(d.id, d.disc, approvals);
+          const myApproval = approvals[d.id]?.[currentRole] ?? false;
 
           return (
-            <div key={d.id} className={`dr-row ${DISC_ROW[d.disc]}`}>
-              {/* avatar */}
+            <div
+              key={d.id}
+              className={`dr-row ${DISC_ROW[d.disc]}${fullyApproved ? " row-finalized" : ""}`}
+            >
               <div className={`dr-row-avatar ${DISC_AVA[d.disc]}`}>
-                {discIcon}
+                {DISC_ICON[d.disc]}
               </div>
 
-              {/* name + tags */}
               <div className="dr-row-main">
                 <span className="dr-row-name">{d.name}</span>
                 <div className="dr-row-tags">
                   <span className={`dr-badge ${DISC_BADGE[d.disc]}`}>
                     {d.subDisc}
                   </span>
-                  {d.flag && <span className="dr-badge drb-red">🚩 Clash</span>}
+                  {isFlagged && (
+                    <span className="dr-badge drb-red">🚩 Clash</span>
+                  )}
+                  {fullyApproved && (
+                    <span className="dr-badge drb-finalized">🏆 Finalized</span>
+                  )}
                   {!owned && (
                     <span className="dr-readonly-tag">🔒 Read Only</span>
                   )}
@@ -940,7 +1488,6 @@ export default function DrawingRegister({ currentRole = "mep" }) {
               </div>
 
               <div className="dr-divider" />
-
               <div className="dr-meta" style={{ width: 100 }}>
                 <span className="dr-meta-label">Drawing No.</span>
                 <span
@@ -950,60 +1497,42 @@ export default function DrawingRegister({ currentRole = "mep" }) {
                   {d.number}
                 </span>
               </div>
-
               <div className="dr-divider" />
-
               <div className="dr-meta" style={{ width: 90 }}>
                 <span className="dr-meta-label">Floor</span>
                 <span className="dr-meta-value">{d.floor}</span>
               </div>
-
               <div className="dr-divider" />
-
               <div className="dr-meta" style={{ width: 64 }}>
                 <span className="dr-meta-label">Revision</span>
                 <span
-                  className={`dr-meta-value dr-meta-mono ${
-                    d.disc === "MEP"
-                      ? "dr-meta-mep"
-                      : d.disc === "ARCH"
-                        ? "dr-meta-arch"
-                        : "dr-meta-str"
-                  }`}
+                  className={`dr-meta-value dr-meta-mono ${d.disc === "MEP" ? "dr-meta-mep" : d.disc === "ARCH" ? "dr-meta-arch" : "dr-meta-str"}`}
                 >
                   {d.rev}
                 </span>
               </div>
-
               <div className="dr-divider" />
-
               <div className="dr-meta" style={{ width: 55 }}>
                 <span className="dr-meta-label">Size</span>
                 <span className="dr-meta-value dr-meta-mono">{d.size}</span>
               </div>
-
               <div className="dr-divider" />
-
               <div className="dr-meta" style={{ width: 88 }}>
                 <span className="dr-meta-label">Uploaded</span>
                 <span className="dr-meta-value">{d.date}</span>
               </div>
-
               <div className="dr-divider" />
-
               <div className="dr-meta" style={{ width: 130 }}>
                 <span className="dr-meta-label">Status</span>
                 <span
-                  className={`dr-pill ${STATUS_PILL[d.status] || "drp-review"}`}
+                  className={`dr-pill ${fullyApproved ? "drp-finalized" : STATUS_PILL[d.status] || "drp-review"}`}
                 >
-                  {d.status}
+                  {fullyApproved ? "🏆 Finalized" : d.status}
                 </span>
               </div>
 
-              {/* spacer */}
               <div className="dr-spacer-row" />
 
-              {/* actions */}
               <div className="dr-row-actions">
                 <button className="dr-btn-icon" title="View drawing">
                   👁
@@ -1011,6 +1540,11 @@ export default function DrawingRegister({ currentRole = "mep" }) {
                 <button className="dr-btn-icon" title="Download">
                   ⬇
                 </button>
+
+                {/* Approve button — eligible non-owners only, not yet finalized */}
+
+                {/* Owner sees approval status */}
+
                 <button
                   className="dr-btn-outline"
                   style={{ padding: "6px 12px", fontSize: 11 }}
@@ -1018,6 +1552,7 @@ export default function DrawingRegister({ currentRole = "mep" }) {
                 >
                   🗂 Versions
                 </button>
+
                 {owned && (
                   <a
                     href={
@@ -1042,7 +1577,38 @@ export default function DrawingRegister({ currentRole = "mep" }) {
         <VersionsPanel
           drawing={versionsFor}
           role={currentRole}
+          clashFlags={clashFlags}
+          approvals={approvals}
+          drawingStatuses={drawingStatuses}
           onClose={() => setVersionsFor(null)}
+          onOpenClashModal={(drawing) => setClashModal(drawing)}
+          onRemoveClash={handleRemoveClash}
+          onOpenApproval={(drawing) => {
+            setVersionsFor(null);
+            setApprovalModal(drawing);
+          }}
+          onStatusChange={handleStatusChange}
+        />
+      )}
+
+      {/* ── CLASH FLAG MODAL ── */}
+      {clashModal && (
+        <ClashFlagModal
+          drawing={clashModal}
+          onSubmit={handleClashSubmit}
+          onClose={() => setClashModal(null)}
+        />
+      )}
+
+      {/* ── APPROVAL MODAL ── */}
+      {approvalModal && (
+        <ApprovalModal
+          drawing={approvalModal}
+          role={currentRole}
+          approvals={approvals}
+          onApprove={handleApprove}
+          onWithdraw={handleWithdraw}
+          onClose={() => setApprovalModal(null)}
         />
       )}
 

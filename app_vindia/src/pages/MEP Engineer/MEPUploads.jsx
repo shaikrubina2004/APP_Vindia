@@ -1,4 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useProject } from "../../context/ProjectContext";
+import { API } from "../../services/authService";
 import "../../styles/MEPEngineer.css";
 
 const NOTIFY_TEAMS = [
@@ -61,7 +63,25 @@ const GUIDELINES = [
 const FILE_ICONS = { dwg: "📐", dxf: "📐", pdf: "📄", rvt: "🏗️", ifc: "📐" };
 
 export default function MEPUpload() {
+  const { activeProject } = useProject();
+  const [floors, setFloors] = useState([]);
+  const [formData, setFormData] = useState({
+    name: "",
+    discipline: "",
+    drawing_number: "",
+    drawing_type: "Layout",
+    revision_number: "",
+    title: "",
+    change_notes: "",
+    floor_id: "",
+  });
   const [queued, setQueued] = useState([]);
+  useEffect(() => {
+    if (!activeProject) return;
+    API.get(`/drawings/floors/${activeProject.id}`)
+      .then((res) => setFloors(res.data))
+      .catch((err) => console.error("Failed to load floors:", err));
+  }, [activeProject]);
   const [notify, setNotify] = useState(() => {
     const n = {};
     NOTIFY_TEAMS.forEach((t) => {
@@ -77,6 +97,7 @@ export default function MEPUpload() {
 
   const addFiles = (files) => {
     const items = Array.from(files).map((f) => ({
+      file: f, // keep actual File object
       name: f.name,
       size: (f.size / 1024 / 1024).toFixed(1) + " MB",
       prog: 0,
@@ -85,27 +106,49 @@ export default function MEPUpload() {
   };
   const removeFile = (i) => setQueued((p) => p.filter((_, idx) => idx !== i));
 
-  const startUpload = () => {
-    if (!queued.length) return;
+  const startUpload = async () => {
+    if (!queued.length || !queued[0].file) return;
     setUploading(true);
     setProgress(0);
-    const iv = setInterval(() => {
-      setProgress((prev) => {
-        const next = prev + Math.random() * 14;
-        if (next >= 100) {
-          clearInterval(iv);
-          setTimeout(() => {
-            setUploading(false);
-            setQueued([]);
-            setProgress(0);
-            setToast(true);
-            setTimeout(() => setToast(false), 3500);
-          }, 300);
-          return 100;
-        }
-        return next;
+
+    const data = new FormData();
+    data.append("file", queued[0].file);
+    data.append("project_id", activeProject.id);
+    data.append("name", formData.name || queued[0].name);
+    data.append("discipline", formData.discipline);
+    data.append("sub_discipline", formData.discipline);
+    data.append("drawing_number", formData.drawing_number);
+    data.append("drawing_type", formData.drawing_type);
+    data.append("floor_id", formData.floor_id);
+    data.append("revision_number", formData.revision_number);
+    data.append("title", formData.title || formData.name);
+    data.append("change_notes", formData.change_notes);
+    data.append("uploaded_by", 1); // replace with auth user id
+
+    try {
+      // Simulate progress while uploading
+      const iv = setInterval(() => {
+        setProgress((p) => (p < 85 ? p + Math.random() * 10 : p));
+      }, 200);
+
+      await API.post("/drawings", data, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
-    }, 120);
+
+      clearInterval(iv);
+      setProgress(100);
+      setTimeout(() => {
+        setUploading(false);
+        setQueued([]);
+        setProgress(0);
+        setToast(true);
+        setTimeout(() => setToast(false), 3500);
+      }, 300);
+    } catch (err) {
+      setUploading(false);
+      console.error("Upload failed:", err);
+      alert("Upload failed: " + (err.response?.data?.error ?? err.message));
+    }
   };
 
   const toggleNotify = (key) => setNotify((p) => ({ ...p, [key]: !p[key] }));
@@ -231,15 +274,16 @@ export default function MEPUpload() {
                 style={{ gridTemplateColumns: "repeat(5, 1fr)" }}
               >
                 <div className="edit-form-group">
-                  <label>
-                    Project <span style={{ color: "var(--danger)" }}>*</span>
-                  </label>
-                  <select className="edit-form-input">
-                    <option value="">Select project</option>
-                    <option>Vindia Tower — Block A</option>
-                    <option>Greenfield Mall — Phase 2</option>
-                    <option>Metro Station — Sector 14</option>
-                  </select>
+                  <label>Project</label>
+                  <input
+                    className="edit-form-input"
+                    value={activeProject?.name ?? ""}
+                    readOnly
+                    style={{
+                      background: "var(--bg-light)",
+                      color: "var(--text-secondary)",
+                    }}
+                  />
                 </div>
                 <div className="edit-form-group">
                   <label>
@@ -273,32 +317,25 @@ export default function MEPUpload() {
                     Zone / Floor{" "}
                     <span style={{ color: "var(--danger)" }}>*</span>
                   </label>
-                  <select className="edit-form-input">
-                    <option value="">Select</option>
-                    {[
-                      "Basement",
-                      "Ground Floor",
-                      "Level 1",
-                      "Level 2",
-                      "Level 3",
-                      "All Floors",
-                      "Rooftop",
-                    ].map((z) => (
-                      <option key={z}>{z}</option>
+                  <select
+                    className="edit-form-input"
+                    value={formData.floor_id}
+                    onChange={(e) =>
+                      setFormData((p) => ({ ...p, floor_id: e.target.value }))
+                    }
+                  >
+                    <option value="">Select floor</option>
+                    {floors.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div className="edit-form-group">
                   <label>Drawing Status</label>
-                  <select className="edit-form-input">
-                    {[
-                      "Issued for Coordination",
-                      "Issued for Construction",
-                      "For Review",
-                      "As-Built",
-                    ].map((s) => (
-                      <option key={s}>{s}</option>
-                    ))}
+                  <select className="edit-form-input" disabled>
+                    <option>Issued for Coordination</option>
                   </select>
                 </div>
               </div>

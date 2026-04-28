@@ -183,7 +183,7 @@ export default function MEPDailyLog() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: "1fr 1fr 1fr",
               gap: 12,
               marginTop: 12,
             }}
@@ -204,6 +204,35 @@ export default function MEPDailyLog() {
                 className="edit-form-input"
                 placeholder="e.g. 50m HDPE pipe, 4 AHU units"
               />
+            </div>
+            <div className="edit-form-group">
+              <label>
+                Completion % for this Floor & Discipline
+                <span style={{ color: "var(--danger)" }}> *</span>
+              </label>
+              <div style={{ position: "relative" }}>
+                <input
+                  type="number"
+                  className="edit-form-input"
+                  placeholder="e.g. 68"
+                  min={0}
+                  max={100}
+                  style={{ paddingRight: 32 }}
+                />
+                <span
+                  style={{
+                    position: "absolute",
+                    right: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  %
+                </span>
+              </div>
             </div>
           </div>
 

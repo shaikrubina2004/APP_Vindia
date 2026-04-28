@@ -173,9 +173,9 @@ const AppRoutes = () => {
       />
 
       <Route
-        path="/projects"
+        path="/project-manager/dashboard"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.CEO, ...PROJECT_ROLES]}>
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
             <ProjectManagerLayout>
               <ProjectManagement />
             </ProjectManagerLayout>
@@ -232,7 +232,7 @@ const AppRoutes = () => {
       <Route
         path="/hr"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
             <HRLayout>
               <HRDashboard />
             </HRLayout>
@@ -243,7 +243,7 @@ const AppRoutes = () => {
       <Route
         path="/hr/employees"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
             <HRLayout>
               <Employees />
             </HRLayout>
@@ -254,7 +254,7 @@ const AppRoutes = () => {
       <Route
         path="/hr/add-employee"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
             <HRLayout>
               <AddEmployee />
             </HRLayout>
@@ -265,7 +265,7 @@ const AppRoutes = () => {
       <Route
         path="/hr/employee/:id"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
             <HRLayout>
               <EmployeeDetails />
             </HRLayout>
@@ -276,7 +276,7 @@ const AppRoutes = () => {
       <Route
         path="/hr/attendance"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
             <HRLayout>
               <Attendance />
             </HRLayout>
@@ -287,7 +287,7 @@ const AppRoutes = () => {
       <Route
         path="/hr/documents"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
             <HRLayout>
               <Documents />
             </HRLayout>
@@ -298,7 +298,7 @@ const AppRoutes = () => {
       <Route
         path="/hr/payroll"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
             <HRLayout>
               <Payroll />
             </HRLayout>
@@ -309,7 +309,7 @@ const AppRoutes = () => {
       <Route
         path="/hr/travel"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
             <HRLayout>
               <Travel />
             </HRLayout>
@@ -320,7 +320,7 @@ const AppRoutes = () => {
       <Route
         path="/hr/leaves"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.HR, ROLES.CEO]}>
+          <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
             <HRLayout>
               <Leaves />
             </HRLayout>

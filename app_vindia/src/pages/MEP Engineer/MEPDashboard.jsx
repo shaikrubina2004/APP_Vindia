@@ -242,6 +242,7 @@ const QUICK = [
 export default function MEPDashboard() {
   const [dateStr, setDateStr] = useState("");
   const { activeProject } = useProject();
+
   const [openDisc, setOpenDisc] = useState("M");
 
   useEffect(() => {
@@ -254,6 +255,7 @@ export default function MEPDashboard() {
       }),
     );
   }, []);
+  if (!activeProject) return null; // ← add this line
 
   const milestones = MILESTONE_DATA[activeProject.id] || MILESTONE_DATA.p1;
   const overallM = calcOverall(milestones.M);
