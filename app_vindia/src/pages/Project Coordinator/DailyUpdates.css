@@ -210,7 +210,7 @@
 ══════════════════════════════ */
 .du-task-table {
   background: #f8fbff; border: 1.5px solid #e2eaf4;
-  border-radius: 12px; overflow: hidden; margin-bottom: 12px;
+  border-radius: 12px; overflow: visible; margin-bottom: 12px;
 }
 .du-task-table__head {
   display: grid;
@@ -263,8 +263,8 @@
 .du-approvals-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  align-items: end;
+  gap: 16px;
+  align-items: start;
 }
 .du-field--no-mb { margin-bottom: 0; }
 .du-field-hint-inline {
@@ -436,4 +436,20 @@
   .du-project-options  { flex-direction:column; }
   .du-task-table__head { display:none; }
   .du-task-row, .du-meeting-row { grid-template-columns:1fr 36px; grid-template-rows:auto auto auto; }
+}
+
+
+
+/* FIX SELECT DROPDOWN OVERFLOW ISSUE */
+.du-form-card,
+.du-section,
+.du-section__body,
+.du-approvals-row,
+.du-field {
+  overflow: visible !important;
+}
+
+.du-select {
+  position: relative;
+  z-index: 10;
 }

@@ -1,35 +1,97 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import "./NotificationBell.css";
 
 const TYPE_CFG = {
-  payment:  { label: "Payment",  color: "#2563eb", bg: "#eff6ff" },
-  incident: { label: "Incident", color: "#dc2626", bg: "#fef2f2" },
-  work:     { label: "Work",     color: "#ca8a04", bg: "#fefce8" },
-  approval: { label: "Approval", color: "#7c3aed", bg: "#f5f3ff" },
+  payment:  { label: "Payment",   color: "#2563eb", bg: "#eff6ff" },
+  incident: { label: "Incident",  color: "#dc2626", bg: "#fef2f2" },
+  work:     { label: "Work",      color: "#ca8a04", bg: "#fefce8" },
+  task:     { label: "Task",      color: "#7c3aed", bg: "#f5f3ff" },
+  milestone:{ label: "Milestone", color: "#0891b2", bg: "#ecfeff" },
 };
-export default function NotificationBell({ notifications = [] }) {
-  const [open, setOpen] = useState(false);
+
+const SEV_COLOR = {
+  critical: "#dc2626",
+  warn:     "#f59e0b",
+  info:     "#2563eb",
+  ok:       "#10b981",
+};
+
+export default function NotificationBell({ userId, onMarkRead, onMarkAllRead }) {
+  const navigate = useNavigate();
+  const [open,   setOpen]   = useState(false);
   const [filter, setFilter] = useState("all");
-const [notifs, setNotifs] = useState([]);
+  const [notifs, setNotifs] = useState([]);
 
-useEffect(() => {
-  setNotifs(notifications);
-}, [notifications]);
+  // ── Fetch from backend ──
+  const fetchNotifs = async () => {
+    if (!userId) return;
+    try {
+      const res  = await fetch(`/api/pc-notifications/${userId}`);
+      const data = await res.json();
+      setNotifs(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Notification fetch error:", err);
+    }
+  };
 
-  const unreadCount = notifs.filter(n => !n.read).length;
+  // Initial fetch
+  useEffect(() => {
+    fetchNotifs();
+  }, [userId]);
 
-  const markRead = (id) => setNotifs(p => p.map(n => n.id === id ? { ...n, read: true } : n));
-  const markAllRead = () => setNotifs(p => p.map(n => ({ ...n, read: true })));
+  // ── Poll every 30 seconds ──
+  useEffect(() => {
+    if (!userId) return;
+    const interval = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(interval);
+  }, [userId]);
+
+  const unreadCount = notifs.filter(n => !n.is_read).length;
+
+  const markRead = async (id) => {
+    setNotifs(p => p.map(n => n.id === id ? { ...n, is_read: true } : n));
+    try {
+      await fetch(`/api/pc-notifications/${id}/read`, { method: "PATCH" });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const markAllRead = async () => {
+    setNotifs(p => p.map(n => ({ ...n, is_read: true })));
+    try {
+      await fetch(`/api/pc-notifications/read-all/${userId}`, { method: "PATCH" });
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const shown = filter === "all"
     ? notifs
     : notifs.filter(n => n.type === filter);
 
-    const SEV_COLOR = { critical: "#dc2626", warn: "#f59e0b", info: "#2563eb", ok: "#10b981" };
+  const handleGoToPage = (e, link, id) => {
+    e.stopPropagation();
+    markRead(id);
+    setOpen(false);
+    navigate(link);
+  };
+
+  // ── Time formatter ──
+  const formatTime = (ts) => {
+    const d    = new Date(ts);
+    const now  = new Date();
+    const diff = Math.floor((now - d) / 60000); // minutes
+    if (diff < 1)  return "Just now";
+    if (diff < 60) return `${diff}m ago`;
+    if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+    return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  };
 
   return (
     <>
-      {/* BELL BUTTON — same class as existing navbar icon btns */}
+      {/* Bell Button */}
       <button
         className="navbar-icon-btn notif-bell-btn"
         onClick={() => setOpen(o => !o)}
@@ -45,7 +107,7 @@ useEffect(() => {
         )}
       </button>
 
-      {/* PANEL OVERLAY */}
+      {/* Panel */}
       {open && (
         <div className="notif-overlay" onClick={() => setOpen(false)}>
           <div className="notif-panel" onClick={e => e.stopPropagation()}>
@@ -70,7 +132,7 @@ useEffect(() => {
 
             {/* Filters */}
             <div className="notif-filters">
-              {["all", "payment", "incident", "work", "approval"].map(f => (
+              {["all", "milestone", "work", "incident", "task", "payment"].map(f => (
                 <button key={f}
                   className={`notif-filter-btn ${filter === f ? "active" : ""}`}
                   onClick={() => setFilter(f)}>
@@ -81,30 +143,37 @@ useEffect(() => {
 
             {/* List */}
             <div className="notif-list">
-             {shown.length === 0 && (
-  <p className="notif-empty">
-    No alerts in this category.
-  </p>
-)}
+              {shown.length === 0 && (
+                <p className="notif-empty">No alerts in this category.</p>
+              )}
               {shown.map(n => {
                 const tc = TYPE_CFG[n.type] || TYPE_CFG.work;
                 return (
                   <div key={n.id}
-                    className={`notif-item ${n.read ? "read" : "unread"}`}
+                    className={`notif-item ${n.is_read ? "read" : "unread"}`}
                     onClick={() => markRead(n.id)}>
                     <div className="notif-item__dot"
-                      style={{ background: SEV_COLOR[n.severity] }} />
+                      style={{ background: SEV_COLOR[n.severity] || SEV_COLOR.info }} />
                     <div className="notif-item__body">
                       <div className="notif-item__top">
                         <span className="notif-type-chip"
                           style={{ background: tc.bg, color: tc.color }}>
                           {tc.label}
                         </span>
-                        <span className="notif-item__time">{n.time}</span>
-                        {!n.read && <span className="notif-unread-dot" />}
+                        <span className="notif-item__time">
+                          {formatTime(n.created_at)}
+                        </span>
+                        {!n.is_read && <span className="notif-unread-dot" />}
                       </div>
                       <p className="notif-item__title">{n.title}</p>
-                      <p className="notif-item__desc">{n.desc}</p>
+                      <p className="notif-item__desc">{n.description}</p>
+                      {n.link && (
+                        <button
+                          className="notif-goto"
+                          onClick={(e) => handleGoToPage(e, n.link, n.id)}>
+                          Go to page →
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

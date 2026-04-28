@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../config/db");
+const { insertNotification } = require("../controllers/pcNotificationsController");
 
 /* =========================================================
    CREATE DAILY UPDATE
@@ -14,23 +15,18 @@ router.post("/", async (req, res) => {
       day,
       work,
       progress,
-
       workers,
       absent,
       cementUsed,
       steelUsed,
       materialShort,
-
       issues,
       severity,
       delayHours,
       delayImpact,
-
       pending,
       next,
       safety,
-
-      // 🔥 NEW FIELDS
       task_updates,
       meetings,
       coord_notes,
@@ -45,7 +41,6 @@ router.post("/", async (req, res) => {
        pending, next, safety,
        task_updates, meetings, coord_notes, approval_from,
        status)
-
        VALUES (
          $1,$2,$3,$4,$5,$6,
          $7,$8,$9,$10,$11,
@@ -56,40 +51,42 @@ router.post("/", async (req, res) => {
        )
        RETURNING *`,
       [
-        project_id,
-        coordinator_id,
-        date,
-        day,
-        work,
-        progress,
-
-        workers || 0,
-        absent || 0,
-        cementUsed,
-        steelUsed,
-        materialShort,
-
-        issues,
-        severity || "none",
-        delayHours || 0,
-        delayImpact,
-
-        pending,
-        next,
-        safety,
-
-        task_updates || "[]",
-        meetings || "[]",
-        coord_notes || "",
+        project_id, coordinator_id, date, day, work, progress,
+        workers || 0, absent || 0, cementUsed, steelUsed, materialShort,
+        issues, severity || "none", delayHours || 0, delayImpact,
+        pending, next, safety,
+        task_updates || "[]", meetings || "[]", coord_notes || "",
         approval_from || "Project Manager"
       ]
     );
 
-    // 🔥 UPDATE PROJECT PROGRESS
+    // Update project progress
     await pool.query(
       `UPDATE projects SET progress = $1 WHERE id = $2`,
       [progress || 0, project_id]
     );
+
+    // ── Notification trigger ──────────────────────────────
+    try {
+      const projectResult = await pool.query(
+        `SELECT name FROM projects WHERE id = $1`,
+        [project_id]
+      );
+      const projectName = projectResult.rows[0]?.name || `Project #${project_id}`;
+
+      await insertNotification(
+        coordinator_id,
+        "work",
+        "Daily Update Submitted",
+        `Update for ${projectName} submitted successfully`,
+        "/project-coordinator/daily",
+        "ok"
+      );
+    } catch (notifErr) {
+      // Don't fail the main request if notification fails
+      console.error("Notification error:", notifErr.message);
+    }
+    // ─────────────────────────────────────────────────────
 
     res.status(201).json(result.rows[0]);
 
@@ -100,7 +97,7 @@ router.post("/", async (req, res) => {
 });
 
 /* =========================================================
-   GET ALL UPDATES
+   GET ALL UPDATES FOR A PROJECT
 ========================================================= */
 router.get("/project/:project_id", async (req, res) => {
   try {
@@ -122,88 +119,39 @@ router.get("/project/:project_id", async (req, res) => {
     res.status(500).json({ message: "Error fetching updates" });
   }
 });
+
 /* =========================================================
    UPDATE DAILY UPDATE
 ========================================================= */
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-
     const {
-      work,
-      progress,
-
-      workers,
-      absent,
-      cementUsed,
-      steelUsed,
-      materialShort,
-
-      issues,
-      severity,
-      delayHours,
-      delayImpact,
-
-      pending,
-      next,
-      safety,
-
-      // 🔥 NEW FIELDS
-      task_updates,
-      meetings,
-      coord_notes,
-      approval_from,
-
-      project_id
+      work, progress, workers, absent, cementUsed, steelUsed,
+      materialShort, issues, severity, delayHours, delayImpact,
+      pending, next, safety, task_updates, meetings,
+      coord_notes, approval_from, project_id
     } = req.body;
 
     const result = await pool.query(
       `UPDATE pc_daily_updates SET
-        work=$1,
-        progress=$2,
-        workers=$3,
-        absent=$4,
-        cement_used=$5,
-        steel_used=$6,
-        material_short=$7,
-        issues=$8,
-        severity=$9,
-        delay_hours=$10,
-        delay_impact=$11,
-        pending=$12,
-        next=$13,
-        safety=$14,
-        task_updates=$15,
-        meetings=$16,
-        coord_notes=$17,
-        approval_from=$18,
-        status='pending'
+        work=$1, progress=$2, workers=$3, absent=$4,
+        cement_used=$5, steel_used=$6, material_short=$7,
+        issues=$8, severity=$9, delay_hours=$10, delay_impact=$11,
+        pending=$12, next=$13, safety=$14,
+        task_updates=$15, meetings=$16, coord_notes=$17,
+        approval_from=$18, status='pending'
        WHERE id=$19
        RETURNING *`,
       [
-        work,
-        progress,
-        workers,
-        absent,
-        cementUsed,
-        steelUsed,
-        materialShort,
-        issues,
-        severity || "none",
-        delayHours || 0,
-        delayImpact,
-        pending,
-        next,
-        safety,
-        task_updates || "[]",
-        meetings || "[]",
-        coord_notes || "",
-        approval_from || "Project Manager",
-        id
+        work, progress, workers, absent, cementUsed, steelUsed,
+        materialShort, issues, severity || "none", delayHours || 0,
+        delayImpact, pending, next, safety,
+        task_updates || "[]", meetings || "[]", coord_notes || "",
+        approval_from || "Project Manager", id
       ]
     );
 
-    // 🔥 UPDATE PROJECT PROGRESS
     if (project_id) {
       await pool.query(
         `UPDATE projects SET progress = $1 WHERE id = $2`,
@@ -220,6 +168,21 @@ router.put("/:id", async (req, res) => {
 });
 
 /* =========================================================
+   GET ROLES
+========================================================= */
+router.get("/roles", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name FROM roles ORDER BY name`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("ROLES ERROR:", err);
+    res.status(500).json({ message: "Failed to fetch roles" });
+  }
+});
+
+/* =========================================================
    DELETE
 ========================================================= */
 router.delete("/:id", async (req, res) => {
@@ -228,9 +191,7 @@ router.delete("/:id", async (req, res) => {
       `DELETE FROM pc_daily_updates WHERE id = $1`,
       [req.params.id]
     );
-
     res.json({ message: "Deleted successfully" });
-
   } catch (err) {
     console.error("DELETE ERROR:", err);
     res.status(500).json({ message: "Delete failed" });

@@ -4,63 +4,17 @@ import { useAuth } from "../../context/useAuth";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import "../../styles/layout/Navbar.css";
 import logo from "../../assets/logo.png.png";
-function Navbar({ notificationSlot }) {
+
+function Navbar() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  console.log("ROLE:", user?.role);
-  const [isSearchActive, setIsSearchActive] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [isSearchActive, setIsSearchActive]   = useState(false);
+  const [isProfileOpen,  setIsProfileOpen]    = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen]   = useState(false);
 
-  const [userNotifications, setUserNotifications] = useState([]);
-
-  // NEW — wrap everything in async function:
-  useEffect(() => {
-    const loadNotifications = async () => {
-      if (user?.role === "quantity_surveyor") {
-        setUserNotifications([
-          {
-            id: 1,
-            type: "work",
-            severity: "warn",
-            title: "BOQ mismatch detected",
-            desc: "Check measurement vs BOQ",
-            time: "2 min ago",
-            read: false,
-          },
-          {
-            id: 2,
-            type: "payment",
-            severity: "critical",
-            title: "Steel cost exceeded",
-            desc: "Budget crossed by 12%",
-            time: "10 min ago",
-            read: false,
-          },
-          {
-            id: 3,
-            type: "approval",
-            severity: "info",
-            title: "Measurement pending approval",
-            desc: "Waiting for manager approval",
-            time: "30 min ago",
-            read: false,
-          },
-        ]);
-      } else if (user?.role && user.role !== "structural_engineer") {
-        // SE has its own bell — skip fetch for SE
-        try {
-          const res = await fetch(`/api/notifications?role=${user.role}`);
-          const data = await res.json();
-          setUserNotifications(data);
-        } catch {
-          setUserNotifications([]);
-        }
-      }
-    };
-
-    loadNotifications();
-  }, [user?.role]);
+  // ── REMOVED: old userNotifications state and fetch ──
+  // NotificationBell now handles its own fetching + polling internally
+  // Navbar only needs to pass userId and check the role
 
   const handleLogout = () => {
     setIsProfileOpen(false);
@@ -105,7 +59,8 @@ function Navbar({ notificationSlot }) {
 
       {/* Right Section - User Menu */}
       <div className="navbar-right">
-        {/* Quick Add Button */}
+
+        {/* Timesheet Button */}
         <button
           className="navbar-icon-btn timesheet-btn"
           onClick={() => navigate("/timesheet")}
@@ -124,6 +79,8 @@ function Navbar({ notificationSlot }) {
           </svg>
           <span>Timesheet</span>
         </button>
+
+        {/* Quick Add */}
         <div
           className="quick-add-wrapper"
           onMouseEnter={() => setIsQuickAddOpen(true)}
@@ -148,56 +105,28 @@ function Navbar({ notificationSlot }) {
               className="quick-add-item"
               onClick={() => navigate("/hr/add-employee")}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
               Add Employee
             </button>
             <button className="quick-add-item">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
               </svg>
               Create Project
             </button>
             <button className="quick-add-item">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
               Add Lead
             </button>
             <button className="quick-add-item">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
                 <polyline points="13 2 13 9 20 9"></polyline>
               </svg>
@@ -206,11 +135,13 @@ function Navbar({ notificationSlot }) {
           </div>
         </div>
 
-        {/* Notification Icon */}
-        {notificationSlot ? (
-          notificationSlot
-        ) : (
-          <NotificationBell notifications={userNotifications} />
+        {/* ── Notification Bell ──────────────────────────────────
+            Only renders for project_coordinator role.
+            NotificationBell fetches its own data using userId
+            and polls every 30 seconds automatically.
+        ─────────────────────────────────────────────────────── */}
+        {user?.role === "project_coordinator" && (
+          <NotificationBell userId={user.id} />
         )}
 
         {/* Profile Dropdown */}
@@ -235,7 +166,6 @@ function Navbar({ notificationSlot }) {
             </div>
           </button>
 
-          {/* Dropdown Menu */}
           <div className={`dropdown-menu ${isProfileOpen ? "show" : ""}`}>
             <div className="dropdown-header">
               <div className="dropdown-avatar">
@@ -258,42 +188,21 @@ function Navbar({ notificationSlot }) {
             </div>
             <div className="dropdown-divider"></div>
             <button className="dropdown-item">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
               Profile
             </button>
             <button className="dropdown-item">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="1"></circle>
                 <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m2.12 2.12l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m2.12-2.12l4.24-4.24M19.78 19.78l-4.24-4.24m-2.12-2.12l-4.24-4.24"></path>
               </svg>
               Settings
             </button>
             <button className="dropdown-item">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path>
                 <path d="M12 1v6m0 6v6"></path>
               </svg>
@@ -301,14 +210,7 @@ function Navbar({ notificationSlot }) {
             </button>
             <div className="dropdown-divider"></div>
             <button className="dropdown-item logout" onClick={handleLogout}>
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                 <polyline points="16 17 21 12 16 7"></polyline>
                 <line x1="21" y1="12" x2="9" y2="12"></line>
@@ -317,6 +219,7 @@ function Navbar({ notificationSlot }) {
             </button>
           </div>
         </div>
+
       </div>
     </nav>
   );

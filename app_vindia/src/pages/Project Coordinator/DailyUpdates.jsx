@@ -1,3 +1,4 @@
+import axios from "axios";
 import React, { useState, useEffect } from "react";
 import { createUpdate, getUpdates, updateUpdate } 
 from "../../services/pcDailyUpdateService";
@@ -22,8 +23,6 @@ const TASK_STATUS_OPTIONS = [
   { value: "delayed",     label: "Delayed",     color: "#ef4444", bg: "#fee2e2", icon: "!" },
   { value: "on-hold",     label: "On Hold",     color: "#f59e0b", bg: "#fff3cd", icon: "⏸" },
 ];
-
-const MEETING_TYPES = ["Client", "Architect", "Contractor", "Consultant", "Internal", "Vendor"];
 
 const EMPTY_FORM = {
   projectId:       "",
@@ -105,17 +104,41 @@ const TaskUpdateRow = ({ item, onChange, onRemove }) => (
 /* ─────────────────────────────────────────
    MEETING ROW
 ───────────────────────────────────────── */
-const MeetingRow = ({ item, onChange, onRemove }) => (
+const MeetingRow = ({ item, onChange, onRemove, roles }) => (
   <div className="du-meeting-row">
-    <select className="du-select du-select--sm" value={item.type}
-      onChange={e => onChange({ ...item, type: e.target.value })}>
-      {MEETING_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+    
+    <select
+      className="du-select du-select--sm"
+      value={item.type}
+      onChange={e => onChange({ ...item, type: e.target.value })}
+    >
+      <option value="">Select Role</option>
+
+      {roles.map(role => (
+        <option key={role.id} value={role.name}>
+          {role.name}
+        </option>
+      ))}
     </select>
-    <input className="du-input du-input--flex" placeholder="With whom (name / company)"
-      value={item.with} onChange={e => onChange({ ...item, with: e.target.value })} />
-    <input className="du-input du-input--flex" placeholder="Decision / outcome"
-      value={item.decision} onChange={e => onChange({ ...item, decision: e.target.value })} />
-    <button className="du-row-del" onClick={onRemove} title="Remove">✕</button>
+
+    <input
+      className="du-input du-input--flex"
+      placeholder="With whom (name / company)"
+      value={item.with}
+      onChange={e => onChange({ ...item, with: e.target.value })}
+    />
+
+    <input
+      className="du-input du-input--flex"
+      placeholder="Decision / outcome"
+      value={item.decision}
+      onChange={e => onChange({ ...item, decision: e.target.value })}
+    />
+
+    <button className="du-row-del" onClick={onRemove} title="Remove">
+      ✕
+    </button>
+
   </div>
 );
 
@@ -127,6 +150,7 @@ export default function DailyUpdates() {
   const [logs, setLogs] = useState([]);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [projects, setProjects] = useState([]); // ✅ CORRECT PLACE
+  const [roles, setRoles] = useState([]);
 
   const [editId, setEditId] = useState(null);
   const [toast, setToast] = useState(null);
@@ -134,9 +158,12 @@ export default function DailyUpdates() {
   const [submitting, setSubmit] = useState(false);
   const [activeTab, setActiveTab] = useState("form");
     // ✅ LOAD PROJECTS ON PAGE LOAD
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  
+
+useEffect(() => {
+  fetchProjects();
+  fetchRoles();
+}, []);
 
   useEffect(() => {
   if (form.projectId) {
@@ -189,6 +216,21 @@ const fetchProjects = async () => {
     console.error("PROJECT FETCH ERROR:", err);
   }
 };
+const fetchRoles = async () => {
+  try {
+    const res = await axios.get(
+      "http://localhost:5000/api/pc-daily-updates/roles"
+    );
+
+    console.log("ROLES:", res.data);
+
+    setRoles(res.data); // ✅ no .data.data here
+
+  } catch (err) {
+    console.error("ROLE FETCH ERROR:", err);
+  }
+};
+
 
   const todayLog = logs.find(
   l =>
@@ -208,7 +250,10 @@ const fetchProjects = async () => {
   const removeTaskRow = (i) => set("taskUpdates", form.taskUpdates.filter((_, idx) => idx !== i));
 
   /* ── meeting helpers ── */
-  const addMeeting    = () => set("meetings", [...form.meetings, { type: "Client", with: "", decision: "" }]);
+  const addMeeting = () => set("meetings", [
+  ...form.meetings,
+  { type: "", with: "", decision: "" }   // ✅ EMPTY DEFAULT
+]);
   const updateMeeting = (i, val) => set("meetings", form.meetings.map((r, idx) => idx === i ? val : r));
   const removeMeeting = (i) => set("meetings", form.meetings.filter((_, idx) => idx !== i));
 
@@ -562,9 +607,13 @@ const fetchProjects = async () => {
                     <span></span>
                   </div>
                   {form.meetings.map((item, i) => (
-                    <MeetingRow key={i} item={item}
-                      onChange={val => updateMeeting(i, val)}
-                      onRemove={() => removeMeeting(i)} />
+                   <MeetingRow
+                    key={i}
+                    item={item}
+                    onChange={val => updateMeeting(i, val)}
+                    onRemove={() => removeMeeting(i)}
+                    roles={roles}   // ✅ IMPORTANT
+                  />
                   ))}
                 </div>
               )}
@@ -590,13 +639,19 @@ const fetchProjects = async () => {
               <div className="du-approvals-row">
                 <div className="du-field du-field--no-mb">
                   <label className="du-label">Approval / Action Awaited From <span className="du-field-hint-inline">— Who is blocking progress?</span></label>
-                  <select className="du-select" value={form.approvalFrom}
-                    onChange={e => set("approvalFrom", e.target.value)}>
-                    <option value="">— Select —</option>
-                    {["Project Manager","Client","Consultant","Architect","Contractor","Government"].map(v => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
-                  </select>
+                  <select
+                  className="du-select"
+                  value={form.approvalFrom}
+                  onChange={e => set("approvalFrom", e.target.value)}
+                >
+                  <option value="">— Select —</option>
+
+                  {roles.map(role => (
+                    <option key={role.id} value={role.name}>
+                      {role.name}
+                    </option>
+                  ))}
+                </select>
                 </div>
                 <div className="du-field du-field--no-mb">
                   <label className="du-label">What is pending / blocking?</label>

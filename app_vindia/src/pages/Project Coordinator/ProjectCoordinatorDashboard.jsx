@@ -187,23 +187,33 @@ const ProjectCoordinatorDashboard = () => {
   const [showAll, setShowAll] = useState(false); // ← NEW
 
   useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const res = await getProjects();
-        console.log("API DATA:", res.data);
-        setProjects(res.data);
-        if (res.data.length > 0) {
-          setSelected(res.data[0]);
-        }
-      } catch (err) {
-        console.error("Error fetching projects:", err);
-      } finally {
-        setPageLoading(false);
+  const fetchProjects = async () => {
+    try {
+      const res = await getProjects();
+      const data = res.data;
+
+      setProjects(data);
+
+      if (data.length > 0) {
+        // 🔥 SORT SAME AS CARDS
+        const sorted = [
+          ...data.filter(p => p.status === "IN PROGRESS"),
+          ...data.filter(p => p.status !== "IN PROGRESS"),
+        ];
+
+        setSelected(sorted[0]); // ✅ FIRST CARD WILL MATCH UI
       }
-    };
-    setPageLoading(true);
-    fetchProjects();
-  }, []);
+
+    } catch (err) {
+      console.error("Error fetching projects:", err);
+    } finally {
+      setPageLoading(false);
+    }
+  };
+
+  setPageLoading(true);
+  fetchProjects();
+}, []);
 
   const handleSelect = (proj) => {
     if (!proj || proj.id === selected?.id) return;
@@ -247,8 +257,8 @@ const ProjectCoordinatorDashboard = () => {
           <button className="coord-btn-outline" onClick={() => navigate("/project-coordinator/payments")}>
             Payments
           </button>
-          <button className="coord-btn-primary" onClick={() => navigate("/project-coordinator/tasks/create")}>
-            + Create Task
+          <button className="coord-btn-primary" onClick={() => navigate("/project-coordinator/milestone")}>
+            Milestone
           </button>
         </div>
       </div>
