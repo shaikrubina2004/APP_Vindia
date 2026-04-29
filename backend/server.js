@@ -59,7 +59,7 @@ const seNotificationRoutes = require("./routes/seNotificationRoutes");
 /* ── QS MODULES ───────────────────────────────── */
 const qsRoutes = require("./routes/qsRoutes");
 const boqRoutes = require("./routes/boqRoutes");
-const costReportRoutes = require("./routes/costReportRoutes");
+//const costReportRoutes = require("./routes/costReportRoutes");
 
 const app = express();
 
@@ -124,7 +124,7 @@ try {
   app.use("/api/qs", qsRoutes);
   app.use("/api/qs", qsRoutes);
  app.use("/api/boq", boqRoutes);
- app.use("/api/cost-report", costReportRoutes);
+ //app.use("/api/cost-report", costReportRoutes);
   /* ── Other Modules ───────────────── */
   app.use("/api/timesheets", timesheetRoutes);
   app.use("/api/daily-reports", dailyRoutes); // ✅ normal route
