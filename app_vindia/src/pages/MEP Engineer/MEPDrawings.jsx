@@ -1,404 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { useProject } from "../../context/ProjectContext";
+import { API } from "../../services/authService";
 import ProjectSwitcher from "../../components/project/ProjectSwitcher";
 import "../../styles/MEPEngineer.css";
 
 /* ═══════════════════════════════════════
    DRAWINGS DATA
 ═══════════════════════════════════════ */
-const DRAWINGS = {
-  p1: [
-    {
-      id: 1,
-      name: "HVAC Layout — Ground Floor",
-      disc: "M",
-      discLabel: "Mechanical",
-      discBadge: "badge-mep-m",
-      floor: "Ground Floor",
-      date: "Today",
-      size: "2.4 MB",
-      rev: "Rev-4",
-      latest: true,
-      flag: false,
-    },
-    {
-      id: 2,
-      name: "HVAC Layout — Level 1",
-      disc: "M",
-      discLabel: "Mechanical",
-      discBadge: "badge-mep-m",
-      floor: "Level 1",
-      date: "2 days ago",
-      size: "2.1 MB",
-      rev: "Rev-3",
-      latest: true,
-      flag: false,
-    },
-    {
-      id: 3,
-      name: "HVAC Layout — Level 2",
-      disc: "M",
-      discLabel: "Mechanical",
-      discBadge: "badge-mep-m",
-      floor: "Level 2",
-      date: "5 days ago",
-      size: "1.9 MB",
-      rev: "Rev-2",
-      latest: false,
-      flag: true,
-    },
-    {
-      id: 4,
-      name: "Chiller Plant Layout",
-      disc: "M",
-      discLabel: "Mechanical",
-      discBadge: "badge-mep-m",
-      floor: "Basement",
-      date: "1 week ago",
-      size: "3.1 MB",
-      rev: "Rev-1",
-      latest: true,
-      flag: false,
-    },
-    {
-      id: 5,
-      name: "Electrical Single Line",
-      disc: "E",
-      discLabel: "Electrical",
-      discBadge: "badge-mep-e",
-      floor: "All Floors",
-      date: "Yesterday",
-      size: "1.6 MB",
-      rev: "Rev-5",
-      latest: true,
-      flag: false,
-    },
-    {
-      id: 6,
-      name: "Conduit Routing — GF",
-      disc: "E",
-      discLabel: "Electrical",
-      discBadge: "badge-mep-e",
-      floor: "Ground Floor",
-      date: "3 days ago",
-      size: "1.2 MB",
-      rev: "Rev-2",
-      latest: true,
-      flag: true,
-    },
-    {
-      id: 7,
-      name: "Lighting Layout — L1",
-      disc: "E",
-      discLabel: "Electrical",
-      discBadge: "badge-mep-e",
-      floor: "Level 1",
-      date: "4 days ago",
-      size: "0.9 MB",
-      rev: "Rev-3",
-      latest: true,
-      flag: false,
-    },
-    {
-      id: 8,
-      name: "Plumbing — Ground Floor",
-      disc: "P",
-      discLabel: "Plumbing",
-      discBadge: "badge-mep-p",
-      floor: "Ground Floor",
-      date: "Today",
-      size: "1.8 MB",
-      rev: "Rev-3",
-      latest: true,
-      flag: false,
-    },
-    {
-      id: 9,
-      name: "Drainage — Level 2",
-      disc: "P",
-      discLabel: "Plumbing",
-      discBadge: "badge-mep-p",
-      floor: "Level 2",
-      date: "Yesterday",
-      size: "2.0 MB",
-      rev: "Rev-4",
-      latest: true,
-      flag: false,
-    },
-    {
-      id: 10,
-      name: "Water Supply Riser",
-      disc: "P",
-      discLabel: "Plumbing",
-      discBadge: "badge-mep-p",
-      floor: "All Floors",
-      date: "1 week ago",
-      size: "1.4 MB",
-      rev: "Rev-2",
-      latest: false,
-      flag: true,
-    },
-    {
-      id: 11,
-      name: "Fire Fighting Layout",
-      disc: "P",
-      discLabel: "Plumbing",
-      discBadge: "badge-mep-p",
-      floor: "All Floors",
-      date: "2 weeks ago",
-      size: "2.6 MB",
-      rev: "Rev-1",
-      latest: true,
-      flag: false,
-    },
-    {
-      id: 12,
-      name: "HVAC Level 3 — Revised",
-      disc: "M",
-      discLabel: "Mechanical",
-      discBadge: "badge-mep-m",
-      floor: "Level 3",
-      date: "Today",
-      size: "2.3 MB",
-      rev: "Rev-5",
-      latest: true,
-      flag: true,
-    },
-  ],
-  p2: [
-    {
-      id: 1,
-      name: "HVAC Layout — Ground Floor",
-      disc: "M",
-      discLabel: "Mechanical",
-      discBadge: "badge-mep-m",
-      floor: "Ground Floor",
-      date: "3 days ago",
-      size: "1.9 MB",
-      rev: "Rev-2",
-      latest: true,
-      flag: false,
-    },
-    {
-      id: 2,
-      name: "Electrical SLD",
-      disc: "E",
-      discLabel: "Electrical",
-      discBadge: "badge-mep-e",
-      floor: "All Floors",
-      date: "5 days ago",
-      size: "1.2 MB",
-      rev: "Rev-1",
-      latest: true,
-      flag: false,
-    },
-    {
-      id: 3,
-      name: "Plumbing — Ground Floor",
-      disc: "P",
-      discLabel: "Plumbing",
-      discBadge: "badge-mep-p",
-      floor: "Ground Floor",
-      date: "4 days ago",
-      size: "1.5 MB",
-      rev: "Rev-2",
-      latest: true,
-      flag: true,
-    },
-    {
-      id: 4,
-      name: "Conduit Routing — GF",
-      disc: "E",
-      discLabel: "Electrical",
-      discBadge: "badge-mep-e",
-      floor: "Ground Floor",
-      date: "1 week ago",
-      size: "1.0 MB",
-      rev: "Rev-1",
-      latest: true,
-      flag: false,
-    },
-  ],
-  p3: [
-    {
-      id: 1,
-      name: "HVAC Schematic",
-      disc: "M",
-      discLabel: "Mechanical",
-      discBadge: "badge-mep-m",
-      floor: "Ground Floor",
-      date: "1 week ago",
-      size: "1.1 MB",
-      rev: "Rev-1",
-      latest: true,
-      flag: false,
-    },
-    {
-      id: 2,
-      name: "Plumbing Schematic",
-      disc: "P",
-      discLabel: "Plumbing",
-      discBadge: "badge-mep-p",
-      floor: "Ground Floor",
-      date: "1 week ago",
-      size: "0.9 MB",
-      rev: "Rev-1",
-      latest: true,
-      flag: false,
-    },
-  ],
-};
 
 /* ═══════════════════════════════════════
    VERSION DATA  (keyed by drawing id)
    In production this comes from your API
 ═══════════════════════════════════════ */
-const VERSION_DATA = {
-  1: [
-    {
-      rev: "Rev-4",
-      current: true,
-      date: "Today · 10:32 AM",
-      uploader: "MEP Engineer (You)",
-      title: "Duct sizing corrected after structural review",
-      note: "Revised duct dimensions in Zone C to avoid structural clash. All team members notified. Previous version archived.",
-      adds: ["Zone C duct resize"],
-      mods: ["AHU position adjusted"],
-      dels: [],
-    },
-    {
-      rev: "Rev-3",
-      current: false,
-      date: "3 days ago",
-      uploader: "MEP Engineer",
-      title: "Added exhaust ventilation for stairwell",
-      note: "New exhaust vent added as per Architect requirement. Coordinated with Structural for slab penetration.",
-      adds: ["Stairwell exhaust"],
-      mods: ["Riser routing updated"],
-      dels: [],
-    },
-    {
-      rev: "Rev-2",
-      current: false,
-      date: "1 week ago",
-      uploader: "MEP Engineer",
-      title: "Client comment — fresh air supply points added",
-      note: "Added fresh air supply points per client walkthrough comments.",
-      adds: ["Fresh air supply points"],
-      mods: [],
-      dels: [],
-    },
-    {
-      rev: "Rev-1",
-      current: false,
-      date: "2 weeks ago",
-      uploader: "MEP Engineer",
-      title: "Initial issue for coordination",
-      note: "First version issued for inter-discipline coordination review.",
-      adds: ["Initial drawing"],
-      mods: [],
-      dels: [],
-    },
-  ],
-  3: [
-    {
-      rev: "Rev-2",
-      current: false,
-      date: "5 days ago",
-      uploader: "MEP Engineer",
-      title: "Clash flagged — coordination pending",
-      note: "Structural beam conflict identified in Zone B. Drawing flagged pending resolution with Structural team.",
-      adds: [],
-      mods: ["Zone B routing adjusted"],
-      dels: [],
-    },
-    {
-      rev: "Rev-1",
-      current: false,
-      date: "2 weeks ago",
-      uploader: "MEP Engineer",
-      title: "Initial issue for coordination",
-      note: "First version issued for coordination.",
-      adds: ["Initial drawing"],
-      mods: [],
-      dels: [],
-    },
-  ],
-  8: [
-    {
-      rev: "Rev-3",
-      current: true,
-      date: "Today · 08:20 AM",
-      uploader: "MEP Engineer (You)",
-      title: "Pipe routing updated after beam layout change",
-      note: "Structural issued new beam positions. Pipe routes updated to avoid conflicts on Ground Floor.",
-      adds: [],
-      mods: ["Cold water main rerouted", "HW return loop"],
-      dels: [],
-    },
-    {
-      rev: "Rev-2",
-      current: false,
-      date: "4 days ago",
-      uploader: "MEP Engineer",
-      title: "Toilet block added — Type B unit",
-      note: "New toilet block added as per Architect layout Rev4.",
-      adds: ["Type B toilet block"],
-      mods: [],
-      dels: [],
-    },
-    {
-      rev: "Rev-1",
-      current: false,
-      date: "2 weeks ago",
-      uploader: "MEP Engineer",
-      title: "Initial issue",
-      note: "First version for coordination.",
-      adds: ["Initial drawing"],
-      mods: [],
-      dels: [],
-    },
-  ],
-};
 
 /* fallback versions for drawings without specific data */
-function getDefaultVersions(drawing) {
-  return [
-    {
-      rev: drawing.rev,
-      current: true,
-      date: drawing.date,
-      uploader: "MEP Engineer (You)",
-      title: `Latest revision — ${drawing.name}`,
-      note: "Updated after coordination review with Architect and Structural team.",
-      adds: [],
-      mods: ["Routing updated per latest coordination"],
-      dels: [],
-    },
-    {
-      rev: "Rev-2",
-      current: false,
-      date: "1 week ago",
-      uploader: "MEP Engineer",
-      title: "Intermediate revision",
-      note: "Changes incorporated after site inspection.",
-      adds: [],
-      mods: ["Minor adjustments"],
-      dels: [],
-    },
-    {
-      rev: "Rev-1",
-      current: false,
-      date: "3 weeks ago",
-      uploader: "MEP Engineer",
-      title: "Initial issue for coordination",
-      note: "First version issued for inter-discipline coordination review.",
-      adds: ["Initial drawing"],
-      mods: [],
-      dels: [],
-    },
-  ];
-}
 
 const DISC_ICON = { M: "🔧", E: "⚡", P: "🚿" };
 
@@ -427,7 +42,29 @@ function ChangeChip({ label, type }) {
    SLIDE-OUT VERSIONS PANEL
 ═══════════════════════════════════════ */
 function VersionsPanel({ drawing, onClose }) {
-  const versions = VERSION_DATA[drawing.id] || getDefaultVersions(drawing);
+  const [versions, setVersions] = useState([]);
+  const [loadingV, setLoadingV] = useState(true);
+
+  useEffect(() => {
+    API.get(`/drawings/${drawing.id}/versions`)
+      .then((res) => {
+        const mapped = res.data.map((v) => ({
+          ...v,
+          rev: v.revision_number,
+          current: v.is_latest,
+          uploader: v.uploaded_by_name || "Unknown",
+          title: v.title,
+          note: v.change_notes || "—",
+          date: new Date(v.uploaded_at).toLocaleDateString(),
+          adds: [],
+          mods: [],
+          dels: [],
+        }));
+        setVersions(mapped);
+      })
+      .catch(() => setVersions([]))
+      .finally(() => setLoadingV(false));
+  }, [drawing.id]);
 
   /* close on Escape key */
   useEffect(() => {
@@ -466,6 +103,12 @@ function VersionsPanel({ drawing, onClose }) {
 
         {/* body */}
         <div className="slideout-body">
+          {loadingV && (
+            <p style={{ padding: 16, fontSize: 13 }}>Loading versions...</p>
+          )}
+          {!loadingV && versions.length === 0 && (
+            <p style={{ padding: 16, fontSize: 13 }}>No versions found.</p>
+          )}
           {/* current version highlight box */}
           <div
             style={{
@@ -558,26 +201,38 @@ function VersionsPanel({ drawing, onClose }) {
                   <div className="ver-title">{v.title}</div>
                   <div className="ver-note">{v.note}</div>
                   <div className="ver-changes">
-                    {v.adds.map((a) => (
+                    {(v.adds || []).map((a) => (
                       <ChangeChip key={a} label={a} type="add" />
                     ))}
-                    {v.mods.map((m) => (
+                    {(v.mods || []).map((m) => (
                       <ChangeChip key={m} label={m} type="mod" />
                     ))}
-                    {v.dels.map((d) => (
+                    {(v.dels || []).map((d) => (
                       <ChangeChip key={d} label={d} type="del" />
                     ))}
                   </div>
                   <div className="ver-actions">
-                    <button
+                    <a
+                      href={`http://localhost:5000${v.file_url}`}
+                      download
                       className={v.current ? "btn-primary" : "btn-outline"}
-                      style={{ padding: "5px 12px", fontSize: 11 }}
+                      style={{
+                        padding: "5px 12px",
+                        fontSize: 11,
+                        textDecoration: "none",
+                      }}
                     >
                       📥 {v.current ? "Download Current" : "Download"}
-                    </button>
+                    </a>
                     <button
                       className="btn-outline"
                       style={{ padding: "5px 12px", fontSize: 11 }}
+                      onClick={() =>
+                        window.open(
+                          `http://localhost:5000${v.file_url}`,
+                          "_blank",
+                        )
+                      }
                     >
                       👁 View
                     </button>
@@ -615,15 +270,54 @@ function VersionsPanel({ drawing, onClose }) {
 ═══════════════════════════════════════ */
 export default function MEPDrawings() {
   const { activeProject } = useProject();
-  if (!activeProject) return null; // ← add this line
 
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [drawings, setDrawings] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [versionsFor, setVersionsFor] = useState(null);
 
-  const drawings = DRAWINGS[activeProject.id] || [];
-  const [versionsFor, setVersionsFor] = useState(null); /* drawing obj | null */
+  useEffect(() => {
+    if (!activeProject) return;
+    setLoading(true);
+    API.get(`/drawings/project/${activeProject.id}`)
+      .then((res) => setDrawings(res.data))
+      .catch((err) => console.error("Failed to load drawings:", err))
+      .finally(() => setLoading(false));
+  }, [activeProject]);
 
-  const visible = drawings.filter((d) => {
+  const mapped = drawings.map((d) => ({
+    ...d,
+    disc:
+      d.sub_discipline === "Mechanical"
+        ? "M"
+        : d.sub_discipline === "Electrical"
+          ? "E"
+          : d.sub_discipline === "Plumbing"
+            ? "P"
+            : d.discipline === "ARCH"
+              ? "A"
+              : "S",
+    discLabel: d.sub_discipline,
+    discBadge:
+      d.sub_discipline === "Mechanical"
+        ? "badge-mep-m"
+        : d.sub_discipline === "Electrical"
+          ? "badge-mep-e"
+          : d.sub_discipline === "Plumbing"
+            ? "badge-mep-p"
+            : d.discipline === "ARCH"
+              ? "badge-arch"
+              : "badge-str",
+    floor: d.floor_name,
+    date: new Date(d.uploaded_at).toLocaleDateString(),
+    size: d.file_size || "—",
+    rev: d.revision_number || "—",
+    latest: d.status !== "Superseded",
+    flag: d.has_clash,
+  }));
+
+  const visible = mapped.filter((d) => {
     const mDisc = filter === "all" || d.disc === filter;
     const mSearch =
       d.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -632,11 +326,12 @@ export default function MEPDrawings() {
   });
 
   const counts = {
-    all: drawings.length,
-    M: drawings.filter((d) => d.disc === "M").length,
-    E: drawings.filter((d) => d.disc === "E").length,
-    P: drawings.filter((d) => d.disc === "P").length,
+    all: mapped.length,
+    M: mapped.filter((d) => d.disc === "M").length,
+    E: mapped.filter((d) => d.disc === "E").length,
+    P: mapped.filter((d) => d.disc === "P").length,
   };
+  if (!activeProject) return null;
 
   return (
     <div className="mep-page">
@@ -678,19 +373,19 @@ export default function MEPDrawings() {
           {
             icon: "✅",
             label: "Latest Version",
-            value: drawings.filter((d) => d.latest).length,
+            value: mapped.filter((d) => d.latest).length,
             ic: "ic-green",
           },
           {
             icon: "🕐",
             label: "Outdated",
-            value: drawings.filter((d) => !d.latest).length,
+            value: mapped.filter((d) => !d.latest).length,
             ic: "ic-amber",
           },
           {
             icon: "🚩",
             label: "Clash Flagged",
-            value: drawings.filter((d) => d.flag).length,
+            value: mapped.filter((d) => d.flag).length,
             ic: "ic-red",
           },
         ].map((s) => (
@@ -741,8 +436,14 @@ export default function MEPDrawings() {
       </div>
 
       {/* ── DRAWING ROWS ── */}
+      {/* ── DRAWING ROWS ── */}
       <div className="records-list">
-        {visible.length === 0 && (
+        {loading && (
+          <div className="no-records">
+            <p>Loading drawings...</p>
+          </div>
+        )}
+        {!loading && visible.length === 0 && (
           <div className="no-records">
             <p>No drawings match your search.</p>
           </div>
@@ -828,15 +529,24 @@ export default function MEPDrawings() {
               <button
                 className="btn-outline"
                 style={{ padding: "6px 12px", fontSize: 11 }}
+                onClick={() =>
+                  window.open(`http://localhost:5000${d.file_url}`, "_blank")
+                }
               >
                 👁 View
               </button>
-              <button
+              <a
+                href={`http://localhost:5000${d.file_url}`}
+                download
                 className="btn-outline"
-                style={{ padding: "6px 12px", fontSize: 11 }}
+                style={{
+                  padding: "6px 12px",
+                  fontSize: 11,
+                  textDecoration: "none",
+                }}
               >
                 ⬇ Download
-              </button>
+              </a>
               {/* ── Versions button opens slide-out panel ── */}
               <button
                 className="btn-primary"

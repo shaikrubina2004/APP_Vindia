@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import ProjectSwitcher from "../../components/project/ProjectSwitcher";
 import { useProject } from "../../context/ProjectContext";
+import { API } from "../../services/authService";
 import "../../styles/DrawingRegister.css";
 
 /* ═══════════════════════════════════════
@@ -38,471 +39,22 @@ const STATUS_TRANSITIONS = {
 /* ═══════════════════════════════════════
    MEP DRAWINGS
 ═══════════════════════════════════════ */
-const MEP_DRAWINGS = [
-  {
-    id: "M-001",
-    name: "HVAC Layout — Ground Floor",
-    disc: "MEP",
-    subDisc: "Mechanical",
-    floor: "Ground Floor",
-    type: "Layout",
-    number: "MEP-HVAC-GF-001",
-    rev: "Rev-4",
-    latest: true,
-    status: "Issued for Construction",
-    date: "2026-04-25",
-    uploadedBy: "MEP Engineer",
-    size: "2.4 MB",
-    flag: false,
-  },
-  {
-    id: "M-002",
-    name: "HVAC Layout — Level 1",
-    disc: "MEP",
-    subDisc: "Mechanical",
-    floor: "Level 1",
-    type: "Layout",
-    number: "MEP-HVAC-L1-001",
-    rev: "Rev-3",
-    latest: true,
-    status: "Issued for Coordination",
-    date: "2026-04-23",
-    uploadedBy: "MEP Engineer",
-    size: "2.1 MB",
-    flag: false,
-  },
-  {
-    id: "M-003",
-    name: "HVAC Layout — Level 2",
-    disc: "MEP",
-    subDisc: "Mechanical",
-    floor: "Level 2",
-    type: "Layout",
-    number: "MEP-HVAC-L2-001",
-    rev: "Rev-2",
-    latest: false,
-    status: "Issued for Coordination",
-    date: "2026-04-20",
-    uploadedBy: "MEP Engineer",
-    size: "1.9 MB",
-    flag: true,
-  },
-  {
-    id: "M-004",
-    name: "Electrical Single Line",
-    disc: "MEP",
-    subDisc: "Electrical",
-    floor: "All Floors",
-    type: "Single Line",
-    number: "MEP-EL-SLD-001",
-    rev: "Rev-5",
-    latest: true,
-    status: "Approved",
-    date: "2026-04-24",
-    uploadedBy: "MEP Engineer",
-    size: "1.6 MB",
-    flag: false,
-  },
-  {
-    id: "M-005",
-    name: "Conduit Routing — GF",
-    disc: "MEP",
-    subDisc: "Electrical",
-    floor: "Ground Floor",
-    type: "Routing",
-    number: "MEP-EL-CR-GF-001",
-    rev: "Rev-2",
-    latest: true,
-    status: "Issued for Coordination",
-    date: "2026-04-22",
-    uploadedBy: "MEP Engineer",
-    size: "1.2 MB",
-    flag: true,
-  },
-  {
-    id: "M-006",
-    name: "Plumbing — Ground Floor",
-    disc: "MEP",
-    subDisc: "Plumbing",
-    floor: "Ground Floor",
-    type: "Layout",
-    number: "MEP-PL-GF-001",
-    rev: "Rev-3",
-    latest: true,
-    status: "Issued for Construction",
-    date: "2026-04-25",
-    uploadedBy: "MEP Engineer",
-    size: "1.8 MB",
-    flag: false,
-  },
-  {
-    id: "M-007",
-    name: "Drainage — Level 2",
-    disc: "MEP",
-    subDisc: "Plumbing",
-    floor: "Level 2",
-    type: "Drainage",
-    number: "MEP-DR-L2-001",
-    rev: "Rev-4",
-    latest: true,
-    status: "Approved",
-    date: "2026-04-24",
-    uploadedBy: "MEP Engineer",
-    size: "2.0 MB",
-    flag: false,
-  },
-  {
-    id: "M-008",
-    name: "HVAC Level 3 — Revised",
-    disc: "MEP",
-    subDisc: "Mechanical",
-    floor: "Level 3",
-    type: "Layout",
-    number: "MEP-HVAC-L3-001",
-    rev: "Rev-5",
-    latest: true,
-    status: "Issued for Coordination",
-    date: "2026-04-25",
-    uploadedBy: "MEP Engineer",
-    size: "2.3 MB",
-    flag: true,
-  },
-];
 
 /* ═══════════════════════════════════════
    ARCHITECT DRAWINGS
 ═══════════════════════════════════════ */
-const ARCH_DRAWINGS = [
-  {
-    id: "A-001",
-    name: "Floor Plan — Ground Floor",
-    disc: "ARCH",
-    subDisc: "Architectural",
-    floor: "Ground Floor",
-    type: "Floor Plan",
-    number: "A-GF-001",
-    rev: "R2",
-    latest: true,
-    status: "Approved",
-    date: "2026-04-20",
-    uploadedBy: "Architect Team",
-    size: "3.2 MB",
-    flag: false,
-  },
-  {
-    id: "A-002",
-    name: "Floor Plan — Level 1",
-    disc: "ARCH",
-    subDisc: "Architectural",
-    floor: "Level 1",
-    type: "Floor Plan",
-    number: "A-L1-001",
-    rev: "R3",
-    latest: true,
-    status: "Approved",
-    date: "2026-04-21",
-    uploadedBy: "Architect Team",
-    size: "3.0 MB",
-    flag: false,
-  },
-  {
-    id: "A-003",
-    name: "Floor Plan — Level 2",
-    disc: "ARCH",
-    subDisc: "Architectural",
-    floor: "Level 2",
-    type: "Floor Plan",
-    number: "A-L2-001",
-    rev: "R2",
-    latest: true,
-    status: "Issued for Coordination",
-    date: "2026-04-19",
-    uploadedBy: "Architect Team",
-    size: "2.8 MB",
-    flag: false,
-  },
-  {
-    id: "A-004",
-    name: "Reflected Ceiling Plan — GF",
-    disc: "ARCH",
-    subDisc: "Architectural",
-    floor: "Ground Floor",
-    type: "Ceiling Plan",
-    number: "A-RCP-GF-001",
-    rev: "R1",
-    latest: true,
-    status: "Issued for Coordination",
-    date: "2026-04-18",
-    uploadedBy: "Architect Team",
-    size: "2.5 MB",
-    flag: false,
-  },
-  {
-    id: "A-005",
-    name: "Elevation — North Face",
-    disc: "ARCH",
-    subDisc: "Architectural",
-    floor: "All Floors",
-    type: "Elevation",
-    number: "A-EL-N-001",
-    rev: "R2",
-    latest: true,
-    status: "Approved",
-    date: "2026-04-17",
-    uploadedBy: "Architect Team",
-    size: "1.9 MB",
-    flag: false,
-  },
-  {
-    id: "A-006",
-    name: "Section — AA",
-    disc: "ARCH",
-    subDisc: "Architectural",
-    floor: "All Floors",
-    type: "Section",
-    number: "A-SEC-AA-001",
-    rev: "R1",
-    latest: false,
-    status: "Issued for Coordination",
-    date: "2026-04-15",
-    uploadedBy: "Architect Team",
-    size: "1.6 MB",
-    flag: false,
-  },
-];
 
 /* ═══════════════════════════════════════
    STRUCTURAL DRAWINGS
 ═══════════════════════════════════════ */
-const STR_DRAWINGS = [
-  {
-    id: "S-001",
-    name: "Column Layout — Ground Floor",
-    disc: "STR",
-    subDisc: "Structural",
-    floor: "Ground Floor",
-    type: "Column Layout",
-    number: "S-CL-001",
-    rev: "R1",
-    latest: true,
-    status: "Approved",
-    date: "2026-04-19",
-    uploadedBy: "Structural Team",
-    size: "2.8 MB",
-    flag: false,
-  },
-  {
-    id: "S-002",
-    name: "Beam Layout — Level 1",
-    disc: "STR",
-    subDisc: "Structural",
-    floor: "Level 1",
-    type: "Beam Layout",
-    number: "S-BL-L1-001",
-    rev: "R2",
-    latest: true,
-    status: "Approved",
-    date: "2026-04-20",
-    uploadedBy: "Structural Team",
-    size: "2.6 MB",
-    flag: false,
-  },
-  {
-    id: "S-003",
-    name: "Beam Layout — Level 3",
-    disc: "STR",
-    subDisc: "Structural",
-    floor: "Level 3",
-    type: "Beam Layout",
-    number: "S-BL-L3-001",
-    rev: "R3",
-    latest: true,
-    status: "Issued for Coordination",
-    date: "2026-04-22",
-    uploadedBy: "Structural Team",
-    size: "2.4 MB",
-    flag: true,
-  },
-  {
-    id: "S-004",
-    name: "Foundation Layout",
-    disc: "STR",
-    subDisc: "Structural",
-    floor: "Basement",
-    type: "Foundation",
-    number: "S-FL-001",
-    rev: "R1",
-    latest: true,
-    status: "Approved",
-    date: "2026-04-15",
-    uploadedBy: "Structural Team",
-    size: "3.1 MB",
-    flag: false,
-  },
-  {
-    id: "S-005",
-    name: "Slab Details — Level 2",
-    disc: "STR",
-    subDisc: "Structural",
-    floor: "Level 2",
-    type: "Slab Detail",
-    number: "S-SD-L2-001",
-    rev: "R2",
-    latest: true,
-    status: "Approved",
-    date: "2026-04-18",
-    uploadedBy: "Structural Team",
-    size: "1.8 MB",
-    flag: false,
-  },
-  {
-    id: "S-006",
-    name: "Retaining Wall Details",
-    disc: "STR",
-    subDisc: "Structural",
-    floor: "Basement",
-    type: "Wall Detail",
-    number: "S-RW-001",
-    rev: "R1",
-    latest: false,
-    status: "Issued for Coordination",
-    date: "2026-04-14",
-    uploadedBy: "Structural Team",
-    size: "1.5 MB",
-    flag: false,
-  },
-];
 
 /* ═══════════════════════════════════════
    DRAWINGS BY PROJECT
 ═══════════════════════════════════════ */
-const DRAWINGS_BY_PROJECT = {
-  p1: [...MEP_DRAWINGS, ...ARCH_DRAWINGS, ...STR_DRAWINGS],
-  p2: [
-    MEP_DRAWINGS[0],
-    MEP_DRAWINGS[1],
-    MEP_DRAWINGS[3],
-    MEP_DRAWINGS[5],
-    ARCH_DRAWINGS[0],
-    ARCH_DRAWINGS[1],
-    ARCH_DRAWINGS[3],
-    STR_DRAWINGS[0],
-    STR_DRAWINGS[1],
-    STR_DRAWINGS[3],
-  ],
-  p3: [
-    MEP_DRAWINGS[0],
-    MEP_DRAWINGS[3],
-    ARCH_DRAWINGS[0],
-    ARCH_DRAWINGS[2],
-    STR_DRAWINGS[0],
-  ],
-};
 
 /* ═══════════════════════════════════════
    VERSION DATA
 ═══════════════════════════════════════ */
-const VERSION_DATA = {
-  "M-001": [
-    {
-      rev: "Rev-4",
-      current: true,
-      date: "2026-04-25",
-      uploader: "MEP Engineer",
-      title: "Duct sizing corrected after structural review",
-      note: "Revised duct dimensions in Zone C to avoid structural clash. All team members notified.",
-    },
-    {
-      rev: "Rev-3",
-      current: false,
-      date: "2026-04-20",
-      uploader: "MEP Engineer",
-      title: "Added exhaust ventilation for stairwell",
-      note: "New exhaust vent per Architect requirement. Coordinated with Structural.",
-    },
-    {
-      rev: "Rev-2",
-      current: false,
-      date: "2026-04-14",
-      uploader: "MEP Engineer",
-      title: "Fresh air supply points added",
-      note: "Added fresh air supply points per client walkthrough comments.",
-    },
-    {
-      rev: "Rev-1",
-      current: false,
-      date: "2026-04-07",
-      uploader: "MEP Engineer",
-      title: "Initial issue for coordination",
-      note: "First version issued for inter-discipline coordination review.",
-    },
-  ],
-  "A-001": [
-    {
-      rev: "R2",
-      current: true,
-      date: "2026-04-20",
-      uploader: "Architect Team",
-      title: "Toilet block repositioned — Level 2",
-      note: "Toilet block moved 1.5m north as per client brief update. MEP team notified for plumbing review.",
-    },
-    {
-      rev: "R1",
-      current: false,
-      date: "2026-04-10",
-      uploader: "Architect Team",
-      title: "Initial issue for coordination",
-      note: "First floor plan issued for all discipline coordination.",
-    },
-  ],
-  "S-003": [
-    {
-      rev: "R3",
-      current: true,
-      date: "2026-04-22",
-      uploader: "Structural Team",
-      title: "Beam B-14 position updated — 200mm east shift",
-      note: "Beam B-14 shifted 200mm east. MEP to check HVAC pipe route conflict on Level 3.",
-    },
-    {
-      rev: "R2",
-      current: false,
-      date: "2026-04-16",
-      uploader: "Structural Team",
-      title: "Additional beam added — Zone C",
-      note: "New secondary beam added in Zone C. MEP coordination required.",
-    },
-    {
-      rev: "R1",
-      current: false,
-      date: "2026-04-08",
-      uploader: "Structural Team",
-      title: "Initial issue for coordination",
-      note: "First version issued for coordination.",
-    },
-  ],
-};
-
-function getDefaultVersions(drawing) {
-  return [
-    {
-      rev: drawing.rev,
-      current: true,
-      date: drawing.date,
-      uploader: drawing.uploadedBy,
-      title: `Latest revision — ${drawing.name}`,
-      note: "Updated after coordination review.",
-    },
-    {
-      rev: drawing.rev === "R1" ? "R0" : "R1",
-      current: false,
-      date: "2026-04-01",
-      uploader: drawing.uploadedBy,
-      title: "Initial issue for coordination",
-      note: "First version issued.",
-    },
-  ];
-}
 
 /* ═══════════════════════════════════════
    CLASH TYPES
@@ -881,7 +433,26 @@ function VersionsPanel({
   onOpenApproval,
   onStatusChange,
 }) {
-  const versions = VERSION_DATA[drawing.id] || getDefaultVersions(drawing);
+  const [versions, setVersions] = useState([]);
+  const [loadingV, setLoadingV] = useState(true);
+
+  useEffect(() => {
+    API.get(`/drawings/${drawing.id}/versions`)
+      .then((res) => {
+        const mapped = res.data.map((v) => ({
+          ...v,
+          rev: v.revision_number,
+          current: v.is_latest,
+          uploader: v.uploaded_by_name || "Unknown",
+          note: v.change_notes || "—",
+          date: new Date(v.uploaded_at).toLocaleDateString(),
+        }));
+        setVersions(mapped);
+      })
+      .catch(() => setVersions([]))
+      .finally(() => setLoadingV(false));
+  }, [drawing.id]);
+
   const owned = canUpload(role, drawing.disc);
   const isNonMEP = drawing.disc !== "MEP";
   const clashInfo = clashFlags[drawing.id];
@@ -994,6 +565,9 @@ function VersionsPanel({
             </div>
           )}
 
+          {loadingV && (
+            <p style={{ padding: 16, fontSize: 13 }}>Loading versions...</p>
+          )}
           <div className="dr-ver-history-label">
             Full Revision History — {versions.length} version
             {versions.length > 1 ? "s" : ""}
@@ -1149,8 +723,25 @@ function VersionsPanel({
 /* ═══════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════ */
-export default function DrawingRegister({ currentRole = "mep" }) {
+const ROLE_MAP = {
+  mep_engineer: "mep",
+  architect: "arch",
+  structural_engineer: "str",
+};
+
+export default function DrawingRegister({ resolvedRole: resolvedRoleProp }) {
   const { activeProject } = useProject();
+
+  const resolvedRole =
+    resolvedRoleProp ??
+    (() => {
+      try {
+        const user = JSON.parse(localStorage.getItem("user"));
+        return ROLE_MAP[user?.role] ?? "mep";
+      } catch {
+        return "mep";
+      }
+    })();
   const [discFilter, setDiscFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -1159,18 +750,57 @@ export default function DrawingRegister({ currentRole = "mep" }) {
   const [clashModal, setClashModal] = useState(null);
   const [approvalModal, setApprovalModal] = useState(null);
   const [clashFlags, setClashFlags] = useState({});
-  /*
-    approvals shape: { [drawingId]: { mep?: bool, arch?: bool, str?: bool } }
-    Only the two non-owner roles are ever set per drawing.
-  */
   const [approvals, setApprovals] = useState({});
-  const [drawingStatuses, setDrawingStatuses] = useState({}); // { [drawingId]: "Issued for Coordination" | "Issued for Construction" }
+  const [drawingStatuses, setDrawingStatuses] = useState({});
   const [toast, setToast] = useState("");
+  const [rawDrawings, setRawDrawings] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!activeProject) return;
+    setLoading(true);
+    API.get(`/drawings/project/${activeProject.id}`)
+      .then((res) => {
+        setRawDrawings(res.data);
+        // seed approvals from DB so isFullyApproved works correctly
+        const seeded = {};
+        res.data.forEach((d) => {
+          seeded[d.id] = {
+            mep:
+              d.mep_status === "Approved" ||
+              d.mep_status === "Approved with Comments",
+            arch:
+              d.arch_status === "Approved" ||
+              d.arch_status === "Approved with Comments",
+            str:
+              d.str_status === "Approved" ||
+              d.str_status === "Approved with Comments",
+          };
+        });
+        setApprovals(seeded);
+      })
+      .catch((err) => console.error("Failed to load drawings:", err))
+      .finally(() => setLoading(false));
+  }, [activeProject]);
+
   if (!activeProject) return null;
 
-  const roleMeta = ROLE_META[currentRole] || ROLE_META.mep;
+  const roleMeta = ROLE_META[resolvedRole] || ROLE_META.mep;
 
-  const drawings = DRAWINGS_BY_PROJECT[activeProject.id] ?? [];
+  const drawings = rawDrawings.map((d) => ({
+    ...d,
+    disc: d.discipline,
+    subDisc: d.sub_discipline,
+    floor: d.floor_name,
+    number: d.drawing_number,
+    rev: d.revision_number || "—",
+    date: d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString() : "—",
+    size: d.file_size || "—",
+    uploadedBy: d.uploaded_by_name || "—",
+    status: d.display_status || d.status,
+    flag: d.has_clash,
+    latest: d.status !== "Superseded",
+  }));
 
   const counts = {
     all: drawings.length,
@@ -1218,8 +848,19 @@ export default function DrawingRegister({ currentRole = "mep" }) {
   };
 
   /* ── clash handlers ── */
-  const handleClashSubmit = ({ clashType, reason }) => {
+  const handleClashSubmit = async ({ clashType, reason }) => {
     const drawing = clashModal;
+    try {
+      await API.post("/drawings/clashes", {
+        drawing_id_1: drawing.id,
+        drawing_id_2: drawing.id,
+        clash_type: clashType,
+        description: reason,
+        raised_by: resolvedRole,
+      });
+    } catch (err) {
+      console.error("Clash flag failed:", err);
+    }
     setClashFlags((prev) => ({
       ...prev,
       [drawing.id]: {
@@ -1242,25 +883,44 @@ export default function DrawingRegister({ currentRole = "mep" }) {
   };
 
   /* ── approval handlers ── */
-  const handleApprove = (drawingId, role) => {
+  const handleApprove = async (drawingId, role) => {
+    const d = drawings.find((x) => x.id === drawingId);
+    try {
+      await API.put(`/drawings/versions/${d.version_id}/approve`, {
+        role,
+        user_id: d.uploaded_by_id,
+        status: "Approved",
+      });
+    } catch (err) {
+      console.error("Approval failed:", err);
+    }
     const newApprovals = {
       ...approvals,
       [drawingId]: { ...(approvals[drawingId] ?? {}), [role]: true },
     };
     setApprovals(newApprovals);
-    const d = drawings.find((x) => x.id === drawingId);
     if (isFullyApproved(drawingId, d?.disc, newApprovals)) {
       showToast(`🏆 ${d?.name} is now Finalized — all approvals received!`);
     } else {
       showToast(`✅ Approval recorded for ${d?.name}`);
     }
   };
-  const handleStatusChange = (drawingId, newStatus) => {
-    setDrawingStatuses((prev) => ({ ...prev, [drawingId]: newStatus }));
+  const handleStatusChange = async (drawingId, newStatus) => {
     const d = drawings.find((x) => x.id === drawingId);
+    try {
+      await API.put(
+        `/drawings/versions/${d.version_id}/issue-for-construction`,
+        {
+          user_id: d.uploaded_by_id,
+          role: resolvedRole,
+        },
+      );
+    } catch (err) {
+      console.error("Status change failed:", err);
+    }
+    setDrawingStatuses((prev) => ({ ...prev, [drawingId]: newStatus }));
     showToast(`📋 ${d?.name} status updated to "${newStatus}"`);
   };
-
   const handleWithdraw = (drawingId, role) => {
     setApprovals((prev) => ({
       ...prev,
@@ -1289,17 +949,17 @@ export default function DrawingRegister({ currentRole = "mep" }) {
           >
             📥 Download All
           </button>
-          {currentRole === "mep" && (
+          {resolvedRole === "mep" && (
             <a href="/mep/upload" className="dr-btn-primary">
               ⬆️ Upload MEP Drawing
             </a>
           )}
-          {currentRole === "arch" && (
+          {resolvedRole === "arch" && (
             <a href="/arch/upload" className="dr-btn-primary">
               ⬆️ Upload Arch Drawing
             </a>
           )}
-          {currentRole === "str" && (
+          {resolvedRole === "str" && (
             <a href="/str/upload" className="dr-btn-primary">
               ⬆️ Upload STR Drawing
             </a>
@@ -1446,7 +1106,13 @@ export default function DrawingRegister({ currentRole = "mep" }) {
 
       {/* ── DRAWING ROWS ── */}
       <div className="dr-list">
-        {visible.length === 0 && (
+        {loading && (
+          <div className="dr-empty">
+            <span className="dr-empty-icon">⏳</span>
+            <p>Loading drawings...</p>
+          </div>
+        )}
+        {!loading && visible.length === 0 && (
           <div className="dr-empty">
             <span className="dr-empty-icon">📂</span>
             <p>No drawings match your search or filter.</p>
@@ -1454,11 +1120,11 @@ export default function DrawingRegister({ currentRole = "mep" }) {
         )}
 
         {visible.map((d) => {
-          const owned = canUpload(currentRole, d.disc);
-          const canApproveThis = canApprove(currentRole, d.disc);
+          const owned = canUpload(resolvedRole, d.disc);
+          const canApproveThis = canApprove(resolvedRole, d.disc);
           const isFlagged = d.flag || !!clashFlags[d.id];
           const fullyApproved = isFullyApproved(d.id, d.disc, approvals);
-          const myApproval = approvals[d.id]?.[currentRole] ?? false;
+          const myApproval = approvals[d.id]?.[resolvedRole] ?? false;
 
           return (
             <div
@@ -1556,9 +1222,9 @@ export default function DrawingRegister({ currentRole = "mep" }) {
                 {owned && (
                   <a
                     href={
-                      currentRole === "mep"
+                      resolvedRole === "mep"
                         ? "/mep/upload"
-                        : `/${currentRole}/upload`
+                        : `/${resolvedRole}/upload`
                     }
                     className="dr-btn-primary"
                     style={{ padding: "6px 12px", fontSize: 11 }}
@@ -1576,7 +1242,7 @@ export default function DrawingRegister({ currentRole = "mep" }) {
       {versionsFor && (
         <VersionsPanel
           drawing={versionsFor}
-          role={currentRole}
+          role={resolvedRole}
           clashFlags={clashFlags}
           approvals={approvals}
           drawingStatuses={drawingStatuses}
@@ -1604,7 +1270,7 @@ export default function DrawingRegister({ currentRole = "mep" }) {
       {approvalModal && (
         <ApprovalModal
           drawing={approvalModal}
-          role={currentRole}
+          role={resolvedRole}
           approvals={approvals}
           onApprove={handleApprove}
           onWithdraw={handleWithdraw}
