@@ -44,11 +44,11 @@ import ActivityLog from "../pages/siteEngineer/ActivityLog";
 import QuantitySurveyorDashboard from "../pages/Quality Surveyor/QuantitySurveyorDashboard";
 import Qsdailyupdates from "../pages/Quality Surveyor/Qsdailyupdates";
 import Qsboq from "../pages/Quality Surveyor/Qsboq";
-import Measurements from "../pages/Quality Surveyor/Measurements";
+
 import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
 import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
 
-import Qsalerts from "../pages/Quality Surveyor/Qsalerts";
+
 
 /* MEP ROLES */
 import MEPDashboard from "../pages/MEP Engineer/MEPDashboard";
@@ -404,14 +404,7 @@ const AppRoutes = () => {
           </QuantitySurveyorLayout>
         }
       />
-      <Route
-        path="/quantity-surveyor/alerts"
-        element={
-          <QuantitySurveyorLayout>
-            <Qsalerts />
-          </QuantitySurveyorLayout>
-        }
-      />
+      
 
       <Route
         path="/quantity-surveyor/incident"
@@ -430,14 +423,7 @@ const AppRoutes = () => {
         }
       />
 
-      <Route
-        path="/quantity-surveyor/measurements"
-        element={
-          <QuantitySurveyorLayout>
-            <Measurements />
-          </QuantitySurveyorLayout>
-        }
-      />
+      
       <Route
         path="/quantity-surveyor/quantity-report"
         element={
