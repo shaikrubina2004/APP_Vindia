@@ -5,9 +5,10 @@ export const StructuralEngineerMenu = [
     path: "/structural-engineer/drawings",
     icon: "file-text",
   },
-  
+  { name: "BOQ", path: "/structural-engineer/boq", icon: "clipboard" },
+
   { name: "RFI", path: "/structural-engineer/rfi", icon: "help-circle" },
-  
+
   {
     name: "Incidents",
     path: "/structural-engineer/incidents",
