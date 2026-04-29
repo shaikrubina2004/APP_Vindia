@@ -1,15 +1,23 @@
 const pool = require("../config/db"); // your existing pg pool
 
 // ── Internal helper called by other controllers ──
-const insertNotification = async (userId, type, title, description, link, severity = "info") => {
+const insertNotification = async (
+  userId,
+  type,
+  title,
+  description,
+  link,
+  severity = "info",
+  projectId
+) => {
   try {
     await pool.query(
-      `INSERT INTO pc_notifications (user_id, type, title, description, link, severity)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [userId, type, title, description, link, severity]
+      `INSERT INTO pc_notifications 
+      (user_id, type, title, description, link, severity, project_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [userId, type, title, description, link, severity, projectId]
     );
   } catch (err) {
-    // Don't crash the main request if notification insert fails
     console.error("Notification insert failed:", err.message);
   }
 };

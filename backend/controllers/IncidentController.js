@@ -6,7 +6,7 @@ const { insertNotification } = require("./pcNotificationsController");
 function calcDeadline(priority) {
   const now = Date.now();
   const HOUR = 3600000;
-  const DAY = 86400000;
+  const DAY  = 86400000;
   const offsets = { P1: 8 * HOUR, P2: 2 * DAY, P3: 7 * DAY };
   return new Date(now + (offsets[priority] ?? 2 * DAY));
 }
@@ -25,17 +25,24 @@ async function patchHistoryUser(client, table, fkCol, fkVal, userId) {
   );
 }
 
-/* helper — fetch coordinator_id for a project */
 async function getCoordinatorId(projectId) {
   if (!projectId) return null;
   try {
     const { rows } = await pool.query(
-      `SELECT coordinator_id FROM projects WHERE id = $1`,
-      [projectId]
+      `SELECT coordinator_id FROM projects WHERE id = $1`, [projectId]
     );
     return rows[0]?.coordinator_id ?? null;
-  } catch (_) {
-    return null;
+  } catch (_) { return null; }
+}
+
+/* Never crashes the main request flow */
+async function safeNotify(userId, type, title, description, link, severity, referenceId) {
+  if (!userId) return;
+  try {
+    await insertNotification(userId, type, title, description, link, severity, referenceId ?? null);
+    console.log(`✅ Notification sent → user:${userId} type:${type} title:${title}`);
+  } catch (err) {
+    console.error("Notification error:", err.message);
   }
 }
 
@@ -86,8 +93,7 @@ exports.getAllIncidents = async (req, res) => {
     const { status, priority, search } = req.query;
     const userId = req.user?.id ?? null;
 
-    let conditions = [];
-    let params = [];
+    let conditions = [], params = [];
     let idx = 1;
 
     if (userId !== null) {
@@ -116,8 +122,8 @@ exports.getAllIncidents = async (req, res) => {
 };
 
 exports.getIncidentById = async (req, res) => {
-  const { id } = req.params;
-  const client = await pool.connect();
+  const { id }  = req.params;
+  const client  = await pool.connect();
   try {
     const { rows: incRows } = await client.query(
       `SELECT * FROM v_incident_overview WHERE id = $1`, [id]
@@ -142,12 +148,9 @@ exports.getIncidentById = async (req, res) => {
     );
 
     const { rows: tasks } = await client.query(
-      `SELECT
-         t.id, t.incident_id, t.task_no, t.title, t.note, t.priority, t.status,
-         t.done_at, t.created_at, t.updated_at,
-         u.id   AS assignee_id,
-         u.name AS assignee_name,
-         r.name AS role_name
+      `SELECT t.id, t.incident_id, t.task_no, t.title, t.note, t.priority, t.status,
+              t.done_at, t.created_at, t.updated_at,
+              u.id AS assignee_id, u.name AS assignee_name, r.name AS role_name
        FROM tasks t
        LEFT JOIN users u ON u.id = t.assigned_to
        LEFT JOIN roles r ON r.id = u.role_id
@@ -157,9 +160,10 @@ exports.getIncidentById = async (req, res) => {
     );
 
     const taskIds = tasks.map((t) => t.id);
-    let taskComments = [];
+    let taskComments = [], taskPhotos = [];
+
     if (taskIds.length) {
-      const { rows } = await client.query(
+      const { rows: tcRows } = await client.query(
         `SELECT tc.id, tc.task_id, tc.body, tc.comment_type, tc.created_at,
                 u.id AS author_id, u.name AS author_name
          FROM task_comments tc
@@ -168,11 +172,8 @@ exports.getIncidentById = async (req, res) => {
          ORDER BY tc.created_at ASC`,
         [taskIds],
       );
-      taskComments = rows;
-    }
+      taskComments = tcRows;
 
-    let taskPhotos = [];
-    if (taskIds.length) {
       const { rows: tpRows } = await client.query(
         `SELECT tp.id, tp.task_id, tp.url, tp.uploaded_at
          FROM task_photos tp
@@ -202,17 +203,19 @@ exports.getIncidentById = async (req, res) => {
 };
 
 exports.createIncident = async (req, res) => {
-  const { title, description, priority = "P2", assigned_to_user_id, project_id } = req.body;
+  // incidents table has NO project_id column
+  const { title, description, priority = "P2", assigned_to_user_id } = req.body;
   const created_by = req.user?.id ?? null;
-
+ 
+  console.log("🔔 createIncident payload:", { title, assigned_to_user_id, created_by });
+ 
   if (!title?.trim())
     return res.status(400).json({ success: false, message: "Title is required" });
-
+ 
   try {
     const deadline_at = calcDeadline(priority);
-
-    let assignee_name = null;
-    let role_name     = null;
+ 
+    let assignee_name = null, role_name = null;
     if (assigned_to_user_id) {
       const { rows } = await pool.query(
         `SELECT u.name, r.name AS role_name
@@ -223,43 +226,47 @@ exports.createIncident = async (req, res) => {
       );
       if (rows.length) { assignee_name = rows[0].name; role_name = rows[0].role_name; }
     }
-
-    const cols = ["title","description","priority","assigned_to","deadline_at"];
+ 
+    const cols = ["title", "description", "priority", "assigned_to", "deadline_at"];
     const vals = [title.trim(), description ?? null, priority, assigned_to_user_id ?? null, deadline_at];
-
-    if (project_id)    { cols.push("project_id");    vals.push(project_id); }
     if (created_by !== null) { cols.push("created_by"); vals.push(created_by); }
-
+ 
     const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
     const { rows } = await pool.query(
       `INSERT INTO incidents (${cols.join(", ")}) VALUES (${placeholders}) RETURNING *`,
       vals,
     );
-
+ 
     const newIncident = rows[0];
+    const severity    = priority === "P1" ? "critical" : "warn";
+ 
+    console.log("✅ Incident inserted:", newIncident.id, "assigned_to:", newIncident.assigned_to);
+ 
+    // ── SINGLE notification rule ──────────────────────────────
+    // Only notify the ASSIGNEE.
+    // If you assign to yourself: 1 notification (as assignee).
+    // If someone else creates and assigns to you: 1 notification (as assignee).
+    // Creator gets NO notification — they know, they just created it.
+    const assigneeId = parseInt(assigned_to_user_id, 10);
+const creatorId  = created_by ? parseInt(created_by, 10) : null;
+ 
+if (assigneeId && assigneeId !== creatorId) {
+  await safeNotify(
+    assigneeId,
+    "incident",
+    `New Incident Assigned — ${title.trim()}`,
+    `You have been assigned: ${title.trim()}`,
+    "/project-coordinator/incidents",
+    severity,
+    null
+  );
+}
 
-    // ── Notification ─────────────────────────────────────────
-    try {
-      const coordinatorId = await getCoordinatorId(project_id);
-      if (coordinatorId) {
-        const severity = priority === "P1" ? "critical" : "warn";
-        await insertNotification(
-          coordinatorId,
-          "incident",
-          `New Incident — ${title.trim()}`,
-          `${title.trim()} reported${project_id ? " on project" : ""}`,
-          "/project-coordinator/incidents",
-          severity
-        );
-      }
-    } catch (notifErr) {
-      console.error("Notification error:", notifErr.message);
-    }
     // ─────────────────────────────────────────────────────────
-
+ 
     res.status(201).json({ success: true, data: { ...newIncident, assignee_name, role_name } });
   } catch (err) {
-    console.error("createIncident:", err);
+    console.error("createIncident ERROR:", err.message);
     res.status(500).json({ success: false, message: "Failed to create incident", detail: err.message });
   }
 };
@@ -267,43 +274,45 @@ exports.createIncident = async (req, res) => {
 exports.createStandaloneTask = async (req, res) => {
   const { title, note, priority = "P2", assigned_to_user_id, project_id } = req.body;
   const created_by = req.user?.id ?? null;
-
+ 
   if (!title?.trim())
     return res.status(400).json({ success: false, message: "Title is required" });
   if (!assigned_to_user_id)
     return res.status(400).json({ success: false, message: "Assignee is required" });
-
+ 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
+ 
     const { rows } = await client.query(
       `INSERT INTO tasks (title, note, priority, assigned_to, created_by)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [title.trim(), note ?? null, priority, assigned_to_user_id, created_by],
     );
-
+ 
     await client.query("COMMIT");
+ 
+    console.log("✅ Standalone task created, notifying assignee:", assigned_to_user_id);
+ 
+    // ── SINGLE notification rule ──────────────────────────────
+    // Only notify the ASSIGNEE — same logic as incidents.
+    const assigneeId = parseInt(assigned_to_user_id, 10);
+const creatorId  = created_by ? parseInt(created_by, 10) : null;
+ 
+if (assigneeId && assigneeId !== creatorId) {
+  await safeNotify(
+    assigneeId,
+    "task",
+    `New Task Assigned — ${title.trim()}`,
+    `You have been assigned: ${title.trim()}`,
+    "/project-coordinator/incidents?page=tasks",
+    "info",
+    null
+  );
+}
 
-    // ── Notification ─────────────────────────────────────────
-    try {
-      const coordinatorId = await getCoordinatorId(project_id);
-      if (coordinatorId) {
-        await insertNotification(
-          coordinatorId,
-          "task",
-          `New Task — ${title.trim()}`,
-          `Task created and assigned`,
-          "/project-coordinator/incidents?page=tasks",
-          "info"
-        );
-      }
-    } catch (notifErr) {
-      console.error("Notification error:", notifErr.message);
-    }
     // ─────────────────────────────────────────────────────────
-
+ 
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -314,18 +323,18 @@ exports.createStandaloneTask = async (req, res) => {
   }
 };
 
+
 exports.updateIncident = async (req, res) => {
   const { id } = req.params;
   const { title, description, priority, assigned_to_user_id } = req.body;
 
-  const fields = [];
-  const params = [];
+  const fields = [], params = [];
   let idx = 1;
 
-  if (title !== undefined)              { fields.push(`title = $${idx++}`);       params.push(title); }
-  if (description !== undefined)        { fields.push(`description = $${idx++}`); params.push(description); }
-  if (priority !== undefined)           { fields.push(`priority = $${idx++}`);    params.push(priority); }
-  if (assigned_to_user_id !== undefined){ fields.push(`assigned_to = $${idx++}`); params.push(assigned_to_user_id); }
+  if (title !== undefined)               { fields.push(`title = $${idx++}`);       params.push(title); }
+  if (description !== undefined)         { fields.push(`description = $${idx++}`); params.push(description); }
+  if (priority !== undefined)            { fields.push(`priority = $${idx++}`);    params.push(priority); }
+  if (assigned_to_user_id !== undefined) { fields.push(`assigned_to = $${idx++}`); params.push(assigned_to_user_id); }
 
   if (!fields.length)
     return res.status(400).json({ success: false, message: "No fields to update" });
@@ -338,6 +347,17 @@ exports.updateIncident = async (req, res) => {
     );
     if (!rows.length)
       return res.status(404).json({ success: false, message: "Incident not found" });
+
+    if (assigned_to_user_id) {
+      await safeNotify(
+        assigned_to_user_id, "incident",
+        `Incident Assigned — ${rows[0].title}`,
+        `You have been assigned: ${rows[0].title}`,
+        "/project-coordinator/incidents",
+        priority === "P1" ? "critical" : "warn", null
+      );
+    }
+
     res.json({ success: true, data: rows[0] });
   } catch (err) {
     console.error("updateIncident:", err);
@@ -346,9 +366,9 @@ exports.updateIncident = async (req, res) => {
 };
 
 exports.updateIncidentStatus = async (req, res) => {
-  const { id } = req.params;
+  const { id }     = req.params;
   const { status } = req.body;
-  const userId = req.user?.id ?? null;
+  const userId     = req.user?.id ?? null;
 
   const validStatuses = ["Created","Assigned","In Progress","Resolved","Closed"];
   if (!validStatuses.includes(status))
@@ -358,13 +378,9 @@ exports.updateIncidentStatus = async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Fetch existing row BEFORE update so we have title + project_id
+    // incidents has no project_id — just fetch the row
     const { rows: existing } = await client.query(
-      `SELECT i.*, p.coordinator_id, p.name AS project_name
-       FROM incidents i
-       LEFT JOIN projects p ON p.id = i.project_id
-       WHERE i.id = $1 AND i.is_deleted = FALSE`,
-      [id]
+      `SELECT * FROM incidents WHERE id = $1 AND is_deleted = FALSE`, [id]
     );
     if (!existing.length) {
       await client.query("ROLLBACK");
@@ -378,31 +394,22 @@ exports.updateIncidentStatus = async (req, res) => {
     );
 
     if (userId) {
-      try {
-        await patchHistoryUser(client, "incident_status_history", "incident_id", id, userId);
-      } catch (_) { /* non-fatal */ }
+      try { await patchHistoryUser(client, "incident_status_history", "incident_id", id, userId); }
+      catch (_) {}
     }
 
     await client.query("COMMIT");
 
-    // ── Notification when incident becomes overdue ────────────
-    if (status === "Overdue" || status === "Blocked") {
-      try {
-        if (row.coordinator_id) {
-          await insertNotification(
-            row.coordinator_id,
-            "incident",
-            `Incident ${status} — ${row.title}`,
-            `${row.title}${row.project_name ? ` on ${row.project_name}` : ""} is now ${status.toLowerCase()}`,
-            "/project-coordinator/incidents",
-            "warn"
-          );
-        }
-      } catch (notifErr) {
-        console.error("Notification error:", notifErr.message);
-      }
+    // Notify assignee of status change
+    if (row.assigned_to) {
+      await safeNotify(
+        row.assigned_to, "incident",
+        `Incident ${status} — ${row.title}`,
+        `"${row.title}" is now ${status}`,
+        "/project-coordinator/incidents",
+        status === "Resolved" ? "ok" : "info", null
+      );
     }
-    // ─────────────────────────────────────────────────────────
 
     res.json({ success: true, data: rows[0] });
   } catch (err) {
@@ -445,8 +452,7 @@ exports.addIncidentComment = async (req, res) => {
   try {
     const { rows } = await pool.query(
       `INSERT INTO incident_comments (incident_id, author_id, body)
-       VALUES ($1, $2, $3)
-       RETURNING id, body, created_at`,
+       VALUES ($1, $2, $3) RETURNING id, body, created_at`,
       [id, author_id, body.trim()],
     );
     res.status(201).json({ success: true, data: rows[0] });
@@ -461,14 +467,14 @@ exports.addIncidentComment = async (req, res) => {
 ══════════════════════════════════════════════════════════════ */
 
 exports.addIncidentPhoto = async (req, res) => {
-  const { id } = req.params;
+  const { id }      = req.params;
   const uploaded_by = req.user?.id ?? null;
 
   if (!req.body.url?.trim())
     return res.status(400).json({ success: false, message: "Photo data is required" });
 
   try {
-    const supabase = require("../config/supabase");
+    const supabase   = require("../config/supabase");
     const base64Data = req.body.url.replace(/^data:image\/\w+;base64,/, "");
     const buffer     = Buffer.from(base64Data, "base64");
     const mimeMatch  = req.body.url.match(/^data:(image\/\w+);base64,/);
@@ -485,8 +491,7 @@ exports.addIncidentPhoto = async (req, res) => {
 
     const { rows } = await pool.query(
       `INSERT INTO incident_photos (incident_id, url, uploaded_by)
-       VALUES ($1, $2, $3)
-       RETURNING id, url, uploaded_at`,
+       VALUES ($1, $2, $3) RETURNING id, url, uploaded_at`,
       [id, urlData.publicUrl, uploaded_by],
     );
     res.status(201).json({ success: true, data: rows[0] });
@@ -505,8 +510,7 @@ exports.getAllTasks = async (req, res) => {
     const { role, status, priority, search } = req.query;
     const userId = req.user?.id ?? null;
 
-    let conditions = [];
-    let params = [];
+    let conditions = [], params = [];
     let idx = 1;
 
     if (userId !== null) {
@@ -525,8 +529,7 @@ exports.getAllTasks = async (req, res) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const { rows } = await pool.query(
-      `SELECT * FROM v_task_queue ${where} ORDER BY created_at DESC`,
-      params,
+      `SELECT * FROM v_task_queue ${where} ORDER BY created_at DESC`, params,
     );
 
     const taskIds = rows.map((t) => t.id);
@@ -571,12 +574,9 @@ exports.getTasksByIncident = async (req, res) => {
   const { id } = req.params;
   try {
     const { rows } = await pool.query(
-      `SELECT
-         t.id, t.incident_id, t.task_no, t.title, t.note, t.priority, t.status,
-         t.done_at, t.created_at, t.updated_at,
-         u.id   AS assignee_id,
-         u.name AS assignee_name,
-         r.name AS role_name
+      `SELECT t.id, t.incident_id, t.task_no, t.title, t.note, t.priority, t.status,
+              t.done_at, t.created_at, t.updated_at,
+              u.id AS assignee_id, u.name AS assignee_name, r.name AS role_name
        FROM tasks t
        LEFT JOIN users u ON u.id = t.assigned_to
        LEFT JOIN roles r ON r.id = u.role_id
@@ -592,8 +592,8 @@ exports.getTasksByIncident = async (req, res) => {
 };
 
 exports.createTasks = async (req, res) => {
-  const { id } = req.params;
-  const { tasks } = req.body;
+  const { id }     = req.params;
+  const { tasks }  = req.body;
   const created_by = req.user?.id ?? null;
 
   if (!Array.isArray(tasks) || !tasks.length)
@@ -603,8 +603,9 @@ exports.createTasks = async (req, res) => {
   try {
     await client.query("BEGIN");
 
+    // ⚠️ incidents has no project_id — just verify incident exists
     const { rows: incRows } = await client.query(
-      `SELECT id, project_id FROM incidents WHERE id = $1 AND is_deleted = FALSE`, [id]
+      `SELECT id FROM incidents WHERE id = $1 AND is_deleted = FALSE`, [id]
     );
     if (!incRows.length) {
       await client.query("ROLLBACK");
@@ -618,7 +619,8 @@ exports.createTasks = async (req, res) => {
       let assignee_name = null, role_name = null;
       if (task.assigned_to_user_id) {
         const { rows: userRows } = await client.query(
-          `SELECT u.name, r.name AS role_name FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = $1`,
+          `SELECT u.name, r.name AS role_name FROM users u
+           LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = $1`,
           [task.assigned_to_user_id],
         );
         if (userRows.length) { assignee_name = userRows[0].name; role_name = userRows[0].role_name; }
@@ -634,6 +636,17 @@ exports.createTasks = async (req, res) => {
         tVals,
       );
       created.push({ ...rows[0], incident_id: id, assignee_name, role_name });
+
+      // Notify assignee of each task
+      if (task.assigned_to_user_id) {
+        await safeNotify(
+          task.assigned_to_user_id, "task",
+          `New Task Assigned — ${task.title.trim()}`,
+          `You have been assigned: ${task.title.trim()}`,
+          "/project-coordinator/incidents?page=tasks",
+          "info", null
+        );
+      }
     }
 
     await client.query("COMMIT");
@@ -648,9 +661,9 @@ exports.createTasks = async (req, res) => {
 };
 
 exports.updateTaskStatus = async (req, res) => {
-  const { taskId } = req.params;
+  const { taskId }  = req.params;
   const { status, blocked_reason } = req.body;
-  const userId = req.user?.id ?? null;
+  const userId      = req.user?.id ?? null;
 
   const validStatuses = ["Pending","In Progress","Done","Blocked"];
   if (!validStatuses.includes(status))
@@ -662,14 +675,8 @@ exports.updateTaskStatus = async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Fetch existing task BEFORE update to get title + project_id + coordinator_id
     const { rows: existing } = await client.query(
-      `SELECT t.*, p.coordinator_id, p.name AS project_name
-       FROM tasks t
-       LEFT JOIN incidents i ON i.id = t.incident_id
-       LEFT JOIN projects  p ON p.id = i.project_id
-       WHERE t.id = $1 AND t.is_deleted = FALSE`,
-      [taskId]
+      `SELECT * FROM tasks WHERE id = $1 AND is_deleted = FALSE`, [taskId]
     );
     if (!existing.length) {
       await client.query("ROLLBACK");
@@ -683,19 +690,12 @@ exports.updateTaskStatus = async (req, res) => {
     );
 
     if (userId) {
-      try {
-        await patchHistoryUser(client, "task_status_history", "task_id", taskId, userId);
-      } catch (_) { /* non-fatal */ }
+      try { await patchHistoryUser(client, "task_status_history", "task_id", taskId, userId); }
+      catch (_) {}
     }
 
     if (status === "Blocked") {
-      let authorId = userId;
-      if (!authorId) {
-        const { rows: taskRows } = await client.query(
-          `SELECT assigned_to FROM tasks WHERE id = $1`, [taskId]
-        );
-        authorId = taskRows[0]?.assigned_to ?? null;
-      }
+      const authorId = userId ?? row.assigned_to ?? null;
       if (authorId) {
         await client.query(
           `INSERT INTO task_comments (task_id, author_id, body, comment_type)
@@ -707,22 +707,16 @@ exports.updateTaskStatus = async (req, res) => {
 
     await client.query("COMMIT");
 
-    // ── Notification when task becomes Blocked ────────────────
-    if (status === "Blocked" && row.coordinator_id) {
-      try {
-        await insertNotification(
-          row.coordinator_id,
-          "task",
-          `Task Blocked — ${row.title}`,
-          `${row.title}${row.project_name ? ` on ${row.project_name}` : ""} is blocked`,
-          "/project-coordinator/incidents?page=tasks",
-          "warn"
-        );
-      } catch (notifErr) {
-        console.error("Notification error:", notifErr.message);
-      }
+    // Notify the task creator when blocked
+    if (status === "Blocked" && row.created_by) {
+      await safeNotify(
+        row.created_by, "task",
+        `Task Blocked — ${row.title}`,
+        `"${row.title}" has been blocked`,
+        "/project-coordinator/incidents?page=tasks",
+        "warn", null
+      );
     }
-    // ─────────────────────────────────────────────────────────
 
     res.json({ success: true, data: rows[0] });
   } catch (err) {
@@ -756,8 +750,8 @@ exports.deleteTask = async (req, res) => {
 
 exports.addTaskComment = async (req, res) => {
   const { taskId } = req.params;
-  const { body } = req.body;
-  const author_id = req.user?.id ?? null;
+  const { body }   = req.body;
+  const author_id  = req.user?.id ?? null;
 
   if (!body?.trim())
     return res.status(400).json({ success: false, message: "Comment body is required" });
@@ -777,14 +771,14 @@ exports.addTaskComment = async (req, res) => {
 };
 
 exports.addTaskPhoto = async (req, res) => {
-  const { taskId } = req.params;
+  const { taskId }  = req.params;
   const uploaded_by = req.user?.id ?? null;
 
   if (!req.body.url?.trim())
     return res.status(400).json({ success: false, message: "Photo data is required" });
 
   try {
-    const supabase = require("../config/supabase");
+    const supabase   = require("../config/supabase");
     const base64Data = req.body.url.replace(/^data:image\/\w+;base64,/, "");
     const buffer     = Buffer.from(base64Data, "base64");
     const mimeMatch  = req.body.url.match(/^data:(image\/\w+);base64,/);
@@ -801,8 +795,7 @@ exports.addTaskPhoto = async (req, res) => {
 
     const { rows } = await pool.query(
       `INSERT INTO task_photos (task_id, url, uploaded_by)
-       VALUES ($1, $2, $3)
-       RETURNING id, url, uploaded_at`,
+       VALUES ($1, $2, $3) RETURNING id, url, uploaded_at`,
       [taskId, urlData.publicUrl, uploaded_by],
     );
     res.status(201).json({ success: true, data: rows[0] });
@@ -820,22 +813,22 @@ exports.getStats = async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        COUNT(*)                                                                    AS total,
-        COUNT(*) FILTER (WHERE status NOT IN ('Resolved','Closed'))                 AS open,
-        COUNT(*) FILTER (WHERE status IN ('Resolved','Closed'))                     AS resolved,
-        COUNT(*) FILTER (WHERE priority = 'P1')                                     AS p1,
+        COUNT(*)                                                                         AS total,
+        COUNT(*) FILTER (WHERE status NOT IN ('Resolved','Closed'))                      AS open,
+        COUNT(*) FILTER (WHERE status IN ('Resolved','Closed'))                          AS resolved,
+        COUNT(*) FILTER (WHERE priority = 'P1')                                          AS p1,
         COUNT(*) FILTER (WHERE status NOT IN ('Resolved','Closed') AND deadline_at < NOW()) AS overdue
       FROM incidents WHERE is_deleted = FALSE
     `);
 
     const { rows: taskRows } = await pool.query(`
       SELECT
-        COUNT(*)                                                          AS total,
-        COUNT(*) FILTER (WHERE status = 'Pending')                        AS pending,
-        COUNT(*) FILTER (WHERE status = 'In Progress')                    AS in_progress,
-        COUNT(*) FILTER (WHERE status = 'Done')                           AS done,
-        COUNT(*) FILTER (WHERE status = 'Blocked')                        AS blocked,
-        COUNT(*) FILTER (WHERE priority = 'P1' AND status = 'Pending')    AS p1_urgent
+        COUNT(*)                                                           AS total,
+        COUNT(*) FILTER (WHERE status = 'Pending')                         AS pending,
+        COUNT(*) FILTER (WHERE status = 'In Progress')                     AS in_progress,
+        COUNT(*) FILTER (WHERE status = 'Done')                            AS done,
+        COUNT(*) FILTER (WHERE status = 'Blocked')                         AS blocked,
+        COUNT(*) FILTER (WHERE priority = 'P1' AND status = 'Pending')     AS p1_urgent
       FROM tasks WHERE is_deleted = FALSE
     `);
 

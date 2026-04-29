@@ -69,15 +69,45 @@ exports.getAllWBS = async (req, res) => {
 ──────────────────────────────────────────────*/
 exports.createWBSItem = async (req, res) => {
   const { project_id, code, name } = req.body;
-  if (!project_id || !name) return res.status(400).json({ error: "project_id and name required" });
+
+  if (!project_id || !name) {
+    return res.status(400).json({ error: "project_id and name required" });
+  }
+
   try {
     const { rows } = await pool.query(
-      `INSERT INTO wbs (project_id, code, name, parent_id, status, progress, budget, spent, visible_to_client)
-       VALUES ($1,$2,$3,NULL,'Not Started',0,0,0,false) RETURNING *`,
+      `INSERT INTO wbs (
+        project_id, code, name, parent_id,
+        status, progress, budget, spent, visible_to_client
+      )
+      VALUES ($1,$2,$3,NULL,'Not Started',0,0,0,false)
+      RETURNING *`,
       [project_id, code || "", name]
     );
-    return res.status(201).json({ ...rows[0], tasks: [] });
+
+    const newMilestone = rows[0];
+
+    const proj = await pool.query(
+      `SELECT coordinator_id FROM projects WHERE id = $1`,
+      [project_id]
+    );
+    const coordinatorId = proj.rows[0]?.coordinator_id;
+
+    if (coordinatorId) {
+      await insertNotification(
+        coordinatorId,
+        "milestone",
+        "New Milestone Created",
+        `${name} milestone added`,
+        "/project-coordinator/milestone",
+        "info",
+        project_id
+      );
+    }
+
+    return res.status(201).json({ ...newMilestone, tasks: [] });
   } catch (err) {
+    console.error("CREATE WBS ERROR:", err.message);
     return res.status(500).json({ error: err.message });
   }
 };
@@ -87,7 +117,8 @@ exports.createWBSItem = async (req, res) => {
 ──────────────────────────────────────────────*/
 exports.createWBSTask = async (req, res) => {
   const { project_id, parent_id, code, name } = req.body;
-  if (!project_id || !parent_id || !name) return res.status(400).json({ error: "project_id, parent_id and name required" });
+  if (!project_id || !parent_id || !name)
+    return res.status(400).json({ error: "project_id, parent_id and name required" });
   try {
     const { rows } = await pool.query(
       `INSERT INTO wbs (project_id, code, name, parent_id, status, progress)
@@ -139,11 +170,12 @@ exports.updateWBSItem = async (req, res) => {
       }
     }
 
-    // ── Notification: milestone manually set to Delayed ──────
+    // ── Notification: top-level milestone manually set to Delayed ──
+    // FIX: was using undefined `ms` variable — now correctly uses rows[0] + a fresh query
     if (
       req.body.status &&
       req.body.status.toLowerCase() === "delayed" &&
-      !rows[0].parent_id  // only for top-level milestones, not subtasks
+      !rows[0].parent_id   // only top-level milestones, not subtasks
     ) {
       try {
         const projResult = await pool.query(
@@ -158,16 +190,17 @@ exports.updateWBSItem = async (req, res) => {
             coordinatorId,
             "milestone",
             `Milestone Delayed — ${rows[0].name}`,
-            "Status set to Delayed",
+            "Milestone has been marked as Delayed",
             "/project-coordinator/milestone",
-            "critical"
+            "critical",
+            rows[0].project_id
           );
         }
       } catch (notifErr) {
         console.error("Notification error:", notifErr.message);
       }
     }
-    // ─────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
 
     return res.json(rows[0]);
   } catch (err) {
@@ -191,12 +224,12 @@ async function syncParentStatus(parentId) {
     const active   = statuses.filter((s) => s === "in progress" || s === "in-progress").length;
     const delayed  = statuses.filter((s) => s === "delayed").length;
 
-    let newStatus  = "Not Started";
-    let progress   = 0;
+    let newStatus = "Not Started";
+    let progress  = 0;
 
-    if (done === all)    { newStatus = "Completed"; progress = 100; }
-    else if (delayed > 0){ newStatus = "Delayed";   progress = Math.round(done/all*100); }
-    else if (active > 0 || done > 0) { newStatus = "In Progress"; progress = Math.round(done/all*100); }
+    if (done === all)         { newStatus = "Completed";   progress = 100; }
+    else if (delayed > 0)     { newStatus = "Delayed";     progress = Math.round(done / all * 100); }
+    else if (active > 0 || done > 0) { newStatus = "In Progress"; progress = Math.round(done / all * 100); }
 
     await pool.query(
       `UPDATE wbs SET status = $1, progress = $2 WHERE id = $3`,
@@ -207,7 +240,7 @@ async function syncParentStatus(parentId) {
     if (newStatus === "Delayed") {
       try {
         const parentResult = await pool.query(
-          `SELECT w.name, p.coordinator_id
+          `SELECT w.name, p.coordinator_id, p.id AS project_id
            FROM wbs w
            JOIN projects p ON p.id = w.project_id
            WHERE w.id = $1`,
@@ -221,7 +254,8 @@ async function syncParentStatus(parentId) {
             `Milestone Delayed — ${ms.name}`,
             "One or more subtasks marked as Delayed",
             "/project-coordinator/milestone",
-            "critical"
+            "critical",
+            ms.project_id
           );
         }
       } catch (notifErr) {
@@ -259,7 +293,7 @@ exports.autoPlanWBS = async (req, res) => {
     const map = {};
     for (const item of items) {
       const parentId = item.parent_id ? map[item.parent_id] : null;
-      const { rows }  = await pool.query(
+      const { rows } = await pool.query(
         `INSERT INTO wbs (project_id,code,name,parent_id,status,progress,budget,spent,visible_to_client)
          VALUES ($1,$2,$3,$4,'Not Started',0,0,0,false) RETURNING id`,
         [project_id, item.code, item.name, parentId]
@@ -301,13 +335,13 @@ exports.getSEAlerts = async (req, res) => {
 exports.applySEAlert = async (req, res) => {
   const { id } = req.params;
   try {
-    /* Fetch the alert with milestone name, subtask name, coordinator_id */
     const { rows: alertRows } = await pool.query(
       `SELECT
          sa.*,
          w.name        AS milestone_name,
          wt.name       AS subtask_name,
-         p.coordinator_id
+         p.coordinator_id,
+         p.id          AS project_id
        FROM site_engineer_daily_updates sa
        JOIN wbs      w  ON w.id  = sa.milestone_id
        JOIN projects p  ON p.id  = w.project_id
@@ -318,7 +352,6 @@ exports.applySEAlert = async (req, res) => {
     if (!alertRows.length) return res.status(404).json({ error: "Alert not found" });
     const alert = alertRows[0];
 
-    /* Apply status to subtask first (if provided), then milestone */
     if (alert.subtask_id && alert.suggested_status) {
       await pool.query(
         `UPDATE wbs SET status = $1 WHERE id = $2`,
@@ -337,7 +370,6 @@ exports.applySEAlert = async (req, res) => {
       }
     }
 
-    /* Mark as applied */
     await pool.query(
       `UPDATE site_engineer_daily_updates SET applied = true WHERE id = $1`,
       [id]
@@ -353,7 +385,8 @@ exports.applySEAlert = async (req, res) => {
           `SE Update — ${alert.milestone_name}`,
           `${alert.subtask_name || alert.milestone_name} marked ${alert.suggested_status} by ${alert.submitted_by}`,
           "/project-coordinator/milestone",
-          severity
+          severity,
+          alert.project_id
         );
       } catch (notifErr) {
         console.error("Notification error:", notifErr.message);

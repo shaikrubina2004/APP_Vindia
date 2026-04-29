@@ -76,47 +76,60 @@ export default function IncidentManagement({
   };
 
   const handleCreate = async () => {
-    if (!form.title.trim() || !form.assignedId) return;
-    setSaving(true);
-    try {
-      const res = await API.post("/incidents", {
-        title: form.title.trim(),
-        description: form.description.trim(),
-        priority: form.priority,
-        assigned_to_user_id: form.assignedId,
+  if (!form.title.trim() || !form.assignedId) return;
+  setSaving(true);
+
+  try {
+    // ✅ DEFINE payload FIRST
+    const payload = {
+      title: form.title.trim(),
+      description: form.description.trim(),
+      priority: form.priority,
+      assigned_to_user_id: form.assignedId,
+    };
+
+    // ✅ NOW log it
+    console.log("📤 INCIDENT PAYLOAD:", payload);
+
+    // ✅ USE payload
+    const res = await API.post("/incidents", payload);
+
+    const newIncidentId = res.data.data.id;
+
+    if (photoPreview && newIncidentId) {
+      await API.post(`/incidents/${newIncidentId}/photos`, {
+        url: photoPreview,
       });
-
-      const newIncidentId = res.data.data.id;
-
-      // Upload photo if attached
-      if (photoPreview && newIncidentId) {
-        await API.post(`/incidents/${newIncidentId}/photos`, {
-          url: photoPreview,
-        });
-      }
-
-      await refreshIncident(newIncidentId);
-      setForm({
-        title: "",
-        description: "",
-        priority: "P2",
-        assignedId: "",
-        roleName: "",
-      });
-      setPhotoPreview(null);
-      setShowCreate(false);
-    } catch (err) {
-      console.error("createIncident:", err);
-      alert(
-        "Failed to create incident: " +
-          (err.response?.data?.detail ??
-            err.response?.data?.message ??
-            err.message),
-      );
-    } finally {
-      setSaving(false);
     }
-  };
+
+    await refreshIncident(newIncidentId);
+
+    setForm({
+      title: "",
+      description: "",
+      priority: "P2",
+      assignedId: "",
+      roleName: "",
+    });
+
+    setPhotoPreview(null);
+    setShowCreate(false);
+
+    // ✅ ADD THIS LINE
+    setTimeout(() => window.refreshNotifications?.(), 1500);
+
+  } catch (err) {
+    console.error("createIncident:", err);
+    alert(
+      "Failed to create incident: " +
+      (err.response?.data?.detail ??
+       err.response?.data?.message ??
+       err.message)
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
   const advanceStatus = async (inc) => {
     const idx = STATUS_FLOW.indexOf(inc.status);

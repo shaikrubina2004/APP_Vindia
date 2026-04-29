@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { insertNotification } = require("./pcNotificationsController");
 
 /**
  * ✅ Create Project
@@ -21,20 +22,20 @@ exports.createProject = async (req, res) => {
       phone,
     } = req.body;
 
-    // ✅ Basic validation
+    // ✅ Validation
     if (!name || !client || !budget) {
       return res.status(400).json({
         error: "Name, Client and Budget are required",
       });
     }
 
-    // ✅ Phone validation (optional)
     if (phone && phone.length !== 10) {
       return res.status(400).json({
         error: "Phone must be 10 digits",
       });
     }
 
+    // ✅ Create Project
     const result = await pool.query(
       `INSERT INTO projects (
         name, client, start_date, end_date, budget,
@@ -61,7 +62,31 @@ exports.createProject = async (req, res) => {
       ]
     );
 
-    res.status(201).json(result.rows[0]);
+    const newProject = result.rows[0];
+
+    // ✅ Get coordinator_id for this project
+    const proj = await pool.query(
+      `SELECT coordinator_id FROM projects WHERE id = $1`,
+      [newProject.id]
+    );
+
+    const coordinatorId = proj.rows[0]?.coordinator_id;
+
+    // ✅ Send notification (only if coordinator exists)
+    if (coordinatorId) {
+      await insertNotification(
+        coordinatorId,
+        "project",
+        "New Project Created",
+        `Project "${name}" is created`,
+        "/project-coordinator/dashboard", // 👈 better navigation
+        "info",
+        newProject.id
+      );
+    }
+
+    // ✅ Response
+    res.status(201).json(newProject);
 
   } catch (err) {
     console.error("🔥 CREATE ERROR:", err.message);

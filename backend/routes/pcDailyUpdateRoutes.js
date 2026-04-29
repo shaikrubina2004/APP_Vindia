@@ -59,6 +59,15 @@ router.post("/", async (req, res) => {
         approval_from || "Project Manager"
       ]
     );
+    await insertNotification(
+  46,
+  "work",
+  "New Daily Update",
+  "Site engineer submitted update",
+  "/project-coordinator/daily",
+  "info",
+  project_id
+);
 
     // Update project progress
     await pool.query(

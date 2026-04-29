@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./NotificationBell.css";
 
 const TYPE_CFG = {
+  project:  { label: "Project",   color: "#0ea5e9", bg: "#e0f2fe" },
   payment:  { label: "Payment",   color: "#2563eb", bg: "#eff6ff" },
   incident: { label: "Incident",  color: "#dc2626", bg: "#fef2f2" },
-  work:     { label: "Work",      color: "#ca8a04", bg: "#fefce8" },
   task:     { label: "Task",      color: "#7c3aed", bg: "#f5f3ff" },
   milestone:{ label: "Milestone", color: "#0891b2", bg: "#ecfeff" },
 };
@@ -17,102 +17,135 @@ const SEV_COLOR = {
   ok:       "#10b981",
 };
 
-export default function NotificationBell({ userId, onMarkRead, onMarkAllRead }) {
-  const navigate = useNavigate();
-  const [open,   setOpen]   = useState(false);
-  const [filter, setFilter] = useState("all");
-  const [notifs, setNotifs] = useState([]);
+const FILTERS = ["all", "project", "milestone", "incident", "task", "payment"];
 
-  // ── Fetch from backend ──
-  const fetchNotifs = async () => {
+export default function NotificationBell({ userId }) {
+  const navigate = useNavigate();
+  const [open,     setOpen]     = useState(false);
+  const [filter,   setFilter]   = useState("all");
+  const [notifs,   setNotifs]   = useState([]);
+  const [showRead, setShowRead] = useState(false);
+
+  const fetchNotifs = useCallback(async () => {
     if (!userId) return;
     try {
-      const res  = await fetch(`/api/pc-notifications/${userId}`);
+      const res  = await fetch(`http://localhost:5000/api/pc-notifications/${userId}`);
       const data = await res.json();
       setNotifs(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Notification fetch error:", err);
     }
-  };
+  }, [userId]);
 
   // Initial fetch
-  useEffect(() => {
-    fetchNotifs();
-  }, [userId]);
+  useEffect(() => { fetchNotifs(); }, [fetchNotifs]);
 
-  // ── Poll every 30 seconds ──
+  // Poll every 10 seconds (reduced from 30)
   useEffect(() => {
     if (!userId) return;
-    const interval = setInterval(fetchNotifs, 30000);
+    const interval = setInterval(fetchNotifs, 10000);
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [userId, fetchNotifs]);
+
+  // Expose refresh globally so other components can trigger it
+  // Usage from anywhere: window.refreshNotifications?.()
+  useEffect(() => {
+    window.refreshNotifications = fetchNotifs;
+    return () => { delete window.refreshNotifications; };
+  }, [fetchNotifs]);
 
   const unreadCount = notifs.filter(n => !n.is_read).length;
 
   const markRead = async (id) => {
     setNotifs(p => p.map(n => n.id === id ? { ...n, is_read: true } : n));
     try {
-      await fetch(`/api/pc-notifications/${id}/read`, { method: "PATCH" });
-    } catch (err) {
-      console.error(err);
-    }
+      await fetch(`http://localhost:5000/api/pc-notifications/${id}/read`, { method: "PATCH" });
+    } catch (err) { console.error(err); }
   };
 
   const markAllRead = async () => {
     setNotifs(p => p.map(n => ({ ...n, is_read: true })));
     try {
-      await fetch(`/api/pc-notifications/read-all/${userId}`, { method: "PATCH" });
-    } catch (err) {
-      console.error(err);
-    }
+      await fetch(`http://localhost:5000/api/pc-notifications/read-all/${userId}`, { method: "PATCH" });
+    } catch (err) { console.error(err); }
   };
 
-  const shown = filter === "all"
-    ? notifs
-    : notifs.filter(n => n.type === filter);
-
-  const handleGoToPage = (e, link, id) => {
+  const handleGoToPage = (e, n) => {
     e.stopPropagation();
-    markRead(id);
+    markRead(n.id);
     setOpen(false);
-    navigate(link);
+    const routes = {
+      project:   "/project-coordinator/dashboard",
+      milestone: "/project-coordinator/milestone",
+      task:      "/project-coordinator/incidents?page=tasks",
+      incident:  "/project-coordinator/incidents",
+      payment:   "/project-coordinator/payments",
+    };
+    navigate(routes[n.type] ?? "/project-coordinator/dashboard");
   };
 
-  // ── Time formatter ──
   const formatTime = (ts) => {
     const d    = new Date(ts);
     const now  = new Date();
-    const diff = Math.floor((now - d) / 60000); // minutes
-    if (diff < 1)  return "Just now";
-    if (diff < 60) return `${diff}m ago`;
+    const diff = Math.floor((now - d) / 60000);
+    if (diff < 1)    return "Just now";
+    if (diff < 60)   return `${diff}m ago`;
     if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
     return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   };
 
+  const byType     = filter === "all" ? notifs : notifs.filter(n => n.type === filter);
+  const unreadList = byType.filter(n => !n.is_read);
+  const readList   = byType.filter(n =>  n.is_read);
+
+  const NotifCard = ({ n, dimmed = false }) => {
+    const tc = TYPE_CFG[n.type] ?? TYPE_CFG.task;
+    return (
+      <div
+        className={`notif-item ${dimmed ? "read" : "unread"}`}
+        onClick={(e) => handleGoToPage(e, n)}
+      >
+        <div
+          className="notif-item__dot"
+          style={{ background: SEV_COLOR[n.severity] ?? SEV_COLOR.info }}
+        />
+        <div className="notif-item__body">
+          <div className="notif-item__top">
+            <span className="notif-type-chip" style={{ background: tc.bg, color: tc.color }}>
+              {tc.label}
+            </span>
+            <span className="notif-item__time">{formatTime(n.created_at)}</span>
+            {!dimmed && <span className="notif-unread-dot" />}
+          </div>
+          <p className="notif-item__title">{n.title}</p>
+          <p className="notif-item__desc">{n.description}</p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
-      {/* Bell Button */}
       <button
         className="navbar-icon-btn notif-bell-btn"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => {
+          setOpen(o => !o);
+          // Refresh when opening the panel
+          if (!open) fetchNotifs();
+        }}
         title="Notifications"
       >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
-        {unreadCount > 0 && (
-          <span className="notif-bell-badge">{unreadCount}</span>
-        )}
+        {unreadCount > 0 && <span className="notif-bell-badge">{unreadCount}</span>}
       </button>
 
-      {/* Panel */}
       {open && (
         <div className="notif-overlay" onClick={() => setOpen(false)}>
           <div className="notif-panel" onClick={e => e.stopPropagation()}>
 
-            {/* Header */}
             <div className="notif-panel__header">
               <div>
                 <h3 className="notif-panel__title">Notifications</h3>
@@ -130,54 +163,44 @@ export default function NotificationBell({ userId, onMarkRead, onMarkAllRead }) 
               </div>
             </div>
 
-            {/* Filters */}
             <div className="notif-filters">
-              {["all", "milestone", "work", "incident", "task", "payment"].map(f => (
-                <button key={f}
+              {FILTERS.map(f => (
+                <button
+                  key={f}
                   className={`notif-filter-btn ${filter === f ? "active" : ""}`}
-                  onClick={() => setFilter(f)}>
+                  onClick={() => setFilter(f)}
+                >
                   {f.charAt(0).toUpperCase() + f.slice(1)}
                 </button>
               ))}
             </div>
 
-            {/* List */}
             <div className="notif-list">
-              {shown.length === 0 && (
-                <p className="notif-empty">No alerts in this category.</p>
+              {unreadList.length === 0 ? (
+                <p className="notif-empty">
+                  {readList.length === 0 ? "You're all caught up ✓" : "No new notifications"}
+                </p>
+              ) : (
+                unreadList.map(n => <NotifCard key={n.id} n={n} dimmed={false} />)
               )}
-              {shown.map(n => {
-                const tc = TYPE_CFG[n.type] || TYPE_CFG.work;
-                return (
-                  <div key={n.id}
-                    className={`notif-item ${n.is_read ? "read" : "unread"}`}
-                    onClick={() => markRead(n.id)}>
-                    <div className="notif-item__dot"
-                      style={{ background: SEV_COLOR[n.severity] || SEV_COLOR.info }} />
-                    <div className="notif-item__body">
-                      <div className="notif-item__top">
-                        <span className="notif-type-chip"
-                          style={{ background: tc.bg, color: tc.color }}>
-                          {tc.label}
-                        </span>
-                        <span className="notif-item__time">
-                          {formatTime(n.created_at)}
-                        </span>
-                        {!n.is_read && <span className="notif-unread-dot" />}
-                      </div>
-                      <p className="notif-item__title">{n.title}</p>
-                      <p className="notif-item__desc">{n.description}</p>
-                      {n.link && (
-                        <button
-                          className="notif-goto"
-                          onClick={(e) => handleGoToPage(e, n.link, n.id)}>
-                          Go to page →
-                        </button>
-                      )}
+
+              {readList.length > 0 && (
+                <>
+                  <button
+                    className="notif-show-read-btn"
+                    onClick={() => setShowRead(v => !v)}
+                  >
+                    {showRead
+                      ? "▲ Hide read notifications"
+                      : `▼ Show ${readList.length} read notification${readList.length > 1 ? "s" : ""}`}
+                  </button>
+                  {showRead && (
+                    <div className="notif-read-section">
+                      {readList.map(n => <NotifCard key={n.id} n={n} dimmed={true} />)}
                     </div>
-                  </div>
-                );
-              })}
+                  )}
+                </>
+              )}
             </div>
 
           </div>
