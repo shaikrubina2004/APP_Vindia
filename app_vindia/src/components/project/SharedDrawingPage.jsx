@@ -576,7 +576,7 @@ function VersionsPanel({
           {/* timeline */}
           <div className="dr-ver-timeline">
             {versions.map((v, i) => {
-              const showClashBtn = isNonMEP && v.current;
+              const showClashBtn = v.current && !canUpload(role, drawing.disc);
               return (
                 <div className="dr-ver-entry" key={v.rev}>
                   <div className="dr-ver-spine">
