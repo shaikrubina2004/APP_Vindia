@@ -39,34 +39,7 @@ const pool = require("../config/db");
 })();
 
 // ── Auto-create cost_reports table ────────────────────────────────────────────
-(async () => {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS cost_reports (
-        id              SERIAL        PRIMARY KEY,
-        project_id      INTEGER       NOT NULL,
-        project_name    VARCHAR(255)  NOT NULL,
-        milestone_id    INTEGER       NOT NULL,
-        milestone_name  VARCHAR(255)  NOT NULL,
-        boq_id          INTEGER       NOT NULL,
-        items           JSONB         NOT NULL DEFAULT '[]',
-        total_cost      NUMERIC(15,2) NOT NULL DEFAULT 0,
-        status          VARCHAR(50)   NOT NULL DEFAULT 'pending_pm',
-        pm_comment      TEXT                   DEFAULT '',
-        created_date    DATE                   DEFAULT CURRENT_DATE,
-        updated_date    DATE,
-        created_at      TIMESTAMP              DEFAULT NOW(),
-        updated_at      TIMESTAMP              DEFAULT NOW()
-      );
-      CREATE INDEX IF NOT EXISTS idx_cr_project   ON cost_reports (project_id);
-      CREATE INDEX IF NOT EXISTS idx_cr_status    ON cost_reports (status);
-      CREATE INDEX IF NOT EXISTS idx_cr_boq       ON cost_reports (boq_id);
-    `);
-    console.log("✅ cost_reports table ready");
-  } catch (err) {
-    console.error("❌ cost_reports table setup failed:", err.message);
-  }
-})();
+
 
 // ── Format BOQ row for API response ──────────────────────────────────────────
 function formatBoq(r) {
