@@ -9,7 +9,7 @@ const {
   approveReport,
   rejectReport,
   deleteReport,
-} = require("../controllers/costReportController");
+} = require("../controllers/costReportcontroller");
 
 router.put("/approve/:id", approveReport);
 router.put("/reject/:id",  rejectReport);
