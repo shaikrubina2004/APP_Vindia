@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useReducer } from "react";
 import ReactDOM from "react-dom";
-import "./ArchitectDesigns.css";
+//import "./ArchitectDesigns.css";
 import { getArchitectProjects } from "../../services/architectprojectService";
 // ─── Constants ────────────────────────────────────────────────────────────────
 

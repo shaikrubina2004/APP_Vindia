@@ -476,16 +476,7 @@ const AppRoutes = () => {
 
       {/* STRUCTURAL */}
       {/* SHARED DRAWING PAGE — Structural */}
-      <Route
-        path="/structural-engineer/shared/drawings"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.STRUCTURAL_ENGINEER]}>
-            <ProjectManagerLayout>
-              <SharedDrawingPage />
-            </ProjectManagerLayout>
-          </ProtectedRoute>
-        }
-      />
+
       <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
       <Route path="/structural-engineer/rfi/:id" element={<RFIDetails />} />
 
