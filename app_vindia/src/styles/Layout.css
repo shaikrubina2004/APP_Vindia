@@ -1,6 +1,9 @@
 /* ============================= */
 /* MAIN APP LAYOUT */
 /* ============================= */
+body, html {
+  overflow-x: hidden;
+}
 
 .app-layout {
   display: flex;
@@ -55,25 +58,23 @@
 /* MAIN SECTION */
 /* ============================= */
 
+/* AFTER */
 .main-section {
   margin-left: 80px;
-    flex: 1;              /* 🔥 THIS IS KEY */
-  min-width: 0;         
-  width: calc(100% - 80px); /* 🔥 IMPORTANT FIX */
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  display: flex;
+  flex-direction: column;
+  /* NO overflow-x here */
 }
-
-/* ============================= */
-/* PAGE CONTENT */
-/* ============================= */
 
 .page-content {
   margin-top: 70px;
   padding: 12px 20px;
   width: 100%;
-  flex: 1;
-    box-sizing: border-box;
-
-  overflow: visible;
+  box-sizing: border-box;
+  /* NO overflow-x here */
 }
 
 /* ============================= */

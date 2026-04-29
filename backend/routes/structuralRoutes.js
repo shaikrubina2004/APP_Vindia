@@ -24,16 +24,22 @@ router.get("/dashboard", async (req, res) => {
   try {
     const drawingsResult = await pool.query("SELECT COUNT(*) FROM drawings");
 
-    const latestVersionResult = await pool.query(
-      "SELECT version FROM drawings ORDER BY created_at DESC LIMIT 1"
-    );
+    let latestVersion = "N/A";
+    try {
+      const latestVersionResult = await pool.query(
+        "SELECT version FROM drawings ORDER BY created_at DESC LIMIT 1",
+      );
+      latestVersion = latestVersionResult.rows[0]?.version || "N/A";
+    } catch (err) {
+      console.log("⚠️ version column missing in drawings table");
+    }
 
     let incidentsCount = 0;
     let notificationsCount = 0;
 
     try {
       const incidentsResult = await pool.query(
-        "SELECT COUNT(*) FROM incidents WHERE status='pending'"
+        "SELECT COUNT(*) FROM incidents WHERE status='pending'",
       );
       incidentsCount = parseInt(incidentsResult.rows[0].count);
     } catch (err) {
@@ -42,7 +48,7 @@ router.get("/dashboard", async (req, res) => {
 
     try {
       const notificationsResult = await pool.query(
-        "SELECT COUNT(*) FROM notifications"
+        "SELECT COUNT(*) FROM notifications",
       );
       notificationsCount = parseInt(notificationsResult.rows[0].count);
     } catch (err) {
@@ -50,11 +56,11 @@ router.get("/dashboard", async (req, res) => {
     }
 
     res.json({
-      totalDrawings: parseInt(drawingsResult.rows[0].count),
-      latestVersion: latestVersionResult.rows[0]?.version || "N/A",
-      pendingIncidents: incidentsCount,
-      notifications: notificationsCount,
-    });
+  totalDrawings: parseInt(drawingsResult.rows[0].count),
+  latestVersion,   // ✅ uses the safely-fetched value
+  pendingIncidents: incidentsCount,
+  notifications: notificationsCount,
+});
   } catch (err) {
     console.error("Dashboard Error:", err);
     res.status(500).json({ error: err.message });
@@ -76,7 +82,7 @@ router.post("/upload-drawing", upload.single("file"), async (req, res) => {
 
     await pool.query(
       "INSERT INTO drawings (name, version, file_url, uploaded_by) VALUES ($1, $2, $3, $4)",
-      [name, version, file_url, uploaded_by]
+      [name, version, file_url, uploaded_by],
     );
 
     res.json({ message: "Drawing uploaded successfully" });
@@ -92,7 +98,7 @@ router.post("/upload-drawing", upload.single("file"), async (req, res) => {
 router.get("/drawings", async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM drawings ORDER BY created_at DESC"
+      "SELECT * FROM drawings ORDER BY created_at DESC",
     );
     res.json(result.rows);
   } catch (err) {
@@ -135,44 +141,15 @@ router.put("/drawings/:id/status", async (req, res) => {
       return res.status(400).json({ error: "Invalid role" });
     }
 
-    await pool.query(
-      `UPDATE drawings SET ${column}=$1 WHERE id=$2`,
-      [status, id]
-    );
+    await pool.query(`UPDATE drawings SET ${column}=$1 WHERE id=$2`, [
+      status,
+      id,
+    ]);
 
     res.json({ message: "Updated successfully" });
   } catch (err) {
     console.error("Update Error:", err);
     res.status(500).json({ error: "Failed" });
-  }
-});
-
-// ==============================
-// 📋 BOQ ROUTE
-// ==============================
-router.get("/boq", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM boq ORDER BY id DESC");
-    res.json(result.rows);
-  } catch (err) {
-    console.error("BOQ ERROR DETAIL:", err.message);  // ← check your terminal now
-    res.status(500).json({ error: err.message });     // ← also send it to browser
-  }
-});
-
-router.put("/:projectId/submit-to-qs", async (req, res) => {
-  const { projectId } = req.params;
-
-  try {
-    await pool.query(
-      `UPDATE boq SET status = 'submitted_to_qs' WHERE project_id = $1`,
-      [projectId]
-    );
-
-    res.json({ message: "Submitted to QS successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
   }
 });
 

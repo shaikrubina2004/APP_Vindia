@@ -120,8 +120,8 @@ try {
   app.use("/api/structural", structuralRoutes);
   app.use("/api/se-daily-reports", seDailyRoutes); // ✅ SE route
   app.use("/rfis", rfiRoutes);
-  app.use("/api/se-notifications", require("./routes/seNotificationRoutes"));
-  /* ── QS Modules ───────────────── */
+// ✅ Use the import from the top of the file
+app.use("/api/se-notifications", seNotificationRoutes);  /* ── QS Modules ───────────────── */
   app.use("/api/qs", qsRoutes);
   app.use("/api/qs", qsRoutes);
  app.use("/api/boq", boqRoutes);
