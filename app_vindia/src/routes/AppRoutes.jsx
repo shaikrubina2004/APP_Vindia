@@ -48,8 +48,6 @@ import Qsboq from "../pages/Quality Surveyor/Qsboq";
 import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
 import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
 
-
-
 /* MEP ROLES */
 import MEPDashboard from "../pages/MEP Engineer/MEPDashboard";
 import MEPDailylog from "../pages/MEP Engineer/MEPDailylog";
@@ -404,7 +402,6 @@ const AppRoutes = () => {
           </QuantitySurveyorLayout>
         }
       />
-      
 
       <Route
         path="/quantity-surveyor/incident"
@@ -423,7 +420,6 @@ const AppRoutes = () => {
         }
       />
 
-      
       <Route
         path="/quantity-surveyor/quantity-report"
         element={
@@ -479,10 +475,32 @@ const AppRoutes = () => {
       />
 
       {/* STRUCTURAL */}
+      {/* SHARED DRAWING PAGE — Structural */}
+      <Route
+        path="/structural-engineer/shared/drawings"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.STRUCTURAL_ENGINEER]}>
+            <ProjectManagerLayout>
+              <SharedDrawingPage />
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
       <Route path="/structural-engineer/rfi/:id" element={<RFIDetails />} />
 
       {/* ARCHITECT */}
+      {/* SHARED DRAWING PAGE — Architect */}
+      <Route
+        path="/architect/shared/drawings"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
+            <ArchitectLayout>
+              <SharedDrawingPage />
+            </ArchitectLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/architect/dashboard"
         element={
