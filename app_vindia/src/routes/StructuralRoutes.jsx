@@ -13,7 +13,7 @@ function StructuralRoutes() {
         {/* Redirect bare /structural-engineer to dashboard */}
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard"     element={<Dashboard />} />
-        <Route path="drawings"      element={<Drawings />} />
+        <Route path="shared/drawings"      element={<Drawings />} />
         <Route path="rfi"           element={<RFI />} />
         <Route path="incidents"     element={<AppShell />} />
         <Route path="daily-updates" element={<SEDailyUpdates />} />

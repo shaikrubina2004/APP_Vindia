@@ -2,7 +2,7 @@ export const StructuralEngineerMenu = [
   { name: "Dashboard", path: "/structural-engineer/dashboard", icon: "home" },
   {
     name: "Drawings",
-    path: "/structural-engineer/drawings",
+    path: "/structural-engineer/shared/drawings",
     icon: "file-text",
   },
   { name: "BOQ", path: "/structural-engineer/boq", icon: "clipboard" },
