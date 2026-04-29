@@ -56,7 +56,7 @@ const STAGE_LABELS = {
   qs:         "Quantity Surveyor",
   site:       "Site Engineer",
   pm:         "Project Manager",
-  client:     "Client",
+  client:     "Client",    
 };
 
 // ─── Stage order ──────────────────────────────────────────────────────────────
