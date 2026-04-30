@@ -1,11 +1,16 @@
-// FILE PATH: src/components/SENotificationBell/SENotificationBell.jsx
-// (or wherever your current SENotificationBell lives — same location as before)
+// FILE PATH: src/components/notifications/SENotificationBell.jsx
+// ─────────────────────────────────────────────────────────────────────────────
+// Bell icon + sliding notification panel for the Structural Engineer role.
+// Only shows real notifications from the DB (no dummy data).
+// Clicking a notification marks it read and navigates to the linked page.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSENotifications } from "../../context/useSENotifications";
 import "./SENotificationBell.css";
 
+// ── Type config: chip colour per notification type ────────────────────────────
 const TYPE_CFG = {
   drawing:  { label: "Drawing",  color: "#0891b2", bg: "#ecfeff" },
   incident: { label: "Incident", color: "#dc2626", bg: "#fef2f2" },
@@ -25,12 +30,13 @@ const SEV_COLOR = {
   ok:       "#10b981",
 };
 
-const FILTERS = ["all", "drawing", "rfi", "incident", "task", "boq", "handover", "work"];
+// Only show filters for types that have real data or are relevant modules
+const FILTERS = ["all", "drawing", "approval", "rfi", "incident", "task", "boq", "work"];
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "Just now";
+  const m    = Math.floor(diff / 60_000);
+  if (m < 1)  return "Just now";
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
@@ -38,11 +44,11 @@ function timeAgo(dateStr) {
 }
 
 export default function SENotificationBell() {
-  const { notifications, unreadCount, markAllRead, removeNotification } =
+  const { notifications, unreadCount, markAllRead, removeNotification, loading } =
     useSENotifications();
 
   const navigate = useNavigate();
-  const [open, setOpen]     = useState(false);
+  const [open,   setOpen]   = useState(false);
   const [filter, setFilter] = useState("all");
 
   const shown =
@@ -50,30 +56,31 @@ export default function SENotificationBell() {
       ? notifications
       : notifications.filter((n) => n.type === filter);
 
-  // Click a notification:
-  // 1. Remove from UI + mark read in DB via context.removeNotification
-  // 2. Close panel
-  // 3. Navigate to linked page
+  // Click: remove from UI + mark read in DB, then navigate
   const handleItemClick = async (n) => {
-    await removeNotification(n.id); // handles both UI removal and DB persistence
+    await removeNotification(n.id);
     setOpen(false);
     if (n.link) navigate(n.link);
   };
 
   return (
     <>
-      {/* ── Bell Button ───────────────────────────────────────────────── */}
+      {/* ── Bell Button ────────────────────────────────────────────────── */}
       <button
         className="navbar-icon-btn se-notif-bell-btn"
         onClick={() => setOpen((o) => !o)}
         title="Notifications"
         aria-label="Notifications"
       >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="22" height="22" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round"
+        >
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
+
         {unreadCount > 0 && (
           <span className="se-notif-badge">
             {unreadCount > 99 ? "99+" : unreadCount}
@@ -81,7 +88,7 @@ export default function SENotificationBell() {
         )}
       </button>
 
-      {/* ── Panel ─────────────────────────────────────────────────────── */}
+      {/* ── Panel ──────────────────────────────────────────────────────── */}
       {open && (
         <div className="se-notif-overlay" onClick={() => setOpen(false)}>
           <div className="se-notif-panel" onClick={(e) => e.stopPropagation()}>
@@ -94,6 +101,7 @@ export default function SENotificationBell() {
                   <span className="se-notif-unread-label">{unreadCount} unread</span>
                 )}
               </div>
+
               <div className="se-notif-header-actions">
                 {unreadCount > 0 && (
                   <button
@@ -109,25 +117,33 @@ export default function SENotificationBell() {
 
             {/* Filter tabs */}
             <div className="se-notif-filters">
-              {FILTERS.map((f) => (
-                <button
-                  key={f}
-                  className={`se-filter-btn ${filter === f ? "active" : ""}`}
-                  onClick={() => setFilter(f)}
-                >
-                  {f === "rfi" ? "RFI" : f.charAt(0).toUpperCase() + f.slice(1)}
-                  {f !== "all" &&
-                    notifications.filter((n) => n.type === f).length > 0 && (
-                      <span className="se-filter-dot" />
-                    )}
-                </button>
-              ))}
+              {FILTERS.map((f) => {
+                const count = f === "all"
+                  ? notifications.length
+                  : notifications.filter((n) => n.type === f).length;
+                return (
+                  <button
+                    key={f}
+                    className={`se-filter-btn ${filter === f ? "active" : ""}`}
+                    onClick={() => setFilter(f)}
+                  >
+                    {f === "rfi" ? "RFI" : f.charAt(0).toUpperCase() + f.slice(1)}
+                    {count > 0 && f !== "all" && <span className="se-filter-dot" />}
+                  </button>
+                );
+              })}
             </div>
 
-            {/* List */}
+            {/* Notification list */}
             <div className="se-notif-list">
-              {shown.length === 0 ? (
-                <p className="se-notif-empty">No notifications in this category.</p>
+              {loading ? (
+                <p className="se-notif-empty">Loading…</p>
+              ) : shown.length === 0 ? (
+                <p className="se-notif-empty">
+                  {filter === "all"
+                    ? "You're all caught up! No new notifications."
+                    : `No ${filter} notifications.`}
+                </p>
               ) : (
                 shown.map((n) => {
                   const tc = TYPE_CFG[n.type] || TYPE_CFG.work;
@@ -137,18 +153,24 @@ export default function SENotificationBell() {
                       className="se-notif-item unread clickable"
                       onClick={() => handleItemClick(n)}
                     >
+                      {/* Severity dot */}
                       <div
                         className="se-notif-sev-dot"
                         style={{ background: SEV_COLOR[n.severity] || SEV_COLOR.info }}
                       />
+
                       <div className="se-notif-body">
                         <div className="se-notif-top">
-                          <span className="se-type-chip" style={{ background: tc.bg, color: tc.color }}>
+                          <span
+                            className="se-type-chip"
+                            style={{ background: tc.bg, color: tc.color }}
+                          >
                             {tc.label}
                           </span>
                           <span className="se-notif-time">{timeAgo(n.created_at)}</span>
                           <span className="se-unread-dot" />
                         </div>
+
                         <p className="se-notif-item-title">{n.title}</p>
                         <p className="se-notif-item-desc">{n.description}</p>
                         {n.link && <span className="se-notif-goto">Go to page →</span>}
