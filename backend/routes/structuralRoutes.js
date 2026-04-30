@@ -1,75 +1,77 @@
-const express = require("express");
-const router = express.Router();
-const pool = require("../config/db");
-const multer = require("multer");
-const path = require("path");
-// ==============================
-// 📂 MULTER CONFIG (FILE UPLOAD)
-// ==============================
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
+// FILE PATH: backend/routes/structuralRoutes.js
+// ─────────────────────────────────────────────────────────────────────────────
+// Structural Engineer API routes.
+// Drawing status changes by Architect / MEP / Manager automatically fire
+// an SE notification via createSENotification().
+// ─────────────────────────────────────────────────────────────────────────────
 
+const express  = require("express");
+const router   = express.Router();
+const pool     = require("../config/db");
+const multer   = require("multer");
+const createSENotification = require("../utils/createSENotification");
+
+// ── Multer (file uploads) ─────────────────────────────────────────────────────
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, "uploads/"),
+  filename:    (_req,  file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+});
 const upload = multer({ storage });
 
-// ==============================
-// 📊 DASHBOARD API
-// ==============================
+// ═════════════════════════════════════════════════════════════════════════════
+// 📊  DASHBOARD
+// ═════════════════════════════════════════════════════════════════════════════
 router.get("/dashboard", async (req, res) => {
   try {
     const drawingsResult = await pool.query("SELECT COUNT(*) FROM drawings");
 
+    // version column may not exist yet — handled gracefully
     let latestVersion = "N/A";
     try {
-      const latestVersionResult = await pool.query(
-        "SELECT version FROM drawings ORDER BY created_at DESC LIMIT 1",
+      const vr = await pool.query(
+        "SELECT version FROM drawings ORDER BY created_at DESC LIMIT 1"
       );
-      latestVersion = latestVersionResult.rows[0]?.version || "N/A";
-    } catch (err) {
-      console.log("⚠️ version column missing in drawings table");
+      latestVersion = vr.rows[0]?.version || "N/A";
+    } catch {
+      console.log("⚠️  version column missing in drawings — returning N/A");
     }
 
     let incidentsCount = 0;
+    try {
+      const ir = await pool.query(
+        "SELECT COUNT(*) FROM incidents WHERE status = 'pending'"
+      );
+      incidentsCount = parseInt(ir.rows[0].count, 10);
+    } catch {
+      console.log("⚠️  incidents table missing");
+    }
+
+    // Count only SE-targeted unread notifications
     let notificationsCount = 0;
-
     try {
-      const incidentsResult = await pool.query(
-        "SELECT COUNT(*) FROM incidents WHERE status='pending'",
+      const nr = await pool.query(
+        "SELECT COUNT(*) FROM notifications WHERE role = 'structural_engineer' AND is_read = false"
       );
-      incidentsCount = parseInt(incidentsResult.rows[0].count);
-    } catch (err) {
-      console.log("⚠️ incidents table missing");
+      notificationsCount = parseInt(nr.rows[0].count, 10);
+    } catch {
+      console.log("⚠️  notifications table missing");
     }
 
-    try {
-      const notificationsResult = await pool.query(
-        "SELECT COUNT(*) FROM notifications",
-      );
-      notificationsCount = parseInt(notificationsResult.rows[0].count);
-    } catch (err) {
-      console.log("⚠️ notifications table missing");
-    }
-
-    res.json({
-  totalDrawings: parseInt(drawingsResult.rows[0].count),
-  latestVersion,   // ✅ uses the safely-fetched value
-  pendingIncidents: incidentsCount,
-  notifications: notificationsCount,
-});
+    return res.json({
+      totalDrawings:    parseInt(drawingsResult.rows[0].count, 10),
+      latestVersion,
+      pendingIncidents: incidentsCount,
+      notifications:    notificationsCount,
+    });
   } catch (err) {
-    console.error("Dashboard Error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("Dashboard Error:", err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// ==============================
-// 📤 UPLOAD DRAWING
-// ==============================
+// ═════════════════════════════════════════════════════════════════════════════
+// 📤  UPLOAD DRAWING
+// ═════════════════════════════════════════════════════════════════════════════
 router.post("/upload-drawing", upload.single("file"), async (req, res) => {
   try {
     const { name, version, uploaded_by } = req.body;
@@ -78,78 +80,151 @@ router.post("/upload-drawing", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "File is required" });
     }
 
-    const file_url = req.file.filename;
-
     await pool.query(
       "INSERT INTO drawings (name, version, file_url, uploaded_by) VALUES ($1, $2, $3, $4)",
-      [name, version, file_url, uploaded_by],
+      [name, version, req.file.filename, uploaded_by]
     );
 
-    res.json({ message: "Drawing uploaded successfully" });
+    // Notify SE that a new drawing was uploaded
+    await createSENotification({
+      type:        "drawing",
+      severity:    "info",
+      title:       `New Drawing Uploaded: ${name}`,
+      description: `Drawing "${name}" (${version || "no version"}) was uploaded by ${uploaded_by || "a team member"}.`,
+    });
+
+    return res.json({ message: "Drawing uploaded successfully" });
   } catch (err) {
-    console.error("Upload Error:", err);
-    res.status(500).json({ error: "Upload failed" });
+    console.error("Upload Error:", err.message);
+    return res.status(500).json({ error: "Upload failed" });
   }
 });
 
-// ==============================
-// 📄 GET DRAWINGS
-// ==============================
+// ═════════════════════════════════════════════════════════════════════════════
+// 📄  GET DRAWINGS
+// ═════════════════════════════════════════════════════════════════════════════
 router.get("/drawings", async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM drawings ORDER BY created_at DESC",
+      "SELECT * FROM drawings ORDER BY created_at DESC"
     );
-    res.json(result.rows);
+    return res.json(result.rows);
   } catch (err) {
-    console.error("Fetch Drawings Error:", err);
-    res.status(500).json({ error: "Error fetching drawings" });
+    console.error("Fetch Drawings Error:", err.message);
+    return res.status(500).json({ error: "Error fetching drawings" });
   }
 });
 
-// ==============================
-// ❌ DELETE DRAWING
-// ==============================
+// ═════════════════════════════════════════════════════════════════════════════
+// ❌  DELETE DRAWING
+// ═════════════════════════════════════════════════════════════════════════════
 router.delete("/drawings/:id", async (req, res) => {
   try {
-    const { id } = req.params;
-
-    await pool.query("DELETE FROM drawings WHERE id=$1", [id]);
-
-    res.json({ message: "Deleted successfully" });
+    await pool.query("DELETE FROM drawings WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Deleted successfully" });
   } catch (err) {
-    console.error("Delete Error:", err);
-    res.status(500).json({ error: "Delete failed" });
+    console.error("Delete Error:", err.message);
+    return res.status(500).json({ error: "Delete failed" });
   }
 });
 
-// ==============================
-// 🔄 UPDATE DRAWING STATUS
-// ==============================
+// ═════════════════════════════════════════════════════════════════════════════
+// 🔄  UPDATE DRAWING STATUS  (called by Architect / MEP / Manager)
+//     → fires an SE notification on every status change
+// ═════════════════════════════════════════════════════════════════════════════
 router.put("/drawings/:id/status", async (req, res) => {
   try {
-    const { id } = req.params;
-    const { role, status } = req.body;
+    const { id }            = req.params;
+    const { role, status }  = req.body;
 
-    let column = "";
+    const COLUMN_MAP = {
+      architect: "architect_status",
+      mep:       "mep_status",
+      manager:   "manager_status",
+    };
 
-    if (role === "architect") column = "architect_status";
-    else if (role === "mep") column = "mep_status";
-    else if (role === "manager") column = "manager_status";
-
+    const column = COLUMN_MAP[role];
     if (!column) {
       return res.status(400).json({ error: "Invalid role" });
     }
 
-    await pool.query(`UPDATE drawings SET ${column}=$1 WHERE id=$2`, [
-      status,
-      id,
-    ]);
+    // Fetch the drawing name for a meaningful notification message
+    let drawingName = `Drawing #${id}`;
+    try {
+      const dr = await pool.query("SELECT name FROM drawings WHERE id = $1", [id]);
+      if (dr.rows[0]) drawingName = dr.rows[0].name;
+    } catch { /* ignore */ }
 
-    res.json({ message: "Updated successfully" });
+    await pool.query(
+      `UPDATE drawings SET ${column} = $1 WHERE id = $2`,
+      [status, id]
+    );
+
+    // ── Determine severity based on status ───────────────────────────────
+    const severityMap = {
+      approved: "ok",
+      rejected: "critical",
+      pending:  "warn",
+    };
+    const lcStatus  = status?.toLowerCase();
+    const severity  = severityMap[lcStatus] || "info";
+    const roleName  = role.charAt(0).toUpperCase() + role.slice(1);
+
+    await createSENotification({
+      type:        "drawing",
+      severity,
+      title:       `Drawing ${status} by ${roleName}`,
+      description: `"${drawingName}" was marked as "${status}" by the ${roleName}.`,
+    });
+
+    return res.json({ message: "Updated successfully" });
   } catch (err) {
-    console.error("Update Error:", err);
-    res.status(500).json({ error: "Failed" });
+    console.error("Update Error:", err.message);
+    return res.status(500).json({ error: "Failed" });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ✅  APPROVE DRAWING  (dedicated approval endpoint from any role)
+//     POST /api/structural/drawings/:id/approve
+//     Body: { approvedBy: "John – Architect", role: "architect", comment: "LGTM" }
+// ═════════════════════════════════════════════════════════════════════════════
+router.post("/drawings/:id/approve", async (req, res) => {
+  try {
+    const { id }                            = req.params;
+    const { approvedBy, role, comment = "" } = req.body;
+
+    // Mark architect/mep/manager status as approved
+    const COLUMN_MAP = {
+      architect: "architect_status",
+      mep:       "mep_status",
+      manager:   "manager_status",
+    };
+    const column = COLUMN_MAP[role];
+    if (column) {
+      await pool.query(
+        `UPDATE drawings SET ${column} = 'approved' WHERE id = $1`,
+        [id]
+      );
+    }
+
+    let drawingName = `Drawing #${id}`;
+    try {
+      const dr = await pool.query("SELECT name FROM drawings WHERE id = $1", [id]);
+      if (dr.rows[0]) drawingName = dr.rows[0].name;
+    } catch { /* ignore */ }
+
+    await createSENotification({
+      type:        "approval",
+      severity:    "ok",
+      title:       `Drawing Approved – ${drawingName}`,
+      description: `${approvedBy || role} approved "${drawingName}".${comment ? ` Comment: ${comment}` : ""}`,
+    });
+
+    return res.json({ message: "Drawing approved and SE notified." });
+  } catch (err) {
+    console.error("Approve Error:", err.message);
+    return res.status(500).json({ error: "Approval failed" });
   }
 });
 

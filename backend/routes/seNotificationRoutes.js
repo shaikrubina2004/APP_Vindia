@@ -1,91 +1,122 @@
-// FILE PATH: routes/seNotificationRoutes.js
+// FILE PATH: backend/routes/seNotificationRoutes.js
+// ─────────────────────────────────────────────────────────────────────────────
+// All SE notification endpoints.
+// Mounted in server.js as: app.use("/api/se-notifications", seNotificationRoutes)
+// ─────────────────────────────────────────────────────────────────────────────
 
 const express = require("express");
-const router = express.Router();
+const router  = express.Router();
 const protect = require("../middleware/authMiddleware");
-const pool = require("../config/db");
+const pool    = require("../config/db");
 
-// 🔗 TYPE → PAGE ROUTING MAP
+// ── Link map: type → frontend route ──────────────────────────────────────────
 const TYPE_LINK = {
-  drawing:  "/structural-engineer/drawings",
+  drawing:  "/structural-engineer/shared/drawings",
   rfi:      "/structural-engineer/rfi",
   incident: "/structural-engineer/incidents",
-  approval: "/structural-engineer/approvals",
+  approval: "/structural-engineer/shared/drawings",
   work:     "/structural-engineer/daily-updates",
   boq:      "/structural-engineer/boq",
   task:     "/structural-engineer/incidents?page=tasks",
-  handover: "/structural-engineer/handover",
-  analysis: "/structural-engineer/analysis",
+  handover: "/structural-engineer/shared/drawings",
+  analysis: "/structural-engineer/daily-updates",
 };
 
-// ✅ GET — only unread (on reload, read ones never come back)
-const getSENotifications = async (req, res) => {
+// ── Helper: shape a DB row into the frontend-expected object ─────────────────
+function shapeRow(n) {
+  return {
+    id:          n.id,
+    type:        n.type        || "work",
+    severity:    n.severity    || "info",
+    title:       n.message,
+    description: n.description || n.message,
+    created_at:  n.created_at,
+    is_read:     n.is_read,
+    link:        TYPE_LINK[n.type] || "/structural-engineer/dashboard",
+  };
+}
+
+// ── GET /  – unread notifications for the logged-in SE ───────────────────────
+router.get("/", protect, async (req, res) => {
   try {
     if (req.user?.role !== "structural_engineer") {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const result = await pool.query(`
-      SELECT id, message, type, severity, is_read, created_at
-      FROM notifications
-      WHERE role = 'structural_engineer'
-        AND is_read = false
-      ORDER BY created_at DESC
-      LIMIT 50
-    `);
+    const result = await pool.query(
+      `SELECT id, message, description, type, severity, is_read, created_at
+         FROM notifications
+        WHERE role = 'structural_engineer'
+          AND is_read = false
+        ORDER BY created_at DESC
+        LIMIT 50`
+    );
 
-    const notifications = result.rows.map((n) => ({
-      id:          n.id,
-      type:        n.type,
-      severity:    n.severity,
-      title:       n.message,
-      description: n.message,
-      created_at:  n.created_at,
-      is_read:     n.is_read,
-      link:        TYPE_LINK[n.type] || "/structural-engineer/dashboard",
-    }));
-
-    return res.json({ success: true, notifications });
+    return res.json({
+      success:       true,
+      notifications: result.rows.map(shapeRow),
+    });
   } catch (err) {
-    console.error("getSENotifications error:", err.message);
+    console.error("GET /se-notifications error:", err.message);
     return res.status(500).json({ success: false, message: "Server error" });
   }
-};
+});
 
-// ✅ GET COUNT — used by dashboard card
-const getSENotificationCount = async (req, res) => {
+// ── GET /count  – unread badge count ─────────────────────────────────────────
+router.get("/count", protect, async (req, res) => {
   try {
     if (req.user?.role !== "structural_engineer") {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const result = await pool.query(`
-      SELECT COUNT(*) AS count
-      FROM notifications
-      WHERE role = 'structural_engineer' AND is_read = false
-    `);
+    const result = await pool.query(
+      `SELECT COUNT(*) AS count
+         FROM notifications
+        WHERE role = 'structural_engineer'
+          AND is_read = false`
+    );
 
-    return res.json({ success: true, count: parseInt(result.rows[0].count, 10) });
+    return res.json({
+      success: true,
+      count:   parseInt(result.rows[0].count, 10),
+    });
   } catch (err) {
-    console.error("getSENotificationCount error:", err.message);
+    console.error("GET /se-notifications/count error:", err.message);
     return res.status(500).json({ success: false, message: "Server error" });
   }
-};
+});
 
-// ✅ MARK SINGLE READ
-const markRead = async (req, res) => {
+// ── PATCH /read-all  – mark every unread notification read ───────────────────
+router.patch("/read-all", protect, async (req, res) => {
   try {
     if (req.user?.role !== "structural_engineer") {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    const rawId = req.params.id;
-    const realId = parseInt(rawId, 10);
+    await pool.query(
+      `UPDATE notifications
+          SET is_read = true
+        WHERE role = 'structural_engineer'
+          AND is_read = false`
+    );
 
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("PATCH /se-notifications/read-all error:", err.message);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ── PATCH /:id/read  – mark a single notification read ───────────────────────
+router.patch("/:id/read", protect, async (req, res) => {
+  try {
+    if (req.user?.role !== "structural_engineer") {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const realId = parseInt(req.params.id, 10);
     if (isNaN(realId) || realId <= 0) {
-      return res.status(400).json({
-        error: `Invalid notification ID: "${rawId}". Must be a positive integer.`,
-      });
+      return res.status(400).json({ error: `Invalid notification ID: "${req.params.id}"` });
     }
 
     const result = await pool.query(
@@ -99,35 +130,9 @@ const markRead = async (req, res) => {
 
     return res.json({ success: true, id: realId });
   } catch (err) {
-    console.error("markRead error:", err.message);
+    console.error("PATCH /se-notifications/:id/read error:", err.message);
     return res.status(500).json({ success: false, message: "Server error" });
   }
-};
-
-// ✅ MARK ALL READ
-const markAllRead = async (req, res) => {
-  try {
-    if (req.user?.role !== "structural_engineer") {
-      return res.status(403).json({ success: false, message: "Access denied" });
-    }
-
-    await pool.query(`
-      UPDATE notifications
-      SET is_read = true
-      WHERE role = 'structural_engineer' AND is_read = false
-    `);
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error("markAllRead error:", err.message);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-};
-
-// ⚠️ ORDER MATTERS: /count and /read-all must be BEFORE /:id/read
-router.get("/count",      protect, getSENotificationCount);
-router.get("/",           protect, getSENotifications);
-router.patch("/read-all", protect, markAllRead);
-router.patch("/:id/read", protect, markRead);
+});
 
 module.exports = router;
