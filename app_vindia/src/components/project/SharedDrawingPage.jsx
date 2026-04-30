@@ -137,9 +137,12 @@ function ApprovalBadges({ drawingId, disc, approvals }) {
 /* ═══════════════════════════════════════
    CLASH FLAG MODAL
 ═══════════════════════════════════════ */
-function ClashFlagModal({ drawing, onSubmit, onClose }) {
+function ClashFlagModal({ drawing, drawings, onSubmit, onClose }) {
   const [clashType, setClashType] = useState("");
   const [reason, setReason] = useState("");
+  const [conflictingDrawingId, setConflictingDrawingId] = useState("");
+
+  const otherDrawings = drawings.filter((d) => d.id !== drawing.id);
 
   useEffect(() => {
     const handler = (e) => {
@@ -149,7 +152,7 @@ function ClashFlagModal({ drawing, onSubmit, onClose }) {
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const canSubmit = clashType.trim() && reason.trim();
+  const canSubmit = clashType.trim() && reason.trim() && conflictingDrawingId;
 
   return (
     <>
@@ -196,8 +199,21 @@ function ClashFlagModal({ drawing, onSubmit, onClose }) {
 
           <div className="dr-clash-field">
             <label className="dr-clash-label">
-              Description of clash <span style={{ color: "#c0392b" }}>*</span>
+              Conflicting drawing <span style={{ color: "#c0392b" }}>*</span>
             </label>
+            <select
+              className="dr-clash-textarea"
+              style={{ height: 36, padding: "6px 10px", resize: "none" }}
+              value={conflictingDrawingId}
+              onChange={(e) => setConflictingDrawingId(e.target.value)}
+            >
+              <option value="">Select the drawing this conflicts with</option>
+              {otherDrawings.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name} — {d.floor} ({d.disc})
+                </option>
+              ))}
+            </select>
             <textarea
               className="dr-clash-textarea"
               rows={4}
@@ -230,7 +246,9 @@ function ClashFlagModal({ drawing, onSubmit, onClose }) {
           <button
             className="dr-btn-clash-submit"
             disabled={!canSubmit}
-            onClick={() => canSubmit && onSubmit({ clashType, reason })}
+            onClick={() =>
+              canSubmit && onSubmit({ clashType, reason, conflictingDrawingId })
+            }
           >
             🚩 Submit Clash Flag
           </button>
@@ -435,6 +453,15 @@ function VersionsPanel({
 }) {
   const [versions, setVersions] = useState([]);
   const [loadingV, setLoadingV] = useState(true);
+  const [clashDetails, setClashDetails] = useState([]);
+
+  useEffect(() => {
+    if (drawing.flag || clashFlags[drawing.id]) {
+      API.get(`/drawings/clashes/${drawing.id}`)
+        .then((res) => setClashDetails(res.data))
+        .catch(() => setClashDetails([]));
+    }
+  }, [drawing.id, drawing.flag]);
 
   useEffect(() => {
     API.get(`/drawings/${drawing.id}/versions`)
@@ -539,14 +566,61 @@ function VersionsPanel({
           </div>
 
           {/* clash banner */}
-          {isFlagged && clashInfo && (
-            <div className="dr-alert dr-alert-red" style={{ marginBottom: 14 }}>
-              <span className="dr-alert-icon">🚩</span>
-              <div>
-                <strong>Clash flagged</strong> — {clashInfo.clashType}
-                <br />
-                <span style={{ fontSize: 11 }}>{clashInfo.reason}</span>
-              </div>
+          {/* clash banner */}
+          {isFlagged && (
+            <div style={{ marginBottom: 14 }}>
+              {clashDetails.length > 0 ? (
+                clashDetails.map((c) => (
+                  <div
+                    key={c.id}
+                    className="dr-alert dr-alert-red"
+                    style={{ marginBottom: 8 }}
+                  >
+                    <span className="dr-alert-icon">🚩</span>
+                    <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+                      <strong>Clash flagged</strong> — {c.clash_type}
+                      <br />
+                      <span>{c.description}</span>
+                      <br />
+                      <span
+                        style={{ fontSize: 11, color: "var(--text-secondary)" }}
+                      >
+                        <strong>Drawing 1:</strong> {c.drawing_1_name}
+                        {" · "}
+                        <strong>Drawing 2:</strong> {c.drawing_2_name}
+                        {" · "}Raised by: <strong>{c.raised_by_name}</strong>
+                        {" · "}
+                        {new Date(c.created_at).toLocaleDateString()}
+                        {" · "}Priority: <strong>{c.priority}</strong>
+                        {" · "}Status: <strong>{c.status}</strong>
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : clashInfo ? (
+                <div
+                  className="dr-alert dr-alert-red"
+                  style={{ marginBottom: 8 }}
+                >
+                  <span className="dr-alert-icon">🚩</span>
+                  <div>
+                    <strong>Clash flagged</strong> — {clashInfo.clashType}
+                    <br />
+                    <span style={{ fontSize: 11 }}>{clashInfo.reason}</span>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="dr-alert dr-alert-red"
+                  style={{ marginBottom: 8 }}
+                >
+                  <span className="dr-alert-icon">🚩</span>
+                  <span>
+                    This drawing has an open clash. Open versions panel for
+                    details.
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -611,17 +685,29 @@ function VersionsPanel({
                     <div className="dr-ver-title">{v.title}</div>
                     <div className="dr-ver-note">{v.note}</div>
                     <div className="dr-ver-actions">
-                      <button
+                      <a
+                        href={`http://localhost:5000${v.file_url}`}
+                        download
                         className={
                           v.current ? "dr-btn-primary" : "dr-btn-outline"
                         }
-                        style={{ padding: "5px 12px", fontSize: 11 }}
+                        style={{
+                          padding: "5px 12px",
+                          fontSize: 11,
+                          textDecoration: "none",
+                        }}
                       >
                         📥 {v.current ? "Download Current" : "Download"}
-                      </button>
+                      </a>
                       <button
                         className="dr-btn-outline"
                         style={{ padding: "5px 12px", fontSize: 11 }}
+                        onClick={() =>
+                          window.open(
+                            `http://localhost:5000${v.file_url}`,
+                            "_blank",
+                          )
+                        }
                       >
                         👁 View
                       </button>
@@ -848,12 +934,16 @@ export default function DrawingRegister({ resolvedRole: resolvedRoleProp }) {
   };
 
   /* ── clash handlers ── */
-  const handleClashSubmit = async ({ clashType, reason }) => {
+  const handleClashSubmit = async ({
+    clashType,
+    reason,
+    conflictingDrawingId,
+  }) => {
     const drawing = clashModal;
     try {
       await API.post("/drawings/clashes", {
         drawing_id_1: drawing.id,
-        drawing_id_2: drawing.id,
+        drawing_id_2: conflictingDrawingId,
         clash_type: clashType,
         description: reason,
         raised_by: resolvedRole,
@@ -1200,12 +1290,25 @@ export default function DrawingRegister({ resolvedRole: resolvedRoleProp }) {
               <div className="dr-spacer-row" />
 
               <div className="dr-row-actions">
-                <button className="dr-btn-icon" title="View drawing">
+                <button
+                  className="dr-btn-icon"
+                  title="View drawing"
+                  onClick={() =>
+                    window.open(`http://localhost:5000${d.file_url}`, "_blank")
+                  }
+                >
                   👁
                 </button>
-                <button className="dr-btn-icon" title="Download">
+
+                <a
+                  href={`http://localhost:5000${d.file_url}`}
+                  download
+                  className="dr-btn-icon"
+                  title="Download"
+                  style={{ textDecoration: "none" }}
+                >
                   ⬇
-                </button>
+                </a>
 
                 {/* Approve button — eligible non-owners only, not yet finalized */}
 
@@ -1261,6 +1364,7 @@ export default function DrawingRegister({ resolvedRole: resolvedRoleProp }) {
       {clashModal && (
         <ClashFlagModal
           drawing={clashModal}
+          drawings={drawings}
           onSubmit={handleClashSubmit}
           onClose={() => setClashModal(null)}
         />

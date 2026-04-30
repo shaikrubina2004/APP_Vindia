@@ -4,6 +4,7 @@ import Dashboard from "../pages/Structural Engineer/StructuralEngineerDashboard"
 import Drawings from "../pages/Structural Engineer/Drawings";
 import RFI from "../pages/Structural Engineer/RFI";
 import SEDailyUpdates from "../pages/Structural Engineer/SEDailyUpdates";
+import MEPUploads from "../pages/MEP Engineer/MEPUploads";
 import AppShell from "../components/incidents/AppShell";
 import SharedDrawingPage from "../components/project/SharedDrawingPage";
 
@@ -18,6 +19,7 @@ function StructuralRoutes() {
         <Route path="rfi" element={<RFI />} />
         <Route path="incidents" element={<AppShell />} />
         <Route path="daily-updates" element={<SEDailyUpdates />} />
+        <Route path="upload" element={<MEPUploads />} />
       </Route>
     </Routes>
   );

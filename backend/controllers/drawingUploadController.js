@@ -350,12 +350,14 @@ exports.flagClash = async (req, res) => {
       raised_by,
     } = req.body;
 
+    const raised_by_id = req.user?.id;
+
     if (
       !drawing_id_1 ||
       !drawing_id_2 ||
       !clash_type ||
       !description ||
-      !raised_by
+      !raised_by_id
     ) {
       return res.status(400).json({
         error:
@@ -386,7 +388,7 @@ exports.flagClash = async (req, res) => {
         description,
         location || null,
         priority || "P2",
-        raised_by,
+        raised_by_id,
       ],
     );
 
@@ -434,6 +436,46 @@ exports.getFloorsByProject = async (req, res) => {
 /**
  * ✅ Soft delete a drawing
  */
+/**
+ * ✅ Get all clashes for a drawing (both as drawing_1 and drawing_2)
+ */
+exports.getClashesByDrawing = async (req, res) => {
+  try {
+    const { drawing_id } = req.params;
+
+    const result = await pool.query(
+      `SELECT
+         c.id,
+         c.clash_no,
+         c.clash_type,
+         c.description,
+         c.location,
+         c.priority,
+         c.status,
+         c.created_at,
+         c.resolved_at,
+         d1.id   AS drawing_1_id,
+         d1.name AS drawing_1_name,
+         d2.id   AS drawing_2_id,
+         d2.name AS drawing_2_name,
+         u.name  AS raised_by_name
+       FROM drawing_clashes c
+       JOIN drawings d1 ON d1.id = c.drawing_id_1
+       JOIN drawings d2 ON d2.id = c.drawing_id_2
+       JOIN users    u  ON u.id  = c.raised_by
+       WHERE (c.drawing_id_1 = $1 OR c.drawing_id_2 = $1)
+         AND c.is_deleted = FALSE
+       ORDER BY c.created_at DESC`,
+      [drawing_id],
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("🔥 FETCH CLASHES ERROR:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 exports.deleteDrawing = async (req, res) => {
   try {
     const { drawing_id } = req.params;

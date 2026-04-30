@@ -26,4 +26,6 @@ export const StructuralEngineerMenu = [
     path: "/structural-engineer/daily-updates",
     icon: "calendar",
   },
+
+  { name: "Upload", path: "/structural-engineer/upload", icon: "upload" },
 ];
