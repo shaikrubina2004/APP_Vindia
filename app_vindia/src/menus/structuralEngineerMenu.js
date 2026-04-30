@@ -36,9 +36,7 @@ export const StructuralEngineerMenu = [
     path: "/structural-engineer/daily-updates",
     icon: "calendar",
   },
-<<<<<<< Updated upstream
+
 
   { name: "Upload", path: "/structural-engineer/upload", icon: "upload" },
-=======
->>>>>>> Stashed changes
 ];
