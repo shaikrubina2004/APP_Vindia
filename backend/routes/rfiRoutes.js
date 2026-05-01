@@ -1,125 +1,110 @@
-// routes/rfiRoutes.js
+// FILE PATH: backend/routes/rfiRoutes.js
+// ─────────────────────────────────────────────────────────────────────────────
+// RFI endpoints.  When any role RESPONDS to an RFI, the Structural Engineer
+// receives a real notification.
+// ─────────────────────────────────────────────────────────────────────────────
+
 const express = require("express");
 const router  = express.Router();
 const pool    = require("../config/db");
+const createSENotification = require("../utils/createSENotification");
 
-// ── GET all RFIs ─────────────────────────────────────────────────────────
+// ── GET all RFIs ──────────────────────────────────────────────────────────────
 router.get("/", async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT
-        r.id,
-        r.project_id,
-        COALESCE(p.name, 'Project #' || r.project_id) AS project,
-        r.title       AS subject,
-        r.description,
-        r.priority,
-        r.status,
-        r.response,
-        COALESCE(e.name, 'Engineer #' || r.raised_by)  AS raised_by,
-        r.created_at  AS date
-      FROM rfi r
-      LEFT JOIN projects  p ON p.id = r.project_id
-      LEFT JOIN employees e ON e.id = r.raised_by
-      ORDER BY r.created_at DESC
-    `);
-    res.json(result.rows);
+    const result = await pool.query("SELECT * FROM rfis ORDER BY created_at DESC");
+    return res.json(result.rows);
   } catch (err) {
-    console.error("RFI GET Error:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("Fetch RFIs error:", err.message);
+    return res.status(500).json({ error: "Failed to fetch RFIs" });
   }
 });
 
-// ── GET single RFI ───────────────────────────────────────────────────────
-router.get("/:id", async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT
-        r.id,
-        r.project_id,
-        COALESCE(p.name, 'Project #' || r.project_id) AS project,
-        r.title       AS subject,
-        r.description,
-        r.priority,
-        r.status,
-        r.response,
-        COALESCE(e.name, 'Engineer #' || r.raised_by)  AS raised_by,
-        r.created_at  AS date
-      FROM rfi r
-      LEFT JOIN projects  p ON p.id = r.project_id
-      LEFT JOIN employees e ON e.id = r.raised_by
-      WHERE r.id = $1
-    `, [req.params.id]);
-
-    if (!result.rows.length)
-      return res.status(404).json({ error: "RFI not found" });
-
-    res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── POST create RFI ──────────────────────────────────────────────────────
+// ── POST  create a new RFI ────────────────────────────────────────────────────
 router.post("/", async (req, res) => {
   try {
-    const { project, subject, priority } = req.body;
+    const { subject, description, raised_by, priority = "medium" } = req.body;
 
-    const result = await pool.query(`
-      INSERT INTO rfi
-        (project_id, title, description, priority, status, raised_by, created_at)
-      VALUES
-        (1, $1, $2, $3, 'Pending', 1, NOW())
-      RETURNING
-        id,
-        title      AS subject,
-        priority,
-        status,
-        created_at AS date
-    `, [project, subject, priority]);     
-    // project name stored in title for now (until project lookup added)
+    const result = await pool.query(
+      `INSERT INTO rfis (subject, description, raised_by, priority, status, created_at)
+       VALUES ($1, $2, $3, $4, 'open', NOW()) RETURNING *`,
+      [subject, description, raised_by, priority]
+    );
 
-    res.status(201).json({
-      ...result.rows[0],
-      project,                            // return the name the frontend sent
-      raised_by: "Structural Engineer",
+    return res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("Create RFI error:", err.message);
+    return res.status(500).json({ error: "Failed to create RFI" });
+  }
+});
+
+// ── PATCH /:id/respond  – another role responds to an RFI ────────────────────
+// Body: { response: "...", respondedBy: "John – Architect", role: "architect" }
+router.patch("/:id/respond", async (req, res) => {
+  try {
+    const { id }                         = req.params;
+    const { response, respondedBy, role } = req.body;
+
+    if (!response) {
+      return res.status(400).json({ error: "Response text is required" });
+    }
+
+    await pool.query(
+      `UPDATE rfis
+          SET response = $1, responded_by = $2, status = 'responded', updated_at = NOW()
+        WHERE id = $3`,
+      [response, respondedBy || role, id]
+    );
+
+    // Fetch RFI subject for a meaningful message
+    let subject = `RFI #${id}`;
+    try {
+      const rfi = await pool.query("SELECT subject FROM rfis WHERE id = $1", [id]);
+      if (rfi.rows[0]) subject = rfi.rows[0].subject;
+    } catch { /* ignore */ }
+
+    await createSENotification({
+      type:        "rfi",
+      severity:    "info",
+      title:       `RFI Responded: ${subject}`,
+      description: `${respondedBy || role} responded to "${subject}".`,
     });
+
+    return res.json({ message: "RFI response saved and SE notified." });
   } catch (err) {
-    console.error("RFI POST Error:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("Respond RFI error:", err.message);
+    return res.status(500).json({ error: "Failed to respond to RFI" });
   }
 });
 
-// ── PUT update status ────────────────────────────────────────────────────
-router.put("/:id/status", async (req, res) => {
+// ── PATCH /:id/close  – close an RFI ─────────────────────────────────────────
+router.patch("/:id/close", async (req, res) => {
   try {
-    const { status } = req.body;
-    const result = await pool.query(`
-      UPDATE rfi SET status = $1
-      WHERE id = $2
-      RETURNING id, status, title AS subject
-    `, [status, req.params.id]);
+    const { id }       = req.params;
+    const { closedBy } = req.body;
 
-    res.json(result.rows[0]);
+    await pool.query(
+      `UPDATE rfis SET status = 'closed', updated_at = NOW() WHERE id = $1`,
+      [id]
+    );
+
+    let subject = `RFI #${id}`;
+    try {
+      const rfi = await pool.query("SELECT subject FROM rfis WHERE id = $1", [id]);
+      if (rfi.rows[0]) subject = rfi.rows[0].subject;
+    } catch { /* ignore */ }
+
+    await createSENotification({
+      type:        "rfi",
+      severity:    "ok",
+      title:       `RFI Closed: ${subject}`,
+      description: `"${subject}" has been closed by ${closedBy || "a team member"}.`,
+    });
+
+    return res.json({ message: "RFI closed and SE notified." });
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── PUT submit answer ────────────────────────────────────────────────────
-router.put("/:id/answer", async (req, res) => {
-  try {
-    const { response } = req.body;
-    const result = await pool.query(`
-      UPDATE rfi
-      SET response = $1, status = 'Answered'
-      WHERE id = $2
-      RETURNING id, title AS subject, status, response
-    `, [response, req.params.id]);
-
-    res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Close RFI error:", err.message);
+    return res.status(500).json({ error: "Failed to close RFI" });
   }
 });
 

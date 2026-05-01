@@ -1,25 +1,74 @@
 // FILE PATH: src/services/seNotificationService.js
+// ─────────────────────────────────────────────────────────────────────────────
+// All API calls for SE notifications.
+// Reads the JWT token from localStorage (same key your auth flow uses).
+// ─────────────────────────────────────────────────────────────────────────────
 
-import api from "./api";
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-// Fetch all unread notifications for the logged-in SE
-export const fetchSENotifications = async () => {
-  const res = await api.get("/se-notifications");
-  return res.data.notifications;
-};
+/** Read the JWT stored by your login flow */
+function getToken() {
+  // Adjust the key to match what you store in localStorage on login
+  return localStorage.getItem("token") || localStorage.getItem("authToken") || "";
+}
 
-// Fetch just the count (used by dashboard card)
-export const fetchSENotificationCount = async () => {
-  const res = await api.get("/se-notifications/count");
-  return res.data.count; // number
-};
+function authHeaders() {
+  return {
+    "Content-Type": "application/json",
+    Authorization:  `Bearer ${getToken()}`,
+  };
+}
 
-// Mark single notification read (called on item click)
-export const markSENotificationRead = async (id) => {
-  await api.patch(`/se-notifications/${id}/read`);
-};
+// ── Fetch unread notifications ────────────────────────────────────────────────
+export async function fetchSENotifications() {
+  const res = await fetch(`${BASE}/api/se-notifications`, {
+    headers: authHeaders(),
+  });
 
-// Mark ALL unread notifications read ("Mark all read" button)
-export const markAllSENotificationsRead = async () => {
-  await api.patch("/se-notifications/read-all");
-};
+  if (!res.ok) {
+    throw new Error(`fetchSENotifications: ${res.status} ${res.statusText}`);
+  }
+
+  const body = await res.json();
+  // backend returns { success, notifications }
+  return body.notifications || [];
+}
+
+// ── Mark a single notification read ──────────────────────────────────────────
+export async function markSENotificationRead(id) {
+  // Static IDs (strings like "s1") are local-only; skip the API call
+  if (typeof id === "string" && isNaN(Number(id))) return;
+
+  const res = await fetch(`${BASE}/api/se-notifications/${id}/read`, {
+    method:  "PATCH",
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    throw new Error(`markSENotificationRead: ${res.status}`);
+  }
+}
+
+// ── Mark all notifications read ───────────────────────────────────────────────
+export async function markAllSENotificationsRead() {
+  const res = await fetch(`${BASE}/api/se-notifications/read-all`, {
+    method:  "PATCH",
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    throw new Error(`markAllSENotificationsRead: ${res.status}`);
+  }
+}
+
+// ── Get unread count (used by dashboard card) ─────────────────────────────────
+export async function fetchSENotificationCount() {
+  const res = await fetch(`${BASE}/api/se-notifications/count`, {
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) return 0;
+
+  const body = await res.json();
+  return body.count || 0;
+}

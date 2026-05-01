@@ -1,35 +1,88 @@
-import { createContext, useContext, useState } from "react";
+// FILE PATH: src/context/SENotificationProvider.jsx
+// ─────────────────────────────────────────────────────────────────────────────
+// Provider for SE notifications.
+// • Polls /api/se-notifications every 60 s
+// • NO static / dummy data — only real DB notifications appear
+// • removeNotification  → optimistic UI removal + PATCH /:id/read
+// • markAllRead         → clears list + PATCH /read-all
+// ─────────────────────────────────────────────────────────────────────────────
 
-const NotificationContext = createContext(null);
+import { useState, useEffect, useCallback, useRef } from "react";
+import { SENotificationContext }                    from "./SENotificationContext";
+import {
+  fetchSENotifications,
+  markSENotificationRead,
+  markAllSENotificationsRead,
+} from "../services/seNotificationService";
 
-const ALL_NOTIFICATIONS = [
-  { id: 1,  type: "incident", severity: "critical", title: "Critical Incident",   desc: "Worker injury reported on Block B – Eiffel Tower",         time: "30m ago", read: false },
-  { id: 2,  type: "payment",  severity: "critical", title: "Payment Overdue",      desc: "NH-66 Road Base Layer – ₹1.2Cr overdue by 45 days",        time: "2h ago",  read: false },
-  { id: 3,  type: "payment",  severity: "warn",     title: "Payment Due Soon",      desc: "Eiffel Tower – Milestone 2 payment due in 5 days",         time: "4h ago",  read: false },
-  { id: 4,  type: "payment",  severity: "ok",       title: "Payment Received",      desc: "Eiffel Tower – Advance ₹42L received from XBC Developers", time: "1d ago",  read: false },
-  { id: 5,  type: "incident", severity: "warn",     title: "Incident Raised",       desc: "NH-66 – Scaffolding collapse reported by site engineer",   time: "3h ago",  read: false },
-  { id: 6,  type: "work",     severity: "warn",     title: "Pending Work Alert",    desc: "Eiffel Tower – Block A concrete pouring pending 3 days",   time: "1d ago",  read: true  },
-  { id: 7,  type: "work",     severity: "warn",     title: "Daily Update Due",      desc: "Today's site update not yet submitted",                    time: "Today",   read: false },
-  { id: 8,  type: "approval", severity: "info",     title: "Approval Pending",      desc: "Block C start awaiting Project Manager approval",          time: "2d ago",  read: true  },
-  { id: 9,  type: "payment",  severity: "warn",     title: "Invoice Not Raised",    desc: "Tajmahal Advance – invoice not yet submitted",             time: "3d ago",  read: true  },
-  { id: 10, type: "work",     severity: "ok",       title: "Milestone Completed",   desc: "Eiffel Tower – Foundation milestone marked complete",      time: "2d ago",  read: true  },
-];
+const POLL_MS = 60_000; // poll every 60 seconds
 
-export function NotificationProvider({ children }) {
-  const [notifications, setNotifications] = useState(ALL_NOTIFICATIONS);
-  const [showPanel, setShowPanel]         = useState(false);
+export function SENotificationProvider({ children }) {
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const timerRef                          = useRef(null);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-  const markRead    = (id) => setNotifications(p => p.map(n => n.id === id ? { ...n, read: true } : n));
-  const markAllRead = ()   => setNotifications(p => p.map(n => ({ ...n, read: true })));
+  // ── Load from backend ──────────────────────────────────────────────────────
+  const load = useCallback(async () => {
+    try {
+      const data = await fetchSENotifications();
+      // data is already filtered to is_read=false by the backend
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // Silently fail — don't crash the layout.
+      // Empty array means bell shows 0, which is accurate when offline.
+      console.warn("SE notifications unavailable:", err.message);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    timerRef.current = setInterval(load, POLL_MS);
+    return () => clearInterval(timerRef.current);
+  }, [load]);
+
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const unreadCount = notifications.length; // all fetched items are unread
+
+  // ── Remove one notification (click → marks read in DB + removes from UI) ──
+  const removeNotification = useCallback(async (id) => {
+    // Optimistic: remove from list immediately
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await markSENotificationRead(id);
+    } catch (err) {
+      console.warn("Could not persist read status:", err.message);
+      // Don't restore — UI already looks clean; next poll will reconcile
+    }
+  }, []);
+
+  // ── Mark all read ──────────────────────────────────────────────────────────
+  const markAllRead = useCallback(async () => {
+    setNotifications([]);
+    try {
+      await markAllSENotificationsRead();
+    } catch (err) {
+      console.warn("Could not mark all read:", err.message);
+      // Re-fetch so the badge is accurate
+      load();
+    }
+  }, [load]);
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, showPanel, setShowPanel, markRead, markAllRead }}>
+    <SENotificationContext.Provider
+      value={{
+        notifications,
+        unreadCount,
+        loading,
+        removeNotification,
+        markAllRead,
+        refresh: load,
+      }}
+    >
       {children}
-    </NotificationContext.Provider>
+    </SENotificationContext.Provider>
   );
-}
-
-export function useNotifications() {
-  return useContext(NotificationContext);
 }

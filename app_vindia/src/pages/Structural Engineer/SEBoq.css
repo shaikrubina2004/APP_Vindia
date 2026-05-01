@@ -1,0 +1,119 @@
+/* FILE PATH: src/pages/Structural Engineer/SEBoq.css */
+
+.se-boq-container {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: "Inter", sans-serif;
+}
+
+.se-boq-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.se-boq-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.se-boq-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.se-boq-msg {
+  text-align: center;
+  color: #64748b;
+  padding: 40px;
+  font-size: 14px;
+}
+.se-boq-msg.error { color: #ef4444; }
+
+/* Table */
+.se-boq-table-wrapper {
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  border: 1px solid #e5e7eb;
+}
+
+.se-boq-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.se-boq-table thead tr {
+  background: #f1f5f9;
+}
+
+.se-boq-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.se-boq-table td {
+  padding: 12px 16px;
+  border-top: 1px solid #f1f5f9;
+  color: #1e293b;
+  vertical-align: middle;
+}
+
+.se-boq-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.se-boq-table .item-name {
+  font-weight: 500;
+}
+
+.se-boq-table .amount {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* Status chips */
+.status-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-chip.approved  { background: #dcfce7; color: #16a34a; }
+.status-chip.pending   { background: #fef9c3; color: #ca8a04; }
+.status-chip.rejected  { background: #fee2e2; color: #dc2626; }
+
+/* Footer total row */
+.se-boq-table tfoot tr {
+  background: #f8fafc;
+  border-top: 2px solid #e2e8f0;
+}
+.se-boq-table .total-label {
+  font-weight: 700;
+  color: #374151;
+  text-align: right;
+}
+.se-boq-table .total-amount {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1d4ed8;
+}
