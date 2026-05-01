@@ -15,6 +15,7 @@ const {
   issueForConstruction,
   flagClash,
   getClashesByDrawing,
+  resolveClash,
   getFloorsByProject,
   deleteDrawing,
 } = require("../controllers/drawingUploadController");
@@ -92,6 +93,7 @@ router.put(
 
 router.post("/clashes", flagClash);
 router.get("/clashes/:drawing_id", getClashesByDrawing);
+router.put("/clashes/:clash_id/resolve", resolveClash);
 // ── Floors ────────────────────────────
 // GET /api/drawings/floors/:project_id
 
