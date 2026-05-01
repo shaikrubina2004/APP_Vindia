@@ -456,12 +456,10 @@ function VersionsPanel({
   const [clashDetails, setClashDetails] = useState([]);
 
   useEffect(() => {
-    if (drawing.flag || clashFlags[drawing.id]) {
-      API.get(`/drawings/clashes/${drawing.id}`)
-        .then((res) => setClashDetails(res.data))
-        .catch(() => setClashDetails([]));
-    }
-  }, [drawing.id, drawing.flag]);
+    API.get(`/drawings/clashes/${drawing.id}`)
+      .then((res) => setClashDetails(res.data))
+      .catch(() => setClashDetails([]));
+  }, [drawing.id]);
 
   useEffect(() => {
     API.get(`/drawings/${drawing.id}/versions`)
@@ -479,6 +477,13 @@ function VersionsPanel({
       .catch(() => setVersions([]))
       .finally(() => setLoadingV(false));
   }, [drawing.id]);
+  const currentUserId = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user"))?.id;
+    } catch {
+      return null;
+    }
+  })();
 
   const owned = canUpload(role, drawing.disc);
   const isNonMEP = drawing.disc !== "MEP";
@@ -569,34 +574,54 @@ function VersionsPanel({
           {/* clash banner */}
           {isFlagged && (
             <div style={{ marginBottom: 14 }}>
-              {clashDetails.length > 0 ? (
-                clashDetails.map((c) => (
-                  <div
-                    key={c.id}
-                    className="dr-alert dr-alert-red"
-                    style={{ marginBottom: 8 }}
-                  >
-                    <span className="dr-alert-icon">🚩</span>
-                    <div style={{ fontSize: 12, lineHeight: 1.6 }}>
-                      <strong>Clash flagged</strong> — {c.clash_type}
-                      <br />
-                      <span>{c.description}</span>
-                      <br />
-                      <span
-                        style={{ fontSize: 11, color: "var(--text-secondary)" }}
-                      >
-                        <strong>Drawing 1:</strong> {c.drawing_1_name}
-                        {" · "}
-                        <strong>Drawing 2:</strong> {c.drawing_2_name}
-                        {" · "}Raised by: <strong>{c.raised_by_name}</strong>
-                        {" · "}
-                        {new Date(c.created_at).toLocaleDateString()}
-                        {" · "}Priority: <strong>{c.priority}</strong>
-                        {" · "}Status: <strong>{c.status}</strong>
-                      </span>
+              {clashDetails.filter((c) => {
+                const currentVersion = versions.find((v) => v.current);
+                return (
+                  c.version_id_1 === currentVersion?.id ||
+                  c.version_id_2 === currentVersion?.id
+                );
+              }).length > 0 ? (
+                clashDetails
+                  .filter((c) => {
+                    const currentVersion = versions.find((v) => v.current);
+                    return (
+                      c.version_id_1 === currentVersion?.id ||
+                      c.version_id_2 === currentVersion?.id
+                    );
+                  })
+                  .map((c) => (
+                    <div
+                      key={c.id}
+                      className="dr-alert dr-alert-red"
+                      style={{ marginBottom: 8 }}
+                    >
+                      <span className="dr-alert-icon">🚩</span>
+                      <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+                        <strong>Clash flagged</strong> — {c.clash_type}
+                        <br />
+                        <span>{c.description}</span>
+                        <br />
+                        <span style={{ color: "var(--text-secondary)" }}>
+                          <strong>Drawing 1:</strong> {c.drawing_1_name}
+                          {" · "}
+                          <strong>Drawing 2:</strong> {c.drawing_2_name}
+                          {" · "}Raised by: <strong>{c.raised_by_name}</strong>
+                          {" · "}On version:{" "}
+                          <strong>
+                            {versions.find(
+                              (v) =>
+                                v.id === c.version_id_1 ||
+                                v.id === c.version_id_2,
+                            )?.rev || "—"}
+                          </strong>
+                          {" · "}
+                          {new Date(c.created_at).toLocaleDateString()}
+                          {" · "}Priority: <strong>{c.priority}</strong>
+                          {" · "}Status: <strong>{c.status}</strong>
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))
               ) : clashInfo ? (
                 <div
                   className="dr-alert dr-alert-red"
@@ -642,6 +667,24 @@ function VersionsPanel({
           {loadingV && (
             <p style={{ padding: 16, fontSize: 13 }}>Loading versions...</p>
           )}
+          {process.env.NODE_ENV === "development" && (
+            <div style={{ fontSize: 10, color: "gray", marginBottom: 8 }}>
+              Clashes loaded: {clashDetails.length} | Version IDs:{" "}
+              {versions.map((v) => v.id?.slice(0, 8)).join(", ")}
+              <br />
+              Clash version_id_1s:{" "}
+              {clashDetails
+                .map((c) => c.version_id_1?.slice(0, 8) ?? "NULL")
+                .join(", ")}
+              <br />
+              Match test REV-3:{" "}
+              {clashDetails.some(
+                (c) => c.version_id_1 === versions.find((v) => v.current)?.id,
+              )
+                ? "YES"
+                : "NO"}
+            </div>
+          )}
           <div className="dr-ver-history-label">
             Full Revision History — {versions.length} version
             {versions.length > 1 ? "s" : ""}
@@ -669,11 +712,24 @@ function VersionsPanel({
                       >
                         {v.current ? "✓ Current" : "Archived"}
                       </span>
-                      {v.current && isFlagged && (
+                      {clashDetails.some(
+                        (c) =>
+                          c.version_id_1 === v.id || c.version_id_2 === v.id,
+                      ) && (
                         <span className="dr-pill drp-clash">
                           🚩 Clash Flagged
                         </span>
                       )}
+                      {v.current &&
+                        isFlagged &&
+                        !clashDetails.some(
+                          (c) =>
+                            c.version_id_1 === v.id || c.version_id_2 === v.id,
+                        ) && (
+                          <span className="dr-pill drp-clash">
+                            🚩 Clash Flagged
+                          </span>
+                        )}
                       {v.current && fullyApproved && (
                         <span className="dr-pill drp-finalized">
                           🏆 Finalized
@@ -684,6 +740,56 @@ function VersionsPanel({
                     <div className="dr-ver-uploader">👤 {v.uploader}</div>
                     <div className="dr-ver-title">{v.title}</div>
                     <div className="dr-ver-note">{v.note}</div>
+
+                    {clashDetails
+                      .filter(
+                        (c) =>
+                          c.version_id_1 === v.id || c.version_id_2 === v.id,
+                      )
+                      .map((c) => (
+                        <div
+                          key={c.id}
+                          style={{
+                            background: "rgba(200,50,50,0.06)",
+                            border: "1px solid rgba(200,50,50,0.2)",
+                            borderRadius: 6,
+                            padding: "8px 10px",
+                            marginBottom: 8,
+                            fontSize: 11,
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          <strong>🚩 {c.clash_type}</strong> — {c.description}
+                          <br />
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            Conflicts with:{" "}
+                            <strong>
+                              {c.drawing_1_id === drawing.id
+                                ? c.drawing_2_name
+                                : c.drawing_1_name}
+                            </strong>
+                            {" · "}Raised by:{" "}
+                            <strong>{c.raised_by_name}</strong>
+                            {" · "}
+                            {new Date(c.created_at).toLocaleDateString()}
+                            {" · "}Status: <strong>{c.status}</strong>
+                          </span>
+                          {currentUserId &&
+                            c.raised_by_id === currentUserId &&
+                            c.status === "Open" && (
+                              <div style={{ marginTop: 6 }}>
+                                <button
+                                  className="dr-btn-clash-active"
+                                  style={{ padding: "4px 10px", fontSize: 10 }}
+                                  onClick={() => onRemoveClash(drawing, c.id)}
+                                >
+                                  ✓ Mark Resolved
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                      ))}
+
                     <div className="dr-ver-actions">
                       <a
                         href={`http://localhost:5000${v.file_url}`}
@@ -712,24 +818,15 @@ function VersionsPanel({
                         👁 View
                       </button>
 
-                      {showClashBtn &&
-                        (isFlagged ? (
-                          <button
-                            className="dr-btn-clash-active"
-                            style={{ padding: "5px 12px", fontSize: 11 }}
-                            onClick={() => onRemoveClash(drawing)}
-                          >
-                            ✓ Clash Flagged — Remove
-                          </button>
-                        ) : (
-                          <button
-                            className="dr-btn-clash"
-                            style={{ padding: "5px 12px", fontSize: 11 }}
-                            onClick={() => onOpenClashModal(drawing)}
-                          >
-                            🚩 Flag Clash
-                          </button>
-                        ))}
+                      {showClashBtn && (
+                        <button
+                          className="dr-btn-clash"
+                          style={{ padding: "5px 12px", fontSize: 11 }}
+                          onClick={() => onOpenClashModal(drawing)}
+                        >
+                          🚩 Flag Clash
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -762,7 +859,7 @@ function VersionsPanel({
                 </button>
               )}
               <a
-                href="/mep/upload"
+                href={`/mep/upload?drawing_id=${drawing.id}&drawing_name=${encodeURIComponent(drawing.name)}`}
                 className="dr-btn-primary"
                 style={{ flex: 1, justifyContent: "center" }}
               >
@@ -879,6 +976,7 @@ export default function DrawingRegister({ resolvedRole: resolvedRoleProp }) {
     subDisc: d.sub_discipline,
     floor: d.floor_name,
     number: d.drawing_number,
+    version_id: d.version_id,
     rev: d.revision_number || "—",
     date: d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString() : "—",
     size: d.file_size || "—",
@@ -944,6 +1042,7 @@ export default function DrawingRegister({ resolvedRole: resolvedRoleProp }) {
       await API.post("/drawings/clashes", {
         drawing_id_1: drawing.id,
         drawing_id_2: conflictingDrawingId,
+        version_id_1: drawing.version_id,
         clash_type: clashType,
         description: reason,
         raised_by: resolvedRole,
@@ -963,13 +1062,37 @@ export default function DrawingRegister({ resolvedRole: resolvedRoleProp }) {
     showToast(`🚩 Clash flagged on ${drawing.name} — ${clashType}`);
   };
 
-  const handleRemoveClash = (drawing) => {
+  const handleRemoveClash = async (drawing, clashId) => {
+    if (clashId) {
+      try {
+        await API.put(`/drawings/clashes/${clashId}/resolve`);
+      } catch (err) {
+        console.error("Resolve clash failed:", err);
+      }
+    }
     setClashFlags((prev) => {
       const n = { ...prev };
       delete n[drawing.id];
       return n;
     });
-    showToast(`Clash flag removed from ${drawing.name}`);
+    // refresh drawings to update has_clash flag
+    API.get(`/drawings/project/${activeProject.id}`)
+      .then((res) => {
+        setRawDrawings(res.data);
+        const clashSeeded = {};
+        res.data.forEach((d) => {
+          if (d.has_clash) {
+            clashSeeded[d.id] = {
+              clashType: "Flagged",
+              reason: `${d.open_clash_count} open clash${d.open_clash_count > 1 ? "es" : ""}`,
+              date: new Date().toISOString().slice(0, 10),
+            };
+          }
+        });
+        setClashFlags(clashSeeded);
+      })
+      .catch(() => {});
+    showToast(`Clash resolved on ${drawing.name}`);
   };
 
   /* ── approval handlers ── */

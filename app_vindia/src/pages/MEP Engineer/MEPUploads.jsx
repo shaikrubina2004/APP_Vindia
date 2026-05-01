@@ -70,6 +70,13 @@ const FILE_ICONS = { dwg: "📐", dxf: "📐", pdf: "📄", rvt: "🏗️", ifc:
 export default function MEPUpload() {
   const { activeProject } = useProject();
   const [floors, setFloors] = useState([]);
+
+  // detect if this is a "new version" upload
+  const searchParams = new URLSearchParams(window.location.search);
+  const existingDrawingId = searchParams.get("drawing_id");
+  const existingDrawingName = searchParams.get("drawing_name");
+  const isNewVersion = !!existingDrawingId;
+
   const [formData, setFormData] = useState({
     name: "",
     discipline: "",
@@ -122,24 +129,33 @@ export default function MEPUpload() {
 
     const data = new FormData();
     data.append("file", queued[0].file);
-    data.append("project_id", activeProject.id);
-    data.append("name", formData.name || queued[0].name);
-    data.append("discipline", formData.discipline);
-    data.append("sub_discipline", formData.sub_discipline);
-    data.append("drawing_number", formData.drawing_number);
-    data.append("drawing_type", formData.drawing_type);
-    data.append("floor_id", formData.floor_id);
     data.append("revision_number", formData.revision_number);
-    data.append("title", formData.title || formData.name);
+    data.append(
+      "title",
+      formData.title || formData.name || existingDrawingName || queued[0].name,
+    );
     data.append("change_notes", formData.change_notes);
 
+    if (!isNewVersion) {
+      data.append("project_id", activeProject.id);
+      data.append("name", formData.name || queued[0].name);
+      data.append("discipline", formData.discipline);
+      data.append("sub_discipline", formData.sub_discipline);
+      data.append("drawing_number", formData.drawing_number);
+      data.append("drawing_type", formData.drawing_type);
+      data.append("floor_id", formData.floor_id);
+    }
+
     try {
-      // Simulate progress while uploading
       const iv = setInterval(() => {
         setProgress((p) => (p < 85 ? p + Math.random() * 10 : p));
       }, 200);
 
-      await API.post("/drawings", data, {
+      const endpoint = isNewVersion
+        ? `/drawings/${existingDrawingId}/versions`
+        : "/drawings";
+
+      await API.post(endpoint, data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -303,80 +319,101 @@ export default function MEPUpload() {
                     type="text"
                     className="edit-form-input"
                     placeholder="e.g. HVAC Layout — Level 3"
-                    value={formData.name}
+                    value={
+                      isNewVersion
+                        ? existingDrawingName || formData.name
+                        : formData.name
+                    }
+                    readOnly={isNewVersion}
+                    style={
+                      isNewVersion
+                        ? {
+                            background: "var(--bg-light)",
+                            color: "var(--text-secondary)",
+                          }
+                        : {}
+                    }
                     onChange={(e) =>
+                      !isNewVersion &&
                       setFormData((p) => ({ ...p, name: e.target.value }))
                     }
                   />
                 </div>
 
-                <div className="edit-form-group">
-                  <label>
-                    Drawing Number{" "}
-                    <span style={{ color: "var(--danger)" }}>*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="edit-form-input"
-                    placeholder="e.g. MEP-HVAC-GF-001"
-                    value={formData.drawing_number}
-                    onChange={(e) =>
-                      setFormData((p) => ({
-                        ...p,
-                        drawing_number: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
+                {!isNewVersion && (
+                  <div className="edit-form-group">
+                    <label>
+                      Drawing Number{" "}
+                      <span style={{ color: "var(--danger)" }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="edit-form-input"
+                      placeholder="e.g. MEP-HVAC-GF-001"
+                      value={formData.drawing_number}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          drawing_number: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
 
-                <div className="edit-form-group">
-                  <label>
-                    Discipline <span style={{ color: "var(--danger)" }}>*</span>
-                  </label>
-                  <select
-                    className="edit-form-input"
-                    value={formData.discipline}
-                    onChange={(e) =>
-                      setFormData((p) => ({
-                        ...p,
-                        discipline: e.target.value,
-                        sub_discipline: "",
-                      }))
-                    }
-                  >
-                    <option value="">Select</option>
-                    {Object.keys(DISCIPLINE_MAP).map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {!isNewVersion && (
+                  <div className="edit-form-group">
+                    <label>
+                      Discipline{" "}
+                      <span style={{ color: "var(--danger)" }}>*</span>
+                    </label>
+                    <select
+                      className="edit-form-input"
+                      value={formData.discipline}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          discipline: e.target.value,
+                          sub_discipline: "",
+                        }))
+                      }
+                    >
+                      <option value="">Select</option>
+                      {Object.keys(DISCIPLINE_MAP).map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-                <div className="edit-form-group">
-                  <label>
-                    Sub-discipline{" "}
-                    <span style={{ color: "var(--danger)" }}>*</span>
-                  </label>
-                  <select
-                    className="edit-form-input"
-                    value={formData.sub_discipline}
-                    onChange={(e) =>
-                      setFormData((p) => ({
-                        ...p,
-                        sub_discipline: e.target.value,
-                      }))
-                    }
-                    disabled={!formData.discipline}
-                  >
-                    <option value="">Select</option>
-                    {(DISCIPLINE_MAP[formData.discipline] || []).map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {!isNewVersion && (
+                  <div className="edit-form-group">
+                    <label>
+                      Sub-discipline{" "}
+                      <span style={{ color: "var(--danger)" }}>*</span>
+                    </label>
+                    <select
+                      className="edit-form-input"
+                      value={formData.sub_discipline}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          sub_discipline: e.target.value,
+                        }))
+                      }
+                      disabled={!formData.discipline}
+                    >
+                      <option value="">Select</option>
+                      {(DISCIPLINE_MAP[formData.discipline] || []).map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="edit-form-group">
                   <label>
@@ -396,64 +433,66 @@ export default function MEPUpload() {
                     }
                   />
                 </div>
-
-                <div className="edit-form-group">
-                  <label>
-                    Zone / Floor{" "}
-                    <span style={{ color: "var(--danger)" }}>*</span>
-                  </label>
-                  <select
-                    className="edit-form-input"
-                    value={formData.floor_id}
-                    onChange={(e) =>
-                      setFormData((p) => ({ ...p, floor_id: e.target.value }))
-                    }
-                  >
-                    <option value="">Select floor</option>
-                    {floors.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="edit-form-group">
-                  <label>Drawing Type</label>
-                  <select
-                    className="edit-form-input"
-                    value={formData.drawing_type}
-                    onChange={(e) =>
-                      setFormData((p) => ({
-                        ...p,
-                        drawing_type: e.target.value,
-                      }))
-                    }
-                  >
-                    {[
-                      "Layout",
-                      "Floor Plan",
-                      "Section",
-                      "Elevation",
-                      "Detail",
-                      "Schematic",
-                      "Single Line",
-                      "Routing",
-                      "Drainage",
-                      "Foundation",
-                      "Column Layout",
-                      "Beam Layout",
-                      "Slab Detail",
-                      "Wall Detail",
-                      "Ceiling Plan",
-                      "Riser Diagram",
-                    ].map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {!isNewVersion && (
+                  <div className="edit-form-group">
+                    <label>
+                      Zone / Floor{" "}
+                      <span style={{ color: "var(--danger)" }}>*</span>
+                    </label>
+                    <select
+                      className="edit-form-input"
+                      value={formData.floor_id}
+                      onChange={(e) =>
+                        setFormData((p) => ({ ...p, floor_id: e.target.value }))
+                      }
+                    >
+                      <option value="">Select floor</option>
+                      {floors.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {!isNewVersion && (
+                  <div className="edit-form-group">
+                    <label>Drawing Type</label>
+                    <select
+                      className="edit-form-input"
+                      value={formData.drawing_type}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          drawing_type: e.target.value,
+                        }))
+                      }
+                    >
+                      {[
+                        "Layout",
+                        "Floor Plan",
+                        "Section",
+                        "Elevation",
+                        "Detail",
+                        "Schematic",
+                        "Single Line",
+                        "Routing",
+                        "Drainage",
+                        "Foundation",
+                        "Column Layout",
+                        "Beam Layout",
+                        "Slab Detail",
+                        "Wall Detail",
+                        "Ceiling Plan",
+                        "Riser Diagram",
+                      ].map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="edit-form-group">
                   <label>Drawing Status</label>

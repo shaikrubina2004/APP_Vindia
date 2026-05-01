@@ -116,7 +116,8 @@ exports.uploadNewVersion = async (req, res) => {
   const client = await pool.connect();
   try {
     const { drawing_id } = req.params;
-    const { revision_number, title, change_notes, uploaded_by } = req.body;
+    const { revision_number, title, change_notes } = req.body;
+    const uploaded_by = req.user?.id;
 
     if (!revision_number || !title || !uploaded_by) {
       return res
@@ -454,11 +455,14 @@ exports.getClashesByDrawing = async (req, res) => {
          c.status,
          c.created_at,
          c.resolved_at,
+         c.version_id_1,
+         c.version_id_2,
          d1.id   AS drawing_1_id,
          d1.name AS drawing_1_name,
          d2.id   AS drawing_2_id,
          d2.name AS drawing_2_name,
-         u.name  AS raised_by_name
+       u.name  AS raised_by_name,
+         u.id    AS raised_by_id
        FROM drawing_clashes c
        JOIN drawings d1 ON d1.id = c.drawing_id_1
        JOIN drawings d2 ON d2.id = c.drawing_id_2
@@ -472,6 +476,30 @@ exports.getClashesByDrawing = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error("🔥 FETCH CLASHES ERROR:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.resolveClash = async (req, res) => {
+  try {
+    const { clash_id } = req.params;
+    const resolved_by = req.user?.id;
+
+    const result = await pool.query(
+      `UPDATE drawing_clashes
+       SET status = 'Resolved', resolved_by = $1, resolved_at = NOW()
+       WHERE id = $2 AND is_deleted = FALSE
+       RETURNING *`,
+      [resolved_by, clash_id],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Clash not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("🔥 RESOLVE CLASH ERROR:", err.message);
     res.status(500).json({ error: err.message });
   }
 };
