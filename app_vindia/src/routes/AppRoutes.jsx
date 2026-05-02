@@ -10,7 +10,7 @@ import CEOPanel from "../pages/ceo/CEOPanel";
 import UserManagement from "../pages/ceo/UserManagement";
 import ProjectManagement from "../pages/ceo/ProjectManagement";
 
-import BDADashboard from "../pages/BD/BDA/BDADashboard";
+import BDADashboard from "../pages/business-development/business-development-analyst/BDADashboard";
 
 /* HR */
 import HRDashboard from "../pages/hr/HRDashboard";
@@ -80,6 +80,7 @@ import SiteEngineerLayout from "../layouts/SiteEngineerLayout";
 import QuantitySurveyorLayout from "../layouts/QuantitySurveyorLayout";
 import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
 import ArchitectLayout from "../layouts/ArchitectLayout";
+import BDALayout from "../layouts/BDALayout"; {/* ← ADDED */}
 
 /* COMMON */
 import Timesheet from "../pages/timesheet/Timesheet";
@@ -579,6 +580,18 @@ const AppRoutes = () => {
             <CEOLayout>
               <Timesheet />
             </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* BDA */}
+      <Route
+        path="/bda/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
+            <BDALayout>
+              <BDADashboard />
+            </BDALayout>
           </ProtectedRoute>
         }
       />
