@@ -12,11 +12,6 @@ export const StructuralEngineerMenu = [
     icon: "file-text",
   },
   {
-    name: "BOQ",
-    path: "/structural-engineer/boq",               // ← now has a real route
-    icon: "clipboard",
-  },
-  {
     name: "RFI",
     path: "/structural-engineer/rfi",
     icon: "help-circle",
