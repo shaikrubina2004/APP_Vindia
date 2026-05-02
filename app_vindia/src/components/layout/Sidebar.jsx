@@ -1,4 +1,3 @@
-// src/components/layout/Sidebar.jsx
 import React, { useEffect, useRef, useState } from "react";
 import feather from "feather-icons";
 import { NavLink } from "react-router-dom";
@@ -8,19 +7,15 @@ export default function Sidebar({ menuItems = [], defaultOpen = false }) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
   const sidebarRef = useRef(null);
 
-  // Replace feather icons after DOM paint
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
       try {
         feather.replace();
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     });
     return () => cancelAnimationFrame(raf);
   }, [menuItems, open]);
 
-  // Close on Escape
   useEffect(() => {
     function onKey(e) {
       if (e.key === "Escape") setOpen(false);
@@ -29,11 +24,10 @@ export default function Sidebar({ menuItems = [], defaultOpen = false }) {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  // Close when clicking outside (mobile/overlay)
   useEffect(() => {
     function onClick(e) {
       if (!open) return;
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) setOpen(false);
+      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) setOpen(false); // ✅ FIXED
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
@@ -41,7 +35,6 @@ export default function Sidebar({ menuItems = [], defaultOpen = false }) {
 
   return (
     <>
-      {/* Mobile toggle */}
       <button
         className="sidebar-toggle"
         aria-expanded={open}
@@ -52,8 +45,13 @@ export default function Sidebar({ menuItems = [], defaultOpen = false }) {
         {open ? "✕" : "☰"}
       </button>
 
-      {/* Backdrop for mobile */}
-      {open && <div className="sidebar-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />}
+      {open && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
       <nav
         id="app-sidebar"
@@ -62,19 +60,19 @@ export default function Sidebar({ menuItems = [], defaultOpen = false }) {
         aria-hidden={false}
       >
         <ul className="sidebar__menu" role="menu" aria-label="Main navigation">
-          {menuItems.map((item, index) => (
+          {menuItems.map((item, index) => ( // ✅ FIXED
             <li key={item.path || index} role="none">
               <NavLink
                 to={item.path}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className={({ isActive }) => (isActive ? "sidebar__link active" : "sidebar__link")}
-                aria-label={item.name}
+                className={({ isActive }) =>
+                  isActive ? "sidebar__link active" : "sidebar__link"
+                }
+                aria-label={item.name} // ✅ FIXED
               >
-                {/* Icon (feather) */}
                 <i data-feather={item.icon || "circle"} aria-hidden="true" />
-                {/* Tooltip / label (desktop shows tooltip; mobile shows inline text) */}
-                <span aria-hidden="true">{item.name}</span>
+                <span aria-hidden="true">{item.name}</span> {/* ✅ FIXED */}
               </NavLink>
             </li>
           ))}

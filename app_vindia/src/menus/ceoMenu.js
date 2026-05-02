@@ -2,7 +2,7 @@ export const ceoMenu = [
   { name: "Dashboard", path: "/dashboard", icon: "home" },
   { name: "HR Management", path: "/hr", icon: "users" },
   { name: "Finance", path: "/finance", icon: "dollar-sign" },
-  { name: "Project Management", path: "/projects", icon: "folder" },
+  { name: "Project Management", path: "/project-manager/dashboard", icon: "folder" },
   { name: "Employee", path: "/employee", icon: "user" },
   { name: "Site Engineer", path: "/site-engineer", icon: "tool" },
   { name: "Client", path: "/client", icon: "briefcase" },

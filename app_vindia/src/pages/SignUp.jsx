@@ -15,20 +15,22 @@ function SignUp() {
     confirmPassword: "",
   });
 
-  const [showPassword, setShowPassword] = useState(false);
   const [agree, setAgree] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSignup = async () => {
-    console.log("SIGNUP API HIT ✅"); // ✅ MOVE HERE
+    const { firstName, lastName, email, password, confirmPassword } = formData;
 
-    if (formData.password !== formData.confirmPassword) {
+    if (!firstName || !lastName || !email || !password || !confirmPassword) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    if (password !== confirmPassword) {
       alert("Passwords do not match");
       return;
     }
@@ -40,11 +42,10 @@ function SignUp() {
 
     try {
       const res = await signup({
-        name: formData.firstName + " " + formData.lastName,
-        email: formData.email,
-        password: formData.password,
+        name: firstName + " " + lastName,
+        email,
+        password,
       });
-
       alert(res.data.message);
       navigate("/");
     } catch (error) {
@@ -53,74 +54,44 @@ function SignUp() {
   };
 
   return (
-    <div className="login-bg signup-page">
-      <div className="login-card">
-        <div className="login-left">
-          <img src={logo} alt="Vindia Logo" className="login-logo" />
-          <p>
-            You Dream It. <span className="build-text">We Build It.</span>
-          </p>
+    <div className="signup-bg">
+      <div className="signup-card">
+
+        {/* LEFT PANEL */}
+        <div className="signup-left">
+          <img src={logo} alt="Vindia Logo" className="signup-logo" />
+          <p>You Dream It. <span className="build-text">We Build It.</span></p>
         </div>
 
-        <div className="login-right">
-          <h2 style={{ marginBottom: "20px" }}>Create Account</h2>
+        {/* RIGHT PANEL */}
+        <div className="signup-right">
+          <h2>Create Account</h2>
 
           <label>First Name</label>
-          <input
-            type="text"
-            name="firstName"
-            value={formData.firstName}
-            onChange={handleChange}
-          />
+          <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} />
 
           <label>Last Name</label>
-          <input
-            type="text"
-            name="lastName"
-            value={formData.lastName}
-            onChange={handleChange}
-          />
+          <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} />
 
           <label>Email</label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-          />
+          <input type="email" name="email" value={formData.email} onChange={handleChange} />
 
           <label>Password</label>
-          <input
-            type={showPassword ? "text" : "password"}
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-          />
+          <input type="password" name="password" value={formData.password} onChange={handleChange} />
 
           <label>Confirm Password</label>
-          <input
-            type="password"
-            name="confirmPassword"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-          />
+          <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} />
 
           <label className="remember">
-            <input
-              type="checkbox"
-              checked={agree}
-              onChange={() => setAgree(!agree)}
-            />
+            <input type="checkbox" checked={agree} onChange={() => setAgree(!agree)} />
             I agree to Terms & Conditions
           </label>
 
-          <button onClick={handleSignup}>Sign Up</button>
+          <button onClick={handleSignup}>SIGN UP</button>
 
-          <p className="signup-text">
+          <p className="signup-footer-text">
             Already have an account?{" "}
-            <Link to="/" className="signup-link">
-              Sign In
-            </Link>
+            <Link to="/" className="signup-link">Sign In</Link>
           </p>
         </div>
       </div>
