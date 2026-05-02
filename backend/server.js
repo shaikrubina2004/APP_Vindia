@@ -64,6 +64,9 @@ const boqRoutes = require("./routes/boqRoutes");
 const costReportRoutes = require("./routes/costReportRoutes");
 const quantityReportRoutes = require("./routes/quantityReportRoutes");
 
+/* ── BDA / Leads ───────────────────────────────────────── */
+const leadRoutes = require("./routes/leadRoutes");
+
 const app = express();
 
 /* ═══════════════════════════════════════════════════════════
@@ -155,6 +158,8 @@ app.use("/api/se-notifications", seNotificationRoutes);  /* ── QS Modules �
   app.use("/api/progress", progressRoutes);
   app.use("/api/site-engineer-dashboard", siteEngineerDashboardRoutes);
   app.use("/api/drawings", drawingUploadRoutes);
+  /* ── BDA / Leads ───────────────────────────────────────── */
+  app.use("/api/leads", leadRoutes);
 } catch (err) {
   console.error("❌ Route loading error:", err.message);
 }

@@ -190,16 +190,7 @@ const AppRoutes = () => {
         }
       />
 
-      <Route
-        path="/business-development/dashboard"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.BDA]}>
-            <ProjectManagerLayout>
-              <BDADashboard />
-            </ProjectManagerLayout>
-          </ProtectedRoute>
-        }
-      />
+  
 
       {/* HR */}
       <Route
@@ -601,7 +592,7 @@ const AppRoutes = () => {
 
       {/* BDA */}
       <Route
-        path="/bda/dashboard"
+        path="/business-development/dashboard"
         element={
           <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
             <BDALayout>

@@ -1,5 +1,5 @@
 export const bdaMenu = [
-  { name: "BDA", path: "/bda/dashboard", icon: "trending-up" },
+  { name: "Dashboard", path: "/business-development/dashboard", icon: "home" },
   { name: "Leads",       path: "/bda/leads",       icon: "users" },
   { name: "Add Lead",    path: "/bda/add-lead",    icon: "plus-circle" },
   { name: "Follow Up",   path: "/bda/follow-up",   icon: "phone-call" },
