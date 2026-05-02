@@ -51,7 +51,7 @@ export default function RFIPage() {
         const data = await fetchRFIs(view);
         console.log("✅ DATA:", data);
 
-        setRfis(Array.isArray(data) ? data : []);
+setRfis(Array.isArray(data?.rfis) ? data.rfis : []);
       } catch (err) {
         console.error("❌ ERROR:", err);
         setIsError(true);

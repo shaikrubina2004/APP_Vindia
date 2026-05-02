@@ -438,23 +438,8 @@ const AppRoutes = () => {
 
       {/* STRUCTURAL */}
       <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
-      <Route path="/rfi/:id" element={<RFIDetailPage />} />
-      <Route
-        path="/structural-engineer/rfi"
-        element={
-          <StructuralEngineerLayout>
-            <RFIPage />
-          </StructuralEngineerLayout>
-        }
-      />
-      <Route
-        path="/structural-engineer/rfi/:id"
-        element={
-          <StructuralEngineerLayout>
-            <RFIDetailPage />
-          </StructuralEngineerLayout>
-        }
-      />
+      
+    
 
       {/* ARCHITECT */}
       <Route
