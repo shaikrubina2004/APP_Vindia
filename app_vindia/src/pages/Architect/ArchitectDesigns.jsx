@@ -1,839 +1,1050 @@
-import React, { useEffect, useMemo, useRef, useState, useReducer } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import ReactDOM from "react-dom";
-import "./ArchitectDesigns.css";
 import { getArchitectProjects } from "../../services/architectprojectService";
+import "./ArchitectDesigns.css";
 import {
-  getDrawingsByProject,
   createDrawing,
+  getDrawings,
+  sendDrawing,
+  requestDrawing,
+  getRequests,
 } from "../../services/architectDesignService";
+
+// ─── Role mapping: localStorage user.role → DMS role ─────────────────────────
+const ROLE_MAP = {
+  architect:           "Architect",
+  draftsman:           "Architect",
+  project_coordinator: "Program Coordinator",
+  quantity_surveyor:   "Quantity Surveyor",
+  site_engineer:       "Site Engineer",
+  client:              "Client",
+  project_manager:     "Architect",
+  ceo:                 "Architect",
+};
+
 const DRAWING_TYPES = ["Working Drawing", "Detailed Drawing"];
-const STATUSES = ["Pending", "Approved", "Rejected", "Accepted"];
+
+const WORKING_DRAWING_SEQUENCE = [
+  "Quantity Surveyor",
+  "Site Engineer",
+  "Program Coordinator",
+  "Client",
+];
+
+// Role code used when talking to the backend
+const DMS_ROLE_TO_CODE = {
+  "Architect":           "architect",
+  "Program Coordinator": "project_coordinator",
+  "Quantity Surveyor":   "quantity_surveyor",
+  "Site Engineer":       "site_engineer",
+  "Client":              "client",
+};
+
+const PROJECT_SCOPED_ROLES = new Set(["Site Engineer", "Client"]);
+
+const DEFAULT_REQUEST_NOTE =
+  "I am formally requesting a detailed drawing for the above-mentioned project. " +
+  "The working drawing currently available does not provide sufficient detail for our on-site requirements. " +
+  "Specifically, we require enlarged plans, sections, and elevations that clearly indicate material specifications, " +
+  "dimensions, and construction notes. Please ensure the drawing is updated to the latest revision and issued at the earliest convenience. " +
+  "Kindly acknowledge receipt of this request and advise on the expected turnaround time.";
 
 const uid = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const now = () => new Date().toISOString();
-const fmt = (v) => (v ? new Date(v).toLocaleString() : "—");
-const pretty = (f) => f.replace(/\.[^/.]+$/, "").replace(/[-_]+/g, " ").trim();
-const badgeClass = (v) => `chip chip-${String(v).toLowerCase().replace(/\s+/g, "-")}`;
-const displayStage = (d) => (d?.status === "Approved" ? "Fully Approved" : d?.stage || "—");
+const fmt = (v) =>
+  v
+    ? new Date(v).toLocaleString("en-GB", {
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      })
+    : "—";
 
-const emptyNode = () => ({
-  state: "pending",
-  sentAt: null,
-  returnedAt: null,
-  approvedAt: null,
-  sentBy: "",
-  note: "",
-  revision: "",
-});
-
-const emptyWorkflow = () => ({
-  qs: emptyNode(),
-  site: emptyNode(),
-  pm: emptyNode(),
-  client: emptyNode(),
-});
-
-const makeDrawing = ({
-  id,
-  project,
-  name,
-  drawingType,
-  revision,
-  stage = "Draft",
-  status = "Pending",
-  description = "",
-  fileName = "",
-  previewUrl = "",
-}) => ({
-  id,
-  project,
-  name,
-  drawingType,
-  revision,
-  stage,
-  status,
-  description,
-  fileName,
-  previewUrl,
-  createdAt: now(),
-  updated: now(),
-  approvedRevision: "",
-  workflow: emptyWorkflow(),
-  history: [
-    {
-      rev: revision,
-      stage,
-      status,
-      updated: now(),
-      previewUrl,
-      note: description || "Initial upload",
-    },
-  ],
-  actionLog: [
-    {
-      ts: now(),
-      action: "Created",
-      stage: "—",
-      note: description || "Drawing created",
-    },
-  ],
-});
-
-const STAGE_LABELS = {
-  qs: "Quantity Surveyor",
-  site: "Site Engineer",
-  pm: "Project Manager",
-  client: "Client",
-};
-
-const stageOrderFor = () => ["qs", "site", "pm", "client"];
-
-const stageActions = (d, step) => {
-  const w = d.workflow || {};
-  const node = w[step] || emptyNode();
-  const isDetailed = d.drawingType === "Detailed Drawing";
-
-  return {
-    canSend: isDetailed ? node.state === "pending" : step === "qs" ? node.state === "pending" : w.qs.state === "sent" && node.state === "pending",
-    canApprove: step === "client" && node.state === "sent",
-    canReject: step === "client" && node.state === "sent",
-    canReturn: false,
-    canView: node.state !== "pending",
+const badgeClass = (status) => {
+  const map = {
+    Pending:  "dms-badge dms-badge-pending",
+    Sent:     "dms-badge dms-badge-sent",
+    Approved: "dms-badge dms-badge-approved",
+    Rejected: "dms-badge dms-badge-rejected",
   };
+  return map[status] || "dms-badge dms-badge-pending";
 };
 
-const initialState = {
-  projects: [],
-  selectedProjectId: "",
-  selectedDrawingId: "",
-  search: "",
-  projectFilter: "All",
-  statusFilter: "All",
-  modal: null,
-  toast: null,
-  uploadForm: {
-    file: null,
-    project: "",
-    projectStatus: "Pending",
-    drawingName: "",
-    drawingType: "Working Drawing",
-    revision: "R1",
-    previewUrl: "",
-  },
-};
-
-function reducer(state, action) {
-  switch (action.type) {
-    case "SET":
-      return { ...state, [action.field]: action.value };
-    case "OPEN_MODAL":
-      return {
-        ...state,
-        modal: action.modal,
-        selectedProjectId: action.projectId || state.selectedProjectId,
-        selectedDrawingId: action.drawingId || state.selectedDrawingId,
-      };
-    case "CLOSE_MODAL":
-      return { ...state, modal: null };
-    case "BACK_TO_LIST":
-      return { ...state, modal: "project" };
-    case "SET_TOAST":
-      return { ...state, toast: { id: uid(), ...action.toast } };
-    case "CLEAR_TOAST":
-      return { ...state, toast: null };
-    case "SET_UPLOAD_FORM":
-      return { ...state, uploadForm: { ...state.uploadForm, [action.field]: action.value } };
-    case "RESET_UPLOAD":
-      return {
-        ...state,
-        uploadForm: {
-          file: null,
-          project: "",
-          projectStatus: "Pending",
-          drawingName: "",
-          drawingType: "Working Drawing",
-          revision: "R1",
-          previewUrl: "",
-        },
-      };
-    case "ADD_DRAWING": {
-      const exists = state.projects.some((p) => p.name === action.projectName);
-      const projects = exists
-        ? state.projects.map((p) =>
-            p.name !== action.projectName ? p : { ...p, drawings: [action.drawing, ...p.drawings], status: action.projectStatus || p.status }
-          )
-        : [
-            ...state.projects,
-            {
-              id: `PRJ-${String(state.projects.length + 1).padStart(3, "0")}`,
-              name: action.projectName,
-              status: action.projectStatus || "Pending",
-              drawings: [action.drawing],
-            },
-          ];
-      const project = projects.find((p) => p.name === action.projectName);
-      return {
-        ...state,
-        projects,
-        selectedProjectId: project?.id || state.selectedProjectId,
-        selectedDrawingId: action.drawing.id,
-        modal: "project",
-      };
-    }
-    case "UPDATE_DRAWING": {
-      const projects = state.projects.map((p) =>
-        p.id !== action.projectId ? p : { ...p, drawings: p.drawings.map((d) => (d.id === action.drawing.id ? action.drawing : d)) }
-      );
-      const updatedProjects = projects.map((p) => {
-        if (p.id !== action.projectId) return p;
-        const anyApproved = p.drawings.some((d) => d.status === "Approved");
-        return { ...p, status: anyApproved ? "Accepted" : p.status };
-      });
-      return {
-        ...state,
-        projects: updatedProjects,
-        selectedProjectId: action.projectId,
-        selectedDrawingId: action.drawing.id,
-      };
-    }
-    case "DELETE_DRAWING": {
-      const projects = state.projects.map((p) =>
-        p.id !== action.projectId ? p : { ...p, drawings: p.drawings.filter((d) => d.id !== action.drawingId) }
-      );
-      return {
-        ...state,
-        projects,
-        selectedProjectId: action.projectId,
-        selectedDrawingId: "",
-      };
-    }
-    case "SELECT_PROJECT":
-      return {
-        ...state,
-        selectedProjectId: action.projectId,
-        selectedDrawingId: action.drawingId || state.selectedDrawingId,
-        modal: "project",
-      };
-    case "SELECT_DRAWING":
-      return {
-        ...state,
-        selectedProjectId: action.projectId,
-        selectedDrawingId: action.drawingId,
-        modal: "drawing",
-      };
-    default:
-      return state;
-  }
+function resolveActiveRole(user) {
+  if (!user) return null;
+  const code = (user.role || "").toLowerCase().trim();
+  return ROLE_MAP[code] || null;
 }
 
-function StatCard({ label, value, accent }) {
-  return (
-    <div className={`stat-card${accent ? " stat-card--accent" : ""}`}>
-      <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
-    </div>
-  );
+// ─── Normalise a drawing row from the DB into the shape the UI expects ────────
+function normaliseDrawing(row) {
+  return {
+    id:          row.id,
+    projectId:   String(row.project_id),
+    projectName: row.project_name || row.name || "—",
+    drawingName: row.name,
+    drawingType: row.drawing_type,
+    revision:    row.current_revision || row.revision || "—",
+    fileName:    row.file_name || row.file_url || "",
+    blobKey:     null,           // blob URLs are local only; DB rows have no blob
+    uploadedAt:  row.created_at,
+    // sentTo is populated from architect_drawing_recipients via JOIN in the backend
+    // If your GET /api/architect-designs returns a recipients array, map it here.
+    // For now we default to [] and rely on backend-side filtering for recipients.
+    sentTo:      Array.isArray(row.recipients)
+      ? row.recipients.map((r) => ({
+          role:           r.role,
+          sentAt:         r.sent_at,
+          assignedUserId: r.user_id ? Number(r.user_id) : null,
+        }))
+      : [],
+  };
 }
 
-function Modal({ title, subtitle = "", wide = false, small = false, onClose, children, footer }) {
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, []);
-
-  return ReactDOM.createPortal(
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div
-        className={`modal${wide ? " modal-wide" : small ? " modal-medium" : ""}`}
-        onMouseDown={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="modal-title"
-      >
-        <div className="modal-head">
-          <div>
-            <h3 id="modal-title" className="modal-title">{title}</h3>
-            {subtitle && <p className="modal-subtitle">{subtitle}</p>}
-          </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-footer">{footer}</div>}
-      </div>
-    </div>,
-    document.body
-  );
+// ─── Normalise a request row from the DB ──────────────────────────────────────
+function normaliseRequest(row) {
+  return {
+    id:          row.id,
+    from:        row.role || "—",
+    projectId:   String(row.project_id),
+    projectName: row.project_name || "—",
+    note:        row.description || "",
+    sentAt:      row.created_at,
+    seen:        row.status !== "pending",
+  };
 }
 
+// ─── Toast ────────────────────────────────────────────────────────────────────
 function Toast({ toast, onClose }) {
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(onClose, 3500);
     return () => clearTimeout(t);
   }, [toast, onClose]);
-
   if (!toast) return null;
-
+  const typeClass =
+    toast.type === "success" ? "dms-toast dms-toast-success"
+    : toast.type === "error" ? "dms-toast dms-toast-error"
+    : "dms-toast dms-toast-info";
   return ReactDOM.createPortal(
-    <div className={`toast toast-${toast.type}`}>{toast.message}</div>,
+    <div className={typeClass}>{toast.message}</div>,
     document.body
   );
 }
 
-function WorkflowStageCard({ drawing, step, onAction }) {
-  const node = drawing.workflow[step] || emptyNode();
-  const actions = stageActions(drawing, step);
-  const label = STAGE_LABELS[step];
-
-  return (
-    <div className={`wf-stage wf-stage--${node.state}`}>
-      <div className="wf-stage-head">
-        <div className="wf-stage-head-left">
-          <strong className="wf-stage-label">{label}</strong>
-        </div>
-        <span className={`chip chip-${node.state}`}>{node.state}</span>
-      </div>
-      <div className="wf-stage-actions">
-        {actions.canSend && <button className="btn btn--info btn--sm" onClick={() => onAction(step, "send")}>↑ Send</button>}
-        {actions.canApprove && <button className="btn btn--success btn--sm" onClick={() => onAction(step, "approve")}>✓ Approve</button>}
-        {actions.canReject && <button className="btn btn--danger btn--sm" onClick={() => onAction(step, "reject")}>✕ Reject</button>}
-      </div>
-    </div>
-  );
-}
-
-function AddDrawingModal({ project, onClose, onAdd, toastFn, user }) {
-  const fileRef = useRef(null);
-  const [name, setName] = useState("");
-  const [type, setType] = useState("Working Drawing");
-  const [revision, setRevision] = useState("R1");
-  const [file, setFile] = useState(null);
-  const createdUrls = useRef([]);
-
-  useEffect(() => () => createdUrls.current.forEach((u) => URL.revokeObjectURL(u)), []);
+// ─── Modal ────────────────────────────────────────────────────────────────────
+function Modal({ title, wide, onClose, children, footer }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    return () => { document.body.style.overflow = ""; };
   }, []);
-
-  const onFileChange = (f) => {
-    if (!f) return;
-    if (!name.trim()) setName(pretty(f.name) || "Untitled Drawing");
-    setFile(f);
-    if (fileRef.current) fileRef.current.value = "";
-  };
-
-const handleAdd = async () => {
-  if (!name.trim()) return toastFn("error", "Enter drawing name");
-  if (!revision.trim()) return toastFn("error", "Enter revision");
-  if (!file) return toastFn("error", "Select file");
-
-  try {
-    await createDrawing({
-      id: `DWG-${Date.now()}`,
-      project_id: project.id,
-      name,
-      drawing_type: type,
-      current_revision: revision,
-     
-created_by: user?.id || null,reated_by: 1, // or user.id
-      file_name: file.name,
-      file_url: "dummy-url"
-    });
-
-    toastFn("success", "Saved to DB ✅");
-    onClose();
-
-  } catch (err) {
-    console.error(err);
-    toastFn("error", "Failed to save");
-  }
-};
-
   return ReactDOM.createPortal(
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal modal-medium" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="modal-head">
-          <h3 className="modal-title">Add Drawing</h3>
-          <button className="icon-btn" onClick={onClose}>✕</button>
+    <div className="dms-backdrop" onMouseDown={onClose}>
+      <div
+        className={`dms-modal${wide ? " dms-modal-wide" : ""}`}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="dms-modal-head">
+          <h3 className="dms-modal-title">{title}</h3>
+          <button className="dms-modal-close" onClick={onClose}>✕</button>
         </div>
-        <div className="modal-body">
-          <div className="form-grid">
-            <div className="form-field full">
-              <label className="form-label">Drawing Name</label>
-              <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Structural Plan" />
-            </div>
-            <div className="form-field full">
-              <label className="form-label">Drawing Type</label>
-              <select className="input" value={type} onChange={(e) => setType(e.target.value)}>
-                {DRAWING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="form-field full">
-              <label className="form-label">Revision</label>
-              <input className="input" value={revision} onChange={(e) => setRevision(e.target.value)} placeholder="e.g. R1" />
-            </div>
-            <div className="form-field full">
-              <label className="form-label">File</label>
-              <input ref={fileRef} type="file" accept="*/*" className="hidden-file" onChange={(e) => onFileChange(e.target.files?.[0] || null)} />
-              <div className="upload-file-row">
-                <button className="btn btn--ghost btn--sm" onClick={() => fileRef.current?.click()}>Choose File</button>
-                {file && <span className="muted file-name">{file.name}</span>}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn--ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn--primary" onClick={handleAdd}>Add Drawing</button>
-        </div>
+        <div className="dms-modal-body">{children}</div>
+        {footer && <div className="dms-modal-foot">{footer}</div>}
       </div>
     </div>,
     document.body
   );
 }
 
-export default function ArchitecturalDrawingManagementSystem() {
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const globalUploadRef = useRef(null);
-  const createdUrlsRef = useRef([]);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [assignedProjects, setAssignedProjects] = useState([]);
-  const [user] = useState(() => JSON.parse(localStorage.getItem("user") || "{}"));
+// ─── WorkflowTracker ──────────────────────────────────────────────────────────
+function WorkflowTracker({ sentTo }) {
+  return (
+    <div className="dms-workflow-row">
+      {WORKING_DRAWING_SEQUENCE.map((role, i) => {
+        const info = sentTo.find((s) => s.role === role);
+        return (
+          <React.Fragment key={role}>
+            <div className="dms-wf-step">
+              <div className={`dms-wf-dot${info ? " sent" : ""}`}>
+                {info ? "✓" : i + 1}
+              </div>
+              <div className={`dms-wf-label${info ? " sent" : ""}`}>
+                {role.split(" ").map((w) => w[0]).join(".")}
+              </div>
+            </div>
+            {i < WORKING_DRAWING_SEQUENCE.length - 1 && (
+              <div className={`dms-wf-line${info ? " done" : ""}`} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
 
-useEffect(() => {
-  if (!user?.id) return;
+// ─── Role pill ────────────────────────────────────────────────────────────────
+function RolePill({ role }) {
+  const colors = {
+    Architect:             { bg: "#1e3a5f", color: "#90caf9" },
+    "Program Coordinator": { bg: "#1b3a2d", color: "#81c995" },
+    "Quantity Surveyor":   { bg: "#3b2a00", color: "#ffd54f" },
+    "Site Engineer":       { bg: "#2d1b3a", color: "#ce93d8" },
+    Client:                { bg: "#1a2a3a", color: "#80deea" },
+  };
+  const s = colors[role] || { bg: "#222", color: "#fff" };
+  return (
+    <span style={{
+      background: s.bg, color: s.color, borderRadius: 6,
+      padding: "3px 12px", fontSize: 12, fontWeight: 700, letterSpacing: 0.5,
+    }}>
+      {role}
+    </span>
+  );
+}
 
-  const loadProjects = async () => {
+// ─── File preview ─────────────────────────────────────────────────────────────
+function FilePreview({ d, fileBlobs, maxHeight = 380 }) {
+  const blobUrl = fileBlobs[d.blobKey];
+  // If no local blob, try the stored file_url from the DB
+  const src = blobUrl || d.fileUrl || d.file_url || null;
+  const isImg = /\.(png|jpg|jpeg|gif|bmp|webp|svg)$/i.test(d.fileName || "");
+  const isPDF = /\.pdf$/i.test(d.fileName || "");
+  return (
+    <>
+      <div className="dms-file-preview-box">
+        {src && isImg && (
+          <img src={src} alt={d.drawingName}
+            style={{ maxWidth: "100%", maxHeight, objectFit: "contain" }} />
+        )}
+        {src && isPDF && (
+          <iframe src={src} style={{ width: "100%", height: maxHeight, border: "none" }}
+            title={d.drawingName} />
+        )}
+        {src && !isImg && !isPDF && (
+          <div style={{ textAlign: "center", padding: 24, color: "var(--ink-muted)" }}>
+            <div className="dms-file-icon">📄</div>
+            <div style={{ fontWeight: 700, color: "var(--ink)", marginBottom: 16 }}>{d.fileName}</div>
+            <a href={src} download={d.fileName}
+              className="dms-btn dms-btn-success dms-download-link-inline">
+              ↓ Download File
+            </a>
+          </div>
+        )}
+        {!src && <div style={{ color: "var(--ink-muted)", fontSize: 13 }}>Preview unavailable</div>}
+      </div>
+      {src && (isImg || isPDF) && (
+        <a href={src} download={d.fileName}
+          className="dms-btn dms-btn-success dms-download-link">
+          ↓ Download {d.fileName}
+        </a>
+      )}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function DrawingManagementSystem() {
+  const [currentUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}"); }
+    catch { return {}; }
+  });
+
+  const activeRole = resolveActiveRole(currentUser);
+
+  const [projects, setProjects]               = useState([]);
+  const [drawings, setDrawings]               = useState([]);
+  const [requests, setRequests]               = useState([]);
+  const [loading, setLoading]                 = useState(false);
+  const [toast, setToast]                     = useState(null);
+  const [modal, setModal]                     = useState(null);
+  const [selectedDrawing, setSelectedDrawing] = useState(null);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [hoveredRow, setHoveredRow]           = useState(null);
+  const [fileBlobs, setFileBlobs]             = useState({});
+  const fileRef = useRef(null);
+
+  const [uf, setUf] = useState({
+    projectId: "", drawingName: "", drawingType: "Working Drawing",
+    revision: "R1", file: null, fileName: "", blobKey: null,
+  });
+  const [rf, setRf] = useState({ projectId: "", note: DEFAULT_REQUEST_NOTE });
+
+  // Architect-only: which role tab is active for preview
+  const [architectViewAs, setArchitectViewAs] = useState("Architect");
+
+  const viewRole = activeRole === "Architect" ? architectViewAs : activeRole;
+  const isArchitectPreview = activeRole === "Architect";
+
+  const showToast = (type, message) => setToast({ type, message });
+  const closeModal = () => { setModal(null); setSelectedRequest(null); };
+
+  // ── Load projects ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    (async () => {
+      try {
+        const res = await getArchitectProjects(currentUser.id);
+        const list = res?.data || res || [];
+        setProjects(
+          list.map((p) => ({
+            id:             p.project_id   || p.id   || uid(),
+            name:           p.project_name || p.name || "Unnamed Project",
+            status:         p.status       || "Pending",
+            clientUserId:   p.client_user_id   != null ? Number(p.client_user_id)   : null,
+            siteEngineerId: p.site_engineer_id != null ? Number(p.site_engineer_id) : null,
+          }))
+        );
+      } catch (err) {
+        console.error("Failed to load projects:", err);
+      }
+    })();
+  }, [currentUser?.id]);
+
+  // ── Load drawings FROM DB ──────────────────────────────────────────────────
+  // This is the key fix: fetch drawings on mount AND after every upload/send.
+  const loadDrawings = useCallback(async () => {
+    if (!currentUser?.id || !activeRole) return;
+    setLoading(true);
     try {
-      const res = await getArchitectProjects(user.id);
-      const projects = res?.data || res || [];
+      const roleCode = DMS_ROLE_TO_CODE[activeRole] || activeRole.toLowerCase();
+      const res = await getDrawings(currentUser.id, roleCode);
+      const rows = res?.data || res || [];
+      setDrawings(rows.map(normaliseDrawing));
+    } catch (err) {
+      console.error("Failed to load drawings:", err);
+      showToast("error", "Could not load drawings from server.");
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUser?.id, activeRole]);
 
-      const formatted = await Promise.all(
-        projects.map(async (p) => {
-          const drawingsRes = await getDrawingsByProject(p.id);
+  useEffect(() => {
+    loadDrawings();
+  }, [loadDrawings]);
 
-          return {
-            id: p.id,
-            name: p.name,
-            status: p.status || "Pending",
-            drawings: drawingsRes.data || []
-          };
-        })
-      );
+  // ── Load requests FROM DB (Architect only) ─────────────────────────────────
+  const loadRequests = useCallback(async () => {
+    if (activeRole !== "Architect") return;
+    try {
+      const res = await getRequests();
+      const rows = res?.data || res || [];
+      setRequests(rows.map(normaliseRequest));
+    } catch (err) {
+      console.error("Failed to load requests:", err);
+    }
+  }, [activeRole]);
 
-      dispatch({ type: "SET", field: "projects", value: formatted });
+  useEffect(() => {
+    loadRequests();
+  }, [loadRequests]);
 
+  // ── File pick ──────────────────────────────────────────────────────────────
+  const handleFileChange = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const key = uid();
+    setFileBlobs((prev) => ({ ...prev, [key]: URL.createObjectURL(f) }));
+    setUf((prev) => ({
+      ...prev, file: f, fileName: f.name, blobKey: key,
+      drawingName: prev.drawingName ||
+        f.name.replace(/\.[^/.]+$/, "").replace(/[-_]+/g, " ").trim(),
+    }));
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  // ── Upload ─────────────────────────────────────────────────────────────────
+  const handleUpload = async () => {
+    if (!uf.projectId)        return showToast("error", "Please select a project.");
+    if (!uf.drawingName.trim()) return showToast("error", "Enter a drawing name.");
+    if (!uf.revision.trim())  return showToast("error", "Enter a revision.");
+    if (!uf.file)             return showToast("error", "Choose a file.");
+
+    if (!currentUser?.id) return showToast("error", "User not logged in.");
+
+    // ── Step 1: upload the actual file to the server ──────────────────────
+    let fileUrl = "";
+    try {
+      const formData = new FormData();
+      formData.append("file", uf.file);
+      // Use your existing /api/drawings upload endpoint
+      const uploadRes = await fetch("/api/drawings/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      // Adjust the key name to whatever your upload endpoint returns
+      fileUrl = uploadData.url || uploadData.file_url || uploadData.path || "";
+    } catch (err) {
+      console.warn("File upload failed, storing placeholder:", err);
+      fileUrl = `uploads/${uf.fileName}`; // fallback so the DB row still saves
+    }
+
+    // ── Step 2: save the drawing record to the DB ─────────────────────────
+    const payload = {
+      id:           uid(),
+      project_id:   parseInt(uf.projectId, 10),
+      name:         uf.drawingName.trim(),
+      drawing_type: uf.drawingType,
+      revision:     uf.revision.trim(),
+      file_url:     fileUrl,
+      file_name:    uf.fileName,
+      user_id:      currentUser.id,
+    };
+
+    try {
+      await createDrawing(payload);
+      showToast("success", `"${payload.name}" uploaded successfully.`);
+      // Reset form
+      setUf({ projectId: "", drawingName: "", drawingType: "Working Drawing",
+               revision: "R1", file: null, fileName: "", blobKey: null });
+      closeModal();
+      // ── Step 3: reload drawings so the new one appears in the table ──────
+      await loadDrawings();
     } catch (err) {
       console.error(err);
+      showToast("error", "Failed to save drawing. Please try again.");
     }
   };
 
-  loadProjects();
-}, [user?.id]);
+  // ── Send drawing to a role ─────────────────────────────────────────────────
+  const sendTo = async (drawingId, role) => {
+    const drawing = drawings.find((d) => String(d.id) === String(drawingId));
+    const project = projects.find((p) => String(p.id) === String(drawing?.projectId));
 
-  useEffect(() => () => createdUrlsRef.current.forEach((u) => URL.revokeObjectURL(u)), []);
-  useEffect(() => {
-    if (!state.toast) return;
-    const t = setTimeout(() => dispatch({ type: "CLEAR_TOAST" }), 3500);
-    return () => clearTimeout(t);
-  }, [state.toast]);
+    // Determine the specific user_id for project-scoped roles
+    let recipientUserId = null;
+    if (role === "Client")        recipientUserId = project?.clientUserId ?? null;
+    if (role === "Site Engineer") recipientUserId = project?.siteEngineerId ?? null;
 
-  const selectedProject = useMemo(() => state.projects.find((p) => p.id === state.selectedProjectId) || null, [state.projects, state.selectedProjectId]);
-  const selectedDrawing = useMemo(() => selectedProject?.drawings.find((d) => d.id === state.selectedDrawingId) || selectedProject?.drawings[0] || null, [selectedProject, state.selectedDrawingId]);
-
-  const filteredProjects = useMemo(
-    () =>
-      state.projects.filter((p) => {
-        const q = state.search.trim().toLowerCase();
-        return (!q || p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)) &&
-          (state.projectFilter === "All" || p.name === state.projectFilter) &&
-          (state.statusFilter === "All" || p.status === state.statusFilter);
-      }),
-    [state.projects, state.search, state.projectFilter, state.statusFilter]
-  );
-
-  const stats = useMemo(
-    () => ({
-      totalProjects: state.projects.length,
-      totalDrawings: state.projects.reduce((s, p) => s + p.drawings.length, 0),
-      pending: state.projects.reduce((s, p) => s + p.drawings.filter((d) => d.status === "Pending").length, 0),
-      rejected: state.projects.reduce((s, p) => s + p.drawings.filter((d) => d.status === "Rejected").length, 0),
-      approved: state.projects.reduce((s, p) => s + p.drawings.filter((d) => d.status === "Approved").length, 0),
-    }),
-    [state.projects]
-  );
-
-  const toast = (type, message) => dispatch({ type: "SET_TOAST", toast: { type, message } });
-  const closeModal = () => {
-    dispatch({ type: "CLOSE_MODAL" });
-    setShowAddModal(false);
-  };
-  const openProject = (id) => dispatch({ type: "SELECT_PROJECT", projectId: id });
-  const openDrawing = (pid, did) => dispatch({ type: "SELECT_DRAWING", projectId: pid, drawingId: did });
-
-  const onGlobalFileChange = (file) => {
-    if (!file) return;
-    const previewUrl = URL.createObjectURL(file);
-    createdUrlsRef.current.push(previewUrl);
-    dispatch({ type: "SET_UPLOAD_FORM", field: "file", value: file });
-    dispatch({ type: "SET_UPLOAD_FORM", field: "previewUrl", value: previewUrl });
-    if (!state.uploadForm.drawingName) {
-      dispatch({ type: "SET_UPLOAD_FORM", field: "drawingName", value: pretty(file.name) || "Untitled Drawing" });
-    }
-    if (globalUploadRef.current) globalUploadRef.current.value = "";
-  };
-
-  const handleWorkflowAction = (step, actionType) => {
-    if (!selectedDrawing || !selectedProject) return;
-    const next = structuredClone(selectedDrawing);
-    const node = next.workflow[step];
-
-    if (actionType === "send") {
-      node.state = "sent";
-      node.sentAt = now();
-      node.sentBy = user?.name || "Unknown";
-      node.note = `Sent to ${STAGE_LABELS[step]}`;
-      next.stage = `${STAGE_LABELS[step]} Review`;
-      next.status = "Pending";
-    }
-
-    if (actionType === "approve") {
-      node.state = "approved";
-      node.approvedAt = now();
-      node.note = `Approved by ${STAGE_LABELS[step]}`;
-
-      if (step === "client") {
-        next.status = "Approved";
-        next.stage = "Fully Approved";
-        next.approvedRevision = next.revision;
-      } else if (next.drawingType === "Working Drawing") {
-        const order = stageOrderFor(next);
-        const currentIndex = order.indexOf(step);
-        const nextStep = order[currentIndex + 1];
-        if (nextStep) {
-          const nextNode = next.workflow[nextStep];
-          nextNode.state = "sent";
-          nextNode.sentAt = now();
-          nextNode.sentBy = STAGE_LABELS[step];
-          nextNode.note = `Auto-sent from ${STAGE_LABELS[step]}`;
-          next.stage = `${STAGE_LABELS[nextStep]} Review`;
-          next.status = "Pending";
-        } else {
-          next.status = "Approved";
-          next.approvedRevision = next.revision;
-          next.stage = "Fully Approved";
-        }
-      } else {
-        next.status = "Pending";
-        next.stage = `${STAGE_LABELS[step]} Approved`;
+    try {
+      await sendDrawing(drawingId, {
+        user_id: recipientUserId,
+        role:    role,
+        sent_by: currentUser.id,
+      });
+      showToast("success", `Sent to ${role}.`);
+      // Refresh so the Delivery Log and sentTo badges update
+      await loadDrawings();
+      // Also refresh selectedDrawing if it's the one we just sent
+      if (selectedDrawing && String(selectedDrawing.id) === String(drawingId)) {
+        const updated = drawings.find((d) => String(d.id) === String(drawingId));
+        if (updated) setSelectedDrawing(updated);
       }
+    } catch (err) {
+      console.error(err);
+      showToast("error", `Failed to send to ${role}.`);
     }
-
-    if (actionType === "reject") {
-      node.state = "rejected";
-      node.returnedAt = now();
-      node.note = `Rejected by ${STAGE_LABELS[step]}`;
-      next.status = "Rejected";
-      next.stage = `${STAGE_LABELS[step]} Rejected`;
-    }
-
-    next.updated = now();
-    next.actionLog = [{ ts: now(), action: actionType.toUpperCase(), stage: step, note: `${STAGE_LABELS[step] || step} — ${actionType}` }, ...next.actionLog];
-    dispatch({ type: "UPDATE_DRAWING", projectId: selectedProject.id, drawing: next });
-    toast("success", `${STAGE_LABELS[step] || step} — ${actionType} recorded.`);
   };
 
-  const handleGlobalUpload = () => {
-    const { file, project, projectStatus, drawingName, drawingType, revision, previewUrl } = state.uploadForm;
-    if (!project) return toast("error", "Select a project.");
-    if (!drawingName.trim()) return toast("error", "Enter a drawing name.");
-    if (!revision.trim()) return toast("error", "Enter a revision.");
-    if (!file) return toast("error", "Please choose a file.");
+  // Re-sync selectedDrawing from the refreshed drawings list after loadDrawings
+  useEffect(() => {
+    if (!selectedDrawing) return;
+    const fresh = drawings.find((d) => String(d.id) === String(selectedDrawing.id));
+    if (fresh) setSelectedDrawing(fresh);
+  }, [drawings]);
 
-    const allDrawings = state.projects.flatMap((p) => p.drawings);
-    const drawing = makeDrawing({
-      id: `DWG-${String(allDrawings.length + 1).padStart(3, "0")}`,
-      project,
-      name: drawingName.trim(),
-      drawingType,
-      revision: revision.trim(),
-      stage: "Draft",
-      status: "Pending",
-      fileName: file.name,
-      previewUrl,
+  const getNextStage = (d) => {
+    const sent = d.sentTo.map((s) => s.role);
+    return WORKING_DRAWING_SEQUENCE.find((r) => !sent.includes(r)) || null;
+  };
+
+  // ── Send request ───────────────────────────────────────────────────────────
+  const sendRequest = async () => {
+    if (!rf.projectId) return showToast("error", "Select a project.");
+    try {
+      await requestDrawing({
+        project_id:   parseInt(rf.projectId, 10),
+        requested_by: currentUser.id,
+        role:         DMS_ROLE_TO_CODE[activeRole] || activeRole,
+        description:  rf.note.trim(),
+        due_date:     new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
+      });
+      setRf({ projectId: "", note: DEFAULT_REQUEST_NOTE });
+      closeModal();
+      showToast("success", "Request sent to Architect.");
+      await loadRequests();
+    } catch (err) {
+      console.error(err);
+      showToast("error", "Failed to send request.");
+    }
+  };
+
+  // ── Drawing filter ─────────────────────────────────────────────────────────
+  function filterDrawingsForRole(role) {
+    return drawings.filter((d) => {
+      const entry = d.sentTo.find((s) => s.role === role);
+      if (!entry) return false;
+      if (isArchitectPreview) return true;
+      if (PROJECT_SCOPED_ROLES.has(role)) {
+        return entry.assignedUserId === Number(currentUser.id);
+      }
+      return true;
     });
+  }
 
-    dispatch({ type: "ADD_DRAWING", projectName: project, projectStatus, drawing });
-    dispatch({ type: "RESET_UPLOAD" });
-    closeModal();
-    toast("success", `"${drawingName}" uploaded.`);
-  };
+  // ─────────────────────────────────────────────────────────────────────────
+  // VIEWS
+  // ─────────────────────────────────────────────────────────────────────────
 
-  const removeDrawing = (projectId, drawingId) => {
-    dispatch({ type: "DELETE_DRAWING", projectId, drawingId });
-    toast("info", "Drawing removed.");
-  };
-
-  const handleAddDrawing = (projectName, projectStatus, drawing, revision) => {
-    dispatch({ type: "ADD_DRAWING", projectName, projectStatus, drawing });
-    setShowAddModal(false);
-    toast("success", `Drawing added — revision ${revision}.`);
-  };
-
-  return (
-    <div className="page">
-      <Toast toast={state.toast} onClose={() => dispatch({ type: "CLEAR_TOAST" })} />
-      <input ref={globalUploadRef} type="file" accept="*/*" className="hidden-file" onChange={(e) => onGlobalFileChange(e.target.files?.[0] || null)} />
-
-      <header className="header">
-        <div className="header-text">
-          <h1 className="header-title">Drawing Management System</h1>
-          <p className="header-sub">QS · Site · PM · Client</p>
+  const ArchitectView = () => {
+    const unseenRequests = requests.filter((r) => !r.seen);
+    return (
+      <div>
+        <div className="dms-top-bar">
+          <div className="dms-section-title">My Drawings ({drawings.length})</div>
+          <button className="dms-btn dms-btn-primary" onClick={() => setModal("upload")}>
+            + Upload Drawing
+          </button>
         </div>
-        <div className="header-actions">
-          <button className="btn btn--ghost" onClick={() => dispatch({ type: "OPEN_MODAL", modal: "approved" })}>Approved Projects</button>
-          <button className="btn btn--primary" onClick={() => dispatch({ type: "OPEN_MODAL", modal: "upload" })}>+ Upload Drawing</button>
-        </div>
-      </header>
 
-      <div className="stats-row">
-        <StatCard label="Total Projects" value={stats.totalProjects} />
-        <StatCard label="Total Drawings" value={stats.totalDrawings} />
-        <StatCard label="Pending" value={stats.pending} />
-        <StatCard label="Rejected" value={stats.rejected} />
-        <StatCard label="Approved" value={stats.approved} accent />
-      </div>
-
-      <div className="filters">
-        <input className="input filters-search" placeholder="Search project…" value={state.search} onChange={(e) => dispatch({ type: "SET", field: "search", value: e.target.value })} />
-        <select className="input filters-select" value={state.projectFilter} onChange={(e) => dispatch({ type: "SET", field: "projectFilter", value: e.target.value })}>
-          <option value="All">All Projects</option>
-          {assignedProjects.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
-        </select>
-        <select className="input filters-select" value={state.statusFilter} onChange={(e) => dispatch({ type: "SET", field: "statusFilter", value: e.target.value })}>
-          <option value="All">All Status</option>
-          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </div>
-
-      <div className="table-card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Project ID</th>
-              <th>Project Name</th>
-              <th>Status</th>
-              <th>Drawings</th>
-              <th>Approved</th>
-              <th>Pending</th>
-              <th>Rejected</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProjects.length === 0 ? (
-              <tr><td colSpan={7} className="table-empty">No projects found.</td></tr>
-            ) : (
-              filteredProjects.map((project) => {
-                const approved = project.drawings.filter((d) => d.status === "Approved").length;
-                const pending = project.drawings.filter((d) => d.status === "Pending").length;
-                const rejected = project.drawings.filter((d) => d.status === "Rejected").length;
-                return (
-                  <tr key={project.id} className={`${state.selectedProjectId === project.id ? "row--selected" : ""} ${project.status === "Accepted" ? "row--approved" : ""}`} onClick={() => openProject(project.id)} style={{ cursor: "pointer" }}>
-                    <td className="cell-mono muted">{project.id}</td>
-                    <td><strong>{project.name}</strong></td>
-                    <td><span className={badgeClass(project.status)}>{project.status}</span></td>
-                    <td>{project.drawings.length}</td>
-                    <td>{approved}</td>
-                    <td>{pending}</td>
-                    <td>{rejected}</td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {state.modal === "project" && selectedProject && (
-        <Modal title={`Project: ${selectedProject.name}`} onClose={closeModal} small>
-          <div className="project-meta-bar">
-            <span className="cell-mono muted">{selectedProject.id}</span>
-            <span>
-              Status: <span className={badgeClass(selectedProject.status)}>{selectedProject.status}</span>
-            </span>
-            <button className="btn btn--primary btn--sm" onClick={() => setShowAddModal(true)}>+ Add Drawing</button>
+        {loading ? (
+          <div className="dms-card dms-empty-box">Loading drawings…</div>
+        ) : drawings.length === 0 ? (
+          <div className="dms-card dms-empty-box">
+            No drawings yet — click "+ Upload Drawing" to begin.
           </div>
-          <p className="section-title">Drawings</p>
-          {selectedProject.drawings.length === 0 ? (
-            <div className="empty-box">No drawings yet — click "+ Add Drawing" above.</div>
-          ) : (
-            <div className="drawing-grid">
-              {selectedProject.drawings.map((drawing) => (
-                <div key={drawing.id} className={`drawing-card${selectedDrawing?.id === drawing.id ? " drawing-card--active" : ""}`} onClick={() => openDrawing(selectedProject.id, drawing.id)}>
-                  <div className="drawing-card-top">
-                    <strong>{drawing.name}</strong>
-                    <span className={badgeClass(drawing.status)}>{drawing.status}</span>
+        ) : (
+          <div className="dms-card">
+            <table className="dms-table">
+              <thead>
+                <tr>
+                  {["Drawing Name","Project","Type","Rev","Uploaded","Sent To","Actions"].map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {drawings.map((d) => (
+                  <tr
+                    key={d.id}
+                    className={hoveredRow === d.id ? "hovered" : ""}
+                    onMouseEnter={() => setHoveredRow(d.id)}
+                    onMouseLeave={() => setHoveredRow(null)}
+                  >
+                    <td><strong style={{ color: "var(--ink)" }}>{d.drawingName}</strong></td>
+                    <td><span style={{ color: "var(--ink-3)", fontSize: 12 }}>{d.projectName}</span></td>
+                    <td>
+                      <span className={`dms-tag ${d.drawingType === "Working Drawing" ? "dms-tag-gold" : "dms-tag-blue"}`}>
+                        {d.drawingType === "Working Drawing" ? "Working" : "Detailed"}
+                      </span>
+                    </td>
+                    <td><span className="dms-revision">{d.revision}</span></td>
+                    <td><span style={{ fontSize: 11, color: "var(--ink-muted)" }}>{fmt(d.uploadedAt)}</span></td>
+                    <td>
+                      {d.sentTo.length === 0 ? (
+                        <span style={{ color: "var(--ink-faint)", fontSize: 11 }}>None</span>
+                      ) : (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                          {d.sentTo.map((s) => (
+                            <span key={s.role} className={badgeClass("Sent")}>
+                              {s.role.split(" ").map((w) => w[0]).join("")}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <button className="dms-btn dms-btn-ghost"
+                        onClick={() => { setSelectedDrawing(d); setModal("detail"); }}>
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {requests.length > 0 && (
+          <>
+            <div className="dms-section-title" style={{ marginTop: 28 }}>
+              Incoming Requests
+              {unseenRequests.length > 0 && (
+                <span className="dms-notif-badge">{unseenRequests.length}</span>
+              )}
+            </div>
+            <div className="dms-card dms-card-padded">
+              {requests.map((req) => (
+                <div
+                  key={req.id}
+                  className={`dms-req-card${req.seen ? " seen" : ""}`}
+                  onClick={() => { setSelectedRequest(req); setModal("requestDetail"); }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, color: "var(--ink)", marginBottom: 4, fontSize: 13 }}>
+                      <span style={{ color: "var(--blue-mid)" }}>{req.from}</span>{" "}
+                      <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>
+                        requested a detailed drawing
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+                      Project:{" "}
+                      <span style={{ color: "var(--amber)", fontWeight: 600 }}>
+                        {req.projectName || "—"}
+                      </span>
+                    </div>
+                    {req.note && (
+                      <div style={{ fontSize: 12, color: "var(--ink-muted)", marginTop: 4, fontStyle: "italic" }}>
+                        "{req.note.slice(0, 80)}{req.note.length > 80 ? "…" : ""}"
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 4 }}>{fmt(req.sentAt)}</div>
                   </div>
-                  <div className="drawing-card-meta">
-                    <span>{drawing.drawingType}</span>
-                    <span>Rev: <strong>{drawing.revision}</strong></span>
-                    {drawing.approvedRevision && <span>✓ {drawing.approvedRevision}</span>}
-                  </div>
-                  <div className="drawing-card-stage muted">{displayStage(drawing)}</div>
-                  <div className="drawing-card-footer">
-                    <button className="btn btn--ghost btn--sm" onClick={(e) => { e.stopPropagation(); openDrawing(selectedProject.id, drawing.id); }}>View</button>
-                    <button className="btn btn--danger btn--sm" onClick={(e) => { e.stopPropagation(); removeDrawing(selectedProject.id, drawing.id); }}>Remove</button>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                    <button className="dms-btn dms-btn-info"
+                      onClick={(e) => { e.stopPropagation(); setSelectedRequest(req); setModal("requestDetail"); }}>
+                      View
+                    </button>
+                    {!req.seen && (
+                      <button className="dms-btn dms-btn-success"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRequests((prev) =>
+                            prev.map((r) => (r.id === req.id ? { ...r, seen: true } : r))
+                          );
+                        }}>
+                        Mark Seen
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const RecipientView = ({ role }) => {
+    const canRequest = role !== "Quantity Surveyor" && role !== "Client";
+    const mine = filterDrawingsForRole(role);
+
+    return (
+      <div>
+        <div className="dms-top-bar">
+          <div className="dms-section-title">
+            {isArchitectPreview
+              ? `All drawings sent to ${role} (${mine.length})`
+              : `Drawings Sent to Me (${mine.length})`}
+          </div>
+          {canRequest && !isArchitectPreview && (
+            <button className="dms-btn dms-btn-ghost"
+              onClick={() => { setRf({ projectId: "", note: DEFAULT_REQUEST_NOTE }); setModal("request"); }}>
+              + Request Detailed Drawing
+            </button>
           )}
-        </Modal>
-      )}
+        </div>
 
-      {showAddModal && selectedProject && (
-        <AddDrawingModal project={selectedProject} onClose={() => setShowAddModal(false)} onAdd={handleAddDrawing} toastFn={toast} user={user} />
-      )}
-
-      {state.modal === "drawing" && selectedDrawing && selectedProject && (
-        <Modal title="Drawing Workflow" onClose={closeModal} wide>
-          <div className="modal-top-actions">
-            <button className="btn btn--ghost btn--sm" onClick={() => dispatch({ type: "BACK_TO_LIST" })}>← Back to Projects</button>
+        {loading ? (
+          <div className="dms-card dms-empty-box">Loading drawings…</div>
+        ) : mine.length === 0 ? (
+          <div className="dms-card dms-empty-box">
+            {isArchitectPreview
+              ? `No drawings have been sent to ${role} yet.`
+              : "No drawings have been sent to you yet."}
           </div>
-          <div className="drawing-detail-layout">
-            <div className="detail-left">
-              <div className="card">
-                <div className="card-title">Drawing Info</div>
-                <div className="info-grid">
-                  <span className="info-label">Name</span>
-                  <span>{selectedDrawing.name}</span>
-                  <span className="info-label">Project</span>
-                  <span>{selectedDrawing.project}</span>
-                  <span className="info-label">Type</span>
-                  <span>{selectedDrawing.drawingType}</span>
-                  <span className="info-label">Current Rev</span>
-                  <span><strong>{selectedDrawing.revision}</strong></span>
-                  <span className="info-label">Status</span>
-                  <span className={badgeClass(selectedDrawing.status)}>{selectedDrawing.status}</span>
-                  <span className="info-label">Stage</span>
-                  <span>{displayStage(selectedDrawing)}</span>
-                  <span className="info-label">Updated</span>
-                  <span className="muted cell-mono" style={{ fontSize: 11 }}>{fmt(selectedDrawing.updated)}</span>
-                </div>
-              </div>
-            </div>
-            <div className="detail-right">
-              <div className="card card--stretch">
-                <div className="card-title">
-                  Workflow Stages
-                  <span style={{ marginLeft: 10, fontSize: 11, fontWeight: 400, color: "var(--muted)" }}>4 stages</span>
-                </div>
-                <div className="wf-stages">
-                  {stageOrderFor(selectedDrawing).map((step) => (
-                    <WorkflowStageCard key={step} drawing={selectedDrawing} step={step} onAction={handleWorkflowAction} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {state.modal === "upload" && (
-        <Modal
-          title="Upload Drawing"
-          onClose={closeModal}
-          footer={
-            <>
-              <button className="btn btn--ghost" onClick={closeModal}>Cancel</button>
-              <button className="btn btn--primary" onClick={handleGlobalUpload}>Upload</button>
-            </>
-          }
-        >
-          <div className="form-grid">
-            <div className="form-field full">
-              <label className="form-label">File</label>
-              <div className="upload-file-row">
-                <button className="btn btn--ghost btn--sm" onClick={() => globalUploadRef.current?.click()}>Choose File</button>
-                {state.uploadForm.file && <span className="muted file-name">{state.uploadForm.file.name}</span>}
-              </div>
-            </div>
-
-            <div className="form-field">
-              <label className="form-label">Project</label>
-              <select className="input" value={state.uploadForm.project} onChange={(e) => dispatch({ type: "SET_UPLOAD_FORM", field: "project", value: e.target.value })}>
-                <option value="">Select project</option>
-                {assignedProjects.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
-              </select>
-            </div>
-
-            <div className="form-field">
-              <label className="form-label">Project Status</label>
-              <select className="input" value={state.uploadForm.projectStatus} onChange={(e) => dispatch({ type: "SET_UPLOAD_FORM", field: "projectStatus", value: e.target.value })}>
-                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-
-            <div className="form-field">
-              <label className="form-label">Drawing Name</label>
-              <input className="input" value={state.uploadForm.drawingName} placeholder="e.g. Tower A Floor Plan" onChange={(e) => dispatch({ type: "SET_UPLOAD_FORM", field: "drawingName", value: e.target.value })} />
-            </div>
-
-            <div className="form-field">
-              <label className="form-label">Drawing Type</label>
-              <select className="input" value={state.uploadForm.drawingType} onChange={(e) => dispatch({ type: "SET_UPLOAD_FORM", field: "drawingType", value: e.target.value })}>
-                {DRAWING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-
-            <div className="form-field">
-              <label className="form-label">Revision</label>
-              <input className="input" value={state.uploadForm.revision} placeholder="e.g. R1" onChange={(e) => dispatch({ type: "SET_UPLOAD_FORM", field: "revision", value: e.target.value })} />
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {state.modal === "approved" && (
-        <Modal title="Approved Projects" onClose={closeModal} wide>
-          <div className="table-card">
-            <table className="table">
+        ) : (
+          <div className="dms-card">
+            <table className="dms-table">
               <thead>
                 <tr>
-                  <th>Project ID</th>
-                  <th>Project Name</th>
-                  <th>Status</th>
-                  <th>Drawings</th>
-                  <th>Approved</th>
+                  {["Drawing Name","Project","Type","Revision","Received","Actions"].map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {state.projects.filter((p) => p.status === "Accepted").length === 0 ? (
-                  <tr><td colSpan={5} className="table-empty">No approved projects yet.</td></tr>
-                ) : (
-                  state.projects.filter((p) => p.status === "Accepted").map((project) => {
-                    const approved = project.drawings.filter((d) => d.status === "Approved").length;
-                    return (
-                      <tr key={project.id}>
-                        <td className="cell-mono muted">{project.id}</td>
-                        <td><strong>{project.name}</strong></td>
-                        <td><span className={badgeClass(project.status)}>{project.status}</span></td>
-                        <td>{project.drawings.length}</td>
-                        <td>{approved}</td>
-                      </tr>
-                    );
-                  })
-                )}
+                {mine.map((d) => {
+                  const sentInfo = d.sentTo.find((s) => s.role === role);
+                  return (
+                    <tr
+                      key={d.id}
+                      className={hoveredRow === d.id ? "hovered" : ""}
+                      onMouseEnter={() => setHoveredRow(d.id)}
+                      onMouseLeave={() => setHoveredRow(null)}
+                    >
+                      <td>
+                        <strong style={{ color: "var(--ink)" }}>{d.drawingName}</strong>
+                        <div style={{ fontSize: 11, color: "var(--ink-muted)", marginTop: 2 }}>
+                          Rev: {d.revision}
+                        </div>
+                      </td>
+                      <td><span style={{ color: "var(--ink-3)" }}>{d.projectName}</span></td>
+                      <td>
+                        <span className={`dms-tag ${d.drawingType === "Working Drawing" ? "dms-tag-gold" : "dms-tag-blue"}`}>
+                          {d.drawingType === "Working Drawing" ? "Working" : "Detailed"}
+                        </span>
+                      </td>
+                      <td><span className="dms-revision">{d.revision}</span></td>
+                      <td>
+                        <span style={{ fontSize: 11, color: "var(--ink-muted)" }}>
+                          {fmt(sentInfo?.sentAt)}
+                        </span>
+                      </td>
+                      <td>
+                        <button className="dms-btn dms-btn-ghost"
+                          onClick={() => { setSelectedDrawing(d); setModal("recipientDetail"); }}>
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-        </Modal>
+        )}
+      </div>
+    );
+  };
+
+  const NoAccessView = () => (
+    <div className="dms-card dms-empty-box" style={{ textAlign: "center", padding: 48 }}>
+      <div style={{ fontSize: 40, marginBottom: 16 }}>🔒</div>
+      <div style={{ fontWeight: 700, fontSize: 16, color: "var(--ink)", marginBottom: 8 }}>
+        Access Restricted
+      </div>
+      <div style={{ color: "var(--ink-muted)", fontSize: 13 }}>
+        Your role (<strong>{currentUser?.role || "unknown"}</strong>) does not have access to the Drawing Management System.
+      </div>
+    </div>
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MODALS
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const UploadModal = () => (
+    <Modal title="Upload Drawing" onClose={closeModal}
+      footer={
+        <>
+          <button className="dms-btn dms-btn-ghost" onClick={closeModal}>Cancel</button>
+          <button className="dms-btn dms-btn-primary" onClick={handleUpload}>Upload Drawing</button>
+        </>
+      }
+    >
+      <div className="dms-form-field">
+        <label className="dms-label">Project *</label>
+        <select className="dms-input" value={uf.projectId}
+          onChange={(e) => setUf((p) => ({ ...p, projectId: e.target.value }))}>
+          <option value="">Select a project…</option>
+          {projects.map((p) => (
+            <option key={p.id} value={String(p.id)}>{p.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="dms-form-field">
+        <label className="dms-label">Drawing Name *</label>
+        <input className="dms-input" value={uf.drawingName} placeholder="e.g. Ground Floor Plan"
+          onChange={(e) => setUf((p) => ({ ...p, drawingName: e.target.value }))} />
+      </div>
+      <div className="dms-grid-2">
+        <div className="dms-form-field">
+          <label className="dms-label">Drawing Type *</label>
+          <select className="dms-input" value={uf.drawingType}
+            onChange={(e) => setUf((p) => ({ ...p, drawingType: e.target.value }))}>
+            {DRAWING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="dms-form-field">
+          <label className="dms-label">Revision *</label>
+          <input className="dms-input" value={uf.revision} placeholder="e.g. R1"
+            onChange={(e) => setUf((p) => ({ ...p, revision: e.target.value }))} />
+        </div>
+      </div>
+      <div className="dms-form-field">
+        <label className="dms-label">File *</label>
+        <input ref={fileRef} type="file" accept="*/*" style={{ display: "none" }} onChange={handleFileChange} />
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button className="dms-btn dms-btn-ghost" onClick={() => fileRef.current?.click()}>
+            Choose File
+          </button>
+          {uf.fileName && <span style={{ fontSize: 12, color: "var(--ink-muted)" }}>{uf.fileName}</span>}
+        </div>
+      </div>
+      {uf.drawingType === "Working Drawing" && (
+        <div className="dms-info-box dms-info-box-gold">
+          ⚡ Working drawings follow a fixed sequence:<br />
+          <strong>QS → Site Engineer → Program Coordinator → Client</strong>
+        </div>
       )}
+      {uf.drawingType === "Detailed Drawing" && (
+        <div className="dms-info-box dms-info-box-blue">
+          📤 Detailed drawings can be sent to any recipient in any order.
+        </div>
+      )}
+    </Modal>
+  );
+
+  const RequestModal = () => (
+    <Modal title="Request Detailed Drawing" onClose={closeModal}
+      footer={
+        <>
+          <button className="dms-btn dms-btn-ghost" onClick={closeModal}>Cancel</button>
+          <button className="dms-btn dms-btn-primary" onClick={sendRequest}>Send Request</button>
+        </>
+      }
+    >
+      <p style={{ fontSize: 13, color: "var(--ink-muted)", marginBottom: 20 }}>
+        This request will be sent to the Architect for a detailed drawing.
+      </p>
+      <div className="dms-form-field">
+        <label className="dms-label">Project *</label>
+        <select className="dms-input" value={rf.projectId}
+          onChange={(e) => setRf((p) => ({ ...p, projectId: e.target.value }))}>
+          <option value="">Select a project…</option>
+          {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </div>
+      <div className="dms-form-field">
+        <label className="dms-label">Note (optional)</label>
+        <textarea className="dms-input"
+          style={{ minHeight: 120, resize: "vertical", lineHeight: 1.6 }}
+          value={rf.note}
+          onChange={(e) => setRf((p) => ({ ...p, note: e.target.value }))} />
+      </div>
+    </Modal>
+  );
+
+  const RequestDetailModal = () => {
+    if (!selectedRequest) return null;
+    const req = selectedRequest;
+    return (
+      <Modal title="Request Details" onClose={closeModal}
+        footer={
+          <div className="dms-modal-foot-spread">
+            {!req.seen && (
+              <button className="dms-btn dms-btn-success" onClick={() => {
+                setRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, seen: true } : r));
+                closeModal();
+              }}>Mark Seen</button>
+            )}
+            <button className="dms-btn dms-btn-ghost" style={{ marginLeft: "auto" }} onClick={closeModal}>
+              Close
+            </button>
+          </div>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="dms-detail-info-card">
+            <div className="dms-grid-2" style={{ gap: "12px 24px" }}>
+              <div>
+                <div className="dms-label">Requested By</div>
+                <div style={{ fontWeight: 700, color: "var(--blue-mid)", fontSize: 14 }}>{req.from}</div>
+              </div>
+              <div>
+                <div className="dms-label">Sent At</div>
+                <div style={{ fontSize: 13, color: "var(--ink-3)" }}>{fmt(req.sentAt)}</div>
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div className="dms-label">Project</div>
+                <div style={{ fontWeight: 600, color: "var(--amber)", fontSize: 14 }}>{req.projectName || "—"}</div>
+              </div>
+              <div>
+                <div className="dms-label">Status</div>
+                <span className={badgeClass(req.seen ? "Approved" : "Pending")}>
+                  {req.seen ? "Seen" : "Unseen"}
+                </span>
+              </div>
+            </div>
+          </div>
+          {req.note ? (
+            <div>
+              <div className="dms-label" style={{ marginBottom: 6 }}>Description</div>
+              <pre className="dms-note-pre">{req.note}</pre>
+            </div>
+          ) : (
+            <div className="dms-info-box dms-info-box-gold">No description provided.</div>
+          )}
+        </div>
+      </Modal>
+    );
+  };
+
+  const DrawingDetailModal = () => {
+    if (!selectedDrawing) return null;
+    const d = selectedDrawing;
+    const next = d.drawingType === "Working Drawing" ? getNextStage(d) : null;
+    return (
+      <Modal title={d.drawingName} wide onClose={closeModal}>
+        <div className="dms-detail-grid">
+          <div>
+            <div className="dms-form-field">
+              <div className="dms-label">Project</div>
+              <div style={{ color: "var(--ink)", fontSize: 14, fontWeight: 600 }}>{d.projectName}</div>
+            </div>
+            <div className="dms-grid-2">
+              <div className="dms-form-field">
+                <div className="dms-label">Type</div>
+                <span className={`dms-tag ${d.drawingType === "Working Drawing" ? "dms-tag-gold" : "dms-tag-blue"}`}>
+                  {d.drawingType}
+                </span>
+              </div>
+              <div className="dms-form-field">
+                <div className="dms-label">Revision</div>
+                <span className="dms-revision-lg">{d.revision}</span>
+              </div>
+              <div className="dms-form-field">
+                <div className="dms-label">Uploaded</div>
+                <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{fmt(d.uploadedAt)}</div>
+              </div>
+              <div className="dms-form-field">
+                <div className="dms-label">File</div>
+                <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{d.fileName}</div>
+              </div>
+            </div>
+
+            {d.drawingType === "Working Drawing" && (
+              <>
+                <div className="dms-label" style={{ marginBottom: 8 }}>Workflow Progress</div>
+                <WorkflowTracker sentTo={d.sentTo} />
+                {next ? (
+                  <button className="dms-btn dms-btn-info" style={{ width: "100%", marginTop: 4 }}
+                    onClick={() => sendTo(d.id, next)}>
+                    → Send to {next}
+                  </button>
+                ) : (
+                  <div className="dms-info-box dms-info-box-gold">✓ Sent to all stages in sequence.</div>
+                )}
+              </>
+            )}
+
+            {d.drawingType === "Detailed Drawing" && (
+              <>
+                <div className="dms-label" style={{ marginBottom: 8 }}>Send To</div>
+                <div className="dms-send-buttons">
+                  {WORKING_DRAWING_SEQUENCE.map((role) => {
+                    const done = d.sentTo.some((s) => s.role === role);
+                    return (
+                      <button key={role}
+                        className={`dms-btn ${done ? "dms-btn-muted" : "dms-btn-primary"}`}
+                        disabled={done} onClick={() => sendTo(d.id, role)}>
+                        {done ? `✓ ${role}` : `→ ${role}`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {d.sentTo.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                <div className="dms-label">Delivery Log</div>
+                {d.sentTo.map((s) => (
+                  <div key={s.role} className="dms-delivery-row">
+                    <span style={{ color: "var(--ink-2)" }}>{s.role}</span>
+                    <span style={{ color: "var(--ink-muted)" }}>{fmt(s.sentAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="dms-label">File Preview</div>
+            <FilePreview d={d} fileBlobs={fileBlobs} maxHeight={380} />
+          </div>
+        </div>
+      </Modal>
+    );
+  };
+
+  const RecipientDetailModal = ({ role }) => {
+    if (!selectedDrawing) return null;
+    const d = selectedDrawing;
+    const sentInfo = d.sentTo.find((s) => s.role === role);
+    return (
+      <Modal title={d.drawingName} wide onClose={closeModal}>
+        <div className="dms-detail-grid">
+          <div>
+            <div className="dms-form-field">
+              <div className="dms-label">Project</div>
+              <div style={{ color: "var(--ink)", fontWeight: 600 }}>{d.projectName}</div>
+            </div>
+            <div className="dms-grid-2">
+              <div className="dms-form-field">
+                <div className="dms-label">Type</div>
+                <span className={`dms-tag ${d.drawingType === "Working Drawing" ? "dms-tag-gold" : "dms-tag-blue"}`}>
+                  {d.drawingType}
+                </span>
+              </div>
+              <div className="dms-form-field">
+                <div className="dms-label">Revision</div>
+                <span className="dms-revision-lg">{d.revision}</span>
+              </div>
+              <div className="dms-form-field">
+                <div className="dms-label">File</div>
+                <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{d.fileName}</div>
+              </div>
+              <div className="dms-form-field">
+                <div className="dms-label">Received</div>
+                <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{fmt(sentInfo?.sentAt)}</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div className="dms-label">File Preview</div>
+            <FilePreview d={d} fileBlobs={fileBlobs} maxHeight={360} />
+          </div>
+        </div>
+      </Modal>
+    );
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────
+  const ALL_VIEWS = ["Architect", "Quantity Surveyor", "Site Engineer", "Program Coordinator", "Client"];
+
+  return (
+    <div className="dms-page">
+      <Toast toast={toast} onClose={() => setToast(null)} />
+
+      <header className="dms-header">
+        <h1 className="dms-header-title">Drawing Management System</h1>
+        {activeRole && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 13, color: "var(--ink-muted)" }}>{currentUser.name}</span>
+            <RolePill role={activeRole} />
+          </div>
+        )}
+      </header>
+
+      {activeRole === "Architect" && (
+        <div className="dms-role-bar" style={{ padding: "10px 24px 0" }}>
+          {ALL_VIEWS.map((role) => (
+            <button
+              key={role}
+              className={`dms-role-btn${architectViewAs === role ? " active" : ""}`}
+              onClick={() => {
+                setArchitectViewAs(role);
+                setSelectedDrawing(null);
+                setSelectedRequest(null);
+                setModal(null);
+              }}
+            >
+              {role}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="dms-content">
+        {!activeRole && <NoAccessView />}
+        {viewRole === "Architect"           && <ArchitectView />}
+        {viewRole === "Quantity Surveyor"   && <RecipientView role="Quantity Surveyor" />}
+        {viewRole === "Site Engineer"       && <RecipientView role="Site Engineer" />}
+        {viewRole === "Program Coordinator" && <RecipientView role="Program Coordinator" />}
+        {viewRole === "Client"              && <RecipientView role="Client" />}
+      </div>
+
+      {modal === "upload"          && <UploadModal />}
+      {modal === "request"         && <RequestModal />}
+      {modal === "requestDetail"   && selectedRequest  && <RequestDetailModal />}
+      {modal === "detail"          && selectedDrawing  && <DrawingDetailModal />}
+      {modal === "recipientDetail" && selectedDrawing  && <RecipientDetailModal role={viewRole} />}
     </div>
   );
 }
