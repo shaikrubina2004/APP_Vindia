@@ -50,6 +50,7 @@ const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoute
 const architectProjectsRoutes = require("./routes/architectProjects");
 const architectDailyLogRoutes = require("./routes/architectDailyLogRoutes");
 const architectDesignRoutes = require("./routes/architectDesignRoutes");
+const architectDrawingUploadRoutes = require("./routes/architectDrawingUploadRoutes");
 
 /* ── STRUCTURAL ENGINEER MODULES ───────────────────────────────── */
 const structuralRoutes = require("./routes/structuralRoutes");
@@ -145,6 +146,7 @@ app.use("/api/se-notifications", seNotificationRoutes);  /* ── QS Modules �
   app.use("/api/architect", architectProjectsRoutes);
   app.use("/api/architect-daily-log", architectDailyLogRoutes);
   app.use("/api/architect-designs", architectDesignRoutes);
+  app.use("/api/architect-drawings", architectDrawingUploadRoutes);
   /* ── Site Engineer Modules ─────────────────────────────── */
   app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes); // Site Engineer RFI
   app.use("/api/ncr", ncrRoutes);

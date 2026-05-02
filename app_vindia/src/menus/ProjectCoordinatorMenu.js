@@ -17,6 +17,7 @@ const ProjectCoordinatorMenu = [
     path: "/project-coordinator/incidents?page=tasks", 
     icon: "check-square" 
   },
+   { name: "Drawings", path: "/project-coordinator/designs", icon: "file" },
 ];
 
 export default ProjectCoordinatorMenu;

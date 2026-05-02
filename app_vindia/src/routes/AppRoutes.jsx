@@ -358,7 +358,14 @@ const AppRoutes = () => {
           </SiteEngineerLayout>
         }
       />
-
+{/*<Route
+  path="/site-engineer/designs"
+  element={
+    <ProjectCoordinatorLayout>
+      <ArchitectDesigns />
+    </ProjectCoordinatorLayout>
+  }
+/>*/}
       {/* QUANTITY SURVEYOR */}
       <Route
         path="/quantity-surveyor/dashboard"
@@ -569,6 +576,14 @@ const AppRoutes = () => {
           </ProjectCoordinatorLayout>
         }
       />
+      <Route
+  path="/project-coordinator/designs"
+  element={
+    <ProjectCoordinatorLayout>
+      <ArchitectDesigns />
+    </ProjectCoordinatorLayout>
+  }
+/>
 
       {/* TIMESHEET */}
       <Route
