@@ -9,7 +9,6 @@ import RFIDetailPage from "../pages/Structural Engineer/RFIDetails";
 import SEDailyUpdates from "../pages/Structural Engineer/SEDailyUpdates";
 import AppShell from "../components/incidents/AppShell";
 import SharedDrawingPage from "../components/project/SharedDrawingPage";
-import SEBoq from "../pages/Structural Engineer/SEBoq";
 
 function StructuralRoutes() {
   return (
@@ -21,7 +20,6 @@ function StructuralRoutes() {
         {/* Core pages */}
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="shared/drawings" element={<SharedDrawingPage />} />
-        <Route path="boq" element={<SEBoq />} />
         <Route path="rfi" element={<RFIPage />} />
         <Route path="rfi/:id" element={<RFIDetailPage />} />
 
