@@ -67,19 +67,27 @@ function ProjectManagement() {
       .then((data) => setManagers(data))
       .catch((err) => console.error(err));
   }, []);
+
+  const [coordinators, setCoordinators] = useState([]);
+  useEffect(() => {
+    fetch("http://localhost:5000/api/projects/coordinators")
+      .then((res) => res.json())
+      .then((data) => setCoordinators(data))
+      .catch((err) => console.error(err));
+  }, []);
   // 🔥 MOVE THIS UP
   const [selectedProject, setSelectedProject] = useState(null);
 
   const [costSummary, setCostSummary] = useState([]);
 
   useEffect(() => {
-    if (!selectedProject) return;
+    if (!selectedProject || !selectedProject.id) return;
 
     fetch(`http://localhost:5000/api/cost-summary/${selectedProject.id}`)
       .then((res) => res.json())
       .then((data) => {
-        console.log("API DATA:", data); // 👈 check this
-        setCostSummary(data);
+        console.log("API DATA:", data);
+        setCostSummary(Array.isArray(data) ? data : []);
       })
       .catch((err) => console.error(err));
   }, [selectedProject]);
@@ -140,8 +148,7 @@ function ProjectManagement() {
     budget: "",
     manager: "",
     teamSize: "",
-
-    // ✅ NEW FIELDS
+    coordinator_id: "", // ✅ added
     building_type: "",
     floors: "",
     description: "",
@@ -200,8 +207,7 @@ function ProjectManagement() {
           end_date: newProject.endDate,
           manager_id: newProject.manager_id,
           site_engineer_id: newProject.site_engineer_id,
-
-          // ✅ new fields
+          coordinator_id: newProject.coordinator_id, // ✅ added
           building_type: newProject.building_type,
           floors: newProject.floors,
           description: newProject.description,
@@ -214,9 +220,10 @@ function ProjectManagement() {
       // ✅ THIS MUST BE OUTSIDE
       const data = await res.json();
 
-      // ✅ Update UI instantly
-      setProjects((prev) => [data, ...prev]);
-      setSelectedProject(data);
+      if (data && data.id) {
+        setProjects((prev) => [data, ...prev]);
+        setSelectedProject(data);
+      }
 
       // ✅ Reset form
       setNewProject({
@@ -227,8 +234,7 @@ function ProjectManagement() {
         endDate: "",
         budget: "",
         site_engineer_id: "",
-
-        // ✅ RESET NEW FIELDS
+        coordinator_id: "", // ✅ added
         building_type: "",
         floors: "",
         description: "",
@@ -675,7 +681,6 @@ function ProjectManagement() {
                       }
                     >
                       <option value="">Select Manager</option>
-
                       {managers.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name}
@@ -695,10 +700,31 @@ function ProjectManagement() {
                       }
                     >
                       <option value="">Select Site Engineer</option>
-
                       {siteEngineers.map((eng) => (
                         <option key={eng.id} value={eng.id}>
                           {eng.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Project Coordinator</label>
+                    <select
+                      value={newProject.coordinator_id || ""}
+                      onChange={(e) =>
+                        setNewProject({
+                          ...newProject,
+                          coordinator_id: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="">Select Coordinator</option>
+                      {coordinators.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
                         </option>
                       ))}
                     </select>

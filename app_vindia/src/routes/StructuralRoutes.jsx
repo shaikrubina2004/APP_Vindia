@@ -4,7 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import NotificationsPage from "../pages/StructuralEngineer/NotificationsPage";
 import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
 import Dashboard from "../pages/StructuralEngineer/StructuralEngineerDashboard";
-import RFIPage       from "../pages/StructuralEngineer/RFI";
+import RFIPage from "../pages/StructuralEngineer/RFI";
 import RFIDetailPage from "../pages/StructuralEngineer/RFIDetails";
 import SEDailyUpdates from "../pages/StructuralEngineer/SEDailyUpdates";
 import AppShell from "../components/incidents/AppShell";

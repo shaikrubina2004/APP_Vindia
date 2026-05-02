@@ -1068,11 +1068,11 @@
     font-size: 10px;
   }
 
- .projects-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
-}
+  .projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+  }
 
   .comparison-chart {
     flex-direction: column;
@@ -1083,17 +1083,17 @@
   .pm-header h1 {
     font-size: 20px;
   }
-.pm-tabs {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 6px;
-  scrollbar-width: none;
-}
+  .pm-tabs {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+  }
 
-.pm-tabs::-webkit-scrollbar {
-  display: none;
-}
+  .pm-tabs::-webkit-scrollbar {
+    display: none;
+  }
 
   .tab-btn {
     padding: 10px 12px;
@@ -2035,8 +2035,8 @@
   gap: 12px;
   margin-top: 15px;
   padding: 10px;
- 
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .pm-tabs button {
@@ -2057,7 +2057,6 @@
   box-shadow: 0 4px 10px rgba(251, 252, 255, 0.3);
 }
 @media (max-width: 768px) {
-
   .projects-grid {
     grid-template-columns: 1fr;
   }
@@ -2075,4 +2074,20 @@
     padding: 10px;
   }
 }
+.form-group textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+  color: var(--text-primary);
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+}
 
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(30, 90, 150, 0.1);
+}

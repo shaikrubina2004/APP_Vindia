@@ -859,7 +859,13 @@ function VersionsPanel({
                 </button>
               )}
               <a
-                href={`/mep/upload?drawing_id=${drawing.id}&drawing_name=${encodeURIComponent(drawing.name)}`}
+                href={`${
+                  drawing.disc === "ARCH"
+                    ? "/architect/upload"
+                    : drawing.disc === "STR"
+                      ? "/structural-engineer/upload"
+                      : "/mep/upload"
+                }?drawing_id=${drawing.id}&drawing_name=${encodeURIComponent(drawing.name)}`}
                 className="dr-btn-primary"
                 style={{ flex: 1, justifyContent: "center" }}
               >
@@ -1168,12 +1174,12 @@ export default function DrawingRegister({ resolvedRole: resolvedRoleProp }) {
             </a>
           )}
           {resolvedRole === "arch" && (
-            <a href="/arch/upload" className="dr-btn-primary">
+            <a href="/architect/upload" className="dr-btn-primary">
               ⬆️ Upload Arch Drawing
             </a>
           )}
           {resolvedRole === "str" && (
-            <a href="/str/upload" className="dr-btn-primary">
+            <a href="/structural-engineer/upload" className="dr-btn-primary">
               ⬆️ Upload STR Drawing
             </a>
           )}
@@ -1450,7 +1456,9 @@ export default function DrawingRegister({ resolvedRole: resolvedRoleProp }) {
                     href={
                       resolvedRole === "mep"
                         ? "/mep/upload"
-                        : `/${resolvedRole}/upload`
+                        : resolvedRole === "arch"
+                          ? "/architect/upload"
+                          : "/structural-engineer/upload"
                     }
                     className="dr-btn-primary"
                     style={{ padding: "6px 12px", fontSize: 11 }}
