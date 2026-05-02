@@ -56,8 +56,8 @@ import SafetyOfficerDashboard from "../pages/Safety Officer/SafetyOfficerDashboa
 /* STRUCTURAL */
 import StructuralRoutes from "./StructuralRoutes";
 import StructuralEngineerLayout from "../layouts/StructuralEngineerLayout";
-import RFIPage from "../pages/Structural Engineer/RFI";
-import RFIDetailPage from "../pages/Structural Engineer/RFIDetails";
+import RFIPage from "../pages/StructuralEngineer/RFI";
+import RFIDetailPage from "../pages/StructuralEngineer/RFIDetails";
 
 /* ARCHITECT */
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
