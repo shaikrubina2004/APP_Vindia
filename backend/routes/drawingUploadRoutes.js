@@ -18,6 +18,9 @@ const {
   resolveClash,
   getFloorsByProject,
   deleteDrawing,
+  upsertDailyLog,
+  getDailyLogsByProject,
+  checkTodayLog,
 } = require("../controllers/drawingUploadController");
 
 /* ══════════════════════════════════════
@@ -98,5 +101,10 @@ router.put("/clashes/:clash_id/resolve", resolveClash);
 // GET /api/drawings/floors/:project_id
 
 router.get("/floors/:project_id", getFloorsByProject);
+
+// ── Daily Logs ────────────────────────
+router.post("/daily-logs", upsertDailyLog);
+router.get("/daily-logs/check", checkTodayLog);
+router.get("/daily-logs/:project_id", getDailyLogsByProject);
 
 module.exports = router;

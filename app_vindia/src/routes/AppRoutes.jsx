@@ -10,6 +10,8 @@ import CEOPanel from "../pages/ceo/CEOPanel";
 import UserManagement from "../pages/ceo/UserManagement";
 import ProjectManagement from "../pages/ceo/ProjectManagement";
 
+import BDADashboard from "../pages/BD/BDA/BDADashboard";
+
 /* HR */
 import HRDashboard from "../pages/hr/HRDashboard";
 import Employees from "../pages/hr/Employees";
@@ -108,7 +110,9 @@ const AppRoutes = () => {
         path="/dashboard"
         element={
           <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
-            <CEOLayout><Dashboard /></CEOLayout>
+            <CEOLayout>
+              <Dashboard />
+            </CEOLayout>
           </ProtectedRoute>
         }
       />
@@ -116,7 +120,9 @@ const AppRoutes = () => {
         path="/ceo"
         element={
           <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-            <CEOLayout><CEOPanel /></CEOLayout>
+            <CEOLayout>
+              <CEOPanel />
+            </CEOLayout>
           </ProtectedRoute>
         }
       />
@@ -124,7 +130,9 @@ const AppRoutes = () => {
         path="/users"
         element={
           <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-            <CEOLayout><UserManagement /></CEOLayout>
+            <CEOLayout>
+              <UserManagement />
+            </CEOLayout>
           </ProtectedRoute>
         }
       />
@@ -132,7 +140,9 @@ const AppRoutes = () => {
         path="/project-manager/dashboard"
         element={
           <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
-            <ProjectManagerLayout><ProjectManagement /></ProjectManagerLayout>
+            <ProjectManagerLayout>
+              <ProjectManagement />
+            </ProjectManagerLayout>
           </ProtectedRoute>
         }
       />
@@ -142,7 +152,9 @@ const AppRoutes = () => {
         path="/pm/team"
         element={
           <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-            <ProjectManagerLayout><TeamManagement /></ProjectManagerLayout>
+            <ProjectManagerLayout>
+              <TeamManagement />
+            </ProjectManagerLayout>
           </ProtectedRoute>
         }
       />
@@ -150,7 +162,9 @@ const AppRoutes = () => {
         path="/pm/incidents"
         element={
           <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.MEP_ENGINEER]}>
-            <ProjectManagerLayout><AppShell /></ProjectManagerLayout>
+            <ProjectManagerLayout>
+              <AppShell />
+            </ProjectManagerLayout>
           </ProtectedRoute>
         }
       />
@@ -158,7 +172,9 @@ const AppRoutes = () => {
         path="/pm/daily-updates"
         element={
           <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-            <ProjectManagerLayout><DailyUpdates /></ProjectManagerLayout>
+            <ProjectManagerLayout>
+              <DailyUpdates />
+            </ProjectManagerLayout>
           </ProtectedRoute>
         }
       />
@@ -166,7 +182,20 @@ const AppRoutes = () => {
         path="/pm/reports"
         element={
           <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-            <ProjectManagerLayout><Reports /></ProjectManagerLayout>
+            <ProjectManagerLayout>
+              <Reports />
+            </ProjectManagerLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/business-development/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.BDA]}>
+            <ProjectManagerLayout>
+              <BDADashboard />
+            </ProjectManagerLayout>
           </ProtectedRoute>
         }
       />
@@ -176,7 +205,9 @@ const AppRoutes = () => {
         path="/hr"
         element={
           <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
-            <HRLayout><HRDashboard /></HRLayout>
+            <HRLayout>
+              <HRDashboard />
+            </HRLayout>
           </ProtectedRoute>
         }
       />
@@ -184,7 +215,9 @@ const AppRoutes = () => {
         path="/hr/employees"
         element={
           <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
-            <HRLayout><Employees /></HRLayout>
+            <HRLayout>
+              <Employees />
+            </HRLayout>
           </ProtectedRoute>
         }
       />
@@ -192,7 +225,9 @@ const AppRoutes = () => {
         path="/hr/add-employee"
         element={
           <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
-            <HRLayout><AddEmployee /></HRLayout>
+            <HRLayout>
+              <AddEmployee />
+            </HRLayout>
           </ProtectedRoute>
         }
       />
@@ -200,7 +235,9 @@ const AppRoutes = () => {
         path="/hr/employee/:id"
         element={
           <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
-            <HRLayout><EmployeeDetails /></HRLayout>
+            <HRLayout>
+              <EmployeeDetails />
+            </HRLayout>
           </ProtectedRoute>
         }
       />
@@ -208,7 +245,9 @@ const AppRoutes = () => {
         path="/hr/attendance"
         element={
           <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
-            <HRLayout><Attendance /></HRLayout>
+            <HRLayout>
+              <Attendance />
+            </HRLayout>
           </ProtectedRoute>
         }
       />
@@ -216,7 +255,9 @@ const AppRoutes = () => {
         path="/hr/documents"
         element={
           <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
-            <HRLayout><Documents /></HRLayout>
+            <HRLayout>
+              <Documents />
+            </HRLayout>
           </ProtectedRoute>
         }
       />
@@ -224,7 +265,9 @@ const AppRoutes = () => {
         path="/hr/payroll"
         element={
           <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
-            <HRLayout><Payroll /></HRLayout>
+            <HRLayout>
+              <Payroll />
+            </HRLayout>
           </ProtectedRoute>
         }
       />
@@ -232,7 +275,9 @@ const AppRoutes = () => {
         path="/hr/travel"
         element={
           <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
-            <HRLayout><Travel /></HRLayout>
+            <HRLayout>
+              <Travel />
+            </HRLayout>
           </ProtectedRoute>
         }
       />
@@ -240,49 +285,186 @@ const AppRoutes = () => {
         path="/hr/leaves"
         element={
           <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
-            <HRLayout><Leaves /></HRLayout>
+            <HRLayout>
+              <Leaves />
+            </HRLayout>
           </ProtectedRoute>
         }
       />
 
       {/* SITE ENGINEER */}
-      <Route path="/site-engineer/dashboard" element={<SiteEngineerLayout><SiteEngineerDashboard /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/daily-diary" element={<SiteEngineerLayout><DailyDiary /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/rfi" element={<SiteEngineerLayout><RFI /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/ncr" element={<SiteEngineerLayout><NCR /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/checklist" element={<SiteEngineerLayout><Checklist /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/progress" element={<SiteEngineerLayout><Progress /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/incidents" element={<SiteEngineerLayout><AppShell /></SiteEngineerLayout>} />
-      <Route path="/site-engineer/activity" element={<SiteEngineerLayout><ActivityLog /></SiteEngineerLayout>} />
+      <Route
+        path="/site-engineer/dashboard"
+        element={
+          <SiteEngineerLayout>
+            <SiteEngineerDashboard />
+          </SiteEngineerLayout>
+        }
+      />
+      <Route
+        path="/site-engineer/daily-diary"
+        element={
+          <SiteEngineerLayout>
+            <DailyDiary />
+          </SiteEngineerLayout>
+        }
+      />
+      <Route
+        path="/site-engineer/rfi"
+        element={
+          <SiteEngineerLayout>
+            <RFI />
+          </SiteEngineerLayout>
+        }
+      />
+      <Route
+        path="/site-engineer/ncr"
+        element={
+          <SiteEngineerLayout>
+            <NCR />
+          </SiteEngineerLayout>
+        }
+      />
+      <Route
+        path="/site-engineer/checklist"
+        element={
+          <SiteEngineerLayout>
+            <Checklist />
+          </SiteEngineerLayout>
+        }
+      />
+      <Route
+        path="/site-engineer/progress"
+        element={
+          <SiteEngineerLayout>
+            <Progress />
+          </SiteEngineerLayout>
+        }
+      />
+      <Route
+        path="/site-engineer/incidents"
+        element={
+          <SiteEngineerLayout>
+            <AppShell />
+          </SiteEngineerLayout>
+        }
+      />
+      <Route
+        path="/site-engineer/activity"
+        element={
+          <SiteEngineerLayout>
+            <ActivityLog />
+          </SiteEngineerLayout>
+        }
+      />
 
       {/* QUANTITY SURVEYOR */}
-      <Route path="/quantity-surveyor/dashboard" element={<QuantitySurveyorLayout><QuantitySurveyorDashboard /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/incident" element={<QuantitySurveyorLayout><AppShell /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/daily-updates" element={<QuantitySurveyorLayout><Qsdailyupdates /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/quantity-report" element={<QuantitySurveyorLayout><Qsquantityreport /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/cost-report" element={<QuantitySurveyorLayout><Qscostreport /></QuantitySurveyorLayout>} />
-      <Route path="/quantity-surveyor/boq" element={<QuantitySurveyorLayout><Qsboq /></QuantitySurveyorLayout>} />
+      <Route
+        path="/quantity-surveyor/dashboard"
+        element={
+          <QuantitySurveyorLayout>
+            <QuantitySurveyorDashboard />
+          </QuantitySurveyorLayout>
+        }
+      />
+      <Route
+        path="/quantity-surveyor/incident"
+        element={
+          <QuantitySurveyorLayout>
+            <AppShell />
+          </QuantitySurveyorLayout>
+        }
+      />
+      <Route
+        path="/quantity-surveyor/daily-updates"
+        element={
+          <QuantitySurveyorLayout>
+            <Qsdailyupdates />
+          </QuantitySurveyorLayout>
+        }
+      />
+      <Route
+        path="/quantity-surveyor/quantity-report"
+        element={
+          <QuantitySurveyorLayout>
+            <Qsquantityreport />
+          </QuantitySurveyorLayout>
+        }
+      />
+      <Route
+        path="/quantity-surveyor/cost-report"
+        element={
+          <QuantitySurveyorLayout>
+            <Qscostreport />
+          </QuantitySurveyorLayout>
+        }
+      />
+      <Route
+        path="/quantity-surveyor/boq"
+        element={
+          <QuantitySurveyorLayout>
+            <Qsboq />
+          </QuantitySurveyorLayout>
+        }
+      />
 
       {/* MEP */}
       <Route path="/mep/*" element={<MEPRoutes />} />
 
       {/* PLANNING / QC / SAFETY */}
-      <Route path="/planning-engineer/dashboard" element={<ProjectManagerLayout><PlanningEngineerDashboard /></ProjectManagerLayout>} />
-      <Route path="/qc/dashboard" element={<ProjectManagerLayout><QCDashboard /></ProjectManagerLayout>} />
-      <Route path="/safety/dashboard" element={<ProjectManagerLayout><SafetyOfficerDashboard /></ProjectManagerLayout>} />
+      <Route
+        path="/planning-engineer/dashboard"
+        element={
+          <ProjectManagerLayout>
+            <PlanningEngineerDashboard />
+          </ProjectManagerLayout>
+        }
+      />
+      <Route
+        path="/qc/dashboard"
+        element={
+          <ProjectManagerLayout>
+            <QCDashboard />
+          </ProjectManagerLayout>
+        }
+      />
+      <Route
+        path="/safety/dashboard"
+        element={
+          <ProjectManagerLayout>
+            <SafetyOfficerDashboard />
+          </ProjectManagerLayout>
+        }
+      />
 
       {/* STRUCTURAL */}
       <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
       <Route path="/rfi/:id" element={<RFIDetailPage />} />
-      <Route path="/structural-engineer/rfi" element={<StructuralEngineerLayout><RFIPage /></StructuralEngineerLayout>} />
-      <Route path="/structural-engineer/rfi/:id" element={<StructuralEngineerLayout><RFIDetailPage /></StructuralEngineerLayout>} />
+      <Route
+        path="/structural-engineer/rfi"
+        element={
+          <StructuralEngineerLayout>
+            <RFIPage />
+          </StructuralEngineerLayout>
+        }
+      />
+      <Route
+        path="/structural-engineer/rfi/:id"
+        element={
+          <StructuralEngineerLayout>
+            <RFIDetailPage />
+          </StructuralEngineerLayout>
+        }
+      />
 
       {/* ARCHITECT */}
       <Route
         path="/architect/shared/drawings"
         element={
           <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
-            <ArchitectLayout><SharedDrawingPage /></ArchitectLayout>
+            <ArchitectLayout>
+              <SharedDrawingPage />
+            </ArchitectLayout>
           </ProtectedRoute>
         }
       />
@@ -290,16 +472,27 @@ const AppRoutes = () => {
         path="/architect/dashboard"
         element={
           <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-            <ArchitectLayout><ArchitectDashboard /></ArchitectLayout>
+            <ArchitectLayout>
+              <ArchitectDashboard />
+            </ArchitectLayout>
           </ProtectedRoute>
         }
       />
-      <Route path="/architect/incidents" element={<ArchitectLayout><AppShell /></ArchitectLayout>} />
+      <Route
+        path="/architect/incidents"
+        element={
+          <ArchitectLayout>
+            <AppShell />
+          </ArchitectLayout>
+        }
+      />
       <Route
         path="/architect/logs"
         element={
           <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-            <ArchitectLayout><ArchitectDailyLogins /></ArchitectLayout>
+            <ArchitectLayout>
+              <ArchitectDailyLogins />
+            </ArchitectLayout>
           </ProtectedRoute>
         }
       />
@@ -307,7 +500,9 @@ const AppRoutes = () => {
         path="/architect/designs"
         element={
           <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-            <ArchitectLayout><ArchitectDesigns /></ArchitectLayout>
+            <ArchitectLayout>
+              <ArchitectDesigns />
+            </ArchitectLayout>
           </ProtectedRoute>
         }
       />
@@ -315,7 +510,9 @@ const AppRoutes = () => {
         path="/architect/sign-off"
         element={
           <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-            <ArchitectLayout><ArchitectSignOff /></ArchitectLayout>
+            <ArchitectLayout>
+              <ArchitectSignOff />
+            </ArchitectLayout>
           </ProtectedRoute>
         }
       />
@@ -323,24 +520,65 @@ const AppRoutes = () => {
         path="/architect/projects"
         element={
           <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-            <ArchitectLayout><ArchitectProject /></ArchitectLayout>
+            <ArchitectLayout>
+              <ArchitectProject />
+            </ArchitectLayout>
           </ProtectedRoute>
         }
       />
 
       {/* PROJECT COORDINATOR */}
-      <Route path="/project-coordinator/dashboard" element={<ProjectCoordinatorLayout><ProjectCoordinatorDashboard /></ProjectCoordinatorLayout>} />
-      <Route path="/project-coordinator/daily" element={<ProjectCoordinatorLayout><DailyUpdatesPC /></ProjectCoordinatorLayout>} />
-      <Route path="/project-coordinator/milestone" element={<ProjectCoordinatorLayout><Milestone /></ProjectCoordinatorLayout>} />
-      <Route path="/project-coordinator/payments" element={<ProjectCoordinatorLayout><Payment /></ProjectCoordinatorLayout>} />
-      <Route path="/project-coordinator/incidents" element={<ProjectCoordinatorLayout><AppShell /></ProjectCoordinatorLayout>} />
+      <Route
+        path="/project-coordinator/dashboard"
+        element={
+          <ProjectCoordinatorLayout>
+            <ProjectCoordinatorDashboard />
+          </ProjectCoordinatorLayout>
+        }
+      />
+      <Route
+        path="/project-coordinator/daily"
+        element={
+          <ProjectCoordinatorLayout>
+            <DailyUpdatesPC />
+          </ProjectCoordinatorLayout>
+        }
+      />
+      <Route
+        path="/project-coordinator/milestone"
+        element={
+          <ProjectCoordinatorLayout>
+            <Milestone />
+          </ProjectCoordinatorLayout>
+        }
+      />
+      <Route
+        path="/project-coordinator/payments"
+        element={
+          <ProjectCoordinatorLayout>
+            <Payment />
+          </ProjectCoordinatorLayout>
+        }
+      />
+      <Route
+        path="/project-coordinator/incidents"
+        element={
+          <ProjectCoordinatorLayout>
+            <AppShell />
+          </ProjectCoordinatorLayout>
+        }
+      />
 
       {/* TIMESHEET */}
       <Route
         path="/timesheet"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR, ...PROJECT_ROLES]}>
-            <CEOLayout><Timesheet /></CEOLayout>
+          <ProtectedRoute
+            allowedRoles={[ROLES.CEO, ROLES.HR, ...PROJECT_ROLES]}
+          >
+            <CEOLayout>
+              <Timesheet />
+            </CEOLayout>
           </ProtectedRoute>
         }
       />

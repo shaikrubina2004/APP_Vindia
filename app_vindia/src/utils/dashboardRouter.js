@@ -43,14 +43,17 @@ export const getDashboardRoute = (role) => {
 
     // ✅ NEW ROLES
 
+    case ROLES.BDA:
+      return "/business-development/dashboard";
+
     case ROLES.CLIENT:
-      return "client/dashboard"; // or create "/client/dashboard" later
+      return "/client/dashboard"; // or create "/client/dashboard" later
 
     case ROLES.SOFTWARE_ENGINEER:
-      return "softwareEngineer/dashboard"; // or "/it/dashboard" if you create one
+      return "/softwareEngineer/dashboard"; // or "/it/dashboard" if you create one
 
     case ROLES.TESTER:
-      return "tester/dashboard"; // same as above
+      return "/tester/dashboard"; // same as above
 
     default:
       return "/";

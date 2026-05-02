@@ -4,6 +4,35 @@ const { insertNotification } = require("./pcNotificationsController");
 /**
  * ✅ Create Project
  */
+
+// ✅ Helper to parse floor string into rows
+function parseFloors(floorsString) {
+  const floors = [];
+  const upper = floorsString.trim().toUpperCase();
+
+  const hasBasement = upper.startsWith("B+");
+  const hasRooftop = upper.endsWith("+R");
+
+  const match = upper.match(/G\+(\d+)/);
+  const numFloors = match ? parseInt(match[1]) : 0;
+
+  if (hasBasement) {
+    floors.push({ name: "Basement", level_no: -1 });
+  }
+
+  floors.push({ name: "Ground Floor", level_no: 0 });
+
+  for (let i = 1; i <= numFloors; i++) {
+    floors.push({ name: `Level ${i}`, level_no: i });
+  }
+
+  if (hasRooftop) {
+    floors.push({ name: "Rooftop", level_no: numFloors + 1 });
+  }
+
+  return floors;
+}
+
 exports.createProject = async (req, res) => {
   try {
     const {
@@ -59,15 +88,27 @@ exports.createProject = async (req, res) => {
         floors || null,
         plot_size || null,
         phone || null,
-      ]
+      ],
     );
 
     const newProject = result.rows[0];
 
+    // ✅ Auto-create floors in project_floors table
+    if (floors) {
+      const floorRows = parseFloors(floors);
+      for (const floor of floorRows) {
+        await pool.query(
+          `INSERT INTO project_floors (project_id, name, level_no, is_active)
+       VALUES ($1, $2, $3, true)`,
+          [newProject.id, floor.name, floor.level_no],
+        );
+      }
+    }
+
     // ✅ Get coordinator_id for this project
     const proj = await pool.query(
       `SELECT coordinator_id FROM projects WHERE id = $1`,
-      [newProject.id]
+      [newProject.id],
     );
 
     const coordinatorId = proj.rows[0]?.coordinator_id;
@@ -81,13 +122,12 @@ exports.createProject = async (req, res) => {
         `Project "${name}" is created`,
         "/project-coordinator/dashboard", // 👈 better navigation
         "info",
-        newProject.id
+        newProject.id,
       );
     }
 
     // ✅ Response
     res.status(201).json(newProject);
-
   } catch (err) {
     console.error("🔥 CREATE ERROR:", err.message);
     res.status(500).json({ error: err.message });
@@ -102,7 +142,7 @@ exports.getManagers = async (req, res) => {
     const result = await pool.query(
       `SELECT id, name 
        FROM employees
-       WHERE designation = 'Project Manager'`
+       WHERE designation = 'Project Manager'`,
     );
 
     res.json(result.rows);
@@ -120,7 +160,7 @@ exports.getSiteEngineers = async (req, res) => {
     const result = await pool.query(
       `SELECT id, name 
        FROM employees
-       WHERE designation = 'Site Engineer'`
+       WHERE designation = 'Site Engineer'`,
     );
 
     res.json(result.rows);
@@ -143,7 +183,7 @@ exports.getAllProjects = async (req, res) => {
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
        LEFT JOIN employees s ON p.site_engineer_id = s.id
-       ORDER BY p.created_at DESC`
+       ORDER BY p.created_at DESC`,
     );
 
     return res.status(200).json(result.rows);
@@ -171,7 +211,7 @@ exports.getProjectById = async (req, res) => {
        LEFT JOIN employees m ON p.manager_id = m.id
        LEFT JOIN employees s ON p.site_engineer_id = s.id
        WHERE p.id = $1`,
-      [id]
+      [id],
     );
 
     if (result.rows.length === 0) {
@@ -258,7 +298,7 @@ exports.updateProject = async (req, res) => {
         plot_size,
         phone,
         id,
-      ]
+      ],
     );
 
     if (result.rows.length === 0) {
@@ -268,7 +308,6 @@ exports.updateProject = async (req, res) => {
     }
 
     return res.status(200).json(result.rows[0]);
-
   } catch (err) {
     console.error("🔥 UPDATE ERROR:", err.message);
     return res.status(500).json({
@@ -286,7 +325,7 @@ exports.deleteProject = async (req, res) => {
   try {
     const result = await pool.query(
       `DELETE FROM projects WHERE id = $1 RETURNING *`,
-      [id]
+      [id],
     );
 
     if (result.rows.length === 0) {
@@ -315,7 +354,7 @@ exports.getProjectsByStatus = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM projects WHERE status = $1`,
-      [status]
+      [status],
     );
 
     return res.status(200).json(result.rows);

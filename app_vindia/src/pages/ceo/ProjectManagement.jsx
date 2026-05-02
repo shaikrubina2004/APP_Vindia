@@ -68,23 +68,21 @@ function ProjectManagement() {
       .catch((err) => console.error(err));
   }, []);
   // 🔥 MOVE THIS UP
-const [selectedProject, setSelectedProject] = useState(null);
+  const [selectedProject, setSelectedProject] = useState(null);
 
-const [costSummary, setCostSummary] = useState([]);
+  const [costSummary, setCostSummary] = useState([]);
 
+  useEffect(() => {
+    if (!selectedProject) return;
 
-useEffect(() => {
-  if (!selectedProject) return;
-
-  fetch(`http://localhost:5000/api/cost-summary/${selectedProject.id}`)
-    .then((res) => res.json())
-    .then((data) => {
-      console.log("API DATA:", data); // 👈 check this
-      setCostSummary(data);
-    })
-    .catch((err) => console.error(err));
-}, [selectedProject]);
-
+    fetch(`http://localhost:5000/api/cost-summary/${selectedProject.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("API DATA:", data); // 👈 check this
+        setCostSummary(data);
+      })
+      .catch((err) => console.error(err));
+  }, [selectedProject]);
 
   const [timesheets, setTimesheets] = useState([
     {
@@ -135,22 +133,22 @@ useEffect(() => {
     rate: "",
   });
   const [newProject, setNewProject] = useState({
-  name: "",
-  client: "",
-  startDate: "",
-  endDate: "",
-  budget: "",
-  manager: "",
-  teamSize: "",
+    name: "",
+    client: "",
+    startDate: "",
+    endDate: "",
+    budget: "",
+    manager: "",
+    teamSize: "",
 
-  // ✅ NEW FIELDS
-  building_type: "",
-  floors: "",
-  description: "",
-  location: "",
-  plot_size: "",
-  phone: "",
-});
+    // ✅ NEW FIELDS
+    building_type: "",
+    floors: "",
+    description: "",
+    location: "",
+    plot_size: "",
+    phone: "",
+  });
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [payments, setPayments] = useState([
     {
@@ -190,31 +188,31 @@ useEffect(() => {
       }
 
       const res = await fetch("http://localhost:5000/api/projects", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: newProject.name,
-        client: newProject.client,
-        budget: newProject.budget,
-        start_date: newProject.startDate,
-        end_date: newProject.endDate,
-        manager_id: newProject.manager_id,
-        site_engineer_id: newProject.site_engineer_id,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newProject.name,
+          client: newProject.client,
+          budget: newProject.budget,
+          start_date: newProject.startDate,
+          end_date: newProject.endDate,
+          manager_id: newProject.manager_id,
+          site_engineer_id: newProject.site_engineer_id,
 
-        // ✅ new fields
-        building_type: newProject.building_type,
-        floors: newProject.floors,
-        description: newProject.description,
-        location: newProject.location,
-        plot_size: newProject.plot_size,
-        phone: newProject.phone,
-      }),
-    }); // ✅ fetch ends here
+          // ✅ new fields
+          building_type: newProject.building_type,
+          floors: newProject.floors,
+          description: newProject.description,
+          location: newProject.location,
+          plot_size: newProject.plot_size,
+          phone: newProject.phone,
+        }),
+      }); // ✅ fetch ends here
 
-// ✅ THIS MUST BE OUTSIDE
-const data = await res.json();
+      // ✅ THIS MUST BE OUTSIDE
+      const data = await res.json();
 
       // ✅ Update UI instantly
       setProjects((prev) => [data, ...prev]);
@@ -222,21 +220,21 @@ const data = await res.json();
 
       // ✅ Reset form
       setNewProject({
-      name: "",
-      client: "",
-      phone: "",
-      startDate: "",
-      endDate: "",
-      budget: "",
-      site_engineer_id: "",
+        name: "",
+        client: "",
+        phone: "",
+        startDate: "",
+        endDate: "",
+        budget: "",
+        site_engineer_id: "",
 
-      // ✅ RESET NEW FIELDS
-      building_type: "",
-      floors: "",
-      description: "",
-      location: "",
-      plot_size: "",
-    });
+        // ✅ RESET NEW FIELDS
+        building_type: "",
+        floors: "",
+        description: "",
+        location: "",
+        plot_size: "",
+      });
 
       setShowProjectModal(false);
     } catch (err) {
@@ -299,14 +297,17 @@ const data = await res.json();
   };
 
   // Calculate project cost breakdown
- const safeData = Array.isArray(costSummary) ? costSummary : [];
+  const safeData = Array.isArray(costSummary) ? costSummary : [];
 
-const costBreakdown = {
-  labour: costSummary.reduce((s, w) => s + Number(w.labour_cost || 0), 0),
-  material: costSummary.reduce((s, w) => s + Number(w.material_cost || 0), 0),
-  equipment: costSummary.reduce((s, w) => s + Number(w.equipment_cost || 0), 0),
-  misc: costSummary.reduce((s, w) => s + Number(w.misc_cost || 0), 0),
-};
+  const costBreakdown = {
+    labour: costSummary.reduce((s, w) => s + Number(w.labour_cost || 0), 0),
+    material: costSummary.reduce((s, w) => s + Number(w.material_cost || 0), 0),
+    equipment: costSummary.reduce(
+      (s, w) => s + Number(w.equipment_cost || 0),
+      0,
+    ),
+    misc: costSummary.reduce((s, w) => s + Number(w.misc_cost || 0), 0),
+  };
 
   // Calculate performance metrics
   const performanceMetrics = {
@@ -326,7 +327,6 @@ const costBreakdown = {
       <div className="pm-header">
         <div>
           <h1>Project Management System</h1>
-          
         </div>
         <button
           className="btn-primary"
@@ -350,157 +350,151 @@ const costBreakdown = {
       {/* Content */}
       <div className="pm-content">
         {/* OVERVIEW TAB */}
-      <div className="overview-section">
+        <div className="overview-section">
+          {/* FILTER BUTTONS */}
+          <div className="filter-buttons">
+            {["All", "In Progress", "Pending", "Completed", "Rejected"].map(
+              (status) => (
+                <button
+                  key={status}
+                  className={`filter-btn ${statusFilter === status ? "active" : ""}`}
+                  onClick={() => setStatusFilter(status)}
+                >
+                  {status}
+                </button>
+              ),
+            )}
+          </div>
 
-  {/* FILTER BUTTONS */}
-  <div className="filter-buttons">
-    {["All", "In Progress", "Pending", "Completed", "Rejected"].map(
-      (status) => (
-        <button
-          key={status}
-          className={`filter-btn ${statusFilter === status ? "active" : ""}`}
-          onClick={() => setStatusFilter(status)}
-        >
-          {status}
-        </button>
-      )
-    )}
-  </div>
-
-  {/* PROJECT CARDS */}
-  {loading ? (
-    <p>Loading projects...</p>
-  ) : (
-    <div className="projects-grid">
-      {projects.map((proj) => (
-        <ProjectCard
-          key={proj.id}
-          proj={proj}
-          isActive={selectedProject?.id === proj.id}
-          onClick={() => setSelectedProject(proj)}
-          variant="overview"
-        />
-      ))}
-    </div>
-  )}
-
-  {/* ✅ TABS (ONLY BUTTONS HERE) */}
- <div className="pm-tabs">
-  <button
-    className={activeTab === "overview" ? "active" : ""}
-    onClick={() => setActiveTab("overview")}
-  >
-    ≡ Project Overview
-  </button>
-
-  <button
-    className={activeTab === "wbs" ? "active" : ""}
-    onClick={() => setActiveTab("wbs")}
-  >
-    ⬚ WBS & Tasks
-  </button>
-
-  <button
-    className={activeTab === "timesheet" ? "active" : ""}
-    onClick={() => setActiveTab("timesheet")}
-  >
-    🗂 Timesheet
-  </button>
-
-  <button
-    className={activeTab === "cost" ? "active" : ""}
-    onClick={() => setActiveTab("cost")}
-  >
-    📊 Cost Tracking
-  </button>
-
-  <button
-    className={activeTab === "payments" ? "active" : ""}
-    onClick={() => setActiveTab("payments")}
-  >
-    ✳ Payments
-  </button>
-</div>
-
-  {/* 🔥 TAB CONTENT (SEPARATE) */}
-
-  {activeTab === "overview" && (
-    <div className="three-column-layout">
-      
-      {/* QUICK INSIGHTS */}
-      <ProjectCard variant="overview">
-        <div className="quick-insights animate">
-          <h3>Quick Insights</h3>
-          <p>⚠ 2 projects delayed</p>
-          <p>💰 1 over budget</p>
-          <p>🚀 Top: 90% progress</p>
-        </div>
-      </ProjectCard>
-
-      {/* TIMESHEET */}
-      <ProjectCard variant="overview">
-        <div className="timesheet-section-new">
-          <h3>Timesheet Submissions</h3>
-          {timesheets.slice(-5).reverse().map((ts) => (
-            <div key={ts.id} className="timesheet-row">
-              <div className="ts-info">
-                <span className="ts-name">{ts.employee}</span>
-                <span className="ts-task">{ts.task}</span>
-              </div>
-              <div className="ts-meta">
-                <span className="ts-hours">{ts.hours}h</span>
-                <span className="ts-date">{ts.date}</span>
-              </div>
+          {/* PROJECT CARDS */}
+          {loading ? (
+            <p>Loading projects...</p>
+          ) : (
+            <div className="projects-grid">
+              {projects.map((proj) => (
+                <ProjectCard
+                  key={proj.id}
+                  proj={proj}
+                  isActive={selectedProject?.id === proj.id}
+                  onClick={() => setSelectedProject(proj)}
+                  variant="overview"
+                />
+              ))}
             </div>
-          ))}
+          )}
+
+          {/* ✅ TABS (ONLY BUTTONS HERE) */}
+          <div className="pm-tabs">
+            <button
+              className={activeTab === "overview" ? "active" : ""}
+              onClick={() => setActiveTab("overview")}
+            >
+              ≡ Project Overview
+            </button>
+
+            <button
+              className={activeTab === "wbs" ? "active" : ""}
+              onClick={() => setActiveTab("wbs")}
+            >
+              ⬚ WBS & Tasks
+            </button>
+
+            <button
+              className={activeTab === "timesheet" ? "active" : ""}
+              onClick={() => setActiveTab("timesheet")}
+            >
+              🗂 Timesheet
+            </button>
+
+            <button
+              className={activeTab === "cost" ? "active" : ""}
+              onClick={() => setActiveTab("cost")}
+            >
+              📊 Cost Tracking
+            </button>
+
+            <button
+              className={activeTab === "payments" ? "active" : ""}
+              onClick={() => setActiveTab("payments")}
+            >
+              ✳ Payments
+            </button>
+          </div>
+
+          {/* 🔥 TAB CONTENT (SEPARATE) */}
+
+          {activeTab === "overview" && (
+            <div className="three-column-layout">
+              {/* QUICK INSIGHTS */}
+              <ProjectCard variant="overview">
+                <div className="quick-insights animate">
+                  <h3>Quick Insights</h3>
+                  <p>⚠ 2 projects delayed</p>
+                  <p>💰 1 over budget</p>
+                  <p>🚀 Top: 90% progress</p>
+                </div>
+              </ProjectCard>
+
+              {/* TIMESHEET */}
+              <ProjectCard variant="overview">
+                <div className="timesheet-section-new">
+                  <h3>Timesheet Submissions</h3>
+                  {timesheets
+                    .slice(-5)
+                    .reverse()
+                    .map((ts) => (
+                      <div key={ts.id} className="timesheet-row">
+                        <div className="ts-info">
+                          <span className="ts-name">{ts.employee}</span>
+                          <span className="ts-task">{ts.task}</span>
+                        </div>
+                        <div className="ts-meta">
+                          <span className="ts-hours">{ts.hours}h</span>
+                          <span className="ts-date">{ts.date}</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </ProjectCard>
+
+              {/* RECENT ACTIVITIES */}
+              <ProjectCard variant="overview">
+                <div className="recent-activity">
+                  <h3>
+                    {selectedProject
+                      ? `${selectedProject.name} - Recent Activities`
+                      : "Recent Activities"}
+                  </h3>
+                  <p>• Sample activity</p>
+                </div>
+              </ProjectCard>
+            </div>
+          )}
+
+          {activeTab === "wbs" && <WbsPage selectedProject={selectedProject} />}
+
+          {activeTab === "timesheet" && (
+            <div className="timesheet-section">Timesheet content</div>
+          )}
+
+          {activeTab === "cost" && (
+            <CostTracking
+              selectedProject={selectedProject}
+              activePhase={activePhase}
+              setActivePhase={setActivePhase}
+              activeCategory={activeCategory}
+              setActiveCategory={setActiveCategory}
+              costBreakdown={costBreakdown}
+              calculateRemaining={calculateRemaining}
+              calculatePercentage={calculatePercentage}
+              costSummary={costSummary}
+            />
+          )}
+
+          {activeTab === "payments" && (
+            <div className="payments-section">Payments content</div>
+          )}
         </div>
-      </ProjectCard>
-
-      {/* RECENT ACTIVITIES */}
-      <ProjectCard variant="overview">
-        <div className="recent-activity">
-          <h3>
-            {selectedProject
-              ? `${selectedProject.name} - Recent Activities`
-              : "Recent Activities"}
-          </h3>
-          <p>• Sample activity</p>
-        </div>
-      </ProjectCard>
-
-    </div>
-  )}
-
-  {activeTab === "wbs" && (
-    <WbsPage selectedProject={selectedProject} />
-  )}
-
-  {activeTab === "timesheet" && (
-    <div className="timesheet-section">Timesheet content</div>
-  )}
-
-  {activeTab === "cost" && (
-    <CostTracking
-      selectedProject={selectedProject}
-      activePhase={activePhase}
-      setActivePhase={setActivePhase}
-      activeCategory={activeCategory}
-      setActiveCategory={setActiveCategory}
-      costBreakdown={costBreakdown}
-      calculateRemaining={calculateRemaining}
-      calculatePercentage={calculatePercentage}
-      costSummary={costSummary}
-    />
-  )}
-
-  {activeTab === "payments" && (
-    <div className="payments-section">Payments content</div>
-  )}
-
-</div>
-        
-
-       
 
         {/* NEW PROJECT MODAL */}
         {showProjectModal && (
@@ -542,16 +536,16 @@ const costBreakdown = {
                   />
                 </div>
                 <div className="form-group">
-                <label>Phone Number</label>
-                <input
-                  type="tel"
-                  placeholder="e.g., 9876543210"
-                  value={newProject.phone}
-                  onChange={(e) =>
-                    setNewProject({ ...newProject, phone: e.target.value })
-                  }
-                />
-              </div>
+                  <label>Phone Number</label>
+                  <input
+                    type="tel"
+                    placeholder="e.g., 9876543210"
+                    value={newProject.phone}
+                    onChange={(e) =>
+                      setNewProject({ ...newProject, phone: e.target.value })
+                    }
+                  />
+                </div>
                 <div className="form-row">
                   <div className="form-group">
                     <label>Start Date</label>
@@ -592,78 +586,82 @@ const costBreakdown = {
                   />
                 </div>
                 <div className="form-row">
+                  {/* BUILDING TYPE */}
+                  <div className="form-group">
+                    <label>Building Type</label>
+                    <select
+                      value={newProject.building_type}
+                      onChange={(e) =>
+                        setNewProject({
+                          ...newProject,
+                          building_type: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="">Select Type</option>
+                      <option value="Commercial">Commercial</option>
+                      <option value="Residential">Residential</option>
+                    </select>
+                  </div>
 
-                {/* BUILDING TYPE */}
-                <div className="form-group">
-                  <label>Building Type</label>
-                  <select
-                    value={newProject.building_type}
-                    onChange={(e) =>
-                      setNewProject({ ...newProject, building_type: e.target.value })
-                    }
-                  >
-                    <option value="">Select Type</option>
-                    <option value="Commercial">Commercial</option>
-                    <option value="Residential">Residential</option>
-                  </select>
+                  {/* FLOORS */}
+                  {/* FLOORS */}
+                  <div className="form-group">
+                    <label>Floors</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. G+5, B+G+10, G+4+R"
+                      value={newProject.floors}
+                      onChange={(e) =>
+                        setNewProject({ ...newProject, floors: e.target.value })
+                      }
+                    />
+                  </div>
                 </div>
 
-                {/* FLOORS */}
+                {/* LOCATION */}
                 <div className="form-group">
-                  <label>Floors</label>
-                  <select
-                    value={newProject.floors}
+                  <label>Location</label>
+                  <input
+                    type="text"
+                    placeholder="Enter location"
+                    value={newProject.location}
                     onChange={(e) =>
-                      setNewProject({ ...newProject, floors: e.target.value })
+                      setNewProject({ ...newProject, location: e.target.value })
                     }
-                  >
-                    <option value="">Select Floors</option>
-                    <option value="G">G</option>
-                    <option value="G+1">G+1</option>
-                    <option value="G+2">G+2</option>
-                    <option value="G+3">G+3</option>
-                  </select>
+                  />
                 </div>
 
-              </div>
+                {/* PLOT SIZE */}
+                <div className="form-group">
+                  <label>Plot Size (sq ft)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 1200"
+                    value={newProject.plot_size}
+                    onChange={(e) =>
+                      setNewProject({
+                        ...newProject,
+                        plot_size: e.target.value,
+                      })
+                    }
+                  />
+                </div>
 
-              {/* LOCATION */}
-              <div className="form-group">
-                <label>Location</label>
-                <input
-                  type="text"
-                  placeholder="Enter location"
-                  value={newProject.location}
-                  onChange={(e) =>
-                    setNewProject({ ...newProject, location: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* PLOT SIZE */}
-              <div className="form-group">
-                <label>Plot Size (sq ft)</label>
-                <input
-                  type="number"
-                  placeholder="e.g., 1200"
-                  value={newProject.plot_size}
-                  onChange={(e) =>
-                    setNewProject({ ...newProject, plot_size: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* DESCRIPTION */}
-              <div className="form-group">
-                <label>Description</label>
-                <textarea
-                  placeholder="Project description..."
-                  value={newProject.description}
-                  onChange={(e) =>
-                    setNewProject({ ...newProject, description: e.target.value })
-                  }
-                />
-              </div>
+                {/* DESCRIPTION */}
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    placeholder="Project description..."
+                    value={newProject.description}
+                    onChange={(e) =>
+                      setNewProject({
+                        ...newProject,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
                 <div className="form-row">
                   <div className="form-group">
                     <label>Project Manager</label>

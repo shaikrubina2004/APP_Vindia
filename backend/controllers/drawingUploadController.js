@@ -526,3 +526,176 @@ exports.deleteDrawing = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+/**
+ * ✅ Create or update a daily log (upsert)
+ */
+exports.upsertDailyLog = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const submitted_by = req.user?.id;
+    const {
+      project_id,
+      floor_id,
+      discipline,
+      log_date,
+      shift,
+      workers_deployed,
+      materials_used,
+      activities,
+      blockers,
+      plan_tomorrow,
+      completion_pct,
+      coord_checked,
+      structural_checked,
+      drawing_checked,
+      incident_checked,
+      photos_uploaded,
+      status,
+    } = req.body;
+
+    if (!project_id || !floor_id || !discipline || !log_date || !activities) {
+      return res.status(400).json({
+        error:
+          "project_id, floor_id, discipline, log_date and activities are required",
+      });
+    }
+
+    await client.query("BEGIN");
+
+    const existing = await client.query(
+      `SELECT id, status FROM daily_logs
+       WHERE project_id = $1 AND floor_id = $2 AND discipline = $3 AND log_date = $4`,
+      [project_id, floor_id, discipline, log_date],
+    );
+
+    let result;
+
+    if (existing.rows.length > 0) {
+      if (existing.rows[0].status === "Verified") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "Cannot edit a Verified log" });
+      }
+
+      result = await client.query(
+        `UPDATE daily_logs SET
+          shift = $1, workers_deployed = $2, materials_used = $3,
+          activities = $4, blockers = $5, plan_tomorrow = $6,
+          completion_pct = $7,
+          coord_checked = $8, structural_checked = $9, drawing_checked = $10,
+          incident_checked = $11, photos_uploaded = $12,
+          status = $13, updated_at = NOW()
+         WHERE project_id = $14 AND floor_id = $15 AND discipline = $16 AND log_date = $17
+         RETURNING *`,
+        [
+          shift || "Day",
+          workers_deployed || 0,
+          materials_used || null,
+          activities,
+          blockers || null,
+          plan_tomorrow || null,
+          completion_pct || 0,
+          coord_checked || false,
+          structural_checked || false,
+          drawing_checked || false,
+          incident_checked || false,
+          photos_uploaded || false,
+          status || "Draft",
+          project_id,
+          floor_id,
+          discipline,
+          log_date,
+        ],
+      );
+    } else {
+      result = await client.query(
+        `INSERT INTO daily_logs
+          (project_id, floor_id, discipline, log_date,
+           shift, workers_deployed, materials_used,
+           activities, blockers, plan_tomorrow,
+           completion_pct,
+           coord_checked, structural_checked, drawing_checked,
+           incident_checked, photos_uploaded,
+           submitted_by, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         RETURNING *`,
+        [
+          project_id,
+          floor_id,
+          discipline,
+          log_date,
+          shift || "Day",
+          workers_deployed || 0,
+          materials_used || null,
+          activities,
+          blockers || null,
+          plan_tomorrow || null,
+          completion_pct || 0,
+          coord_checked || false,
+          structural_checked || false,
+          drawing_checked || false,
+          incident_checked || false,
+          photos_uploaded || false,
+          submitted_by,
+          status || "Draft",
+        ],
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json(result.rows[0]);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("🔥 DAILY LOG UPSERT ERROR:", err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * ✅ Get logs for a project
+ */
+exports.getDailyLogsByProject = async (req, res) => {
+  try {
+    const { project_id } = req.params;
+    const limit = req.query.limit || 10;
+
+    const result = await pool.query(
+      `SELECT dl.*, pf.name AS floor_name, u.name AS submitted_by_name
+       FROM daily_logs dl
+       LEFT JOIN project_floors pf ON pf.id = dl.floor_id
+       LEFT JOIN users u ON u.id = dl.submitted_by
+       WHERE dl.project_id = $1
+       ORDER BY dl.log_date DESC, dl.created_at DESC
+       LIMIT $2`,
+      [project_id, limit],
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("🔥 FETCH DAILY LOGS ERROR:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * ✅ Check if today's log exists
+ */
+exports.checkTodayLog = async (req, res) => {
+  try {
+    const { project_id, floor_id, discipline } = req.query;
+    const today = new Date().toISOString().split("T")[0];
+
+    const result = await pool.query(
+      `SELECT id, status, completion_pct FROM daily_logs
+       WHERE project_id = $1 AND floor_id = $2 AND discipline = $3 AND log_date = $4`,
+      [project_id, floor_id, discipline, today],
+    );
+
+    res.json({ exists: result.rows.length > 0, log: result.rows[0] || null });
+  } catch (err) {
+    console.error("🔥 CHECK TODAY LOG ERROR:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
