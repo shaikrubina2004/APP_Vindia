@@ -1,7 +1,8 @@
 // FILE PATH: backend/routes/rfiRoutes.js
 // Cross-role RFI — any role can raise to any role, both sides see the thread.
 // Mount in server.js as: app.use("/api/rfis", rfiRoutes)
-
+//structural_engineer, mep_engineer, architect, project_coordinator, quantity_surveyor, site_engineer, project_manager, planning_engineer, qc_engineer, safety_officer, hr_manager
+//created for structural engineer but can be used by other roles as well
 const express = require("express");
 const router  = express.Router();
 const pool    = require("../config/db");

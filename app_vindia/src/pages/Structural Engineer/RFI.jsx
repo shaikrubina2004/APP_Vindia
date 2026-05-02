@@ -1,12 +1,10 @@
-// FILE PATH: src/pages/RFI/RFIPage.jsx
-// Works for ALL roles — shows RFIs raised by or assigned to the logged-in user.
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { fetchRFIs, updateRFIStatus, ROLE_LABELS } from "../../api/rfiApi";
 import CreateRFIModal from "./CreateRFI";
 import "./RFI.css";
+// console.log("🚀 RFI PAGE LOADED");
 
 const STATUS_STYLE = {
   open:      { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
@@ -27,28 +25,38 @@ function getUser() {
 }
 
 export default function RFIPage() {
-  const navigate     = useNavigate();
-  const queryClient  = useQueryClient();
-  const user         = getUser();
-  const myRole       = user.role || "";
+    console.log("🚀 RFI COMPONENT RENDERED"); // ✅ move here
+    
+  const navigate    = useNavigate();
+  const queryClient = useQueryClient();
+  const user        = getUser();
+  const myRole      = user.role || "";
 
-  const [view,      setView]      = useState("all");   // all | sent | received
-  const [filter,    setFilter]    = useState("all");   // all | open | responded | closed
+  useEffect(() => {
+  console.log("🔥 useEffect running");
+}, []);
+  const [view,      setView]      = useState("all");
+  const [filter,    setFilter]    = useState("all");
   const [search,    setSearch]    = useState("");
   const [showModal, setShowModal] = useState(false);
 
-  const { data: rfis = [], isLoading, isError } = useQuery({
-    queryKey: ["rfis", view],
-    queryFn:  () => fetchRFIs(view),
-    retry: 1,
-  });
+ const { data: rfis = [], isLoading, isError } = useQuery({
+  queryKey: ["rfis", view],
+  queryFn: async () => {
+    console.log("📡 React Query calling fetchRFIs...");
+    return await fetchRFIs(view);
+  },
+  enabled: true,
+  refetchOnMount: "always",   // 🔥 IMPORTANT CHANGE
+  refetchOnWindowFocus: false,
+  staleTime: 0,
+});
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }) => updateRFIStatus(id, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["rfis"] }),
   });
 
-  // ── Filter + search ────────────────────────────────────────────────────────
   const visible = rfis.filter((r) => {
     const matchStatus = filter === "all" || r.status === filter;
     const matchSearch =
@@ -59,18 +67,14 @@ export default function RFIPage() {
     return matchStatus && matchSearch;
   });
 
-  // ── Stat counts ────────────────────────────────────────────────────────────
   const total     = rfis.length;
   const open      = rfis.filter((r) => r.status === "open").length;
   const responded = rfis.filter((r) => r.status === "responded").length;
   const closed    = rfis.filter((r) => r.status === "closed").length;
-  // Add this right before the return statement
-console.log("RFI render:", { isLoading, isError, rfisLength: rfis.length });
 
   return (
     <div className="rfi-page">
 
-      {/* ── HEADER ──────────────────────────────────────────────────────── */}
       <div className="rfi-page-header">
         <div>
           <h1 className="rfi-page-title">RFI Management</h1>
@@ -81,7 +85,6 @@ console.log("RFI render:", { isLoading, isError, rfisLength: rfis.length });
         </button>
       </div>
 
-      {/* ── STAT CARDS ──────────────────────────────────────────────────── */}
       <div className="rfi-stats">
         {[
           { label: "Total",     value: total,     color: "#6366f1" },
@@ -97,7 +100,6 @@ console.log("RFI render:", { isLoading, isError, rfisLength: rfis.length });
         ))}
       </div>
 
-      {/* ── VIEW TABS (sent / received / all) ───────────────────────────── */}
       <div className="rfi-view-tabs">
         {["all", "sent", "received"].map((v) => (
           <button key={v}
@@ -108,17 +110,16 @@ console.log("RFI render:", { isLoading, isError, rfisLength: rfis.length });
         ))}
       </div>
 
-      {/* ── CONTROLS ────────────────────────────────────────────────────── */}
       <div className="rfi-controls">
         <div className="rfi-search-box">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
                stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
           <input placeholder="Search subject, project, role..."
                  value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-
         <div className="rfi-filter-tabs">
           {["all","open","responded","closed"].map((f) => (
             <button key={f}
@@ -130,28 +131,19 @@ console.log("RFI render:", { isLoading, isError, rfisLength: rfis.length });
         </div>
       </div>
 
-      {/* ── TABLE ───────────────────────────────────────────────────────── */}
       <div className="rfi-table-wrap">
         {isLoading && <p className="rfi-msg">Loading RFIs…</p>}
         {isError   && <p className="rfi-msg error">⚠️ Failed to load RFIs. Check server connection.</p>}
-
         {!isLoading && !isError && visible.length === 0 && (
-          <p className="rfi-msg">No RFIs found.</p>
+          <p className="rfi-msg">No RFIs found. Click &quot;+ Raise RFI&quot; to create one.</p>
         )}
-
         {!isLoading && visible.length > 0 && (
           <table className="rfi-table">
             <thead>
               <tr>
-                <th>#</th>
-                <th>Subject</th>
-                <th>From</th>
-                <th>To</th>
-                <th>Project</th>
-                <th>Priority</th>
-                <th>Replies</th>
-                <th>Status</th>
-                <th>Date</th>
+                <th>#</th><th>Subject</th><th>From</th><th>To</th>
+                <th>Project</th><th>Priority</th><th>Replies</th>
+                <th>Status</th><th>Date</th>
               </tr>
             </thead>
             <tbody>
@@ -161,7 +153,7 @@ console.log("RFI render:", { isLoading, isError, rfisLength: rfis.length });
                 return (
                   <tr key={r.id}
                       className={`rfi-row ${isMyRFI ? "mine" : "incoming"}`}
-                      onClick={() => navigate(`/rfi/${r.id}`)}>
+                      onClick={() => navigate(`/structural-engineer/rfi/${r.id}`)}>
                     <td className="rfi-id">#{r.id}</td>
                     <td className="rfi-subject">{r.subject}</td>
                     <td>
@@ -211,7 +203,6 @@ console.log("RFI render:", { isLoading, isError, rfisLength: rfis.length });
         )}
       </div>
 
-      {/* ── CREATE MODAL ─────────────────────────────────────────────────── */}
       {showModal && (
         <CreateRFIModal
           myRole={myRole}
