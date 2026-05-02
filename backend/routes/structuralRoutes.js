@@ -228,4 +228,63 @@ router.post("/drawings/:id/approve", async (req, res) => {
   }
 });
 
+// 📌 RECENT ACTIVITY
+router.get("/recent-activity", async (req, res) => {
+  try {
+    const drawings = await pool.query(
+      "SELECT name, created_at FROM drawings ORDER BY created_at DESC LIMIT 3"
+    );
+
+    const incidents = await pool.query(
+      "SELECT title, created_at FROM incidents ORDER BY created_at DESC LIMIT 2"
+    );
+
+    const activity = [
+      ...drawings.rows.map(d => ({
+        type: "drawing",
+        text: `New drawing uploaded: ${d.name}`
+      })),
+      ...incidents.rows.map(i => ({
+        type: "incident",
+        text: `Issue reported: ${i.title}`
+      })),
+    ];
+
+    res.json(activity);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch activity" });
+  }
+});
+
+// 🔔 GET SE NOTIFICATIONS
+router.get("/notifications", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, title, description, is_read, created_at
+       FROM notifications
+       WHERE role = 'structural_engineer'
+       ORDER BY created_at DESC`
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Fetch Notifications Error:", err.message);
+    res.status(500).json({ error: "Failed to fetch notifications" });
+  }
+});
+
+// 🔕 MARK AS READ
+router.patch("/notifications/:id/read", async (req, res) => {
+  try {
+    await pool.query(
+      "UPDATE notifications SET is_read = true WHERE id = $1",
+      [req.params.id]
+    );
+
+    res.json({ message: "Marked as read" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update" });
+  }
+});
+
 module.exports = router;

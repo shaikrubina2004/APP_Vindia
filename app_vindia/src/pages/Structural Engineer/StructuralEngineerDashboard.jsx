@@ -16,12 +16,22 @@ import { ErrorBoundary } from "../../utils/ErrorBoundary";
 import { fetchDashboard, QUERY_KEYS } from "../../api/structuralApi";
 import "./StructuralEngineerDashboard.css";
 
-ChartJS.register(BarElement, CategoryScale, LinearScale, ArcElement, Tooltip, Legend);
+ChartJS.register(
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  ArcElement,
+  Tooltip,
+  Legend,
+);
 
 // ─── Skeleton (replaces spinner — feels 3× faster) ────────────────────────
 const DashboardSkeleton = () => (
   <div className="se-container">
-    <div className="skeleton" style={{ height: 32, width: 280, marginBottom: 25, borderRadius: 8 }} />
+    <div
+      className="skeleton"
+      style={{ height: 32, width: 280, marginBottom: 25, borderRadius: 8 }}
+    />
     <div className="se-cards">
       {[...Array(4)].map((_, i) => (
         <div key={i} className="skeleton skeleton-card" />
@@ -31,19 +41,29 @@ const DashboardSkeleton = () => (
       <div className="skeleton skeleton-chart" />
       <div className="skeleton skeleton-chart" />
     </div>
-    <div className="skeleton" style={{ height: 140, marginTop: 30, borderRadius: 16 }} />
+    <div
+      className="skeleton"
+      style={{ height: 140, marginTop: 30, borderRadius: 16 }}
+    />
   </div>
 );
 
 // ─── Error State ───────────────────────────────────────────────────────────
 const DashboardError = ({ refetch }) => (
   <div className="se-loading">
-    <p style={{ color: "#ef4444", fontSize: 15 }}>⚠️ Failed to load dashboard</p>
+    <p style={{ color: "#ef4444", fontSize: 15 }}>
+      ⚠️ Failed to load dashboard
+    </p>
     <button
       onClick={refetch}
       style={{
-        marginTop: 12, padding: "8px 18px", background: "#4f46e5",
-        color: "white", border: "none", borderRadius: 8, cursor: "pointer",
+        marginTop: 12,
+        padding: "8px 18px",
+        background: "#4f46e5",
+        color: "white",
+        border: "none",
+        borderRadius: 8,
+        cursor: "pointer",
       }}
     >
       Retry
@@ -56,11 +76,24 @@ const StructuralEngineerDashboard = () => {
   const navigate = useNavigate();
 
   // ✅ useQuery — cached 5 min, auto-retry, instant on revisit
-  const { data: stats, isLoading, isError, refetch } = useQuery({
+  const {
+    data: stats,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: QUERY_KEYS.dashboard,
     queryFn: fetchDashboard,
+    refetchInterval: 30000, // 🔥 every 30 sec
+    refetchOnWindowFocus: true,
   });
 
+  // 🔥 RECENT ACTIVITY FETCH
+  const { data: activity } = useQuery({
+    queryKey: ["recentActivity"],
+    queryFn: () =>
+      fetch("http://localhost:5000/api/structural/recent-activity").then((res) => res.json()),
+  });
   if (isLoading) return <DashboardSkeleton />;
   if (isError) return <DashboardError refetch={refetch} />;
 
@@ -69,8 +102,12 @@ const StructuralEngineerDashboard = () => {
     labels: ["Drawings", "Incidents", "Notifications"],
     datasets: [
       {
-        label: "Project Stats",    // ✅ FIX: was "undefined" in legend
-        data: [stats.totalDrawings, stats.pendingIncidents, stats.notifications],
+        label: "Project Stats", // ✅ FIX: was "undefined" in legend
+        data: [
+          stats.totalDrawings,
+          stats.pendingIncidents,
+          stats.notifications,
+        ],
         backgroundColor: ["#4f46e5", "#f59e0b", "#06b6d4"],
         borderRadius: 8,
       },
@@ -93,48 +130,103 @@ const StructuralEngineerDashboard = () => {
   return (
     <div className="se-container">
       <h1 className="se-title">Structural Engineer Dashboard</h1>
+      {/* 🚨 ALERT STRIP */}
+      {stats.pendingIncidents > 0 && (
+        <div className="se-alert">
+          ⚠️ {stats.pendingIncidents} critical issues need attention
+        </div>
+      )}
 
       {/* ── CARDS ─────────────────────────────────────────────────────── */}
       <div className="se-cards">
+        {/* DRAWINGS */}
         <div
           className="se-card primary"
-          onClick={() => navigate("/structural-engineer/drawings")}
+          onClick={() => navigate("/structural-engineer/shared/drawings")}
         >
           <div className="card-icon">📐</div>
           <h3>Total Drawings</h3>
-          <p><CountUp end={stats.totalDrawings} duration={1.5} /></p>
+          <p>
+            <CountUp end={stats.totalDrawings} duration={1.5} />
+          </p>
         </div>
 
-        <div className="se-card neutral">
+        {/* VERSION (optional click) */}
+        <div
+          className="se-card neutral"
+          onClick={() => navigate("/structural-engineer/shared/drawings")}
+        >
           <div className="card-icon">🧩</div>
           <h3>Latest Version</h3>
           <p>{stats.latestVersion}</p>
         </div>
 
-        <div className="se-card warning">
+        {/* INCIDENTS */}
+        <div
+          className="se-card warning"
+          onClick={() => navigate("/structural-engineer/incidents")}
+        >
           <div className="card-icon">⚠️</div>
           <h3>Pending Incidents</h3>
-          <p><CountUp end={stats.pendingIncidents} duration={1.5} /></p>
+          <p>
+            <CountUp end={stats.pendingIncidents} duration={1.5} />
+          </p>
         </div>
 
-        <div className="se-card info">
+        {/* NOTIFICATIONS */}
+        <div
+          className="se-card info"
+          onClick={() => navigate("/structural-engineer/notifications")}
+        >
           <div className="card-icon">🔔</div>
           <h3>Notifications</h3>
-          <p><CountUp end={stats.notifications} duration={1.5} /></p>
+          <p>
+            <CountUp end={stats.notifications} duration={1.5} />
+          </p>
         </div>
       </div>
 
       {/* ── CHARTS — each wrapped so one crash doesn't kill the other ─── */}
       <div className="se-charts">
+        {/* PROJECT OVERVIEW */}
         <ErrorBoundary label="Project Overview chart">
-          <div className="chart-box">
+          <div
+            className="chart-box"
+            onClick={() => navigate("/structural-engineer/shared/drawings")}
+            style={{ cursor: "pointer" }}
+          >
             <h3>Project Overview</h3>
-            <Bar data={barData} options={{ maintainAspectRatio: false }} />
+            <Bar
+              data={barData}
+              options={{
+                maintainAspectRatio: false,
+                onClick: (event, elements) => {
+                  if (!elements.length) return;
+
+                  const index = elements[0].index;
+
+                  if (index === 0) {
+                    navigate("/structural-engineer/shared/drawings");
+                  }
+                  if (index === 1) {
+                    navigate("/structural-engineer/incidents");
+                  }
+                  if (index === 2) {
+                    navigate("/structural-engineer/notifications");
+                  }
+                },
+              }}
+            />{" "}
           </div>
         </ErrorBoundary>
 
+        {/* DISTRIBUTION */}
         <ErrorBoundary label="Distribution chart">
-          <div className="chart-box">
+          <div
+            className="chart-box"
+            onClick={() => navigate("/structural-engineer/incidents")}
+            style={{ cursor: "pointer" }}
+          >
             <h3>Distribution</h3>
             <Doughnut data={pieData} options={{ maintainAspectRatio: false }} />
           </div>
@@ -142,12 +234,18 @@ const StructuralEngineerDashboard = () => {
       </div>
 
       {/* ── ACTIVITY ──────────────────────────────────────────────────── */}
-      <div className="se-activity-box">
+      <div
+        className="se-activity-box"
+        onClick={() => navigate("/structural-engineer/daily-updates")}
+        style={{ cursor: "pointer" }}
+      >
         <h2>Recent Activity</h2>
         <ul>
-          <li>📄 New drawing uploaded</li>
-          <li>⚠️ Beam issue detected</li>
-          <li>🔔 Approval pending</li>
+          {activity?.map((item, i) => (
+            <li key={i}>
+              {item.type === "drawing" ? "📄" : "⚠️"} {item.text}
+            </li>
+          ))}
         </ul>
       </div>
     </div>

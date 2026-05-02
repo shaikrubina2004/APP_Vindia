@@ -120,7 +120,7 @@ try {
   /* ── Structural Engineer Modules ───────────────── */
   app.use("/api/structural", structuralRoutes);
   app.use("/api/se-daily-reports", seDailyRoutes); // ✅ SE route
-  app.use("/rfis", rfiRoutes);
+app.use("/api/rfis", rfiRoutes);   // ← changed from /rfis to /api/rfis
 // ✅ Use the import from the top of the file
 app.use("/api/se-notifications", seNotificationRoutes);  /* ── QS Modules ───────────────── */
   app.use("/api/qs", qsRoutes);

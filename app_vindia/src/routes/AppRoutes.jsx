@@ -64,7 +64,10 @@ import SafetyOfficerDashboard from "../pages/Safety Officer/SafetyOfficerDashboa
 
 /* STRUCTURAL */
 import StructuralRoutes from "./StructuralRoutes";
-import RFIDetails from "../pages/Structural Engineer/RFIDetails";
+import StructuralEngineerLayout  from "../layouts/StructuralEngineerLayout";
+import RFIDetails       from "../pages/Structural Engineer/RFIDetails";
+import RFIPage          from "../pages/Structural Engineer/RFI";
+import RFIDetailPage    from "../pages/Structural Engineer/RFIDetails";
 
 /* ARCHITECT */
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
@@ -478,7 +481,23 @@ const AppRoutes = () => {
       {/* SHARED DRAWING PAGE — Structural */}
 
       <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
-      <Route path="/structural-engineer/rfi/:id" element={<RFIDetails />} />
+      <Route path="/rfi/:id" element={<RFIDetailPage />} />
+      <Route
+        path="/structural-engineer/rfi"
+        element={
+          <StructuralEngineerLayout>
+            <RFIPage />
+          </StructuralEngineerLayout>
+        }
+      />
+      <Route
+        path="/structural-engineer/rfi/:id"
+        element={
+          <StructuralEngineerLayout>
+            <RFIDetailPage />
+          </StructuralEngineerLayout>
+        }
+      />
 
       {/* ARCHITECT */}
       {/* SHARED DRAWING PAGE — Architect */}
