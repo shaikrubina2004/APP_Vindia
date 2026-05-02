@@ -9,6 +9,8 @@ import RFIDetailPage from "../pages/StructuralEngineer/RFIDetails";
 import SEDailyUpdates from "../pages/StructuralEngineer/SEDailyUpdates";
 import AppShell from "../components/incidents/AppShell";
 import SharedDrawingPage from "../components/project/SharedDrawingPage";
+import MEPUpload from "../pages/MEP Engineer/MEPUploads";
+import MEPCoordination from "../pages/MEP Engineer/MEPCoordination";
 
 function StructuralRoutes() {
   return (
@@ -26,6 +28,8 @@ function StructuralRoutes() {
         <Route path="incidents" element={<AppShell />} />
         <Route path="daily-updates" element={<SEDailyUpdates />} />
         <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="coordination" element={<MEPCoordination />} />
+        <Route path="upload" element={<MEPUpload />} />
       </Route>
     </Routes>
   );
