@@ -62,7 +62,7 @@ const seNotificationRoutes = require("./routes/seNotificationRoutes");
 const qsRoutes = require("./routes/qsRoutes");
 const boqRoutes = require("./routes/boqRoutes");
 const costReportRoutes = require("./routes/costReportRoutes");
-const quantityReportRoutes = require("./routes/quantityReportRoutes");
+const quantityReportRoutes = require("./routes/Quantityreportroutes js");
 
 /* ── BDA / Leads ───────────────────────────────────────── */
 const leadRoutes = require("./routes/leadRoutes");
@@ -126,11 +126,13 @@ try {
   app.use("/api/se-daily-reports", seDailyRoutes); // ✅ SE route
 app.use("/api/rfis", rfiRoutes);   // ← changed from /rfis to /api/rfis
 // ✅ Use the import from the top of the file
-app.use("/api/se-notifications", seNotificationRoutes);  /* ── QS Modules ───────────────── */
+app.use("/api/se-notifications", seNotificationRoutes);  
+/* ── QS Modules ───────────────── */
   app.use("/api/qs", qsRoutes);
   app.use("/api/qs", qsRoutes);
  app.use("/api/boq", boqRoutes);
  app.use("/api/cost-report", costReportRoutes);
+
  app.use("/api/quantity-report", quantityReportRoutes);
   /* ── Other Modules ───────────────── */
   app.use("/api/timesheets", timesheetRoutes);

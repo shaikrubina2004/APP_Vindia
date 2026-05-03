@@ -1,55 +1,42 @@
 import React, { useState, useEffect, useCallback } from "react";
 import "./Qsquantityreport.css";
 
-// ── API endpoints ──────────────────────────────────────────────
 const BOQ_API = "/api/boq";
 const QR_API  = "/api/quantity-report";
 
-// ── Status config ──────────────────────────────────────────────
 const STATUS = {
   pending_se: { label: "Awaiting SE Approval", color: "blue",  icon: "⏳" },
   approved:   { label: "Approved by SE",        color: "green", icon: "✅" },
   rejected:   { label: "Changes Requested",     color: "red",   icon: "↩️" },
 };
 
-// ── Component ──────────────────────────────────────────────────
 export default function Qsquantityreport() {
-
-  // ── UI state ──
-  const [tab,        setTab]        = useState("create");
-  const [toast,      setToast]      = useState(null);
-  const [loading,    setLoading]    = useState(false);
-  const [apiError,   setApiError]   = useState(null);
-
-  // ── Dropdown data ──
-  const [projects,   setProjects]   = useState([]);
-  const [milestones, setMilestones] = useState([]);
-
-  // ── Form ──
-  const [project,    setProject]    = useState("");
-  const [milestone,  setMilestone]  = useState("");
-  const [sourceBoq,  setSourceBoq]  = useState(null);
-  const [boqLoading, setBoqLoading] = useState(false);
-  const [editingId,  setEditingId]  = useState(null);
-
-  // ── List ──
-  const [reports,        setReports]        = useState([]);
+  const [tab,            setTab]           = useState("list");
+  const [toast,          setToast]         = useState(null);
+  const [apiError,       setApiError]      = useState(null);
+  const [projects,       setProjects]      = useState([]);
+  const [reports,        setReports]       = useState([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [filterProject,  setFilterProject]  = useState("");
   const [filterStatus,   setFilterStatus]   = useState("");
+  const [filterFrom,     setFilterFrom]     = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 7);
+    return d.toISOString().split("T")[0];
+  });
+  const [filterTo,       setFilterTo]       = useState(() => new Date().toISOString().split("T")[0]);
+  const [viewingReport,  setViewingReport]  = useState(null);
+  const [rejectModal,    setRejectModal]    = useState(null); // { id } when open
+  const [rejectComment,  setRejectComment]  = useState("");
 
-  // ── Detail ──
-  const [viewingReport, setViewingReport] = useState(null);
-
-  // ── Notify ──
   const notify = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  //  FETCH — Projects
-  // ═══════════════════════════════════════════════════════════════
+  const totalQty = (items) =>
+    (items || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
+
+  // ── Fetch projects ──
   useEffect(() => {
     (async () => {
       try {
@@ -63,55 +50,7 @@ export default function Qsquantityreport() {
     })();
   }, []);
 
-  // ═══════════════════════════════════════════════════════════════
-  //  FETCH — Milestones when project changes
-  // ═══════════════════════════════════════════════════════════════
-  useEffect(() => {
-    if (!project) { setMilestones([]); setMilestone(""); setSourceBoq(null); return; }
-    (async () => {
-      try {
-        const res  = await fetch(`${BOQ_API}/milestones/${project}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed");
-        setMilestones(data);
-        setMilestone("");
-        setSourceBoq(null);
-      } catch (err) {
-        notify("Could not load milestones: " + err.message, "error");
-        setMilestones([]);
-      }
-    })();
-  }, [project]);
-
-  // ═══════════════════════════════════════════════════════════════
-  //  FETCH — BOQ with status=pending_se when milestone changes
-  // ═══════════════════════════════════════════════════════════════
-  useEffect(() => {
-    if (!project || !milestone) { setSourceBoq(null); return; }
-    (async () => {
-      setBoqLoading(true);
-      setSourceBoq(null);
-      try {
-        const res  = await fetch(
-          `${BOQ_API}?projectId=${project}&status=pending_se`
-        );
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed");
-        const matched = data.find(
-          (b) => String(b.milestoneId) === String(milestone)
-        );
-        setSourceBoq(matched || null);
-      } catch (err) {
-        notify("Could not load BOQ: " + err.message, "error");
-      } finally {
-        setBoqLoading(false);
-      }
-    })();
-  }, [project, milestone]);
-
-  // ═══════════════════════════════════════════════════════════════
-  //  FETCH — Quantity Reports list
-  // ═══════════════════════════════════════════════════════════════
+  // ── Fetch reports ──
   const fetchReports = useCallback(async () => {
     setReportsLoading(true);
     try {
@@ -129,131 +68,67 @@ export default function Qsquantityreport() {
     }
   }, [filterProject, filterStatus]);
 
-  useEffect(() => {
-    if (tab === "list") fetchReports();
-  }, [tab, fetchReports]);
+  useEffect(() => { fetchReports(); }, [fetchReports]);
 
-  // ═══════════════════════════════════════════════════════════════
-  //  SUBMIT — Create / Resubmit Quantity Report
-  // ═══════════════════════════════════════════════════════════════
-  const handleSubmit = async () => {
-    if (!project)   return notify("Please select a project.", "error");
-    if (!milestone) return notify("Please select a milestone.", "error");
-    if (!sourceBoq) return notify("No BOQ pending SE approval found for this milestone.", "error");
-
-    const milestoneObj = milestones.find((m) => String(m.id) === String(milestone));
-    const projectObj   = projects.find((p) => String(p.id) === String(project));
-
-    // Only include material, unit, quantity — NO prices
-    const payload = {
-      projectId:     parseInt(project),
-      projectName:   projectObj?.name,
-      milestoneId:   milestoneObj?.id,
-      milestoneName: milestoneObj?.name,
-      boqId:         sourceBoq.id,
-      items: sourceBoq.rows.map((r) => ({
-        material: r.material,
-        unit:     r.unit,
-        quantity: parseFloat(r.quantity),
-      })),
-      totalItems: sourceBoq.rows?.length || 0,
-    };
-
-    setLoading(true);
+  // ── SE Approve ──
+  const seApprove = async (id) => {
     try {
-      let res, data;
-      if (editingId) {
-        res  = await fetch(`${QR_API}/${editingId}`, {
-          method:  "PUT",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(payload),
-        });
-        data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to update");
-        notify("Quantity Report resubmitted to SE ✓");
-        setEditingId(null);
-      } else {
-        res  = await fetch(QR_API, {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(payload),
-        });
-        data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to create");
-        notify("Quantity Report created & sent to Site Engineer ✓");
-      }
-      setProject("");
-      setMilestone("");
-      setSourceBoq(null);
-      setTab("list");
-    } catch (err) {
-      notify(err.message, "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ═══════════════════════════════════════════════════════════════
-  //  EDIT
-  // ═══════════════════════════════════════════════════════════════
-  const handleEdit = (report) => {
-    setProject(String(report.projectId));
-    setMilestone(String(report.milestoneId));
-    setEditingId(report.id);
-    setTab("create");
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setProject("");
-    setMilestone("");
-    setSourceBoq(null);
-  };
-
-  // ═══════════════════════════════════════════════════════════════
-  //  SE ACTIONS
-  // ═══════════════════════════════════════════════════════════════
-  const seAction = async (id, action, comment = "") => {
-    try {
-      const res  = await fetch(`${QR_API}/${action}/${id}`, {
-        method:  "PUT",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ comment }),
+      const res  = await fetch(`${QR_API}/approve/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}",
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      notify(action === "approve" ? "SE approved ✅" : "SE requested changes ↩️");
+      notify("SE approved ✅ — BOQ finalised and sent to Site Engineer!");
       fetchReports();
       if (viewingReport?.id === id) {
         const r = await fetch(`${QR_API}/${id}`);
         setViewingReport(await r.json());
       }
-    } catch (err) {
-      notify(err.message, "error");
-    }
+    } catch (err) { notify(err.message, "error"); }
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  //  DETAIL VIEW
-  // ═══════════════════════════════════════════════════════════════
+  // ── SE Reject — opens comment modal ──
+  const openRejectModal = (id) => {
+    setRejectComment("");
+    setRejectModal({ id });
+  };
+
+  const submitReject = async () => {
+    if (!rejectModal) return;
+    const id = rejectModal.id;
+    try {
+      const res  = await fetch(`${QR_API}/reject/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comment: rejectComment.trim() || "Please revise the quantities." }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      notify("Changes requested ↩️ — BOQ rejected, QS must edit and resubmit");
+      setRejectModal(null);
+      setRejectComment("");
+      fetchReports();
+      if (viewingReport?.id === id) {
+        const r = await fetch(`${QR_API}/${id}`);
+        setViewingReport(await r.json());
+      }
+    } catch (err) { notify(err.message, "error"); }
+  };
+
+  // ── Open detail ──
   const openDetail = async (report) => {
     setTab("detail");
     try {
       const res  = await fetch(`${QR_API}/${report.id}`);
       const data = await res.json();
       setViewingReport(res.ok ? data : report);
-    } catch (_) {
-      setViewingReport(report);
-    }
+    } catch (_) { setViewingReport(report); }
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  //  EXPORT CSV
-  // ═══════════════════════════════════════════════════════════════
+  // ── Export CSV ──
   const exportCSV = (report) => {
     const lines = [
       `Quantity Report — ${report.projectName} · ${report.milestoneName}`,
-      `Generated: ${new Date().toLocaleDateString("en-IN")}  |  BOQ Ref: #${report.boqId}`,
+      `Generated: ${new Date().toLocaleDateString("en-IN")} | BOQ Ref: #${report.boqId}`,
       "",
       ["#", "Material / Item", "Unit", "Quantity"].join(","),
       ...(report.items || []).map((item, i) =>
@@ -267,33 +142,56 @@ export default function Qsquantityreport() {
     a.click();
   };
 
-  // ── Helpers ──
-  const totalQty = (items) =>
-    (items || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
 
+  // ── Safe date parser — handles "02 May 2026" format ──
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    // Handle "DD MMM YYYY" format e.g. "02 May 2026"
+    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const parts = dateStr.split(" ");
+    if (parts.length === 3 && months[parts[1]] !== undefined) {
+      return new Date(parseInt(parts[2]), months[parts[1]], parseInt(parts[0]));
+    }
+    // Fallback: ISO string
+    const d = new Date(dateStr);
+    return isNaN(d) ? null : d;
+  };
+
+  const setRange = (days) => {
+    const to = new Date(); const from = new Date();
+    from.setDate(from.getDate() - days);
+    setFilterFrom(from.toISOString().split("T")[0]);
+    setFilterTo(to.toISOString().split("T")[0]);
+  };
   const filtered = reports.filter((r) => {
     if (filterProject && String(r.projectId) !== String(filterProject)) return false;
     if (filterStatus  && r.status !== filterStatus)                      return false;
+    if (filterFrom || filterTo) {
+      const d = parseDate(r.createdDate);
+      if (d) {
+        if (filterFrom) {
+          const [fy,fm,fd] = filterFrom.split("-").map(Number);
+          if (d < new Date(fy, fm-1, fd, 0,0,0,0)) return false;
+        }
+        if (filterTo) {
+          const [ty,tm,td] = filterTo.split("-").map(Number);
+          if (d > new Date(ty, tm-1, td, 23,59,59,999)) return false;
+        }
+      }
+    }
     return true;
   });
 
-  // ═══════════════════════════════════════════════════════════════
-  //  RENDER
-  // ═══════════════════════════════════════════════════════════════
   return (
     <div className="qr">
-      {toast && (
-        <div className={`qr__toast qr__toast--${toast.type}`}>{toast.msg}</div>
-      )}
+      {toast && <div className={`qr__toast qr__toast--${toast.type}`}>{toast.msg}</div>}
 
       {/* ── HEADER ── */}
       <div className="qr__header">
         <div className="qr__header-left">
           {tab === "detail" ? (
             <button className="qr__back-btn"
-              onClick={() => { setViewingReport(null); setTab("list"); }}>
-              ← Back
-            </button>
+              onClick={() => { setViewingReport(null); setTab("list"); }}>← Back</button>
           ) : (
             <div className="qr__header-icon">📐</div>
           )}
@@ -306,23 +204,12 @@ export default function Qsquantityreport() {
             <p className="qr__subtitle">Quantity Surveyor · Quantity Management</p>
           </div>
         </div>
-
         {tab !== "detail" && (
           <div className="qr__tabs">
-            <button
-              className={`qr__tab ${tab === "create" ? "active" : ""}`}
-              onClick={() => { cancelEdit(); setTab("create"); }}
-            >
-              {editingId ? "✏️ Editing Report" : "+ New Quantity Report"}
-            </button>
-            <button
-              className={`qr__tab ${tab === "list" ? "active" : ""}`}
-              onClick={() => setTab("list")}
-            >
+            <button className={`qr__tab ${tab === "list" ? "active" : ""}`}
+              onClick={() => setTab("list")}>
               All Reports
-              {reports.length > 0 && (
-                <span className="qr__badge">{reports.length}</span>
-              )}
+              {reports.length > 0 && <span className="qr__badge">{reports.length}</span>}
             </button>
           </div>
         )}
@@ -330,31 +217,25 @@ export default function Qsquantityreport() {
 
       {/* ── FLOW BANNER ── */}
       <div className="qr__flow-bar">
-        {[
-          "Select Milestone",
-          "BOQ Auto-Loaded",
-          "Review Quantities",
-          "Submit to SE",
-          "SE Approves",
-        ].map((s, i, arr) => (
-          <React.Fragment key={i}>
-            <div className="qr__flow-step">
-              <span className="qr__flow-dot">{i + 1}</span>
-              <span className="qr__flow-label">{s}</span>
-            </div>
-            {i < arr.length - 1 && <span className="qr__flow-arrow">›</span>}
-          </React.Fragment>
-        ))}
+        {["PM Approved Cost Report", "Qty Report Auto-Created", "Sent to SE", "SE Approves / Rejects", "BOQ Finalised"].map(
+          (s, i, arr) => (
+            <React.Fragment key={i}>
+              <div className="qr__flow-step">
+                <span className="qr__flow-dot">{i + 1}</span>
+                <span className="qr__flow-label">{s}</span>
+              </div>
+              {i < arr.length - 1 && <span className="qr__flow-arrow">›</span>}
+            </React.Fragment>
+          )
+        )}
       </div>
 
-      {/* ── BOQ Finalisation info bar ── */}
+      {/* ── Info bar ── */}
       <div className="qr__info-bar">
-        <span className="qr__info-icon">ℹ️</span>
+        <span>ℹ️</span>
         <span>
-          BOQ is <strong>finalised</strong> only when both
-          <span className="qr__info-tag qr__info-tag--pm">PM approves Cost Report</span>
-          and
-          <span className="qr__info-tag qr__info-tag--se">SE approves Quantity Report</span>
+          Quantity Reports contain <strong>quantities only</strong> — no pricing visible to SE.
+          BOQ is finalised when SE approves this report.
         </span>
       </div>
 
@@ -362,339 +243,116 @@ export default function Qsquantityreport() {
 
       <div className="qr__body">
 
-        {/* ══════════════════════════════════════
-            CREATE TAB
-        ══════════════════════════════════════ */}
-        {tab === "create" && (
-          <>
-            {editingId && (
-              <div className="qr__edit-banner">
-                <span>✏️ Editing Quantity Report — on resubmit it will go to SE for re-approval.</span>
-                <button className="qr__cancel-btn"
-                  onClick={() => { cancelEdit(); setTab("list"); }}>✕ Cancel</button>
-              </div>
-            )}
-
-            {/* Step 1 — Project & Milestone */}
-            <div className="qr__block">
-              <div className="qr__block-label">
-                <span className="qr__num">1</span>
-                Select Project &amp; Milestone
-              </div>
-              <div className="qr__selectors">
-                <div className="qr__sel-group">
-                  <label className="qr__sel-label">Project</label>
-                  <select
-                    className="qr__select"
-                    value={project}
-                    onChange={(e) => setProject(e.target.value)}
-                    disabled={projects.length === 0}
-                  >
-                    <option value="">
-                      {projects.length === 0 ? "Loading projects…" : "— Choose project —"}
-                    </option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="qr__sel-group">
-                  <label className="qr__sel-label">Milestone (WBS)</label>
-                  <select
-                    className="qr__select"
-                    value={milestone}
-                    onChange={(e) => setMilestone(e.target.value)}
-                    disabled={!project || milestones.length === 0}
-                  >
-                    <option value="">
-                      {!project
-                        ? "— Select project first —"
-                        : milestones.length === 0
-                        ? "No milestones found"
-                        : "— Choose milestone —"}
-                    </option>
-                    {milestones.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.code ? `${m.code} · ` : ""}{m.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {project && milestone && (() => {
-                const proj = projects.find((p) => String(p.id) === String(project));
-                const ms   = milestones.find((m) => String(m.id) === String(milestone));
-                return proj && ms ? (
-                  <div className="qr__proj-tag">
-                    📌 {proj.name} &nbsp;·&nbsp; 🏗️ {ms.name}
-                  </div>
-                ) : null;
-              })()}
-            </div>
-
-            {/* Step 2 — Quantity Breakdown */}
-            <div className="qr__block">
-              <div className="qr__block-label">
-                <span className="qr__num">2</span>
-                Quantity Breakdown
-                <span className="qr__auto-tag">⚡ Auto-loaded from BOQ</span>
-              </div>
-
-              {!project || !milestone ? (
-                <div className="qr__hint">
-                  👆 Select a project and milestone above to load the BOQ quantity data.
-                </div>
-              ) : boqLoading ? (
-                <div className="qr__loading">
-                  <div className="qr__spinner" /> Loading BOQ data…
-                </div>
-              ) : !sourceBoq ? (
-                <div className="qr__no-boq">
-                  <span>⚠️</span>
-                  <div>
-                    <strong>No BOQ found awaiting SE approval</strong> for this milestone.
-                    <p>Only BOQs that have been approved by the PM (pending SE approval) can be used. Please ensure the PM has approved the Cost Report first.</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* BOQ Source card */}
-                  <div className="qr__boq-source">
-                    <div className="qr__boq-source-left">
-                      <span className="qr__boq-source-icon">🔗</span>
-                      <div>
-                        <div className="qr__boq-source-title">
-                          Linked BOQ #{sourceBoq.id}
-                        </div>
-                        <div className="qr__boq-source-meta">
-                          {sourceBoq.projectName} · {sourceBoq.milestoneName}
-                          &nbsp;·&nbsp; {sourceBoq.rows?.length || 0} line items
-                          &nbsp;·&nbsp; Submitted {sourceBoq.date}
-                        </div>
-                      </div>
-                    </div>
-                    <span className="qr__pending-badge">⏳ Awaiting SE Approval</span>
-                  </div>
-
-                  {/* Quantity table — NO prices */}
-                  <div className="qr__table-scroll">
-                    <table className="qr__table">
-                      <colgroup>
-                        <col style={{width:"50px"}} />
-                        <col />
-                        <col style={{width:"100px"}} />
-                        <col style={{width:"140px"}} />
-                        <col style={{width:"80px"}} />
-                      </colgroup>
-                      <thead>
-                        <tr>
-                          <th>#</th>
-                          <th>Material / Item</th>
-                          <th>Unit</th>
-                          <th>Quantity</th>
-                          <th>% Share</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sourceBoq.rows?.map((row, i) => {
-                          const qty      = parseFloat(row.quantity) || 0;
-                          const total    = totalQty(sourceBoq.rows);
-                          const share    = total ? ((qty / total) * 100).toFixed(1) : "0.0";
-                          return (
-                            <tr key={row.id || i}>
-                              <td className="qr-num">{i + 1}</td>
-                              <td className="qr-material">{row.material}</td>
-                              <td className="qr-center">{row.unit}</td>
-                              <td className="qr-qty">
-                                {qty.toLocaleString("en-IN")}
-                              </td>
-                              <td className="qr-pct">
-                                <div className="qr-pct-wrap">
-                                  <span>{share}%</span>
-                                  <div className="qr-pct-bar">
-                                    <div className="qr-pct-fill"
-                                      style={{width: `${share}%`}} />
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot>
-                        <tr>
-                          <td colSpan={3} className="qr-tfoot-lbl">Total Line Items</td>
-                          <td className="qr-tfoot-val">
-                            {sourceBoq.rows?.length || 0} items
-                          </td>
-                          <td className="qr-tfoot-pct">100%</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Step 3 — Summary + Submit */}
-            {sourceBoq && (
-              <div className="qr__footer-row">
-                <div className="qr__summary-pills">
-                  <div className="qr__pill">
-                    <span className="qr__pill-lbl">Line Items</span>
-                    <span className="qr__pill-val">{sourceBoq.rows?.length || 0}</span>
-                  </div>
-                  <div className="qr__pill qr__pill--highlight">
-                    <span className="qr__pill-lbl">Total Quantity</span>
-                    <span className="qr__pill-val">
-                      {totalQty(sourceBoq.rows).toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                  <div className="qr__pill">
-                    <span className="qr__pill-lbl">BOQ Ref</span>
-                    <span className="qr__pill-val">#{sourceBoq.id}</span>
-                  </div>
-                  <div className="qr__pill qr__pill--note">
-                    <span className="qr__pill-lbl">Note</span>
-                    <span className="qr__pill-val qr__pill-val--sm">No prices shown</span>
-                  </div>
-                </div>
-                <button
-                  className="qr__submit-btn"
-                  onClick={handleSubmit}
-                  disabled={loading}
-                >
-                  {loading
-                    ? "Submitting…"
-                    : editingId
-                    ? "Resubmit to SE →"
-                    : "Submit Quantity Report to SE →"}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ══════════════════════════════════════
-            LIST TAB
-        ══════════════════════════════════════ */}
+        {/* ══════ LIST TAB ══════ */}
         {tab === "list" && (
           <>
             <div className="qr__view-head">
               <h2 className="qr__view-h">All Quantity Reports</h2>
+            </div>
+            <div className="qr__filter-bar">
+              <div className="qr__range-btns">
+                <span className="qr__range-label">📅 Show:</span>
+                {[{l:"Today",d:0},{l:"1 Week",d:7},{l:"1 Month",d:30},{l:"3 Months",d:90}].map(({l,d}) => {
+                  const from = new Date(); from.setDate(from.getDate()-d);
+                  const isActive = filterFrom===from.toISOString().split("T")[0] && filterTo===new Date().toISOString().split("T")[0];
+                  return <button key={l} className={`qr__range-btn ${isActive?"active":""}`} onClick={()=>setRange(d)}>{l}</button>;
+                })}
+                <button className="qr__range-btn" onClick={()=>{setFilterFrom("");setFilterTo("");}}>All Time</button>
+              </div>
+              <div className="qr__date-range">
+                <span className="qr__date-range-label">From</span>
+                <input type="date" className="qr__date-input" value={filterFrom} onChange={(e)=>setFilterFrom(e.target.value)} />
+                <span className="qr__date-range-label">To</span>
+                <input type="date" className="qr__date-input" value={filterTo} onChange={(e)=>setFilterTo(e.target.value)} />
+              </div>
               <div className="qr__filters">
-                <select className="qr__select qr__select--sm"
-                  value={filterProject}
-                  onChange={(e) => setFilterProject(e.target.value)}>
+                <select className="qr__select qr__select--sm" value={filterProject} onChange={(e)=>setFilterProject(e.target.value)}>
                   <option value="">All Projects</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
+                  {projects.map((p)=><option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <select className="qr__select qr__select--sm"
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}>
+                <select className="qr__select qr__select--sm" value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)}>
                   <option value="">All Statuses</option>
-                  {Object.entries(STATUS).map(([k, v]) => (
-                    <option key={k} value={k}>{v.label}</option>
-                  ))}
+                  {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
             </div>
 
             {reportsLoading ? (
-              <div className="qr__loading">
-                <div className="qr__spinner" /> Loading reports…
-              </div>
+              <div className="qr__loading"><div className="qr__spinner" /> Loading…</div>
             ) : filtered.length === 0 ? (
               <div className="qr__empty">
                 <span>📐</span>
                 <p>No quantity reports yet.</p>
-                <button className="qr__ghost-btn" onClick={() => setTab("create")}>
-                  Create your first report →
-                </button>
+                <p className="qr__empty-hint">
+                  Quantity reports are auto-created when you click "Create Qty Report" in the BOQ page after PM approves the Cost Report.
+                </p>
               </div>
             ) : (
-              <div className="qr__list-table-wrap">
-                <table className="qr__list-table">
-                  <thead>
-                    <tr>
-                      <th>Project</th>
-                      <th>Milestone</th>
-                      <th>BOQ Ref</th>
-                      <th>Items</th>
-                      <th>Created</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((r) => {
-                      const st      = STATUS[r.status] || STATUS.pending_se;
-                      const canEdit = ["rejected", "pending_se"].includes(r.status);
-                      return (
-                        <tr key={r.id} className="qr__list-row">
-                          <td className="qr__list-proj">{r.projectName}</td>
-                          <td>
-                            <span className="qr__milestone-tag">🏗️ {r.milestoneName}</span>
-                          </td>
-                          <td className="qr__list-boqref">#{r.boqId}</td>
-                          <td className="qr__list-items">
+              <div className="qr__cards-list">
+                {filtered.map((r) => {
+                  const st = STATUS[r.status] || STATUS.pending_se;
+                  return (
+                    <div key={r.id} className={`qr__card qr__card--${st.color}`}>
+                      <div className="qr__card-top">
+                        <div>
+                          <div className="qr__card-proj">{r.projectName}</div>
+                          <div className="qr__card-meta">
+                            🏗️ {r.milestoneName} &nbsp;·&nbsp;
+                            BOQ #{r.boqId} &nbsp;·&nbsp;
+                            📅 {r.createdDate}
+                            {r.updatedDate && <span> · Updated {r.updatedDate}</span>}
+                          </div>
+                        </div>
+                        <div className="qr__card-right">
+                          <div className="qr__card-items">
                             {r.totalItems || r.items?.length || 0} items
-                          </td>
-                          <td className="qr__list-date">
-                            {r.createdDate}
-                            {r.updatedDate && (
-                              <><br />
-                                <span className="qr__updated">Updated {r.updatedDate}</span>
-                              </>
-                            )}
-                          </td>
-                          <td>
-                            <span className={`qr__status-badge qr__status--${st.color}`}>
-                              {st.icon} {st.label}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="qr__list-actions">
-                              <button className="qr__view-btn"
-                                onClick={() => openDetail(r)}>👁 View</button>
-                              {canEdit && (
-                                <button className="qr__edit-btn"
-                                  onClick={() => handleEdit(r)}>✏️ Edit</button>
-                              )}
-                              {r.status === "pending_se" && (
-                                <>
-                                  <button className="qr__approve-btn"
-                                    onClick={() => seAction(r.id, "approve")}>✔ SE OK</button>
-                                  <button className="qr__reject-btn"
-                                    onClick={() => seAction(r.id, "reject", "Please revise quantities.")}>✘ Reject</button>
-                                </>
-                              )}
-                              {r.status === "approved" && (
-                                <button className="qr__export-btn"
-                                  onClick={() => exportCSV(r)}>⬇ CSV</button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </div>
+                          <span className={`qr__status-badge qr__status--${st.color}`}>
+                            {st.icon} {st.label}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* SE comment if rejected */}
+                      {r.status === "rejected" && r.seComment && (
+                        <div className="qr__card-comment">
+                          <strong>💬 SE:</strong> {r.seComment}
+                        </div>
+                      )}
+
+                      <div className="qr__card-actions">
+                        <button className="qr__view-btn" onClick={() => openDetail(r)}>
+                          👁 View Report
+                        </button>
+                        {r.status === "pending_se" && (
+                          <>
+                            <button className="qr__approve-btn" onClick={() => seApprove(r.id)}>
+                              ✔ SE Approve
+                            </button>
+                            <button className="qr__reject-btn"
+                              onClick={() => openRejectModal(r.id)}>
+                              ✘ SE Reject
+                            </button>
+                          </>
+                        )}
+                        {r.status === "approved" && (
+                          <button className="qr__export-btn" onClick={() => exportCSV(r)}>
+                            ⬇ Export CSV
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </>
         )}
 
-        {/* ══════════════════════════════════════
-            DETAIL TAB
-        ══════════════════════════════════════ */}
+        {/* ══════ DETAIL TAB ══════ */}
         {tab === "detail" && viewingReport && (() => {
-          const r  = viewingReport;
-          const st = STATUS[r.status] || STATUS.pending_se;
+          const r     = viewingReport;
+          const st    = STATUS[r.status] || STATUS.pending_se;
           const total = totalQty(r.items);
 
           return (
@@ -714,23 +372,21 @@ export default function Qsquantityreport() {
                     <span className="qr__detail-infolbl">{item.label}</span>
                     {item.badge
                       ? <span className={`qr__status-badge qr__status--${st.color}`}>{st.icon} {st.label}</span>
-                      : <span className="qr__detail-infoval">{item.value}</span>
-                    }
+                      : <span className="qr__detail-infoval">{item.value}</span>}
                   </div>
                 ))}
               </div>
 
-              {/* No-price notice */}
+              {/* No price notice */}
               <div className="qr__no-price-notice">
-                🔒 This report contains <strong>quantities only</strong> — no cost or pricing data is visible to the Site Engineer.
+                🔒 This report contains <strong>quantities only</strong> — no pricing is visible to the Site Engineer.
               </div>
 
               {/* SE rejection note */}
               {r.status === "rejected" && r.seComment && (
                 <div className="qr__note">
                   <strong>💬 SE Comment:</strong> {r.seComment}
-                  <button className="qr__edit-inline"
-                    onClick={() => handleEdit(r)}>✏️ Edit &amp; Resubmit</button>
+                  <span className="qr__note-hint">Go to BOQ page → Edit BOQ → Resubmit</span>
                 </div>
               )}
 
@@ -739,11 +395,9 @@ export default function Qsquantityreport() {
                 <div className="qr__approved-banner">
                   <span className="qr__approved-icon">✅</span>
                   <div>
-                    <div className="qr__approved-title">
-                      Quantity Report Approved by Site Engineer
-                    </div>
+                    <div className="qr__approved-title">Approved by Site Engineer</div>
                     <div className="qr__approved-sub">
-                      Quantities have been verified. Awaiting Cost Report approval by PM to finalise BOQ.
+                      BOQ is now finalised and sent to Site Engineer.
                     </div>
                   </div>
                   <button className="qr__export-btn qr__export-btn--lg"
@@ -758,24 +412,10 @@ export default function Qsquantityreport() {
                 </div>
                 <div className="qr__approval-track">
                   {[
-                    {
-                      label:   "QS Created Report",
-                      done:    ["pending_se","approved","rejected"].includes(r.status),
-                    },
-                    {
-                      label:   "Sent to SE",
-                      done:    ["pending_se","approved","rejected"].includes(r.status),
-                      current: r.status === "pending_se",
-                    },
-                    {
-                      label:   "SE Approved",
-                      done:    r.status === "approved",
-                      current: r.status === "pending_se",
-                    },
-                    {
-                      label:   "BOQ Finalised\n(with Cost Report)",
-                      done:    r.status === "approved",
-                    },
+                    { label: "Qty Report Created",  done: true },
+                    { label: "Sent to SE",           done: ["pending_se","approved","rejected"].includes(r.status), current: r.status === "pending_se" },
+                    { label: "SE Approved",          done: r.status === "approved", current: r.status === "pending_se" },
+                    { label: "BOQ Finalised",        done: r.status === "approved" },
                   ].map((step, i, arr) => (
                     <React.Fragment key={i}>
                       <div className={`qr__ap-step ${step.done ? "done" : step.current ? "active" : ""}`}>
@@ -788,22 +428,20 @@ export default function Qsquantityreport() {
                 </div>
               </div>
 
-              {/* SE action buttons in detail */}
+              {/* SE action buttons */}
               {r.status === "pending_se" && (
                 <div className="qr__se-actions">
                   <span className="qr__se-actions-label">[ SE Actions ]</span>
                   <button className="qr__approve-btn qr__approve-btn--lg"
-                    onClick={() => seAction(r.id, "approve")}>
-                    ✔ Approve Quantity Report
-                  </button>
+                    onClick={() => seApprove(r.id)}>✔ Approve Quantity Report</button>
                   <button className="qr__reject-btn qr__reject-btn--lg"
-                    onClick={() => seAction(r.id, "reject", "Please revise quantities.")}>
+                    onClick={() => openRejectModal(r.id)}>
                     ✘ Request Changes
                   </button>
                 </div>
               )}
 
-              {/* Quantity table */}
+              {/* Quantity table — NO prices */}
               <div className="qr__block">
                 <div className="qr__block-label">
                   <span className="qr__num">📋</span>
@@ -814,19 +452,14 @@ export default function Qsquantityreport() {
                 <div className="qr__table-scroll">
                   <table className="qr__table">
                     <colgroup>
-                      <col style={{width:"50px"}} />
-                      <col />
-                      <col style={{width:"100px"}} />
-                      <col style={{width:"140px"}} />
+                      <col style={{width:"50px"}} /><col />
+                      <col style={{width:"100px"}} /><col style={{width:"140px"}} />
                       <col style={{width:"80px"}} />
                     </colgroup>
                     <thead>
                       <tr>
-                        <th>#</th>
-                        <th>Material / Item</th>
-                        <th>Unit</th>
-                        <th>Quantity</th>
-                        <th>% Share</th>
+                        <th>#</th><th>Material / Item</th><th>Unit</th>
+                        <th>Quantity</th><th>% Share</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -838,14 +471,12 @@ export default function Qsquantityreport() {
                             <td className="qr-num">{i + 1}</td>
                             <td className="qr-material"><strong>{item.material}</strong></td>
                             <td className="qr-center">{item.unit}</td>
-                            <td className="qr-qty">
-                              {qty.toLocaleString("en-IN")}
-                            </td>
+                            <td className="qr-qty">{qty.toLocaleString("en-IN")}</td>
                             <td className="qr-pct">
                               <div className="qr-pct-wrap">
                                 <span>{share}%</span>
                                 <div className="qr-pct-bar">
-                                  <div className="qr-pct-fill" style={{width: `${share}%`}} />
+                                  <div className="qr-pct-fill" style={{width:`${share}%`}} />
                                 </div>
                               </div>
                             </td>
@@ -876,38 +507,53 @@ export default function Qsquantityreport() {
                     {totalQty(r.items).toLocaleString("en-IN")}
                   </span>
                 </div>
-                <div className="qr__sum-card">
-                  <span className="qr__sum-lbl">Highest Qty Item</span>
-                  <span className="qr__sum-val">
-                    {(r.items || []).reduce(
-                      (a, b) => parseFloat(b.quantity) > parseFloat(a.quantity) ? b : a,
-                      r.items?.[0] || {}
-                    )?.material || "—"}
-                  </span>
-                </div>
                 <div className="qr__sum-card qr__sum-card--locked">
                   <span className="qr__sum-lbl">Pricing</span>
-                  <span className="qr__sum-val">🔒 Hidden</span>
+                  <span className="qr__sum-val">🔒 Hidden from SE</span>
                 </div>
               </div>
 
-              {/* Bottom actions */}
               <div className="qr__detail-actions">
                 <button className="qr__ghost-btn"
                   onClick={() => { setViewingReport(null); setTab("list"); }}>
                   ← Back to All Reports
                 </button>
-                {["rejected", "pending_se"].includes(r.status) && (
-                  <button className="qr__edit-btn qr__edit-btn--lg"
-                    onClick={() => handleEdit(r)}>✏️ Edit Report</button>
-                )}
               </div>
-
             </div>
           );
         })()}
-
       </div>
+    {/* ── REJECT COMMENT MODAL ── */}
+    {rejectModal && (
+      <div className="qr__modal-overlay">
+        <div className="qr__modal">
+          <div className="qr__modal-header">
+            <span className="qr__modal-icon">↩️</span>
+            <div>
+              <div className="qr__modal-title">Request Changes</div>
+              <div className="qr__modal-sub">Add a suggestion for the Quantity Surveyor</div>
+            </div>
+          </div>
+          <textarea
+            className="qr__modal-textarea"
+            placeholder="e.g. Please check the quantities for concrete and steel bars…"
+            value={rejectComment}
+            onChange={(e) => setRejectComment(e.target.value)}
+            rows={4}
+            autoFocus
+          />
+          <div className="qr__modal-actions">
+            <button className="qr__modal-cancel"
+              onClick={() => { setRejectModal(null); setRejectComment(""); }}>
+              Cancel
+            </button>
+            <button className="qr__modal-submit" onClick={submitReject}>
+              ✘ Send Rejection &amp; Suggestion
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
