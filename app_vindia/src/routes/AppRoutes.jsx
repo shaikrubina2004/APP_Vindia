@@ -80,7 +80,10 @@ import SiteEngineerLayout from "../layouts/SiteEngineerLayout";
 import QuantitySurveyorLayout from "../layouts/QuantitySurveyorLayout";
 import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
 import ArchitectLayout from "../layouts/ArchitectLayout";
+
+/* BDA */
 import BDALayout from "../layouts/BDALayout"; {/* ← ADDED */}
+import BDALeads from "../pages/business-development/business-development-analyst/BDALeads";
 
 /* COMMON */
 import Timesheet from "../pages/timesheet/Timesheet";
@@ -585,6 +588,12 @@ const AppRoutes = () => {
             </BDALayout>
           </ProtectedRoute>
         }
+      />
+       <Route path="/bda/leads" element={
+        <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
+          <BDALayout><BDALeads /></BDALayout>
+        </ProtectedRoute>
+      } 
       />
 
       {/* FALLBACK */}
