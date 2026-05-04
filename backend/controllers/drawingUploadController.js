@@ -99,11 +99,11 @@ exports.uploadDrawing = async (req, res) => {
 
     // Notify all other MEP engineers about new drawing
     try {
+      // ✅ new — notify all MEP engineers when anyone uploads a drawing
       const projectUsers = await pool.query(
         `SELECT u.id FROM users u
-         JOIN roles r ON r.id = u.role_id
-         WHERE r.code = 'mep_engineer' AND u.id != $1`,
-        [uploaded_by],
+   JOIN roles r ON r.id = u.role_id
+   WHERE r.code = 'mep_engineer'`,
       );
       for (const u of projectUsers.rows) {
         await insertMEPNotification(
