@@ -1,6 +1,5 @@
 const pool = require("../config/db");
 const { insertNotification } = require("./pcNotificationsController");
-const { createNotificationDirect } = require("./qsNotificationController"); // ← NEW
 
 /* ─── HELPERS ─────────────────────────────────────────────── */
 
@@ -36,6 +35,7 @@ async function getCoordinatorId(projectId) {
   } catch (_) { return null; }
 }
 
+/* Never crashes the main request flow */
 async function safeNotify(userId, type, title, description, link, severity, referenceId) {
   if (!userId) return;
   try {
@@ -203,17 +203,18 @@ exports.getIncidentById = async (req, res) => {
 };
 
 exports.createIncident = async (req, res) => {
+  // incidents table has NO project_id column
   const { title, description, priority = "P2", assigned_to_user_id } = req.body;
   const created_by = req.user?.id ?? null;
-
+ 
   console.log("🔔 createIncident payload:", { title, assigned_to_user_id, created_by });
-
+ 
   if (!title?.trim())
     return res.status(400).json({ success: false, message: "Title is required" });
-
+ 
   try {
     const deadline_at = calcDeadline(priority);
-
+ 
     let assignee_name = null, role_name = null;
     if (assigned_to_user_id) {
       const { rows } = await pool.query(
@@ -225,48 +226,44 @@ exports.createIncident = async (req, res) => {
       );
       if (rows.length) { assignee_name = rows[0].name; role_name = rows[0].role_name; }
     }
-
+ 
     const cols = ["title", "description", "priority", "assigned_to", "deadline_at"];
     const vals = [title.trim(), description ?? null, priority, assigned_to_user_id ?? null, deadline_at];
     if (created_by !== null) { cols.push("created_by"); vals.push(created_by); }
-
+ 
     const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
     const { rows } = await pool.query(
       `INSERT INTO incidents (${cols.join(", ")}) VALUES (${placeholders}) RETURNING *`,
       vals,
     );
-
+ 
     const newIncident = rows[0];
     const severity    = priority === "P1" ? "critical" : "warn";
-
+ 
     console.log("✅ Incident inserted:", newIncident.id, "assigned_to:", newIncident.assigned_to);
-
-    // ── PC Bell notification (assignee only) ──────────────────
+ 
+    // ── SINGLE notification rule ──────────────────────────────
+    // Only notify the ASSIGNEE.
+    // If you assign to yourself: 1 notification (as assignee).
+    // If someone else creates and assigns to you: 1 notification (as assignee).
+    // Creator gets NO notification — they know, they just created it.
     const assigneeId = parseInt(assigned_to_user_id, 10);
-    const creatorId  = created_by ? parseInt(created_by, 10) : null;
+const creatorId  = created_by ? parseInt(created_by, 10) : null;
+ 
+if (assigneeId && assigneeId !== creatorId) {
+  await safeNotify(
+    assigneeId,
+    "incident",
+    `New Incident Assigned — ${title.trim()}`,
+    `You have been assigned: ${title.trim()}`,
+    "/project-coordinator/incidents",
+    severity,
+    null
+  );
+}
 
-    if (assigneeId && assigneeId !== creatorId) {
-      await safeNotify(
-        assigneeId,
-        "incident",
-        `New Incident Assigned — ${title.trim()}`,
-        `You have been assigned: ${title.trim()}`,
-        "/project-coordinator/incidents",
-        severity,
-        null
-      );
-    }
-
-    // ── QS Bell notification ──────────────────────────────────
-    await createNotificationDirect({
-      type:         "Incident",
-      project_name: "",
-      milestone:    "",
-      title:        `New Incident: ${title.trim()}`,
-      message:      description ?? "",
-      status:       priority === "P1" ? "high" : "pending",
-    });
-
+    // ─────────────────────────────────────────────────────────
+ 
     res.status(201).json({ success: true, data: { ...newIncident, assignee_name, role_name } });
   } catch (err) {
     console.error("createIncident ERROR:", err.message);
@@ -277,52 +274,45 @@ exports.createIncident = async (req, res) => {
 exports.createStandaloneTask = async (req, res) => {
   const { title, note, priority = "P2", assigned_to_user_id, project_id } = req.body;
   const created_by = req.user?.id ?? null;
-
+ 
   if (!title?.trim())
     return res.status(400).json({ success: false, message: "Title is required" });
   if (!assigned_to_user_id)
     return res.status(400).json({ success: false, message: "Assignee is required" });
-
+ 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
+ 
     const { rows } = await client.query(
       `INSERT INTO tasks (title, note, priority, assigned_to, created_by)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [title.trim(), note ?? null, priority, assigned_to_user_id, created_by],
     );
-
+ 
     await client.query("COMMIT");
-
+ 
     console.log("✅ Standalone task created, notifying assignee:", assigned_to_user_id);
-
-    // ── PC Bell notification (assignee only) ──────────────────
+ 
+    // ── SINGLE notification rule ──────────────────────────────
+    // Only notify the ASSIGNEE — same logic as incidents.
     const assigneeId = parseInt(assigned_to_user_id, 10);
-    const creatorId  = created_by ? parseInt(created_by, 10) : null;
+const creatorId  = created_by ? parseInt(created_by, 10) : null;
+ 
+if (assigneeId && assigneeId !== creatorId) {
+  await safeNotify(
+    assigneeId,
+    "task",
+    `New Task Assigned — ${title.trim()}`,
+    `You have been assigned: ${title.trim()}`,
+    "/project-coordinator/incidents?page=tasks",
+    "info",
+    null
+  );
+}
 
-    if (assigneeId && assigneeId !== creatorId) {
-      await safeNotify(
-        assigneeId,
-        "task",
-        `New Task Assigned — ${title.trim()}`,
-        `You have been assigned: ${title.trim()}`,
-        "/project-coordinator/incidents?page=tasks",
-        "info",
-        null
-      );
-    }
-
-    // ── QS Bell notification ──────────────────────────────────
-    await createNotificationDirect({
-      type:         "Task",
-      project_name: "",
-      milestone:    "",
-      title:        `New Task: ${title.trim()}`,
-      message:      note ?? "",
-      status:       priority === "P1" ? "high" : "pending",
-    });
-
+    // ─────────────────────────────────────────────────────────
+ 
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -332,6 +322,7 @@ exports.createStandaloneTask = async (req, res) => {
     client.release();
   }
 };
+
 
 exports.updateIncident = async (req, res) => {
   const { id } = req.params;
@@ -387,6 +378,7 @@ exports.updateIncidentStatus = async (req, res) => {
   try {
     await client.query("BEGIN");
 
+    // incidents has no project_id — just fetch the row
     const { rows: existing } = await client.query(
       `SELECT * FROM incidents WHERE id = $1 AND is_deleted = FALSE`, [id]
     );
@@ -408,6 +400,7 @@ exports.updateIncidentStatus = async (req, res) => {
 
     await client.query("COMMIT");
 
+    // Notify assignee of status change
     if (row.assigned_to) {
       await safeNotify(
         row.assigned_to, "incident",
@@ -417,16 +410,6 @@ exports.updateIncidentStatus = async (req, res) => {
         status === "Resolved" ? "ok" : "info", null
       );
     }
-
-    // ── QS Bell notification on status change ─────────────────
-    await createNotificationDirect({
-      type:         "Incident",
-      project_name: "",
-      milestone:    "",
-      title:        `Incident ${status}: ${row.title}`,
-      message:      `Incident "${row.title}" status changed to ${status}`,
-      status:       status === "Resolved" ? "approved" : "pending",
-    });
 
     res.json({ success: true, data: rows[0] });
   } catch (err) {
@@ -620,6 +603,7 @@ exports.createTasks = async (req, res) => {
   try {
     await client.query("BEGIN");
 
+    // ⚠️ incidents has no project_id — just verify incident exists
     const { rows: incRows } = await client.query(
       `SELECT id FROM incidents WHERE id = $1 AND is_deleted = FALSE`, [id]
     );
@@ -653,7 +637,7 @@ exports.createTasks = async (req, res) => {
       );
       created.push({ ...rows[0], incident_id: id, assignee_name, role_name });
 
-      // ── PC Bell notification ──────────────────────────────
+      // Notify assignee of each task
       if (task.assigned_to_user_id) {
         await safeNotify(
           task.assigned_to_user_id, "task",
@@ -663,16 +647,6 @@ exports.createTasks = async (req, res) => {
           "info", null
         );
       }
-
-      // ── QS Bell notification ──────────────────────────────
-      await createNotificationDirect({
-        type:         "Task",
-        project_name: "",
-        milestone:    "",
-        title:        `New Task: ${task.title.trim()}`,
-        message:      task.note ?? "",
-        status:       task.priority === "P1" ? "high" : "pending",
-      });
     }
 
     await client.query("COMMIT");
@@ -733,7 +707,7 @@ exports.updateTaskStatus = async (req, res) => {
 
     await client.query("COMMIT");
 
-    // ── PC Bell notification ──────────────────────────────────
+    // Notify the task creator when blocked
     if (status === "Blocked" && row.created_by) {
       await safeNotify(
         row.created_by, "task",
@@ -743,18 +717,6 @@ exports.updateTaskStatus = async (req, res) => {
         "warn", null
       );
     }
-
-    // ── QS Bell notification on task status change ────────────
-    await createNotificationDirect({
-      type:         "Task",
-      project_name: "",
-      milestone:    "",
-      title:        `Task ${status}: ${row.title}`,
-      message:      status === "Blocked"
-                      ? `Task "${row.title}" blocked: ${blocked_reason}`
-                      : `Task "${row.title}" is now ${status}`,
-      status:       status === "Done" ? "approved" : status === "Blocked" ? "rejected" : "pending",
-    });
 
     res.json({ success: true, data: rows[0] });
   } catch (err) {
