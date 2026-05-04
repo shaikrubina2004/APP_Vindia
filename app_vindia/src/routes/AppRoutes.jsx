@@ -84,6 +84,8 @@ import ArchitectLayout from "../layouts/ArchitectLayout";
 /* BDA */
 import BDALayout from "../layouts/BDALayout"; {/* ← ADDED */}
 import BDALeads from "../pages/business-development/business-development-analyst/BDALeads";
+import BDAAddLead from "../pages/business-development/business-development-analyst/BDAAddLead";
+import BDAFollowUp from "../pages/business-development/business-development-analyst/BDAFollowUp";
 
 /* COMMON */
 import Timesheet from "../pages/timesheet/Timesheet";
@@ -595,6 +597,22 @@ const AppRoutes = () => {
         </ProtectedRoute>
       } 
       />
+      <Route path="/bda/add-lead" element={
+      <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
+        <BDALayout><BDAAddLead /></BDALayout>
+      </ProtectedRoute>
+    } 
+    />
+    
+    <Route
+    path="/bda/follow-up"
+    element={
+      <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
+        <BDALayout><BDAFollowUp /></BDALayout>
+      </ProtectedRoute>
+    }
+  />
+
 
       {/* FALLBACK */}
       <Route path="*" element={<h2>Page Not Found</h2>} />
