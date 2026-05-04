@@ -1,8 +1,17 @@
-// FILE PATH: src/pages/RFI/CreateRFIModal.jsx
+// FILE PATH: src/pages/StructuralEngineer/CreateRFI.jsx
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createRFI, ROLE_OPTIONS } from "../../api/rfiApi";
 import "./RFI.css";
+
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+function authHeaders() {
+  const token = localStorage.getItem("token") ||
+    localStorage.getItem("authToken") ||
+    localStorage.getItem("userToken");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export default function CreateRFIModal({ myRole, onClose, onCreated }) {
   const [form, setForm] = useState({
@@ -12,13 +21,33 @@ export default function CreateRFIModal({ myRole, onClose, onCreated }) {
     assigned_to_role: "",
     project_name:     "",
   });
-  const [file,      setFile]      = useState(null);
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState("");
+  const [file,     setFile]     = useState(null);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
+  const [projects, setProjects] = useState([]);
   const fileRef = useRef();
 
-  const assignableRoles = ROLE_OPTIONS.filter((r) => r.value !== myRole);
+  // Fetch projects from project manager
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch(`${BASE}/api/projects`, {
+          headers: authHeaders(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // handle both { projects: [] } and []
+          const list = Array.isArray(data) ? data : (data.projects || data.data || []);
+          setProjects(list);
+        }
+      } catch (err) {
+        console.error("Failed to fetch projects:", err);
+      }
+    };
+    fetchProjects();
+  }, []);
 
+  const assignableRoles = ROLE_OPTIONS.filter((r) => r.value !== myRole);
   const handle = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
   const submit = async () => {
@@ -54,8 +83,12 @@ export default function CreateRFIModal({ myRole, onClose, onCreated }) {
           {error && <p className="rfi-modal-error">{error}</p>}
 
           <label>Subject <span className="req">*</span></label>
-          <input name="subject" value={form.subject}
-                 onChange={handle} placeholder="Brief description of the query" />
+          <input
+            name="subject"
+            value={form.subject}
+            onChange={handle}
+            placeholder="Brief description of the query"
+          />
 
           <label>Assign To <span className="req">*</span></label>
           <select name="assigned_to_role" value={form.assigned_to_role} onChange={handle}>
@@ -77,22 +110,46 @@ export default function CreateRFIModal({ myRole, onClose, onCreated }) {
             </div>
             <div>
               <label>Project</label>
-              <input name="project_name" value={form.project_name}
-                     onChange={handle} placeholder="Project name (optional)" />
+              {projects.length > 0 ? (
+                <select name="project_name" value={form.project_name} onChange={handle}>
+                  <option value="">— Select project —</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.name || p.project_name || p.title}>
+                      {p.name || p.project_name || p.title}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  name="project_name"
+                  value={form.project_name}
+                  onChange={handle}
+                  placeholder="Type project name"
+                />
+              )}
             </div>
           </div>
 
           <label>Description</label>
-          <textarea name="description" value={form.description} onChange={handle}
-                    rows={4} placeholder="Provide full context, drawings refs, location, etc." />
+          <textarea
+            name="description"
+            value={form.description}
+            onChange={handle}
+            rows={4}
+            placeholder="Provide full context, drawing refs, location, etc."
+          />
 
           <label>Attachment <span className="rfi-optional">(optional)</span></label>
           <div className="rfi-file-area" onClick={() => fileRef.current.click()}>
             {file
               ? <span>📎 {file.name}</span>
-              : <span>Click to attach a file (PDF, image, DWG, etc.) — max 10 MB</span>}
-            <input ref={fileRef} type="file" style={{ display: "none" }}
-                   onChange={(e) => setFile(e.target.files[0])} />
+              : <span>Click to attach a file (PDF, image, DWG) — max 10 MB</span>}
+            <input
+              ref={fileRef}
+              type="file"
+              style={{ display: "none" }}
+              onChange={(e) => setFile(e.target.files[0])}
+            />
           </div>
           {file && (
             <button className="rfi-remove-file" onClick={() => setFile(null)}>

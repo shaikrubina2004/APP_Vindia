@@ -20,5 +20,8 @@ export const MEPMenu = [
   },
 
   { name: "Upload", path: "/mep/upload", icon: "upload" },
+
+    { name: "RFI", path: "/mep/rfi", icon: "help-circle" },
+
 ];
 export default MEPMenu;

@@ -51,7 +51,8 @@ export default function RFIPage() {
         const data = await fetchRFIs(view);
         console.log("✅ DATA:", data);
 
-setRfis(Array.isArray(data?.rfis) ? data.rfis : []);
+        // ✅ CORRECT — data is already the array
+        setRfis(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("❌ ERROR:", err);
         setIsError(true);
@@ -203,7 +204,27 @@ setRfis(Array.isArray(data?.rfis) ? data.rfis : []);
                   <tr
                     key={r.id}
                     className={`rfi-row ${isMyRFI ? "mine" : "incoming"}`}
-                    onClick={() => navigate(`/structural-engineer/rfi/${r.id}`)}
+                    // ✅ DYNAMIC — works for every role
+                    onClick={() => {
+                      const user = JSON.parse(
+                        localStorage.getItem("user") || "{}",
+                      );
+                      const role = user.role || "";
+                      const rolePathMap = {
+                        structural_engineer: "/structural-engineer",
+                        mep_engineer: "/mep",
+                        architect: "/architect",
+                        site_engineer: "/site-engineer",
+                        project_manager: "/project-manager",
+                        quantity_surveyor: "/quantity-surveyor",
+                        project_coordinator: "/project-coordinator",
+                        planning_engineer: "/planning-engineer",
+                        qc_engineer: "/qc",
+                        safety_officer: "/safety",
+                      };
+                      const base = rolePathMap[role] || "/structural-engineer";
+                      navigate(`${base}/rfi/${r.id}`);
+                    }}
                   >
                     <td className="rfi-id">#{r.id}</td>
                     <td className="rfi-subject">{r.subject}</td>

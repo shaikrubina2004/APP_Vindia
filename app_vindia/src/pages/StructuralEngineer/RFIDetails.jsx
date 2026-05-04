@@ -1,5 +1,4 @@
-// FILE PATH: src/pages/RFI/RFIDetailPage.jsx
-// Full thread view for a single RFI — works for both sides (raiser + assignee)
+// FILE PATH: src/pages/StructuralEngineer/RFIDetails.jsx
 
 import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -33,12 +32,14 @@ function timeAgo(dateStr) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+const SYSTEM_MESSAGES = ["[File attached with RFI]", "[File attached]"];
+
 export default function RFIDetailPage() {
-  const { id }         = useParams();
-  const navigate       = useNavigate();
-  const queryClient    = useQueryClient();
-  const user           = getUser();
-  const myRole         = user.role || "";
+  const { id }      = useParams();
+  const navigate    = useNavigate();
+  const queryClient = useQueryClient();
+  const user        = getUser();
+  const myRole      = user.role || "";
 
   const [message, setMessage] = useState("");
   const [file,    setFile]    = useState(null);
@@ -61,6 +62,11 @@ export default function RFIDetailPage() {
   const responses = data?.responses || [];
   const isRaiser  = rfi?.raised_by_role === myRole;
   const ss        = STATUS_STYLE[rfi?.status] || STATUS_STYLE.open;
+
+  // Find initial attachment (uploaded when RFI was created)
+  const initialAttachment = responses.find(
+    (r) => r.file_url && SYSTEM_MESSAGES.includes(r.message)
+  );
 
   const sendReply = async () => {
     if (!message.trim() && !file) {
@@ -111,7 +117,9 @@ export default function RFIDetailPage() {
               <span className="rfi-role-chip chip-me">
                 To: {ROLE_LABELS[rfi.assigned_to_role] || rfi.assigned_to_role}
               </span>
-              {rfi.project_name && <span className="rfi-meta-item">📁 {rfi.project_name}</span>}
+              {rfi.project_name && (
+                <span className="rfi-meta-item">📁 {rfi.project_name}</span>
+              )}
               <span className="rfi-meta-item" style={{ color: PRIORITY_COLOR[rfi.priority] }}>
                 ● {rfi.priority} priority
               </span>
@@ -141,45 +149,73 @@ export default function RFIDetailPage() {
             <p>{rfi.description}</p>
           </div>
         )}
+
+        {/* Attachment uploaded during RFI creation */}
+        {initialAttachment && (
+          <div className="rfi-detail-description">
+            <p className="rfi-desc-label">Attached File</p>
+            <a
+              href={`${BASE}${initialAttachment.file_url}`}
+              target="_blank"
+              rel="noreferrer"
+              className="rfi-file-link"
+            >
+              📎 {initialAttachment.file_name || "Download attachment"}
+            </a>
+          </div>
+        )}
       </div>
 
       {/* ── THREAD ────────────────────────────────────────────────────── */}
       <div className="rfi-thread-section">
         <h3 className="rfi-thread-title">
           Conversation Thread
-          <span className="rfi-thread-count">{responses.length} message{responses.length !== 1 ? "s" : ""}</span>
+          <span className="rfi-thread-count">
+            {responses.filter((r) => !SYSTEM_MESSAGES.includes(r.message)).length} message
+            {responses.filter((r) => !SYSTEM_MESSAGES.includes(r.message)).length !== 1 ? "s" : ""}
+          </span>
         </h3>
 
-        {responses.length === 0 && (
+        {responses.filter((r) => !SYSTEM_MESSAGES.includes(r.message)).length === 0 && (
           <p className="rfi-no-replies">No replies yet. Be the first to respond.</p>
         )}
 
         <div className="rfi-thread">
-          {responses.map((r) => {
-            const isMe = r.responder_role === myRole;
-            return (
-              <div key={r.id} className={`rfi-bubble-wrap ${isMe ? "me" : "other"}`}>
-                <div className={`rfi-bubble ${isMe ? "bubble-me" : "bubble-other"}`}>
-                  <div className="rfi-bubble-header">
-                    <strong>{ROLE_LABELS[r.responder_role] || r.responder_role}</strong>
-                    {r.responder_name && <span className="rfi-bubble-name">({r.responder_name})</span>}
-                    <span className="rfi-bubble-time">{timeAgo(r.created_at)}</span>
+          {responses
+            .filter((r) => !SYSTEM_MESSAGES.includes(r.message))
+            .map((r) => {
+              const isMe = r.responder_role === myRole;
+              return (
+                <div key={r.id} className={`rfi-bubble-wrap ${isMe ? "me" : "other"}`}>
+                  <div className={`rfi-bubble ${isMe ? "bubble-me" : "bubble-other"}`}>
+                    <div className="rfi-bubble-header">
+                      <strong>{ROLE_LABELS[r.responder_role] || r.responder_role}</strong>
+                      {r.responder_name && (
+                        <span className="rfi-bubble-name">({r.responder_name})</span>
+                      )}
+                      <span className="rfi-bubble-time">{timeAgo(r.created_at)}</span>
+                    </div>
+
+                    {/* Message text */}
+                    {r.message && (
+                      <p className="rfi-bubble-msg">{r.message}</p>
+                    )}
+
+                    {/* File attachment in reply */}
+                    {r.file_url && (
+                      <a
+                        href={`${BASE}${r.file_url}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rfi-file-link"
+                      >
+                        📎 {r.file_name || "Download attachment"}
+                      </a>
+                    )}
                   </div>
-                  <p className="rfi-bubble-msg">{r.message}</p>
-                  {r.file_url && (
-                    <a
-                      href={`${BASE}${r.file_url}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rfi-file-link"
-                    >
-                      📎 {r.file_name || "Download attachment"}
-                    </a>
-                  )}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
       </div>
 
@@ -205,11 +241,16 @@ export default function RFIDetailPage() {
           />
 
           <div className="rfi-reply-actions">
-            {/* File attach */}
             <div className="rfi-file-area small" onClick={() => fileRef.current.click()}>
-              {file ? <span>📎 {file.name}</span> : <span>📎 Attach file (optional)</span>}
-              <input ref={fileRef} type="file" style={{ display: "none" }}
-                     onChange={(e) => setFile(e.target.files[0])} />
+              {file
+                ? <span>📎 {file.name}</span>
+                : <span>📎 Attach file (optional)</span>}
+              <input
+                ref={fileRef}
+                type="file"
+                style={{ display: "none" }}
+                onChange={(e) => setFile(e.target.files[0])}
+              />
             </div>
             {file && (
               <button className="rfi-remove-file" onClick={() => setFile(null)}>✕</button>
@@ -227,8 +268,10 @@ export default function RFIDetailPage() {
       {rfi.status === "closed" && (
         <div className="rfi-closed-banner">
           ✅ This RFI is closed. Reopen it to add more replies.
-          <button className="rfi-btn-outline small"
-                  onClick={() => statusMutation.mutate("open")}>
+          <button
+            className="rfi-btn-outline small"
+            onClick={() => statusMutation.mutate("open")}
+          >
             Reopen
           </button>
         </div>
