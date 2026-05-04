@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+/home/abhinandhana/Downloads/VINDIA_PROJECT_05/APP_Vindia/app_vindia/src/pages/Architect/ArchitectDesigns.jsximport React, { useState, useRef, useEffect, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { getArchitectProjects } from "../../services/architectprojectService";
 import "./ArchitectDesigns.css";
@@ -139,7 +139,7 @@ function Modal({ title, wide, onClose, children, footer }) {
     return () => { document.body.style.overflow = ""; };
   }, []);
   return ReactDOM.createPortal(
-    <div className="dms-backdrop">
+    <div className="dms-backdrop" onMouseDown={onClose}>
       <div
         className={`dms-modal${wide ? " dms-modal-wide" : ""}`}
         onMouseDown={(e) => e.stopPropagation()}
@@ -332,21 +332,21 @@ export default function DrawingManagementSystem() {
   }, [currentUser?.id, activeRole]);
 
   // ── Load drawings FROM DB ──────────────────────────────────────────────────
-  const loadDrawings = useCallback(async (silent = false) => {
-  if (!currentUser?.id || !activeRole) return;
-  if (!silent) setLoading(true);   // ← only show spinner on first load
-  try {
-    const roleCode = DMS_ROLE_TO_CODE[activeRole] || activeRole.toLowerCase();
-    const res = await getDrawings(currentUser.id, roleCode);
-    const rows = res?.data || res || [];
-    setDrawings(rows.map(normaliseDrawing));
-  } catch (err) {
-    console.error("Failed to load drawings:", err);
-    showToast("error", "Could not load drawings from server.");
-  } finally {
-    if (!silent) setLoading(false); // ← only clear spinner on first load
-  }
-}, [currentUser?.id, activeRole]);
+  const loadDrawings = useCallback(async () => {
+    if (!currentUser?.id || !activeRole) return;
+    setLoading(true);
+    try {
+      const roleCode = DMS_ROLE_TO_CODE[activeRole] || activeRole.toLowerCase();
+      const res = await getDrawings(currentUser.id, roleCode);
+      const rows = res?.data || res || [];
+      setDrawings(rows.map(normaliseDrawing));
+    } catch (err) {
+      console.error("Failed to load drawings:", err);
+      showToast("error", "Could not load drawings from server.");
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUser?.id, activeRole]);
 
   useEffect(() => {
     loadDrawings();
@@ -422,7 +422,7 @@ export default function DrawingManagementSystem() {
       setUf({ projectId: "", drawingName: "", drawingType: "Working Drawing",
                revision: "R1", file: null, fileName: "", blobKey: null });
       closeModal();
-      await loadDrawings(true); 
+      await loadDrawings();
     } catch (err) {
       console.error(err);
       showToast("error", "Failed to save drawing. Please try again.");
@@ -430,47 +430,38 @@ export default function DrawingManagementSystem() {
   };
 
   // ── Send drawing to a role ─────────────────────────────────────────────────
- // REPLACE the entire sendTo function with this:
-const sendTo = async (drawingId, role) => {
-  const drawing = drawings.find((d) => String(d.id) === String(drawingId));
-  const project = projects.find((p) => String(p.id) === String(drawing?.projectId));
+  const sendTo = async (drawingId, role) => {
+    const drawing = drawings.find((d) => String(d.id) === String(drawingId));
+    const project = projects.find((p) => String(p.id) === String(drawing?.projectId));
 
-  let recipientUserId = null;
-  if (role === "Client")        recipientUserId = project?.clientUserId ?? null;
-  if (role === "Site Engineer") recipientUserId = project?.siteEngineerId ?? null;
+    let recipientUserId = null;
+    if (role === "Client")        recipientUserId = project?.clientUserId ?? null;
+    if (role === "Site Engineer") recipientUserId = project?.siteEngineerId ?? null;
 
-  try {
-    await sendDrawing(drawingId, {
-      user_id: recipientUserId,
-      role:    role,
-      sent_by: currentUser.id,
-    });
-    showToast("success", `Sent to ${role}.`);
-
-    // ✅ Update drawings list in-place — NO loadDrawings(), NO re-render flicker
-    const newEntry = { role, sentAt: new Date().toISOString(), assignedUserId: recipientUserId };
-
-    setDrawings((prev) =>
-      prev.map((d) => {
-        if (String(d.id) !== String(drawingId)) return d;
-        return { ...d, sentTo: [...d.sentTo, newEntry] };
-      })
-    );
-
-    // ✅ Update selectedDrawing in-place so modal stays open and reflects new state
-    setSelectedDrawing((prev) => {
-      if (!prev || String(prev.id) !== String(drawingId)) return prev;
-      return { ...prev, sentTo: [...prev.sentTo, newEntry] };
-    });
-
-  } catch (err) {
-    console.error(err);
-    showToast("error", `Failed to send to ${role}.`);
-  }
-};
+    try {
+      await sendDrawing(drawingId, {
+        user_id: recipientUserId,
+        role:    role,
+        sent_by: currentUser.id,
+      });
+      showToast("success", `Sent to ${role}.`);
+      await loadDrawings();
+      if (selectedDrawing && String(selectedDrawing.id) === String(drawingId)) {
+        const updated = drawings.find((d) => String(d.id) === String(drawingId));
+        if (updated) setSelectedDrawing(updated);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("error", `Failed to send to ${role}.`);
+    }
+  };
 
   // Re-sync selectedDrawing after loadDrawings
-
+  useEffect(() => {
+    if (!selectedDrawing) return;
+    const fresh = drawings.find((d) => String(d.id) === String(selectedDrawing.id));
+    if (fresh) setSelectedDrawing(fresh);
+  }, [drawings]);
 
   const getNextStage = (d) => {
     const sent = d.sentTo.map((s) => s.role);
@@ -1100,3 +1091,1105 @@ const sendTo = async (drawingId, role) => {
     </div>
   );
 }
+/home/abhinandhana/Downloads/VINDIA_PROJECT_05/APP_Vindia/app_vindia/src/services/architectDesignService.jsimport axios from "axios";
+
+const API = "/api/architect-designs";
+
+/* ─────────────────────────────────────────────
+   CREATE DRAWING
+───────────────────────────────────────────── */
+export const createDrawing = async (data) => {
+  return axios.post(`${API}`, data);
+};
+
+/* ─────────────────────────────────────────────
+   GET DRAWINGS FOR USER (ROLE FILTERED)
+───────────────────────────────────────────── */
+export const getDrawings = async (userId, role) => {
+  return axios.get(`${API}?userId=${userId}&role=${role}`);
+};
+
+/* ─────────────────────────────────────────────
+   SEND DRAWING TO USER
+───────────────────────────────────────────── */
+export const sendDrawing = async (drawingId, payload) => {
+  return axios.post(`${API}/${drawingId}/send`, payload);
+};
+
+/* ─────────────────────────────────────────────
+   REQUEST DETAILED DRAWING
+───────────────────────────────────────────── */
+export const requestDrawing = async (data) => {
+  return axios.post(`${API}/request`, data);
+};
+
+/* ─────────────────────────────────────────────
+   GET REQUESTS
+───────────────────────────────────────────── */
+export const getRequests = async () => {
+  return axios.get(`${API}/requests`);
+};/home/abhinandhana/Downloads/VINDIA_PROJECT_05/APP_Vindia/backend/controllers/architectDesignController.jsconst pool = require("../config/db");
+
+/* ─────────────────────────────────────────────
+   CREATE DRAWING
+───────────────────────────────────────────── */
+exports.createDrawing = async (req, res) => {
+  try {
+    const { id, project_id, name, drawing_type, revision, file_url, file_name, user_id } = req.body;
+
+    await pool.query(
+      `INSERT INTO architect_drawings
+       (id, project_id, name, drawing_type, current_revision, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [id, project_id, name, drawing_type, revision, user_id]
+    );
+
+    await pool.query(
+      `INSERT INTO architect_drawing_revisions
+       (drawing_id, revision, file_url, file_name, created_by)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [id, revision, file_url, file_name || null, user_id]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────
+   GET DRAWINGS (ROLE BASED)
+───────────────────────────────────────────── */
+exports.getDrawings = async (req, res) => {
+  try {
+    const { userId, role } = req.query;
+
+    let result;
+
+    if (role === "architect") {
+      // Architect sees ALL drawings
+      result = await pool.query(`
+        SELECT
+          d.*,
+          p.name  AS project_name,
+          r.file_url,
+          r.file_name,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'role',    rec.role,
+                'user_id', rec.user_id,
+                'sent_at', rec.sent_at
+              )
+            ) FILTER (WHERE rec.id IS NOT NULL),
+            '[]'
+          ) AS recipients
+        FROM architect_drawings d
+        LEFT JOIN projects p ON p.id = d.project_id
+        LEFT JOIN LATERAL (
+          SELECT * FROM architect_drawing_revisions
+          WHERE drawing_id = d.id
+          ORDER BY created_at DESC LIMIT 1
+        ) r ON true
+        LEFT JOIN architect_drawing_recipients rec ON rec.drawing_id = d.id
+        GROUP BY d.id, p.name, r.file_url, r.file_name
+        ORDER BY d.created_at DESC
+      `);
+
+    } else if (role === "quantity_surveyor" || role === "project_coordinator") {
+      // Role-wide recipients: match by role name only (user_id is NULL for these)
+      // Map backend role code → the DMS display role stored in the recipients table
+      const roleLabel = role === "quantity_surveyor" ? "Quantity Surveyor" : "Program Coordinator";
+
+      result = await pool.query(`
+        SELECT
+          d.*,
+          p.name  AS project_name,
+          r.file_url,
+          r.file_name,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'role',    rec.role,
+                'user_id', rec.user_id,
+                'sent_at', rec.sent_at
+              )
+            ) FILTER (WHERE rec.id IS NOT NULL),
+            '[]'
+          ) AS recipients
+        FROM architect_drawings d
+        LEFT JOIN projects p ON p.id = d.project_id
+        LEFT JOIN LATERAL (
+          SELECT * FROM architect_drawing_revisions
+          WHERE drawing_id = d.id
+          ORDER BY created_at DESC LIMIT 1
+        ) r ON true
+        -- join once to qualify (drawing was sent to this role)
+        JOIN architect_drawing_recipients rq
+          ON rq.drawing_id = d.id AND rq.role = $1
+        -- join again to get ALL recipients for the sentTo badges
+        LEFT JOIN architect_drawing_recipients rec ON rec.drawing_id = d.id
+        GROUP BY d.id, p.name, r.file_url, r.file_name
+        ORDER BY d.created_at DESC
+      `, [roleLabel]);
+
+    } else {
+      // Site Engineer / Client: matched by their specific user_id
+      result = await pool.query(`
+        SELECT
+          d.*,
+          p.name  AS project_name,
+          r.file_url,
+          r.file_name,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'role',    rec.role,
+                'user_id', rec.user_id,
+                'sent_at', rec.sent_at
+              )
+            ) FILTER (WHERE rec.id IS NOT NULL),
+            '[]'
+          ) AS recipients
+        FROM architect_drawings d
+        LEFT JOIN projects p ON p.id = d.project_id
+        LEFT JOIN LATERAL (
+          SELECT * FROM architect_drawing_revisions
+          WHERE drawing_id = d.id
+          ORDER BY created_at DESC LIMIT 1
+        ) r ON true
+        -- qualify: drawing was sent to this specific user
+        JOIN architect_drawing_recipients rq
+          ON rq.drawing_id = d.id AND rq.user_id = $1
+        -- get ALL recipients for sentTo display
+        LEFT JOIN architect_drawing_recipients rec ON rec.drawing_id = d.id
+        GROUP BY d.id, p.name, r.file_url, r.file_name
+        ORDER BY d.created_at DESC
+      `, [userId]);
+    }
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────
+   SEND DRAWING
+   user_id is NULL for role-wide recipients (QS, PC).
+   user_id is set for project-scoped roles (Site Engineer, Client).
+───────────────────────────────────────────── */
+exports.sendDrawing = async (req, res) => {
+  try {
+    const { drawingId } = req.params;
+    const { user_id, role, sent_by } = req.body;
+
+    // Prevent duplicate sends to the same role (or same user for scoped roles)
+    const existing = await pool.query(
+      `SELECT id FROM architect_drawing_recipients
+       WHERE drawing_id = $1 AND role = $2
+       ${user_id ? "AND user_id = $3" : "AND user_id IS NULL"}`,
+      user_id ? [drawingId, role, user_id] : [drawingId, role]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: "Drawing already sent to this recipient." });
+    }
+
+    // Insert — user_id is NULL for QS/PC, set for SE/Client
+    await pool.query(
+      `INSERT INTO architect_drawing_recipients (drawing_id, user_id, role)
+       VALUES ($1, $2, $3)`,
+      [drawingId, user_id || null, role]
+    );
+
+    await pool.query(
+      `INSERT INTO architect_drawing_logs (drawing_id, action, stage, performed_by)
+       VALUES ($1, 'SENT', $2, $3)`,
+      [drawingId, role, sent_by]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────
+   REQUEST DRAWING
+───────────────────────────────────────────── */
+exports.requestDrawing = async (req, res) => {
+  try {
+    const { project_id, requested_by, role, description, due_date } = req.body;
+
+    await pool.query(
+      `INSERT INTO architect_drawing_requests
+       (project_id, requested_by, role, description, due_date)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [project_id, requested_by, role, description, due_date]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ─────────────────────────────────────────────
+   GET REQUESTS (with project name)
+───────────────────────────────────────────── */
+exports.getRequests = async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        req.*,
+        p.name   AS project_name,
+        u.name   AS requester_name,
+        req.role AS requester_role
+      FROM architect_drawing_requests req
+      LEFT JOIN projects p ON p.id = req.project_id
+      LEFT JOIN users u ON u.id = req.requested_by
+      ORDER BY req.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};/home/abhinandhana/Downloads/VINDIA_PROJECT_05/APP_Vindia/backend/routes/architectDesignRoutes.jsconst express = require("express");
+const router = express.Router();
+
+const controller = require("../controllers/architectDesignController");
+
+router.post("/", controller.createDrawing);
+router.get("/", controller.getDrawings);
+router.post("/:drawingId/send", controller.sendDrawing);
+
+router.post("/request", controller.requestDrawing);
+router.get("/requests", controller.getRequests);
+
+module.exports = router;
+CREATE TABLE architect_drawings (
+  id VARCHAR(80) PRIMARY KEY,
+  project_id INT4 NOT NULL,
+
+  name VARCHAR(255) NOT NULL,
+  drawing_type VARCHAR(50) NOT NULL,
+
+  current_revision VARCHAR(20),
+
+  stage VARCHAR(100),
+  status VARCHAR(50) DEFAULT 'Pending',
+
+  approved_revision VARCHAR(20),
+
+  created_by INT4,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (project_id) REFERENCES projects(id),
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);CREATE TABLE architect_drawing_revisions (
+  id SERIAL PRIMARY KEY,
+  drawing_id VARCHAR(80) NOT NULL,
+
+  revision VARCHAR(20) NOT NULL,
+  file_name VARCHAR(255),
+  file_url TEXT,
+
+  created_by INT4,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (drawing_id) REFERENCES architect_drawings(id)
+);CREATE TABLE architect_drawing_workflow (
+  id SERIAL PRIMARY KEY,
+  drawing_id VARCHAR(80) NOT NULL,
+
+  stage VARCHAR(50) NOT NULL,
+  state VARCHAR(20) DEFAULT 'pending',
+
+  sent_at TIMESTAMP,
+  approved_at TIMESTAMP,
+  rejected_at TIMESTAMP,
+
+  sent_by INT4,
+  acted_by INT4,
+
+  note TEXT,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (drawing_id) REFERENCES architect_drawings(id)
+);CREATE TABLE architect_drawing_logs (
+  id SERIAL PRIMARY KEY,
+  drawing_id VARCHAR(80) NOT NULL,
+
+  action VARCHAR(50),
+  stage VARCHAR(50),
+
+  performed_by INT4,
+
+  note TEXT,
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (drawing_id) REFERENCES architect_drawings(id)
+); 
+ALTER TABLE architect_drawings ADD COLUMN IF NOT EXISTS description TEXT;
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migration: Detailed Drawing Requests
+-- Run this once in your PostgreSQL database
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS architect_drawing_requests (
+  id          SERIAL PRIMARY KEY,
+  drawing_id  VARCHAR(80),                      -- filled when architect fulfils the request
+  project_id  INT4 NOT NULL,                    -- project the requester needs the drawing for
+  requested_by INT4 NOT NULL,                   -- user id of requester
+  role        VARCHAR(50) NOT NULL,             -- 'qs' | 'site' | 'pm' | 'client'
+  description TEXT NOT NULL,                    -- what they need
+  due_date    DATE NOT NULL,
+  status      VARCHAR(30) DEFAULT 'pending',    -- 'pending' | 'sent'
+  sent_at     TIMESTAMP,
+  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id)  REFERENCES projects(id),
+  FOREIGN KEY (requested_by) REFERENCES users(id)
+);
+
+-- Track which users a drawing has been sent to (for role-based visibility)
+CREATE TABLE IF NOT EXISTS architect_drawing_recipients (
+  id          SERIAL PRIMARY KEY,
+  drawing_id  VARCHAR(80) NOT NULL,
+  user_id     INT4 NOT NULL,
+  role        VARCHAR(50) NOT NULL,             -- 'qs' | 'site' | 'pm' | 'client'
+  sent_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  description TEXT,                             -- architect's description when sending
+  FOREIGN KEY (drawing_id) REFERENCES architect_drawings(id),
+  FOREIGN KEY (user_id)    REFERENCES users(id)
+);
+ALTER TABLE architect_drawing_recipients
+  ALTER COLUMN user_id DROP NOT NULL;
+  [
+  {
+    "id": 17,
+    "name": "maafi filus",
+    "client": "ajmal khan",
+    "budget": 8373848494,
+    "manager_id": 13,
+    "status": "Active",
+    "created_at": "2026-05-02 10:16:22.198483",
+    "progress": null,
+    "site_engineer_id": 3,
+    "start_date": "2026-05-02",
+    "end_date": "2028-06-28",
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "Mumbai",
+    "description": null,
+    "updated_at": "2026-05-02 10:16:22.198483",
+    "building_type": "Commercial",
+    "floors": "G+3+R",
+    "plot_size": "4999",
+    "phone": "9876543210",
+    "architect_id": null,
+    "client_user_id": null,
+    "coordinator_id": 46
+  },
+  {
+    "id": 14,
+    "name": "S House",
+    "client": "Sharukh Ramesh",
+    "budget": 10000000,
+    "manager_id": 13,
+    "status": "Active",
+    "created_at": "2026-05-02 09:29:58.887707",
+    "progress": null,
+    "site_engineer_id": 3,
+    "start_date": "2026-05-02",
+    "end_date": "2028-01-04",
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "TamilNadu",
+    "description": null,
+    "updated_at": "2026-05-02 09:29:58.887707",
+    "building_type": "Residential",
+    "floors": "G+2+R",
+    "plot_size": "2998",
+    "phone": "9876543210",
+    "architect_id": null,
+    "client_user_id": null,
+    "coordinator_id": 46
+  },
+  {
+    "id": 15,
+    "name": "Al Hilal Mall",
+    "client": "al zubairu bin ul thahiru raheem",
+    "budget": 500000000,
+    "manager_id": 13,
+    "status": "Active",
+    "created_at": "2026-05-02 09:36:27.134398",
+    "progress": null,
+    "site_engineer_id": 3,
+    "start_date": "2026-05-02",
+    "end_date": "2028-06-07",
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "UAE",
+    "description": "al hilal",
+    "updated_at": "2026-05-02 09:36:27.134398",
+    "building_type": "Commercial",
+    "floors": "B+G+5+R",
+    "plot_size": "60000",
+    "phone": "9876543210",
+    "architect_id": null,
+    "client_user_id": null,
+    "coordinator_id": 46
+  },
+  {
+    "id": 16,
+    "name": "ababa",
+    "client": "baba",
+    "budget": 374638282,
+    "manager_id": 13,
+    "status": "Active",
+    "created_at": "2026-05-02 09:49:38.32755",
+    "progress": null,
+    "site_engineer_id": 3,
+    "start_date": "2026-05-30",
+    "end_date": "2030-02-21",
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "Banglore",
+    "description": null,
+    "updated_at": "2026-05-02 09:49:38.32755",
+    "building_type": "Commercial",
+    "floors": "G+3+R",
+    "plot_size": "4999",
+    "phone": "9876543210",
+    "architect_id": null,
+    "client_user_id": null,
+    "coordinator_id": 46
+  },
+  {
+    "id": 7,
+    "name": "chintech",
+    "client": null,
+    "budget": null,
+    "manager_id": null,
+    "status": "active",
+    "created_at": "2026-04-24 07:19:59.132013",
+    "progress": null,
+    "site_engineer_id": null,
+    "start_date": null,
+    "end_date": null,
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "Bangalore",
+    "description": null,
+    "updated_at": "2026-04-24 07:19:59.132013",
+    "building_type": null,
+    "floors": null,
+    "plot_size": null,
+    "phone": null,
+    "architect_id": null,
+    "client_user_id": null,
+    "coordinator_id": 46
+  },
+  {
+    "id": 8,
+    "name": "Vindia",
+    "client": "Sanjay",
+    "budget": 4000000,
+    "manager_id": null,
+    "status": "active",
+    "created_at": "2026-04-24 11:45:51.164821",
+    "progress": null,
+    "site_engineer_id": null,
+    "start_date": null,
+    "end_date": null,
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "Bangalore",
+    "description": null,
+    "updated_at": "2026-04-24 11:45:51.164821",
+    "building_type": null,
+    "floors": null,
+    "plot_size": null,
+    "phone": null,
+    "architect_id": null,
+    "client_user_id": null,
+    "coordinator_id": 46
+  },
+  {
+    "id": 9,
+    "name": "Test Project",
+    "client": null,
+    "budget": null,
+    "manager_id": null,
+    "status": "Active",
+    "created_at": "2026-04-27 05:35:38.137184",
+    "progress": null,
+    "site_engineer_id": null,
+    "start_date": null,
+    "end_date": null,
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": null,
+    "description": null,
+    "updated_at": "2026-04-27 05:35:38.137184",
+    "building_type": null,
+    "floors": null,
+    "plot_size": null,
+    "phone": null,
+    "architect_id": null,
+    "client_user_id": null,
+    "coordinator_id": 46
+  },
+  {
+    "id": 10,
+    "name": "RR Mall",
+    "client": "ABC Developers",
+    "budget": 10000000,
+    "manager_id": 13,
+    "status": "Active",
+    "created_at": "2026-04-28 11:25:44.536484",
+    "progress": null,
+    "site_engineer_id": 3,
+    "start_date": "2026-04-28",
+    "end_date": "2032-04-28",
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "Mysuru",
+    "description": "Add more floors",
+    "updated_at": "2026-04-28 11:25:44.536484",
+    "building_type": "Commercial",
+    "floors": "G+3",
+    "plot_size": "10000",
+    "phone": "8606916820",
+    "architect_id": null,
+    "client_user_id": 27,
+    "coordinator_id": 46
+  },
+  {
+    "id": 3,
+    "name": "Eiffel Tower",
+    "client": "XBC Developers",
+    "budget": 5000000,
+    "manager_id": 13,
+    "status": "IN PROGRESS",
+    "created_at": "2026-03-27 11:44:07.170999",
+    "progress": 55,
+    "site_engineer_id": 3,
+    "start_date": "2026-03-01",
+    "end_date": "2028-12-31",
+    "spent": "2000000.00",
+    "client_paid": "1500000.00",
+    "location": "Paris",
+    "description": "High-rise commercial building",
+    "updated_at": "2026-03-27 11:44:07.170999",
+    "building_type": "Commercial",
+    "floors": "G+20",
+    "plot_size": "8000 sq ft",
+    "phone": "9123456780",
+    "architect_id": 52,
+    "client_user_id": 30,
+    "coordinator_id": 46
+  },
+  {
+    "id": 6,
+    "name": "TAJMAHAL",
+    "client": "SHAJAHAAN",
+    "budget": 100000000,
+    "manager_id": 13,
+    "status": "IN PROGRESS",
+    "created_at": "2026-04-01 05:59:19.544745",
+    "progress": 60,
+    "site_engineer_id": 3,
+    "start_date": "2026-04-01",
+    "end_date": "2028-03-15",
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "Agra",
+    "description": "Residential heritage project",
+    "updated_at": "2026-04-30 06:50:37.650139",
+    "building_type": "Residential",
+    "floors": "G+2",
+    "plot_size": "3000 sq ft",
+    "phone": "9090909090",
+    "architect_id": 52,
+    "client_user_id": 27,
+    "coordinator_id": 46
+  },
+  {
+    "id": 5,
+    "name": "NH-66",
+    "client": "Government Of India",
+    "budget": 10000000,
+    "manager_id": 13,
+    "status": "IN PROGRESS",
+    "created_at": "2026-03-31 17:05:55.367627",
+    "progress": 40,
+    "site_engineer_id": 3,
+    "start_date": "2026-03-31",
+    "end_date": "2032-06-30",
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "Kerala",
+    "description": "National highway project",
+    "updated_at": "2026-03-31 17:05:55.367627",
+    "building_type": "Infrastructure",
+    "floors": "N/A",
+    "plot_size": "50 km stretch",
+    "phone": "9988776655",
+    "architect_id": 52,
+    "client_user_id": 30,
+    "coordinator_id": 46
+  },
+  {
+    "id": 11,
+    "name": "White House",
+    "client": "Donald Trump",
+    "budget": 999999999,
+    "manager_id": 13,
+    "status": "Active",
+    "created_at": "2026-05-02 09:03:50.358189",
+    "progress": null,
+    "site_engineer_id": 3,
+    "start_date": "2026-05-02",
+    "end_date": "2030-06-11",
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "America",
+    "description": "Donald Trump Favourite Project ",
+    "updated_at": "2026-05-02 09:03:50.358189",
+    "building_type": "Commercial",
+    "floors": "B+G+5+R",
+    "plot_size": "99999",
+    "phone": "9876543210",
+    "architect_id": null,
+    "client_user_id": null,
+    "coordinator_id": 46
+  },
+  {
+    "id": 12,
+    "name": "Nexus Mall",
+    "client": "Nexus",
+    "budget": 100000000,
+    "manager_id": 13,
+    "status": "Active",
+    "created_at": "2026-05-02 09:08:55.434305",
+    "progress": null,
+    "site_engineer_id": 3,
+    "start_date": "2026-05-02",
+    "end_date": "2028-05-05",
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "Mysore",
+    "description": "Nexus Mall",
+    "updated_at": "2026-05-02 09:08:55.434305",
+    "building_type": "Commercial",
+    "floors": "B+G+3+R",
+    "plot_size": "499741",
+    "phone": "9876543210",
+    "architect_id": null,
+    "client_user_id": null,
+    "coordinator_id": 46
+  },
+  {
+    "id": 13,
+    "name": "Dhoni House",
+    "client": "Dhoni",
+    "budget": 100000000,
+    "manager_id": 13,
+    "status": "Active",
+    "created_at": "2026-05-02 09:21:17.416138",
+    "progress": null,
+    "site_engineer_id": 3,
+    "start_date": "2026-05-02",
+    "end_date": "2028-06-02",
+    "spent": "0.00",
+    "client_paid": "0.00",
+    "location": "Chennai",
+    "description": "Mahendra Sing Dhoni",
+    "updated_at": "2026-05-02 09:21:17.416138",
+    "building_type": "Residential",
+    "floors": "G+2+R",
+    "plot_size": "4999",
+    "phone": "7777777777",
+    "architect_id": null,
+    "client_user_id": null,
+    "coordinator_id": 46
+  }
+]
+  roles table 
+  [
+  {
+    "id": 16,
+    "department_id": 1,
+    "name": "HR Manager",
+    "code": "hr_manager",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 17,
+    "department_id": 1,
+    "name": "HR Executive",
+    "code": "hr_executive",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 18,
+    "department_id": 2,
+    "name": "Software Engineer",
+    "code": "software_engineer",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 19,
+    "department_id": 2,
+    "name": "Tester",
+    "code": "tester",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 20,
+    "department_id": 3,
+    "name": "Operations Manager",
+    "code": "operations_manager",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 21,
+    "department_id": 3,
+    "name": "Admin Executive",
+    "code": "admin_executive",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 22,
+    "department_id": 4,
+    "name": "Project Manager",
+    "code": "project_manager",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 23,
+    "department_id": 4,
+    "name": "Site Engineer",
+    "code": "site_engineer",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 24,
+    "department_id": 4,
+    "name": "MEP Engineer",
+    "code": "mep_engineer",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 25,
+    "department_id": 5,
+    "name": "Business Development Manager",
+    "code": "bd_manager",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 26,
+    "department_id": 5,
+    "name": "Sales Executive",
+    "code": "sales_executive",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 27,
+    "department_id": 6,
+    "name": "Accountant",
+    "code": "accountant",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 28,
+    "department_id": 6,
+    "name": "Finance Manager",
+    "code": "finance_manager",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 29,
+    "department_id": 7,
+    "name": "Architect",
+    "code": "architect",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 30,
+    "department_id": 7,
+    "name": "Draftsman",
+    "code": "draftsman",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:07:37.114144"
+  },
+  {
+    "id": 33,
+    "department_id": 4,
+    "name": "Project Coordinator",
+    "code": "project_coordinator",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:18:12.866091"
+  },
+  {
+    "id": 34,
+    "department_id": 4,
+    "name": "Quantity Surveyor",
+    "code": "quantity_surveyor",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:18:12.866091"
+  },
+  {
+    "id": 35,
+    "department_id": 4,
+    "name": "Structural Engineer",
+    "code": "structural_engineer",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:18:12.866091"
+  },
+  {
+    "id": 36,
+    "department_id": 4,
+    "name": "Planning Engineer",
+    "code": "planning_engineer",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:21:20.677324"
+  },
+  {
+    "id": 37,
+    "department_id": 4,
+    "name": "Safety Officer",
+    "code": "safety_officer",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:21:20.677324"
+  },
+  {
+    "id": 38,
+    "department_id": 4,
+    "name": "QC Engineer",
+    "code": "qc_engineer",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 07:21:20.677324"
+  },
+  {
+    "id": 39,
+    "department_id": 9,
+    "name": "CEO",
+    "code": "ceo",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-06 09:49:47.435881"
+  },
+  {
+    "id": 41,
+    "department_id": 4,
+    "name": "Client",
+    "code": "client",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-04-28 07:06:19.421335"
+  },
+  {
+    "id": 42,
+    "department_id": 5,
+    "name": "Business Development Analyst",
+    "code": "bda",
+    "description": null,
+    "is_active": true,
+    "created_at": "2026-05-02 07:37:37.50356"
+  }
+]  
+users 
+[
+  {
+    "id": 54,
+    "name": "hr manager",
+    "email": "hr@gmail.com",
+    "password": "$2b$10$B5ErQYJ3THuZUb/zJb6sFuvmd4YPkys3w7LZqWZOwsJ131l1JmnGW",
+    "created_at": "2026-04-28 08:11:43.794819",
+    "status": "pending",
+    "role_id": 16
+  },
+  {
+    "id": 30,
+    "name": "Ananya Krishnan",
+    "email": "ananya.nair01@gmail..com",
+    "password": "$2b$10$Ef.L60OxEQy1MdcUlB9xR.E87pLmvg/0UybWjggIRLcyDpx9WZB0y",
+    "created_at": "2026-03-26 11:45:36.75459",
+    "status": "active",
+    "role_id": 18
+  },
+  {
+    "id": 46,
+    "name": "project coordinater",
+    "email": "pc@gmail.com",
+    "password": "$2b$10$geB5qPsrAMXhmFLGk/iLj.dPvjnTroTwg9hKKsyLOXoU1fy6mn3Oa",
+    "created_at": "2026-04-07 09:13:17.63072",
+    "status": "active",
+    "role_id": 33
+  },
+  {
+    "id": 3,
+    "name": "Sajay Kumar",
+    "email": "sajaykumar.kp@vindiainfrasec.com",
+    "password": "$2b$10$Sq24giPUp4OwE4izomvTteV.6Z3g0DiMgsJpOsny8pw.qLBoRcKRy",
+    "created_at": "2026-03-04 10:54:12.665261",
+    "status": "active",
+    "role_id": 39
+  },
+  {
+    "id": 25,
+    "name": "Abhi",
+    "email": "abhi5@example.com",
+    "password": "$2b$10$fY0CUgCWdzJyUSpFKq1AgelS.F86Lby/m.FdxzHnsnmoc51EoGQwu",
+    "created_at": "2026-03-24 14:29:48.327106",
+    "status": "active",
+    "role_id": 16
+  },
+  {
+    "id": 28,
+    "name": "Abhi",
+    "email": "abhi@gmail.com",
+    "password": "$2b$10$lqbc36mZERGkcXyi/S4F7.RSAM2Em4KTuCurr5Lo0kpa3LxdQpVGm",
+    "created_at": "2026-03-25 04:18:24.603486",
+    "status": "active",
+    "role_id": 16
+  },
+  {
+    "id": 31,
+    "name": "RI",
+    "email": "RIRI@mail.com",
+    "password": "$2b$10$yL8Asya/hpSe7GU6h.yONuaFcz1hWQUqHaV9lM.lKpgXjjYDs2Ym6",
+    "created_at": "2026-03-26 14:38:29.386784",
+    "status": "pending",
+    "role_id": 16
+  },
+  {
+    "id": 32,
+    "name": "Test User",
+    "email": "testuser123@mail.com",
+    "password": "$2b$10$C3xrLs1ooiCPllvqFoSVyuEpvrluW4GAVK0L8G6hPMztno8dMYQtW",
+    "created_at": "2026-03-26 15:42:15.809563",
+    "status": "pending",
+    "role_id": 16
+  },
+  {
+    "id": 33,
+    "name": "New User",
+    "email": "newuser999@mail.com",
+    "password": "$2b$10$I1kQa6baeCvr4H6lMtJYwOFCiBqONRBq/yuDGqB9IagPPISiDZX7a",
+    "created_at": "2026-03-26 15:46:46.552223",
+    "status": "pending",
+    "role_id": 16
+  },
+  {
+    "id": 47,
+    "name": "mep engineer",
+    "email": "mep@gmail,com",
+    "password": "$2b$10$VwlWEnOHP.o5GkalOJNc2.6PnbrZKRiDbJVoEHr8QP2N9HHRkypla",
+    "created_at": "2026-04-07 09:19:19.892753",
+    "status": "pending",
+    "role_id": 24
+  },
+  {
+    "id": 50,
+    "name": "quantity surveyor",
+    "email": "qs@gmail.com",
+    "password": "$2b$10$IfFaiRKxdlJ1Ndh0M0dW4ervmXAtD/ajxbBf0M04D7sba9GC854De",
+    "created_at": "2026-04-07 09:30:18.410597",
+    "status": "pending",
+    "role_id": 34
+  },
+  {
+    "id": 43,
+    "name": "structural engineer",
+    "email": "se@gmail.com",
+    "password": "$2b$10$P/vivrk3gJHlWiRNlBFZKeIvxit1u7FmZl0Al1wgAC1lhVK.YFeTa",
+    "created_at": "2026-04-07 08:14:53.221526",
+    "status": "pending",
+    "role_id": 35
+  },
+  {
+    "id": 53,
+    "name": "site engineer",
+    "email": "siteengineer@gmail.com",
+    "password": "$2b$10$3ZP7aOdo1/x4l3jmun90rupWefuDh.Re1cJWo64VI29yJSoVmzaDK",
+    "created_at": "2026-04-08 09:35:09.360072",
+    "status": "pending",
+    "role_id": 23
+  },
+  {
+    "id": 27,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "password": "$2b$10$hqKkdqBfRlYMdyq4kisYxuNZqnjQ7167yxjH0uwoQDFJNJS/2NjoC",
+    "created_at": "2026-03-25 04:05:55.571672",
+    "status": "active",
+    "role_id": 22
+  },
+  {
+    "id": 52,
+    "name": "archi tect",
+    "email": "archi@gmail.com",
+    "password": "$2b$10$EOSyLsr0gzWO8ZFigYPZiu9vo.TceisspnV3JLzgVzcm64.huCZo6",
+    "created_at": "2026-04-07 09:56:20.080996",
+    "status": "active",
+    "role_id": 29
+  },
+  {
+    "id": 57,
+    "name": "Business Development  Analyst",
+    "email": "bda@gmail.com",
+    "password": "$2b$10$QEyYw8JXmxQyBwEQ8vikKuco5FqFlyMLAlaoCzUe2t4hKMFUt86Eu",
+    "created_at": "2026-05-02 07:15:15.435365",
+    "status": "pending",
+    "role_id": 42
+  }
+]
