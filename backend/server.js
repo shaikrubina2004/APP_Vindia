@@ -63,7 +63,7 @@ const seNotificationRoutes = require("./routes/seNotificationRoutes");
 const qsRoutes = require("./routes/qsRoutes");
 const boqRoutes = require("./routes/boqRoutes");
 const costReportRoutes = require("./routes/costReportRoutes");
-const quantityReportRoutes = require("./routes/Quantityreportroutes js");
+const quantityReportRoutes = require("./routes/Quantityreportroutes.js");
 const qsNotifRoutes = require("./routes/qsNotificationRoutes"); // ← NEW
 
 /* ── BDA / Leads ───────────────────────────────────────── */
