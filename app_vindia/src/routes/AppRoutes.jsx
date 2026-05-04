@@ -85,6 +85,7 @@ import ArchitectLayout from "../layouts/ArchitectLayout";
 import BDALayout from "../layouts/BDALayout"; {/* ← ADDED */}
 import BDALeads from "../pages/business-development/business-development-analyst/BDALeads";
 import BDAAddLead from "../pages/business-development/business-development-analyst/BDAAddLead";
+import BDAReports  from "../pages/business-development/business-development-analyst/BDAReports";
 import BDAFollowUp from "../pages/business-development/business-development-analyst/BDAFollowUp";
 
 /* COMMON */
@@ -603,7 +604,7 @@ const AppRoutes = () => {
       </ProtectedRoute>
     } 
     />
-    
+
     <Route
     path="/bda/follow-up"
     element={
@@ -612,6 +613,14 @@ const AppRoutes = () => {
       </ProtectedRoute>
     }
   />
+    <Route 
+    path="/bda/reports"   
+    element={
+    <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
+      <BDALayout><BDAReports /></BDALayout>
+      </ProtectedRoute>
+    } 
+    />
 
 
       {/* FALLBACK */}

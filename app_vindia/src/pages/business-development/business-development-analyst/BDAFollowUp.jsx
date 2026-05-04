@@ -108,7 +108,6 @@ const AddFollowUpModal = ({ lead, onClose, onSaved }) => {
             </div>
           </div>
 
-          {/* Previous follow-ups for this lead */}
           <PreviousFollowUps leadId={lead.id} />
         </div>
 
@@ -123,7 +122,6 @@ const AddFollowUpModal = ({ lead, onClose, onSaved }) => {
   );
 };
 
-/* Previous follow-ups inside modal */
 const PreviousFollowUps = ({ leadId }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -209,10 +207,10 @@ const LeadCard = ({ lead, badge, onFollowUp }) => (
 ════════════════════════════════════════ */
 const BDAFollowUp = () => {
   const navigate = useNavigate();
-  const [loading, setLoading]   = useState(true);
-  const [allLeads, setAllLeads] = useState([]);
-  const [followUps, setFollowUps] = useState([]); // from followups table
-  const [search, setSearch]     = useState("");
+  const [loading, setLoading]     = useState(true);
+  const [allLeads, setAllLeads]   = useState([]);
+  const [followUps, setFollowUps] = useState([]);
+  const [search, setSearch]       = useState("");
   const [activeTab, setActiveTab] = useState("today");
   const [modalLead, setModalLead] = useState(null);
 
@@ -228,7 +226,7 @@ const BDAFollowUp = () => {
       ]);
       setAllLeads(leadsRes.data.leads || []);
       setFollowUps([
-        ...(todayRes.data.todayFollowUps   || []).map(f => ({ ...f, _type:"today" })),
+        ...(todayRes.data.todayFollowUps    || []).map(f => ({ ...f, _type:"today" })),
         ...(pendingRes.data.pendingFollowUps || []).map(f => ({ ...f, _type:"overdue" })),
       ]);
     } catch (err) {
@@ -238,12 +236,8 @@ const BDAFollowUp = () => {
     }
   };
 
-  /* Build display leads from allLeads + followup snooze dates */
   const categorized = useMemo(() => {
-    const today    = [];
-    const overdue  = [];
-    const upcoming = [];
-    const all      = [];
+    const today = [], overdue = [], upcoming = [], all = [];
 
     allLeads.forEach(lead => {
       const su = lead.snooze_until;
@@ -256,7 +250,6 @@ const BDAFollowUp = () => {
       else                    upcoming.push({ ...lead, next_followup: su });
     });
 
-    // also add from followups table (today/pending)
     followUps.forEach(fu => {
       const exists = [...today,...overdue,...upcoming].find(l => l.id === fu.lead_id);
       if (!exists) {
@@ -279,7 +272,6 @@ const BDAFollowUp = () => {
     all:      categorized.all.length,
   };
 
-  /* Filter by search */
   const filtered = useMemo(() => {
     const list = categorized[activeTab] || [];
     if (!search) return list;
@@ -291,15 +283,12 @@ const BDAFollowUp = () => {
     );
   }, [categorized, activeTab, search]);
 
-  const handleSaved = () => {
-    setModalLead(null);
-    loadData();
-  };
+  const handleSaved = () => { setModalLead(null); loadData(); };
 
   const TABS = [
-    { key:"today",    label:"Today",    color:"#ef4444" },
-    { key:"overdue",  label:"Overdue",  color:"#f59e0b" },
-    { key:"upcoming", label:"Upcoming", color:"#2563eb" },
+    { key:"today",    label:"Today",         color:"#ef4444" },
+    { key:"overdue",  label:"Overdue",        color:"#f59e0b" },
+    { key:"upcoming", label:"Upcoming",       color:"#2563eb" },
     { key:"all",      label:"All Follow-ups", color:"#7c3aed" },
   ];
 
@@ -347,20 +336,52 @@ const BDAFollowUp = () => {
       {/* ── TABS + SEARCH ── */}
       <div className="fu-toolbar">
         <div className="fu-tabs">
-          {TABS.map(t => (
-            <button
-              key={t.key}
-              className={`fu-tab ${activeTab === t.key ? "active" : ""}`}
-              style={activeTab === t.key ? { background: t.color } : {}}
-              onClick={() => setActiveTab(t.key)}
-            >
-              {t.label}
-              <span className={`fu-tab-badge ${activeTab === t.key ? "active" : ""}`}>
-                {counts[t.key]}
-              </span>
-            </button>
-          ))}
+          {TABS.map(t => {
+            const isActive = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                style={{
+                  display:      "inline-flex",
+                  alignItems:   "center",
+                  gap:          "6px",
+                  padding:      "7px 16px",
+                  borderRadius: "8px",
+                  fontSize:     "13px",
+                  fontWeight:   "500",
+                  fontFamily:   "inherit",
+                  cursor:       "pointer",
+                  transition:   "all .2s",
+                  background:   isActive ? t.color : "#ffffff",
+                  color:        isActive ? "#ffffff" : "#64748b",
+                  border:       isActive
+                    ? `1.5px solid ${t.color}`
+                    : "1.5px solid #e2e8f0",
+                  outline: "none",
+                }}
+              >
+                {t.label}
+                <span
+                  style={{
+                    background:   isActive ? "rgba(255,255,255,0.3)" : "#f1f5f9",
+                    color:        isActive ? "#ffffff" : "#64748b",
+                    borderRadius: "20px",
+                    fontSize:     "10px",
+                    fontWeight:   "700",
+                    padding:      "1px 7px",
+                    minWidth:     "20px",
+                    textAlign:    "center",
+                    display:      "inline-block",
+                  }}
+                >
+                  {counts[t.key]}
+                </span>
+              </button>
+            );
+          })}
         </div>
+
         <div className="fu-search-wrap">
           <span className="fu-search-icon">🔍</span>
           <input className="fu-search" placeholder="Search name, phone, city…"
@@ -386,9 +407,9 @@ const BDAFollowUp = () => {
             {activeTab === "today" ? "🎉" : activeTab === "overdue" ? "✅" : "📭"}
           </div>
           <p className="fu-empty__title">
-            {activeTab === "today"   ? "No follow-ups due today!" :
-             activeTab === "overdue" ? "No overdue follow-ups!" :
-             activeTab === "upcoming"? "No upcoming follow-ups" :
+            {activeTab === "today"    ? "No follow-ups due today!"  :
+             activeTab === "overdue"  ? "No overdue follow-ups!"    :
+             activeTab === "upcoming" ? "No upcoming follow-ups"    :
              "No follow-ups found"}
           </p>
           <p className="fu-empty__sub">

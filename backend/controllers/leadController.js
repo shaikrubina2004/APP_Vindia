@@ -391,3 +391,39 @@ exports.getPendingFollowUps = async (req, res) => {
     res.json({ pendingFollowUps: rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 };
+
+/* ── GET TODAY'S FOLLOW-UPS ── */
+exports.getTodaysFollowUps = async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT f.*, l.name, l.phone, l.city, l.status, l.source, l.assigned_to
+       FROM followups f
+       JOIN leads l ON f.lead_id = l.id
+       WHERE DATE(f.next_followup) = CURRENT_DATE
+         AND l.deleted_by_admin = false
+       ORDER BY f.created_at DESC`
+    );
+    res.json({ todayFollowUps: rows });
+  } catch (err) {
+    console.error("Today followups error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+ 
+/* ── GET PENDING / OVERDUE FOLLOW-UPS ── */
+exports.getPendingFollowUps = async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT f.*, l.name, l.phone, l.city, l.status, l.source, l.assigned_to
+       FROM followups f
+       JOIN leads l ON f.lead_id = l.id
+       WHERE DATE(f.next_followup) < CURRENT_DATE
+         AND l.deleted_by_admin = false
+       ORDER BY f.next_followup ASC`
+    );
+    res.json({ pendingFollowUps: rows });
+  } catch (err) {
+    console.error("Pending followups error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
