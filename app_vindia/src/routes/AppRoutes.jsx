@@ -63,7 +63,7 @@ import RFIDetailPage from "../pages/StructuralEngineer/RFIDetails";
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
 import ArchitectDailyLogins from "../pages/Architect/ArchitectDailyLogins";
 import ArchitectDesigns from "../pages/Architect/ArchitectDesigns";
-import ArchitectSignOff from "../pages/Architect/ArchitectSignOff";
+import ArchitectAssign from "../pages/Architect/ArchitectAssign";
 import ArchitectProject from "../pages/Architect/ArchitectProject";
 
 /* PROJECT COORDINATOR */
@@ -497,11 +497,11 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/architect/sign-off"
+        path="/architect/assign"
         element={
           <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
             <ArchitectLayout>
-              <ArchitectSignOff />
+              <ArchitectAssign />
             </ArchitectLayout>
           </ProtectedRoute>
         }

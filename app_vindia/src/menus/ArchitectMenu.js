@@ -25,8 +25,8 @@ export const ArchitectMenu = [
   },
   { 
     /* Official approvals and milestones */
-    name: "Sign Off", 
-    path: "/architect/sign-off", 
+    name: "assign", 
+    path: "/architect/assign", 
     icon: "user-check" 
   },
   { 
