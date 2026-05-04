@@ -1,16 +1,8 @@
 // ══════════════════════════════════════════════════════════════════════════════
 //  quantityReportController.js
-//  Workflow:
-//    QS creates Quantity Report from pending_se BOQ (after PM approved Cost Report)
-//    SE approves → quantity_reports.status = 'approved'
-//               → boqs.status = 'finalised', sent_to_se = TRUE  ← KEY TRIGGER
-//    SE rejects  → quantity_reports.status = 'rejected'
-//               → boqs.status = 'rejected'
-//               → QS must edit BOQ and resubmit (goes back to pending_pm)
-//
-//  Items contain ONLY: material, unit, quantity  — NO prices shown to SE
 // ══════════════════════════════════════════════════════════════════════════════
 const pool = require("../config/db");
+const { createNotificationDirect } = require("./qsNotificationController");
 
 // ── Auto-create table ─────────────────────────────────────────────────────────
 (async () => {
@@ -71,7 +63,6 @@ function formatReport(r) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  GET ALL  —  GET /api/quantity-report
-//  Optional: ?projectId=&status=&boqId=
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getAllReports = async (req, res) => {
   try {
@@ -114,8 +105,6 @@ exports.getReportById = async (req, res) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  CREATE  —  POST /api/quantity-report
-//  BOQ must be in 'pending_se' status (PM already approved Cost Report)
-//  Items: [{ material, unit, quantity }]  — NO prices
 // ══════════════════════════════════════════════════════════════════════════════
 exports.createReport = async (req, res) => {
   try {
@@ -128,18 +117,16 @@ exports.createReport = async (req, res) => {
       return res.status(400).json({ error: "items must be a non-empty array" });
     }
 
-    // BOQ must exist and be pending_se
     const boqCheck = await pool.query("SELECT id, status FROM boqs WHERE id = $1", [boqId]);
     if (!boqCheck.rows.length) {
       return res.status(404).json({ error: "Linked BOQ not found" });
     }
     if (boqCheck.rows[0].status !== "pending_se") {
       return res.status(400).json({
-        error: `Quantity report requires a pending_se BOQ. Current status: ${boqCheck.rows[0].status}. PM must approve the Cost Report first.`,
+        error: `Quantity report requires a pending_se BOQ. Current status: ${boqCheck.rows[0].status}.`,
       });
     }
 
-    // Only one active quantity report per BOQ
     const existing = await pool.query(
       "SELECT id FROM quantity_reports WHERE boq_id = $1 AND status != 'rejected'", [boqId]
     );
@@ -147,11 +134,8 @@ exports.createReport = async (req, res) => {
       return res.status(409).json({ error: "A quantity report already exists for this BOQ. Edit it instead." });
     }
 
-    // Strip prices — keep only material, unit, quantity
     const cleanItems = items.map(({ material, unit, quantity }) => ({
-      material,
-      unit,
-      quantity: parseFloat(quantity) || 0,
+      material, unit, quantity: parseFloat(quantity) || 0,
     }));
 
     const result = await pool.query(
@@ -227,41 +211,42 @@ exports.updateReport = async (req, res) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  SE APPROVE  —  PUT /api/quantity-report/approve/:id
-//  KEY TRIGGER: BOQ → finalised + sent_to_se = TRUE
-//  ⚠️  Must be registered BEFORE /:id in routes
 // ══════════════════════════════════════════════════════════════════════════════
 exports.approveReport = async (req, res) => {
   try {
-    // 1. Approve the quantity report
     const result = await pool.query(
       `UPDATE quantity_reports
        SET status = 'approved', se_comment = '', updated_at = NOW()
        WHERE id = $1 AND status = 'pending_se'
-       RETURNING id, status, boq_id`,
+       RETURNING id, status, boq_id, project_name, milestone_name`,
       [req.params.id]
     );
     if (!result.rows.length) {
       return res.status(404).json({ error: "Quantity report not found or not awaiting SE approval" });
     }
 
-    const { boq_id } = result.rows[0];
+    const { boq_id, project_name, milestone_name } = result.rows[0];
 
-    // 2. Finalise the BOQ — sent_to_se = TRUE
     await pool.query(
       `UPDATE boqs
-       SET status         = 'finalised',
-           sent_to_se     = TRUE,
-           finalised_date = CURRENT_DATE,
-           se_note        = '',
-           updated_at     = NOW()
+       SET status = 'finalised', sent_to_se = TRUE,
+           finalised_date = CURRENT_DATE, se_note = '', updated_at = NOW()
        WHERE id = $1 AND status = 'pending_se'`,
       [boq_id]
     );
 
-    console.log(`✅ BOQ #${boq_id} finalised — SE approved Quantity Report`);
+    // ── QS Notification ──────────────────────────────────────
+    await createNotificationDirect({
+      type:         "Quantity",
+      project_name: project_name,
+      milestone:    milestone_name,
+      title:        "Quantity Report Approved ✅",
+      message:      `Your quantity report for ${milestone_name} has been approved by SE. BOQ finalised.`,
+      status:       "approved",
+    });
 
     res.json({
-      message: "Quantity Report approved by SE ✅ — BOQ finalised and sent to Site Engineer!",
+      message: "Quantity Report approved by SE ✅ — BOQ finalised!",
       id:      result.rows[0].id,
       status:  "approved",
       boqId:   boq_id,
@@ -274,36 +259,40 @@ exports.approveReport = async (req, res) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  SE REJECT  —  PUT /api/quantity-report/reject/:id
-//  Body: { comment }
-//  BOQ moves back to 'rejected' → QS must edit BOQ and resubmit from pending_pm
-//  ⚠️  Must be registered BEFORE /:id in routes
 // ══════════════════════════════════════════════════════════════════════════════
 exports.rejectReport = async (req, res) => {
   try {
     const { comment } = req.body;
     const note = comment || "Please revise the quantities.";
 
-    // 1. Reject the quantity report
     const result = await pool.query(
       `UPDATE quantity_reports
        SET status = 'rejected', se_comment = $1, updated_at = NOW()
        WHERE id = $2 AND status = 'pending_se'
-       RETURNING id, status, boq_id`,
+       RETURNING id, status, boq_id, project_name, milestone_name`,
       [note, req.params.id]
     );
     if (!result.rows.length) {
       return res.status(404).json({ error: "Quantity report not found or not awaiting SE approval" });
     }
 
-    const { boq_id } = result.rows[0];
+    const { boq_id, project_name, milestone_name } = result.rows[0];
 
-    // 2. Move BOQ back to 'rejected'
     await pool.query(
-      `UPDATE boqs
-       SET status = 'rejected', se_note = $1, updated_at = NOW()
+      `UPDATE boqs SET status = 'rejected', se_note = $1, updated_at = NOW()
        WHERE id = $2`,
       [note, boq_id]
     );
+
+    // ── QS Notification ──────────────────────────────────────
+    await createNotificationDirect({
+      type:         "Quantity",
+      project_name: project_name,
+      milestone:    milestone_name,
+      title:        "Quantity Report Rejected ↩️",
+      message:      note,
+      status:       "rejected",
+    });
 
     res.json({
       message: "SE requested changes ↩️ — BOQ rejected, QS must edit and resubmit",
@@ -334,4 +323,3 @@ exports.deleteReport = async (req, res) => {
     res.status(500).json({ error: "Failed to delete quantity report: " + err.message });
   }
 };
-

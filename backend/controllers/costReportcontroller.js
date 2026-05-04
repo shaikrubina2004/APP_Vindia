@@ -1,14 +1,8 @@
 // ══════════════════════════════════════════════════════════════════════════════
 //  costReportController.js
-//  Workflow:
-//    QS creates Cost Report from pending_pm BOQ
-//    PM approves → cost_reports.status = 'approved'
-//                → boqs.status = 'pending_se'  ← KEY TRIGGER
-//    PM rejects  → cost_reports.status = 'rejected'
-//                → boqs.status = 'rejected'
-//                → QS must edit BOQ and resubmit
 // ══════════════════════════════════════════════════════════════════════════════
 const pool = require("../config/db");
+const { createNotificationDirect } = require("./qsNotificationController");
 
 // ── Auto-create table ─────────────────────────────────────────────────────────
 (async () => {
@@ -69,7 +63,6 @@ function formatReport(r) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  GET ALL  —  GET /api/cost-report
-//  Optional: ?projectId=&status=&boqId=
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getAllReports = async (req, res) => {
   try {
@@ -112,7 +105,6 @@ exports.getReportById = async (req, res) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  CREATE  —  POST /api/cost-report
-//  BOQ must be in 'pending_pm' status
 // ══════════════════════════════════════════════════════════════════════════════
 exports.createReport = async (req, res) => {
   try {
@@ -125,7 +117,6 @@ exports.createReport = async (req, res) => {
       return res.status(400).json({ error: "items must be a non-empty array" });
     }
 
-    // BOQ must exist and be pending_pm
     const boqCheck = await pool.query("SELECT id, status FROM boqs WHERE id = $1", [boqId]);
     if (!boqCheck.rows.length) {
       return res.status(404).json({ error: "Linked BOQ not found" });
@@ -136,7 +127,6 @@ exports.createReport = async (req, res) => {
       });
     }
 
-    // Only one active cost report per BOQ
     const existing = await pool.query(
       "SELECT id FROM cost_reports WHERE boq_id = $1 AND status != 'rejected'", [boqId]
     );
@@ -165,7 +155,6 @@ exports.createReport = async (req, res) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  UPDATE  —  PUT /api/cost-report/:id
-//  Only rejected/pending reports can be edited
 // ══════════════════════════════════════════════════════════════════════════════
 exports.updateReport = async (req, res) => {
   try {
@@ -210,32 +199,37 @@ exports.updateReport = async (req, res) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  PM APPROVE  —  PUT /api/cost-report/approve/:id
-//  KEY TRIGGER: BOQ moves from pending_pm → pending_se
-//  ⚠️  Must be registered BEFORE /:id in routes
 // ══════════════════════════════════════════════════════════════════════════════
 exports.approveReport = async (req, res) => {
   try {
-    // 1. Approve the cost report
     const result = await pool.query(
       `UPDATE cost_reports
        SET status = 'approved', pm_comment = '', updated_at = NOW()
        WHERE id = $1 AND status = 'pending_pm'
-       RETURNING id, status, boq_id`,
+       RETURNING id, status, boq_id, project_name, milestone_name`,
       [req.params.id]
     );
     if (!result.rows.length) {
       return res.status(404).json({ error: "Cost report not found or not awaiting PM approval" });
     }
 
-    const { boq_id } = result.rows[0];
+    const { boq_id, project_name, milestone_name } = result.rows[0];
 
-    // 2. Move BOQ from pending_pm → pending_se
     await pool.query(
-      `UPDATE boqs
-       SET status = 'pending_se', pm_note = '', updated_at = NOW()
+      `UPDATE boqs SET status = 'pending_se', pm_note = '', updated_at = NOW()
        WHERE id = $1 AND status = 'pending_pm'`,
       [boq_id]
     );
+
+    // ── QS Notification ──────────────────────────────────────
+    await createNotificationDirect({
+      type:         "Cost",
+      project_name: project_name,
+      milestone:    milestone_name,
+      title:        "Cost Report Approved ✅",
+      message:      `Your cost report for ${milestone_name} has been approved by PM.`,
+      status:       "approved",
+    });
 
     res.json({
       message: "Cost Report approved ✅ — BOQ moved to pending SE approval",
@@ -251,36 +245,40 @@ exports.approveReport = async (req, res) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  PM REJECT  —  PUT /api/cost-report/reject/:id
-//  Body: { comment }
-//  BOQ moves back to 'rejected' → QS must edit BOQ and resubmit
-//  ⚠️  Must be registered BEFORE /:id in routes
 // ══════════════════════════════════════════════════════════════════════════════
 exports.rejectReport = async (req, res) => {
   try {
     const { comment } = req.body;
     const note = comment || "Please review the cost figures.";
 
-    // 1. Reject the cost report
     const result = await pool.query(
       `UPDATE cost_reports
        SET status = 'rejected', pm_comment = $1, updated_at = NOW()
        WHERE id = $2 AND status = 'pending_pm'
-       RETURNING id, status, boq_id`,
+       RETURNING id, status, boq_id, project_name, milestone_name`,
       [note, req.params.id]
     );
     if (!result.rows.length) {
       return res.status(404).json({ error: "Cost report not found or not awaiting PM approval" });
     }
 
-    const { boq_id } = result.rows[0];
+    const { boq_id, project_name, milestone_name } = result.rows[0];
 
-    // 2. Move BOQ back to 'rejected'
     await pool.query(
-      `UPDATE boqs
-       SET status = 'rejected', pm_note = $1, updated_at = NOW()
+      `UPDATE boqs SET status = 'rejected', pm_note = $1, updated_at = NOW()
        WHERE id = $2`,
       [note, boq_id]
     );
+
+    // ── QS Notification ──────────────────────────────────────
+    await createNotificationDirect({
+      type:         "Cost",
+      project_name: project_name,
+      milestone:    milestone_name,
+      title:        "Cost Report Rejected ↩️",
+      message:      note,
+      status:       "rejected",
+    });
 
     res.json({
       message: "PM requested changes ↩️ — BOQ rejected, QS must edit and resubmit",

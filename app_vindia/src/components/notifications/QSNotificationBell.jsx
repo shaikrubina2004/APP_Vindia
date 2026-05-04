@@ -1,244 +1,255 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import "./QSNotificationBell.css";
 
-const API = "/api/qs/notifications";
+const API = "http://localhost:5000/api/qs/notifications";
+
+const TYPE_COLOR = {
+  Cost:     { bg: "#e0f2f1", text: "#0b6e72", border: "#0b6e7240" },
+  Quantity: { bg: "#dbeafe", text: "#1d4ed8", border: "#1d4ed840" },
+  Task:     { bg: "#fef3c7", text: "#d97706", border: "#d9770640" },
+  Incident: { bg: "#fee2e2", text: "#b91c1c", border: "#b91c1c40" },
+};
+
+const STATUS_COLOR = {
+  approved:  "#15803d",
+  rejected:  "#b91c1c",
+  pending:   "#d97706",
+  high:      "#ef4444",
+  finalised: "#15803d",
+};
 
 export default function QSNotificationBell() {
   const [open,          setOpen]          = useState(false);
   const [activeTab,     setActiveTab]     = useState("All");
   const [notifications, setNotifications] = useState([]);
   const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState(null);
   const panelRef = useRef(null);
+  const TABS = ["All", "Cost", "Quantity", "Task", "Incident"];
 
-  const tabs = ["All", "Cost", "Quantity", "Task", "Incident"];
-
-  // ── Fetch from backend ──
+  // ── Fetch ──
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res  = await fetch(API);
       const data = await res.json();
-      if (res.ok && Array.isArray(data.data)) {
+      if (data.success && Array.isArray(data.data)) {
         setNotifications(data.data.map((n) => ({
           id:        n.id,
-          type:      n.type || "Task",
-          project:   n.project_name  || n.project || "",
-          milestone: n.milestone     || "",
-          status:    n.status        || "pending",
-          title:     n.title         || "",
-          desc:      n.message       || n.description || "",
+          type:      n.type         || "Task",
+          project:   n.project_name || "",
+          milestone: n.milestone    || "",
+          title:     n.title        || "",
+          desc:      n.message      || "",
+          status:    n.status       || "pending",
+          unread:    !n.is_read,
           date:      n.created_at
-            ? new Date(n.created_at).toLocaleDateString("en-IN", {
-                day: "numeric", month: "short",
-              })
+            ? new Date(n.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
             : "",
-          unread: !n.is_read,
         })));
+      } else {
+        setError("Failed to load");
       }
-    } catch (_) {}
-    finally { setLoading(false); }
+    } catch (e) {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Fetch on mount + auto-refresh every 30s
+  // Auto-fetch on mount + every 30s
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    const t = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(t);
   }, [fetchNotifications]);
 
-  // Close panel when clicking outside
+  // Close on outside click
   useEffect(() => {
-    const handleClick = (e) => {
-      if (panelRef.current && !panelRef.current.contains(e.target)) {
-        setOpen(false);
-      }
+    if (!open) return;
+    const handler = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) setOpen(false);
     };
-    if (open) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
   // ── Mark all read ──
   const markAllRead = async () => {
-    try {
-      await fetch(`${API}/mark-all-read`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-      });
-      setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
-    } catch (_) {
-      // Optimistic update even if API fails
-      setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
-    }
+    const res = await fetch(`${API}/mark-all-read`, { method: "PUT" });
+    if (res.ok) setNotifications((p) => p.map((n) => ({ ...n, unread: false })));
   };
 
-  // ── Mark single read ──
+  // ── Mark one read ──
   const markRead = async (id) => {
-    try {
-      await fetch(`${API}/${id}/read`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-      });
-    } catch (_) {}
-    setNotifications((prev) =>
-      prev.map((n) => n.id === id ? { ...n, unread: false } : n)
-    );
+    await fetch(`${API}/${id}/read`, { method: "PUT" });
+    setNotifications((p) => p.map((n) => n.id === id ? { ...n, unread: false } : n));
   };
 
   const unreadCount = notifications.filter((n) => n.unread).length;
-
-  const filtered =
-    activeTab === "All"
-      ? notifications
-      : notifications.filter((n) => n.type === activeTab);
-
-  const getColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case "approved":  return "#15803d";
-      case "rejected":  return "#b91c1c";
-      case "pending":   return "#d97706";
-      case "high":      return "#d97706";
-      case "finalised": return "#15803d";
-      default:          return "#6b7280";
-    }
-  };
-
-  const getTypeColor = (type) => {
-    switch (type) {
-      case "Cost":     return "#0b6e72";
-      case "Quantity": return "#1d4ed8";
-      case "Task":     return "#d97706";
-      case "Incident": return "#b91c1c";
-      default:         return "#6b7280";
-    }
-  };
+  const filtered    = activeTab === "All" ? notifications : notifications.filter((n) => n.type === activeTab);
 
   return (
-    <div className="qsn" ref={panelRef}>
+    <div style={{ position: "relative", display: "inline-block" }} ref={panelRef}>
 
-      {/* ── Bell button ── */}
-      <button className="qsn__bell" onClick={() => setOpen(!open)}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+      {/* Bell */}
+      <button onClick={() => setOpen(!open)} style={{
+        position: "relative", background: "none", border: "none",
+        cursor: "pointer", padding: "8px", color: "#374151",
+      }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
           <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
         </svg>
         {unreadCount > 0 && (
-          <span className="qsn__badge">{unreadCount > 9 ? "9+" : unreadCount}</span>
+          <span style={{
+            position: "absolute", top: "2px", right: "2px",
+            background: "#ef4444", color: "#fff", borderRadius: "999px",
+            fontSize: "10px", fontWeight: 700, minWidth: "18px",
+            height: "18px", display: "flex", alignItems: "center",
+            justifyContent: "center", padding: "0 4px",
+          }}>
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
         )}
       </button>
 
-      {/* ── Panel ── */}
+      {/* Panel */}
       {open && (
-        <div className="qsn__panel">
-
+        <div style={{
+          position: "absolute", right: 0, top: "calc(100% + 8px)",
+          width: "380px", background: "#fff", borderRadius: "12px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.15)", zIndex: 9999,
+          border: "1px solid #e5e7eb", overflow: "hidden",
+        }}>
           {/* Header */}
-          <div className="qsn__header">
+          <div style={{
+            padding: "16px 16px 12px", borderBottom: "1px solid #f3f4f6",
+            display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+          }}>
             <div>
-              <h4 className="qsn__title">Notifications</h4>
-              <span className="qsn__unread">
+              <div style={{ fontWeight: 700, fontSize: "16px", color: "#111827" }}>Notifications</div>
+              <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
                 {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
-              </span>
+              </div>
             </div>
-            <div className="qsn__header-actions">
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               {unreadCount > 0 && (
-                <button className="qsn__mark-all" onClick={markAllRead}>
-                  ✓ Mark all read
-                </button>
+                <button onClick={markAllRead} style={{
+                  fontSize: "11px", color: "#0b6e72", background: "none",
+                  border: "none", cursor: "pointer", fontWeight: 600,
+                }}>✓ Mark all read</button>
               )}
-              <button className="qsn__refresh" onClick={fetchNotifications}
-                title="Refresh">
-                🔄
-              </button>
+              <button onClick={fetchNotifications} style={{
+                background: "none", border: "none", cursor: "pointer", fontSize: "14px",
+              }} title="Refresh">🔄</button>
             </div>
           </div>
 
           {/* Tabs */}
-          <div className="qsn__tabs">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                className={`qsn__tab ${activeTab === tab ? "active" : ""}`}
-                onClick={() => setActiveTab(tab)}
-              >
+          <div style={{
+            display: "flex", gap: "4px", padding: "10px 12px",
+            borderBottom: "1px solid #f3f4f6", overflowX: "auto",
+          }}>
+            {TABS.map((tab) => (
+              <button key={tab} onClick={() => setActiveTab(tab)} style={{
+                padding: "5px 12px", borderRadius: "999px", fontSize: "12px",
+                fontWeight: 600, border: "none", cursor: "pointer", whiteSpace: "nowrap",
+                background: activeTab === tab ? "#0b6e72" : "#f3f4f6",
+                color:      activeTab === tab ? "#fff"     : "#6b7280",
+              }}>
                 {tab}
                 {tab === "All" && unreadCount > 0 && (
-                  <span className="qsn__tab-count">{unreadCount}</span>
+                  <span style={{
+                    marginLeft: "5px", background: "#ef4444", color: "#fff",
+                    borderRadius: "999px", fontSize: "10px", padding: "1px 5px",
+                  }}>{unreadCount}</span>
                 )}
               </button>
             ))}
           </div>
 
           {/* List */}
-          <div className="qsn__list">
+          <div style={{ maxHeight: "380px", overflowY: "auto" }}>
             {loading ? (
-              <div className="qsn__loading">
-                <div className="qsn__spinner" />
+              <div style={{ padding: "40px", textAlign: "center", color: "#9ca3af" }}>
                 Loading…
               </div>
+            ) : error ? (
+              <div style={{ padding: "40px", textAlign: "center", color: "#ef4444" }}>
+                {error} — <button onClick={fetchNotifications} style={{
+                  color: "#0b6e72", background: "none", border: "none", cursor: "pointer",
+                }}>Retry</button>
+              </div>
             ) : filtered.length === 0 ? (
-              <div className="qsn__empty">
-                <span>🔔</span>
-                <p>No {activeTab === "All" ? "" : activeTab} notifications</p>
+              <div style={{ padding: "40px", textAlign: "center", color: "#9ca3af" }}>
+                <div style={{ fontSize: "32px" }}>🔔</div>
+                <div style={{ marginTop: "8px" }}>No {activeTab === "All" ? "" : activeTab} notifications</div>
               </div>
             ) : (
-              filtered.map((n) => (
-                <div
-                  key={n.id}
-                  className={`qsn__item ${n.unread ? "qsn__item--unread" : ""}`}
-                  onClick={() => n.unread && markRead(n.id)}
-                >
-                  {/* Unread dot */}
-                  <div
-                    className="qsn__dot"
-                    style={{ background: getColor(n.status) }}
-                  />
+              filtered.map((n) => {
+                const tc = TYPE_COLOR[n.type] || { bg: "#f3f4f6", text: "#6b7280", border: "#6b728040" };
+                const sc = STATUS_COLOR[n.status?.toLowerCase()] || "#6b7280";
+                return (
+                  <div key={n.id} onClick={() => n.unread && markRead(n.id)}
+                    style={{
+                      display: "flex", gap: "10px", padding: "12px 16px",
+                      borderBottom: "1px solid #f9fafb", cursor: n.unread ? "pointer" : "default",
+                      background: n.unread ? "#f0fdfa" : "#fff",
+                      transition: "background 0.2s",
+                    }}>
+                    {/* Status dot */}
+                    <div style={{
+                      width: "8px", height: "8px", borderRadius: "50%",
+                      background: sc, flexShrink: 0, marginTop: "5px",
+                    }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Type badge */}
+                      <span style={{
+                        fontSize: "10px", fontWeight: 700, padding: "2px 7px",
+                        borderRadius: "999px", background: tc.bg,
+                        color: tc.text, border: `1px solid ${tc.border}`,
+                      }}>{n.type}</span>
 
-                  <div className="qsn__content">
-                    {/* Type tag */}
-                    <span
-                      className="qsn__type"
-                      style={{
-                        background: `${getTypeColor(n.type)}18`,
-                        color: getTypeColor(n.type),
-                        border: `1px solid ${getTypeColor(n.type)}40`,
-                      }}
-                    >
-                      {n.type}
-                    </span>
+                      {/* Project */}
+                      {n.project && (
+                        <p style={{ fontSize: "11px", color: "#6b7280", margin: "4px 0 2px", fontWeight: 600 }}>
+                          {n.project}{n.milestone && <span style={{ fontWeight: 400 }}> · {n.milestone}</span>}
+                        </p>
+                      )}
 
-                    {/* Project + milestone */}
-                    {(n.project || n.milestone) && (
-                      <p className="qsn__project">
-                        {n.project}
-                        {n.milestone && (
-                          <span className="qsn__milestone"> · {n.milestone}</span>
-                        )}
+                      {/* Title */}
+                      <p style={{ fontSize: "13px", fontWeight: n.unread ? 600 : 400, color: "#111827", margin: "3px 0" }}>
+                        {n.title}
                       </p>
-                    )}
 
-                    {/* Title */}
-                    <p className="qsn__item-title">{n.title}</p>
-
-                    {/* Description */}
-                    {n.desc && <p className="qsn__desc">{n.desc}</p>}
+                      {/* Desc */}
+                      {n.desc && (
+                        <p style={{ fontSize: "12px", color: "#6b7280", margin: "2px 0 0",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {n.desc}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#9ca3af", flexShrink: 0, marginTop: "2px" }}>
+                      {n.date}
+                    </div>
                   </div>
-
-                  <div className="qsn__date">{n.date}</div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="qsn__footer">
-              <button className="qsn__view-all"
-                onClick={() => { setOpen(false); }}>
-                View all notifications
-              </button>
+            <div style={{ padding: "10px 16px", borderTop: "1px solid #f3f4f6", textAlign: "center" }}>
+              <button onClick={() => setOpen(false)} style={{
+                fontSize: "12px", color: "#0b6e72", background: "none",
+                border: "none", cursor: "pointer", fontWeight: 600,
+              }}>View all notifications</button>
             </div>
           )}
-
         </div>
       )}
     </div>
