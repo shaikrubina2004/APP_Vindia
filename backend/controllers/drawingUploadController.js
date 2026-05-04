@@ -1,6 +1,7 @@
 const pool = require("../config/db");
 const path = require("path");
 const fs = require("fs");
+const { insertMEPNotification } = require("./mepNotificationsController");
 
 /**
  * ✅ Upload a new drawing (creates drawing + first version)
@@ -95,6 +96,28 @@ exports.uploadDrawing = async (req, res) => {
     );
 
     await client.query("COMMIT");
+
+    // Notify all other MEP engineers about new drawing
+    try {
+      const projectUsers = await pool.query(
+        `SELECT u.id FROM users u
+         JOIN roles r ON r.id = u.role_id
+         WHERE r.code = 'mep_engineer' AND u.id != $1`,
+        [uploaded_by],
+      );
+      for (const u of projectUsers.rows) {
+        await insertMEPNotification(
+          u.id,
+          "drawing",
+          `New Drawing Uploaded — ${name}`,
+          `${sub_discipline} drawing ${drawing_number} uploaded.`,
+          "info",
+          drawing.id,
+        );
+      }
+    } catch (notifErr) {
+      console.error("Notify error (non-fatal):", notifErr.message);
+    }
 
     res.status(201).json({
       drawing: drawing,
@@ -274,6 +297,29 @@ exports.approveDrawing = async (req, res) => {
       return res.status(404).json({ error: "Version not found" });
     }
 
+    // Notify drawing uploader about approval (non-fatal)
+    try {
+      const versionOwner = await pool.query(
+        `SELECT dv.uploaded_by, d.name FROM drawing_versions dv
+         JOIN drawings d ON d.id = dv.drawing_id
+         WHERE dv.id = $1`,
+        [version_id],
+      );
+      const owner = versionOwner.rows[0];
+      if (owner?.uploaded_by) {
+        await insertMEPNotification(
+          owner.uploaded_by,
+          "approval",
+          `Drawing ${status} — ${owner.name}`,
+          `Your drawing was ${status.toLowerCase()} by the ${role.toUpperCase()} team.`,
+          status === "Approved" ? "ok" : "warn",
+          version_id,
+        );
+      }
+    } catch (notifErr) {
+      console.error("Approval notify error (non-fatal):", notifErr.message);
+    }
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error("🔥 APPROVE ERROR:", err.message);
@@ -393,14 +439,70 @@ exports.flagClash = async (req, res) => {
       ],
     );
 
-    // TODO: Create linked incident here and write incident_id back
-    // const incident = await createIncident(...)
-    // await client.query(
-    //   `UPDATE drawing_clashes SET incident_id = $1 WHERE id = $2`,
-    //   [incident.id, result.rows[0].id]
-    // );
+    // Auto-create incident for this clash
+    const clash = result.rows[0];
+
+    // Get drawing owner (assigned_to) from drawing_id_2 (the drawing being clashed against)
+    const drawingOwner = await client.query(
+      `SELECT created_by FROM drawings WHERE id = $1`,
+      [drawing_id_1],
+    );
+    const assigned_to = drawingOwner.rows[0]?.created_by || null;
+
+    // Get drawing names for incident title
+    const drawingNames = await client.query(
+      `SELECT d1.name AS name1, d2.name AS name2
+       FROM drawings d1, drawings d2
+       WHERE d1.id = $1 AND d2.id = $2`,
+      [drawing_id_1, drawing_id_2],
+    );
+    const name1 = drawingNames.rows[0]?.name1 || "Drawing 1";
+    const name2 = drawingNames.rows[0]?.name2 || "Drawing 2";
+
+    const incidentResult = await client.query(
+      `INSERT INTO incidents
+        (title, description, priority, status,
+         created_by, assigned_to)
+       VALUES ($1, $2, 'P2', 'Created', $3, $4)
+       RETURNING id`,
+      [
+        `Clash: ${name1} vs ${name2}`,
+        `${clash_type} — ${description}. Clash flagged on drawing "${name1}" conflicting with "${name2}".`,
+        raised_by_id,
+        assigned_to,
+      ],
+    );
+
+    // Link incident back to clash
+    if (incidentResult.rows.length > 0) {
+      await client.query(
+        `UPDATE drawing_clashes SET incident_id = $1 WHERE id = $2`,
+        [incidentResult.rows[0].id, clash.id],
+      );
+    }
 
     await client.query("COMMIT");
+
+    // Notify drawing owner about the clash (non-fatal)
+    try {
+      const drawingCreator = await pool.query(
+        `SELECT created_by FROM drawings WHERE id = $1`,
+        [drawing_id_1],
+      );
+      const ownerId = drawingCreator.rows[0]?.created_by;
+      if (ownerId && ownerId !== raised_by_id) {
+        await insertMEPNotification(
+          ownerId,
+          "clash",
+          `Clash Flagged on Your Drawing`,
+          `${clash_type} — ${description}`,
+          "warn",
+          clash.id,
+        );
+      }
+    } catch (notifErr) {
+      console.error("Clash notify error (non-fatal):", notifErr.message);
+    }
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -457,6 +559,7 @@ exports.getClashesByDrawing = async (req, res) => {
          c.resolved_at,
          c.version_id_1,
          c.version_id_2,
+         c.incident_id,
          d1.id   AS drawing_1_id,
          d1.name AS drawing_1_name,
          d2.id   AS drawing_2_id,

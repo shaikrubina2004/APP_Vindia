@@ -773,6 +773,20 @@ function VersionsPanel({
                             {" · "}
                             {new Date(c.created_at).toLocaleDateString()}
                             {" · "}Status: <strong>{c.status}</strong>
+                            {c.incident_id && (
+                              <span>
+                                {" · "}
+                                <a
+                                  href={`/incidents/${c.incident_id}`}
+                                  style={{
+                                    color: "var(--primary-blue)",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  🔗 View Incident
+                                </a>
+                              </span>
+                            )}
                           </span>
                           {currentUserId &&
                             c.raised_by_id === currentUserId &&

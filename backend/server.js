@@ -19,6 +19,7 @@ const attendanceRoutes = require("./routes/attendanceRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const drawingUploadRoutes = require("./routes/drawingUploadRoutes");
+const mepNotifRoutes = require("./routes/mepNotificationsRoutes");
 
 /* ── PROJECT MODULE ──────────────────────────────────────── */
 const projectRoutes = require("./routes/projectRoutes");
@@ -132,16 +133,17 @@ try {
 
   /* ── QS Modules ───────────────── */
   app.use("/api/qs/notifications", qsNotifRoutes);
-  app.use("/api/qs", qsRoutes);            
+  app.use("/api/qs", qsRoutes);
   app.use("/api/boq", boqRoutes);
   app.use("/api/cost-report", costReportRoutes);
   app.use("/api/quantity-report", quantityReportRoutes);
-   // ← NEW
+  // ← NEW
 
   /* ── Other Modules ───────────────── */
   app.use("/api/timesheets", timesheetRoutes);
   app.use("/api/daily-reports", dailyRoutes);
   app.use("/api/analysis", analysisRoutes);
+  app.use("/api/mep-notifications", mepNotifRoutes);
 
   /* ── Incident Module ───────────────────────────────────── */
   app.use("/api/incidents", incidentRoutes);
@@ -169,7 +171,6 @@ try {
   /* ── BDA / Leads ───────────────────────────────────────── */
   app.use("/api/leads", leadRoutes);
   app.use("/api/reports", reportRoutes);
-
 } catch (err) {
   console.error("❌ Route loading error:", err.message);
 }
@@ -178,7 +179,7 @@ try {
    404 + GLOBAL ERROR HANDLER
 ═══════════════════════════════════════════════════════════ */
 app.use((_req, res) =>
-  res.status(404).json({ success: false, message: "Route not found" })
+  res.status(404).json({ success: false, message: "Route not found" }),
 );
 
 app.use((err, _req, res, _next) => {
