@@ -5,7 +5,7 @@ import { useAuth } from "../../context/useAuth";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import SENotificationBell from "../../components/notifications/SENotificationBell";
 import QSNotificationBell from "../../components/notifications/QSNotificationBell";
-import MEPNotificationBell from "../../components/notifications/MEPNotificationBell";
+import MEPNotificationBell from "../../components/notifications/MepNotifications";
 import "../../styles/layout/Navbar.css";
 import logo from "../../assets/logo.png.png";
 
