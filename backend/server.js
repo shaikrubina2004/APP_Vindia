@@ -11,6 +11,7 @@ const uploadDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
+
 /* ── EXISTING ROUTES ─────────────────────────────────────── */
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -62,7 +63,8 @@ const seNotificationRoutes = require("./routes/seNotificationRoutes");
 const qsRoutes = require("./routes/qsRoutes");
 const boqRoutes = require("./routes/boqRoutes");
 const costReportRoutes = require("./routes/costReportRoutes");
-const quantityReportRoutes = require("./routes/quantityReportRoutes");
+const quantityReportRoutes = require("./routes/Quantityreportroutes js");
+const qsNotifRoutes = require("./routes/qsNotificationRoutes"); // ← NEW
 
 /* ── BDA / Leads ───────────────────────────────────────── */
 const leadRoutes = require("./routes/leadRoutes");
@@ -123,18 +125,21 @@ try {
 
   /* ── Structural Engineer Modules ───────────────── */
   app.use("/api/structural", structuralRoutes);
-  app.use("/api/se-daily-reports", seDailyRoutes); // ✅ SE route
-app.use("/api/rfis", rfiRoutes);   // ← changed from /rfis to /api/rfis
-// ✅ Use the import from the top of the file
-app.use("/api/se-notifications", seNotificationRoutes);  /* ── QS Modules ───────────────── */
-  app.use("/api/qs", qsRoutes);
-  app.use("/api/qs", qsRoutes);
- app.use("/api/boq", boqRoutes);
- app.use("/api/cost-report", costReportRoutes);
- app.use("/api/quantity-report", quantityReportRoutes);
+  app.use("/api/se-daily-reports", seDailyRoutes);
+  app.use("/api/rfis", rfiRoutes);
+  app.use("/api/se-notifications", seNotificationRoutes);
+
+  /* ── QS Modules ───────────────── */
+  app.use("/api/qs/notifications", qsNotifRoutes);
+  app.use("/api/qs", qsRoutes);            
+  app.use("/api/boq", boqRoutes);
+  app.use("/api/cost-report", costReportRoutes);
+  app.use("/api/quantity-report", quantityReportRoutes);
+   // ← NEW
+
   /* ── Other Modules ───────────────── */
   app.use("/api/timesheets", timesheetRoutes);
-  app.use("/api/daily-reports", dailyRoutes); // ✅ normal route
+  app.use("/api/daily-reports", dailyRoutes);
   app.use("/api/analysis", analysisRoutes);
 
   /* ── Incident Module ───────────────────────────────────── */
@@ -145,21 +150,24 @@ app.use("/api/se-notifications", seNotificationRoutes);  /* ── QS Modules �
   app.use("/api/templates", templateRoutes);
   app.use("/api/pc-notifications", pcNotificationsRouter);
 
-  /* ── 🔥 Architect ─────────────────────── */
+  /* ── Architect ─────────────────────── */
   app.use("/api/architect", architectProjectsRoutes);
   app.use("/api/architect-daily-log", architectDailyLogRoutes);
   app.use("/api/architect-designs", architectDesignRoutes);
   app.use("/api/architect-drawings", architectDrawingUploadRoutes);
+
   /* ── Site Engineer Modules ─────────────────────────────── */
-  app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes); // Site Engineer RFI
+  app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes);
   app.use("/api/ncr", ncrRoutes);
   app.use("/api/diary", siteDiaryRoutes);
   app.use("/api/activity-log", activityLogRoutes);
   app.use("/api/progress", progressRoutes);
   app.use("/api/site-engineer-dashboard", siteEngineerDashboardRoutes);
   app.use("/api/drawings", drawingUploadRoutes);
+
   /* ── BDA / Leads ───────────────────────────────────────── */
   app.use("/api/leads", leadRoutes);
+
 } catch (err) {
   console.error("❌ Route loading error:", err.message);
 }
@@ -168,10 +176,9 @@ app.use("/api/se-notifications", seNotificationRoutes);  /* ── QS Modules �
    404 + GLOBAL ERROR HANDLER
 ═══════════════════════════════════════════════════════════ */
 app.use((_req, res) =>
-  res.status(404).json({ success: false, message: "Route not found" }),
+  res.status(404).json({ success: false, message: "Route not found" })
 );
 
-// eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   console.error("Unhandled error:", err);
   res.status(err.status || 500).json({
