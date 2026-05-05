@@ -13,7 +13,7 @@ const TYPE_CONFIG = {
     bg:     "#fee2e2",
     border: "#fca5a5",
     icon:   "⚠️",
-    route:  (n) => `/qs/incidents${n.reference_id ? `?highlight=${n.reference_id}` : ""}`,
+    route:  (n) => `/quantity-surveyor/incident${n.reference_id ? `?highlight=${n.reference_id}` : ""}`,
   },
   task: {
     label:  "Task",
@@ -21,7 +21,7 @@ const TYPE_CONFIG = {
     bg:     "#fef3c7",
     border: "#fcd34d",
     icon:   "✅",
-    route:  (n) => `/qs/incidents?page=tasks${n.reference_id ? `&highlight=${n.reference_id}` : ""}`,
+    route:  (n) => `/quantity-surveyor/incident?page=tasks${n.reference_id ? `&highlight=${n.reference_id}` : ""}`,
   },
   cost: {
     label:  "Cost",
@@ -29,7 +29,7 @@ const TYPE_CONFIG = {
     bg:     "#d1fae5",
     border: "#6ee7b7",
     icon:   "💰",
-    route:  () => `/qs/cost-report`,
+    route:  () => `/quantity-surveyor/cost-report`,
   },
   quantity: {
     label:  "Quantity",
@@ -37,9 +37,8 @@ const TYPE_CONFIG = {
     bg:     "#dbeafe",
     border: "#93c5fd",
     icon:   "📐",
-    route:  () => `/qs/quantity-report`,
+    route:  () => `/quantity-surveyor/quantity-report`,
   },
- 
 };
 
 const SEVERITY_DOT = {
@@ -55,8 +54,8 @@ const TABS = ["All", "Incident", "Task", "Cost", "Quantity"];
 function timeAgo(dateStr) {
   if (!dateStr) return "";
   const diff = (Date.now() - new Date(dateStr)) / 1000;
-  if (diff < 60)   return "Just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 60)    return "Just now";
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 }
@@ -81,7 +80,7 @@ export default function QSNotificationBell() {
   const [error,         setError]         = useState(null);
   const panelRef = useRef(null);
 
-  /* ── Fetch ────────────────────────────────────────────────── */
+  /* ── Fetch — only shows UNREAD notifications ──────────────── */
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -89,17 +88,20 @@ export default function QSNotificationBell() {
       const res  = await fetch(API);
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
+        // Only keep unread ones — read notifications never appear in the bell
         setNotifications(
-          data.data.map((n) => ({
-            id:           n.id,
-            type:         normaliseType(n.type),
-            title:        n.title        || "",
-            desc:         n.message      || n.description || "",
-            severity:     n.severity     || "info",
-            reference_id: n.reference_id || null,
-            unread:       !n.is_read,
-            date:         n.created_at,
-          }))
+          data.data
+            .filter((n) => !n.is_read)
+            .map((n) => ({
+              id:           n.id,
+              type:         normaliseType(n.type),
+              title:        n.title        || "",
+              desc:         n.message      || n.description || "",
+              severity:     n.severity     || "info",
+              reference_id: n.reference_id || null,
+              unread:       true,
+              date:         n.created_at,
+            }))
         );
       } else {
         setError("Failed to load");
@@ -132,37 +134,35 @@ export default function QSNotificationBell() {
   const markAllRead = async () => {
     try {
       await fetch(`${API}/mark-all-read`, { method: "PUT" });
-      setNotifications((p) => p.map((n) => ({ ...n, unread: false })));
+      // Remove ALL from local state — list becomes empty
+      setNotifications([]);
     } catch { /* silent */ }
   };
 
   const handleNotificationClick = async (n) => {
-    /* Mark read */
-    if (n.unread) {
-      try {
-        await fetch(`${API}/${n.id}/read`, { method: "PUT" });
-        setNotifications((p) =>
-          p.map((x) => x.id === n.id ? { ...x, unread: false } : x)
-        );
-      } catch { /* silent */ }
-    }
+    // 1. Remove from local list immediately — it disappears from the bell right away
+    setNotifications((prev) => prev.filter((x) => x.id !== n.id));
 
-    /* Navigate to the right page */
-    const cfg = TYPE_CONFIG[n.type];
-    if (cfg) {
-      setOpen(false);
-      navigate(cfg.route(n));
-    }
+    // 2. Mark as read in DB (awaited so re-fetch won't bring it back)
+    try {
+      await fetch(`${API}/${n.id}/read`, { method: "PUT" });
+    } catch { /* silent */ }
+
+    // 3. Close panel
+    setOpen(false);
+
+    // 4. Navigate to the relevant page
+    const cfg   = TYPE_CONFIG[n.type];
+    const route = cfg ? cfg.route(n) : "/quantity-surveyor/incident";
+    navigate(route);
   };
 
   /* ── Derived ──────────────────────────────────────────────── */
-  const unreadCount = notifications.filter((n) => n.unread).length;
+  const unreadCount = notifications.length; // all items in state are unread
 
   const filtered = activeTab === "All"
     ? notifications
-    : notifications.filter(
-        (n) => n.type === activeTab.toLowerCase()
-      );
+    : notifications.filter((n) => n.type === activeTab.toLowerCase());
 
   /* ── Render ───────────────────────────────────────────────── */
   return (
@@ -219,18 +219,18 @@ export default function QSNotificationBell() {
           {/* Tabs */}
           <div className="qsnb-tabs">
             {TABS.map((tab) => {
-              const tabType = tab.toLowerCase();
+              const tabType   = tab.toLowerCase();
               const tabUnread = tab === "All"
                 ? unreadCount
-                : notifications.filter((n) => n.type === tabType && n.unread).length;
+                : notifications.filter((n) => n.type === tabType).length;
               const cfg = TYPE_CONFIG[tabType];
               return (
                 <button
                   key={tab}
                   className={`qsnb-tab ${activeTab === tab ? "qsnb-tab--active" : ""}`}
                   style={activeTab === tab && cfg ? {
-                    background: cfg.bg,
-                    color: cfg.color,
+                    background:  cfg.bg,
+                    color:       cfg.color,
                     borderColor: cfg.border,
                   } : {}}
                   onClick={() => setActiveTab(tab)}
@@ -265,20 +265,24 @@ export default function QSNotificationBell() {
             ) : (
               filtered.map((n) => {
                 const cfg = TYPE_CONFIG[n.type] || {
-                  label: n.type, color: "#6b7280", bg: "#f3f4f6",
-                  border: "#d1d5db", icon: "📌",
-                  route: () => "/qs/incidents",
+                  label:  n.type,
+                  color:  "#6b7280",
+                  bg:     "#f3f4f6",
+                  border: "#d1d5db",
+                  icon:   "📌",
+                  route:  () => "/quantity-surveyor/incident",
                 };
                 const dotColor = SEVERITY_DOT[n.severity] || SEVERITY_DOT.info;
 
                 return (
                   <div
                     key={n.id}
-                    className={`qsnb-item ${n.unread ? "qsnb-item--unread" : ""}`}
+                    className="qsnb-item qsnb-item--unread"
                     onClick={() => handleNotificationClick(n)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => e.key === "Enter" && handleNotificationClick(n)}
+                    style={{ cursor: "pointer" }}
                   >
                     {/* Left severity dot */}
                     <div
@@ -288,13 +292,14 @@ export default function QSNotificationBell() {
 
                     {/* Body */}
                     <div className="qsnb-item-body">
+
                       {/* Type pill + time */}
                       <div className="qsnb-item-top">
                         <span
                           className="qsnb-type-pill"
                           style={{
-                            background: cfg.bg,
-                            color: cfg.color,
+                            background:  cfg.bg,
+                            color:       cfg.color,
                             borderColor: cfg.border,
                           }}
                         >
@@ -304,7 +309,7 @@ export default function QSNotificationBell() {
                       </div>
 
                       {/* Title */}
-                      <p className={`qsnb-title ${n.unread ? "qsnb-title--bold" : ""}`}>
+                      <p className="qsnb-title qsnb-title--bold">
                         {n.title}
                       </p>
 
@@ -322,12 +327,10 @@ export default function QSNotificationBell() {
                     </div>
 
                     {/* Unread indicator bar */}
-                    {n.unread && (
-                      <div
-                        className="qsnb-unread-bar"
-                        style={{ background: cfg.color }}
-                      />
-                    )}
+                    <div
+                      className="qsnb-unread-bar"
+                      style={{ background: cfg.color }}
+                    />
                   </div>
                 );
               })
@@ -339,12 +342,13 @@ export default function QSNotificationBell() {
             <div className="qsnb-footer">
               <button
                 className="qsnb-view-all"
-                onClick={() => { setOpen(false); navigate("/qs/notifications"); }}
+                onClick={() => { setOpen(false); navigate("/quantity-surveyor/dashboard"); }}
               >
                 View all notifications
               </button>
             </div>
           )}
+
         </div>
       )}
     </div>

@@ -4,7 +4,7 @@ const protect = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
-    console.log("HEADER:", authHeader); // 👈 ADD HERE
+    console.log("HEADER:", authHeader);
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "No token provided" });
@@ -12,14 +12,21 @@ const protect = (req, res, next) => {
 
     const token = authHeader.split(" ")[1];
 
+    // ── Debug: check if JWT_SECRET is loaded ──
+    console.log("JWT_SECRET loaded?", !!process.env.JWT_SECRET);
+    console.log("JWT_SECRET value:", process.env.JWT_SECRET);
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = decoded;
+    console.log("✅ DECODED:", decoded);
 
+    req.user = decoded;
     next();
+
   } catch (err) {
-    console.error("Auth error:", err.message);
-    return res.status(401).json({ message: "Invalid token" });
+    console.error("❌ JWT ERROR:", err.message); // tells us exact reason
+    return res.status(401).json({ message: "Invalid token", detail: err.message });
   }
 };
+
 module.exports = protect;

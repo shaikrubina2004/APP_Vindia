@@ -8,6 +8,12 @@ Chart.register(...registerables);
 
 const API = "http://localhost:5000";
 
+// ── Auth header helper ──────────────────────────────────────
+const authHeaders = () => {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 const timeAgo = (date) => {
   const seconds = Math.floor((new Date() - new Date(date)) / 1000);
   if (seconds < 60) return "Just now";
@@ -53,17 +59,20 @@ export default function QuantitySurveyorDashboard() {
   // ── Fetch all data ──────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
+    const headers = authHeaders();
+
     try {
       const [dashRes, costRes, qtyRes, boqRes, taskRes, incRes] = await Promise.allSettled([
-        axios.get(`${API}/api/qs/dashboard`),
-        axios.get(`${API}/api/cost-report`),
-        axios.get(`${API}/api/quantity-report`),
-        axios.get(`${API}/api/boq`),
-        axios.get(`${API}/api/incidents/tasks`),
-        axios.get(`${API}/api/incidents`),
+        axios.get(`${API}/api/qs/dashboard`,    { headers }),
+        axios.get(`${API}/api/cost-report`,     { headers }),
+        axios.get(`${API}/api/quantity-report`, { headers }),
+        axios.get(`${API}/api/boq`,             { headers }),
+        axios.get(`${API}/api/incidents/tasks`, { headers }),
+        axios.get(`${API}/api/incidents`,       { headers }),
       ]);
 
       if (dashRes.status === "fulfilled") setDashboard(dashRes.value.data?.data);
+
       if (costRes.status === "fulfilled") {
         const d = costRes.value.data;
         setCostReports(Array.isArray(d) ? d : d?.data || []);
@@ -94,12 +103,18 @@ export default function QuantitySurveyorDashboard() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // ── KPI derived values ──────────────────────────────────────
-  const totalCost     = costReports.reduce((s, r) => s + (parseFloat(r.totalCost || r.total_cost) || 0), 0);
-  const totalQty      = quantityReports.reduce((s, r) => s + (parseInt(r.totalItems || r.total_items) || 0), 0);
-  const totalBoq      = boqItems.length;
-  const pendingTasks  = tasks.filter(t => t.status === "Pending" || t.status === "In Progress").length;
-  const openIncidents = incidents.filter(i => !["Resolved", "Closed"].includes(i.status)).length;
-  const totalProjects = dashboard?.totalProjects || 0;
+  const totalCost    = costReports.reduce((s, r) => s + (parseFloat(r.totalCost || r.total_cost) || 0), 0);
+  const totalQty     = quantityReports.reduce((s, r) => s + (parseInt(r.totalItems || r.total_items) || 0), 0);
+  const totalBoq     = boqItems.length;
+
+  const pendingTasks  = tasks.filter(t =>
+    !["Done", "Resolved", "Closed", "done", "resolved", "closed"].includes(t.status)
+  );
+  const openIncidents = incidents.filter(i =>
+    !["Resolved", "Closed", "resolved", "closed"].includes(i.status)
+  );
+
+  const totalProjects   = dashboard?.totalProjects || 0;
   const projectLocation = dashboard?.location || "Multiple Sites";
 
   // ── Chart ───────────────────────────────────────────────────
@@ -218,7 +233,8 @@ export default function QuantitySurveyorDashboard() {
       {/* ── KPI CARDS ── */}
       <section className="qs-kpi-row">
 
-        <div className="qs-kpi-card kpi-navy" onClick={() => navigate("/cost-report")}>
+        <div className="qs-kpi-card kpi-navy"
+          onClick={() => navigate("/quantity-surveyor/cost-report")}>
           <div className="qk-top">
             <span className="qk-label">Total Cost</span>
             <span className="qk-icon">💰</span>
@@ -227,7 +243,8 @@ export default function QuantitySurveyorDashboard() {
           <div className="qk-foot">{costReports.length} cost reports</div>
         </div>
 
-        <div className="qs-kpi-card kpi-teal" onClick={() => navigate("/quantity-report")}>
+        <div className="qs-kpi-card kpi-teal"
+          onClick={() => navigate("/quantity-surveyor/quantity-report")}>
           <div className="qk-top">
             <span className="qk-label">Total Quantity</span>
             <span className="qk-icon">📐</span>
@@ -236,7 +253,8 @@ export default function QuantitySurveyorDashboard() {
           <div className="qk-foot">{quantityReports.length} qty reports</div>
         </div>
 
-        <div className="qs-kpi-card kpi-blue" onClick={() => navigate("/boq")}>
+        <div className="qs-kpi-card kpi-blue"
+          onClick={() => navigate("/quantity-surveyor/boq")}>
           <div className="qk-top">
             <span className="qk-label">BOQ Items</span>
             <span className="qk-icon">📋</span>
@@ -245,21 +263,23 @@ export default function QuantitySurveyorDashboard() {
           <div className="qk-foot">across all milestones</div>
         </div>
 
-        <div className="qs-kpi-card kpi-amber" onClick={() => navigate("/tasks")}>
+        <div className="qs-kpi-card kpi-amber"
+          onClick={() => navigate("/quantity-surveyor/incident?page=tasks")}>
           <div className="qk-top">
             <span className="qk-label">Pending Tasks</span>
             <span className="qk-icon">✅</span>
           </div>
-          <div className="qk-value">{pendingTasks}</div>
+          <div className="qk-value">{pendingTasks.length}</div>
           <div className="qk-foot">{tasks.length} total tasks</div>
         </div>
 
-        <div className="qs-kpi-card kpi-red" onClick={() => navigate("/incidents")}>
+        <div className="qs-kpi-card kpi-red"
+          onClick={() => navigate("/quantity-surveyor/incident")}>
           <div className="qk-top">
             <span className="qk-label">Open Incidents</span>
             <span className="qk-icon">⚠️</span>
           </div>
-          <div className="qk-value">{openIncidents}</div>
+          <div className="qk-value">{openIncidents.length}</div>
           <div className="qk-foot">{incidents.length} total incidents</div>
         </div>
 
@@ -268,10 +288,18 @@ export default function QuantitySurveyorDashboard() {
       {/* ── QUICK ACTIONS ── */}
       <section className="qs-actions">
         <span className="qa-label">Quick Actions:</span>
-        <button className="qa-btn qa-navy"  onClick={() => navigate("/boq")}>+ BOQ Item</button>
-   
-        <button className="qa-btn qa-amber" onClick={() => navigate("/tasks")}>+ Task</button>
-        <button className="qa-btn qa-red"   onClick={() => navigate("/incidents")}>+ Incident</button>
+        <button className="qa-btn qa-navy"
+          onClick={() => navigate("/quantity-surveyor/boq")}>
+          + BOQ Item
+        </button>
+        <button className="qa-btn qa-amber"
+          onClick={() => navigate("/quantity-surveyor/incident?page=tasks")}>
+          + Task
+        </button>
+        <button className="qa-btn qa-red"
+          onClick={() => navigate("/quantity-surveyor/incident")}>
+          + Incident
+        </button>
       </section>
 
       {/* ── CHART + BOQ ── */}
@@ -284,7 +312,10 @@ export default function QuantitySurveyorDashboard() {
               <div className="qsc-title">Cost vs Quantity Analysis</div>
               <div className="qsc-sub">Monthly comparison of spending and work progress</div>
             </div>
-            <button className="vbtn" onClick={() => navigate("/cost-report")}>Full Report →</button>
+            <button className="vbtn"
+              onClick={() => navigate("/quantity-surveyor/cost-report")}>
+              Full Report →
+            </button>
           </div>
           <div className="chart-stats-row">
             <div className="cstat">
@@ -331,7 +362,10 @@ export default function QuantitySurveyorDashboard() {
         <div className="qs-card boq-card">
           <div className="qsc-hd">
             <div className="qsc-title">BOQ Summary</div>
-            <button className="vbtn" onClick={() => navigate("/boq")}>View All →</button>
+            <button className="vbtn"
+              onClick={() => navigate("/quantity-surveyor/boq")}>
+              View All →
+            </button>
           </div>
           <div className="boq-list">
             {boqItems.length === 0 ? (
@@ -364,7 +398,10 @@ export default function QuantitySurveyorDashboard() {
         <div className="qs-card tasks-card">
           <div className="qsc-hd">
             <div className="qsc-title">Pending Tasks</div>
-            <button className="vbtn" onClick={() => navigate("/tasks")}>All Tasks →</button>
+            <button className="vbtn"
+              onClick={() => navigate("/quantity-surveyor/incident?page=tasks")}>
+              All Tasks →
+            </button>
           </div>
           <table className="qs-table">
             <thead>
@@ -376,15 +413,19 @@ export default function QuantitySurveyorDashboard() {
               </tr>
             </thead>
             <tbody>
-              {tasks.length === 0 ? (
-                <tr><td colSpan="4" className="empty-td">No tasks found</td></tr>
+              {pendingTasks.length === 0 ? (
+                <tr><td colSpan="4" className="empty-td">No pending tasks</td></tr>
               ) : (
-                tasks.slice(0, 5).map((t, i) => (
-                  <tr key={t.id || i}>
+                pendingTasks.slice(0, 5).map((t, i) => (
+                  <tr key={t.id || i}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => navigate("/quantity-surveyor/incident?page=tasks")}>
                     <td className="td-title">{t.title}</td>
-                    <td className="td-person">{t.assignee_name || "—"}</td>
+                    <td className="td-person">
+                      {t.assignee_name || t.assigned_to_name || "—"}
+                    </td>
                     <td>
-                      <span className={`pri-badge pri-${(t.priority || "P2").toLowerCase()}`}>
+                      <span className={`pri-badge pri-${(t.priority || "p2").toLowerCase()}`}>
                         {t.priority || "P2"}
                       </span>
                     </td>
@@ -400,14 +441,20 @@ export default function QuantitySurveyorDashboard() {
         <div className="qs-card incidents-card">
           <div className="qsc-hd">
             <div className="qsc-title">Recent Incidents</div>
-            <button className="vbtn" onClick={() => navigate("/incidents")}>All →</button>
+            <button className="vbtn"
+              onClick={() => navigate("/quantity-surveyor/incident")}>
+              All →
+            </button>
           </div>
           <div className="inc-list">
             {incidents.length === 0 ? (
               <div className="empty-state">No incidents found</div>
             ) : (
               incidents.slice(0, 5).map((inc, i) => (
-                <div key={inc.id || i} className="inc-row">
+                <div key={inc.id || i}
+                  className="inc-row"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => navigate("/quantity-surveyor/incident")}>
                   <div className={`inc-dot ${
                     ["Resolved", "Closed"].includes(inc.status)
                       ? "dot-green"

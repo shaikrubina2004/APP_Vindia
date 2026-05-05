@@ -1,9 +1,39 @@
 import React from "react";
 
 function ProjectCard({ proj, isActive, onClick, variant, children }) {
+   const statusStyles = {
+    Active: {
+      bg: "#dcfce7",
+      color: "#16a34a",
+    },
+    "In Progress": {
+      bg: "#dbeafe",
+      color: "#2563eb",
+    },
+    Pending: {
+      bg: "#fff7ed",
+      color: "#92400e",
+    },
+    Completed: {
+      bg: "#ecfdf5",
+      color: "#166534",
+    },
+    Rejected: {
+      bg: "#fef2f2",
+      color: "#991b1b",
+    },
+  };
+
+  const style = statusStyles[proj?.status] || {
+    bg: "#f3f4f6",
+    color: "#374151",
+  };
 
   // ✅ Safe check (prevents crash)
   if (!proj && !children) return null;
+ 
+
+
 
  return (
   <div
@@ -17,29 +47,14 @@ function ProjectCard({ proj, isActive, onClick, variant, children }) {
         <div className="card-header">
           <h3>{proj.name}</h3>
 
-          <span
+        <span
   className="status-badge"
   style={{
-    backgroundColor:
-      proj?.status === "Pending"
-        ? "#fff7ed"
-        : proj?.status === "Completed"
-        ? "#ecfdf5"
-        : proj?.status === "Rejected"
-        ? "#fef2f2"
-        : "#eef4ff",
-
-    color:
-      proj?.status === "Pending"
-        ? "#92400e"
-        : proj?.status === "Completed"
-        ? "#166534"
-        : proj?.status === "Rejected"
-        ? "#991b1b"
-        : "#1e40af",
+    backgroundColor: style.bg,
+    color: style.color,
   }}
 >
-  {proj.status}
+  {proj.status || "Active"}
 </span>
         </div>
 
