@@ -16,17 +16,30 @@ function formatDateTime(d) {
   if (!d) return "—";
   return new Date(d).toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
 }
+
+/* Compare only date part (ignore time) */
+function toDateOnly(d) {
+  const dt = new Date(d);
+  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+}
+function todayDate() {
+  const t = new Date();
+  return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+}
 function isToday(d) {
   if (!d) return false;
-  const t = new Date(); const dd = new Date(d);
-  return dd.getFullYear()===t.getFullYear() && dd.getMonth()===t.getMonth() && dd.getDate()===t.getDate();
+  return toDateOnly(d).getTime() === todayDate().getTime();
 }
 function isOverdue(d) {
   if (!d) return false;
-  return new Date(d) < new Date(new Date().setHours(0,0,0,0));
+  return toDateOnly(d).getTime() < todayDate().getTime();
+}
+function isUpcoming(d) {
+  if (!d) return false;
+  return toDateOnly(d).getTime() > todayDate().getTime();
 }
 function daysOverdue(d) {
-  const diff = new Date(new Date().setHours(0,0,0,0)) - new Date(d);
+  const diff = todayDate() - toDateOnly(d);
   return Math.floor(diff / 86400000);
 }
 
@@ -169,7 +182,7 @@ const LeadCard = ({ lead, badge, onFollowUp }) => (
   <div className={`fu-card fu-card--${badge}`}>
     {badge === "overdue" && (
       <div className="fu-card__overdue-bar">
-        ⚠ {daysOverdue(lead.next_followup)} day{daysOverdue(lead.next_followup)!==1?"s":""} overdue
+        ⚠ {daysOverdue(lead.next_followup)} day{daysOverdue(lead.next_followup) !== 1 ? "s" : ""} overdue
       </div>
     )}
     {badge === "today" && (
@@ -177,6 +190,9 @@ const LeadCard = ({ lead, badge, onFollowUp }) => (
     )}
     {badge === "upcoming" && (
       <div className="fu-card__upcoming-bar">🔔 {formatDate(lead.next_followup)}</div>
+    )}
+    {badge === "all" && (
+      <div className="fu-card__all-bar">📋 Follow-up</div>
     )}
 
     <div className="fu-card__body">
@@ -194,7 +210,7 @@ const LeadCard = ({ lead, badge, onFollowUp }) => (
 
     <div className="fu-card__footer">
       <span className="fu-card__source">{lead.source || "Manual"}</span>
-      {lead.assigned_to && <span className="fu-card__assign">👤 {lead.assigned_to}</span>}
+      {lead.assigned_to && <span className="fu-card__assign">👤 {lead.assigned_to.trim()}</span>}
       <button className="fu-card__btn" onClick={() => onFollowUp(lead)}>
         + Follow Up
       </button>
@@ -207,10 +223,10 @@ const LeadCard = ({ lead, badge, onFollowUp }) => (
 ════════════════════════════════════════ */
 const BDAFollowUp = () => {
   const navigate = useNavigate();
-  const [loading, setLoading]     = useState(true);
-  const [allLeads, setAllLeads]   = useState([]);
-  const [followUps, setFollowUps] = useState([]);
-  const [search, setSearch]       = useState("");
+  const [loading, setLoading]   = useState(true);
+  const [allLeads, setAllLeads] = useState([]);
+  const [followUps, setFollowUps] = useState([]); // records from followups table
+  const [search, setSearch]     = useState("");
   const [activeTab, setActiveTab] = useState("today");
   const [modalLead, setModalLead] = useState(null);
 
@@ -226,8 +242,8 @@ const BDAFollowUp = () => {
       ]);
       setAllLeads(leadsRes.data.leads || []);
       setFollowUps([
-        ...(todayRes.data.todayFollowUps    || []).map(f => ({ ...f, _type:"today" })),
-        ...(pendingRes.data.pendingFollowUps || []).map(f => ({ ...f, _type:"overdue" })),
+        ...(todayRes.data.todayFollowUps    || []).map(f => ({ ...f, _type: "today" })),
+        ...(pendingRes.data.pendingFollowUps || []).map(f => ({ ...f, _type: "overdue" })),
       ]);
     } catch (err) {
       console.error("Follow up load error:", err);
@@ -236,33 +252,96 @@ const BDAFollowUp = () => {
     }
   };
 
+  /* ══════════════════════════════════════
+     CATEGORIZE LEADS
+     
+     Priority order for a lead:
+     1. snooze_until == today  → "today"
+     2. snooze_until < today   → "overdue"
+     3. snooze_until > today   → "upcoming"
+     4. No snooze, but followups table has a record with next_followup == today → "today"
+     5. No snooze, but followups table has a record with next_followup < today  → "overdue"
+     6. No snooze, but followups table has a record with next_followup > today  → "upcoming"
+     7. No snooze, status is any active status → "all"
+     
+     "All Follow-ups" = every lead that is NOT deleted, regardless of status
+     (so BDA can follow up on any lead)
+  ══════════════════════════════════════ */
   const categorized = useMemo(() => {
-    const today = [], overdue = [], upcoming = [], all = [];
+    const todaySet    = new Map(); // id → lead
+    const overdueSet  = new Map();
+    const upcomingSet = new Map();
+    const allSet      = new Map(); // every non-deleted lead
 
-    allLeads.forEach(lead => {
-      const su = lead.snooze_until;
-      if (!su) {
-        if (["Follow Up","Interested"].includes(lead.status)) all.push(lead);
-        return;
+    // Build a map: lead_id → latest followup next_followup date from followups table
+    const fuMap = new Map();
+    followUps.forEach(fu => {
+      if (!fu.next_followup) return;
+      const existing = fuMap.get(fu.lead_id);
+      // keep the most recent followup entry by created_at
+      if (!existing || new Date(fu.created_at) > new Date(existing.created_at)) {
+        fuMap.set(fu.lead_id, fu);
       }
-      if (isToday(su))        today.push(lead);
-      else if (isOverdue(su)) overdue.push({ ...lead, next_followup: su });
-      else                    upcoming.push({ ...lead, next_followup: su });
     });
 
-    followUps.forEach(fu => {
-      const exists = [...today,...overdue,...upcoming].find(l => l.id === fu.lead_id);
-      if (!exists) {
-        const base = allLeads.find(l => l.id === fu.lead_id);
-        if (base) {
-          const enriched = { ...base, next_followup: fu.next_followup, last_note: fu.note };
-          if (fu._type === "today") today.push(enriched);
-          else overdue.push(enriched);
+    allLeads.forEach(lead => {
+      // Add to "all" always
+      allSet.set(lead.id, lead);
+
+      // Determine the effective next follow-up date:
+      // prefer snooze_until from leads table, fallback to followups table
+      const snooze  = lead.snooze_until;
+      const fuEntry = fuMap.get(lead.id);
+      const fuDate  = fuEntry?.next_followup;
+
+      // Check snooze_until first
+      if (snooze) {
+        if (isToday(snooze)) {
+          todaySet.set(lead.id, { ...lead, next_followup: snooze, last_note: fuEntry?.note });
+          return;
+        }
+        if (isOverdue(snooze)) {
+          overdueSet.set(lead.id, { ...lead, next_followup: snooze, last_note: fuEntry?.note });
+          return;
+        }
+        if (isUpcoming(snooze)) {
+          upcomingSet.set(lead.id, { ...lead, next_followup: snooze, last_note: fuEntry?.note });
+          return;
+        }
+      }
+
+      // Fallback: check followups table next_followup
+      if (fuDate) {
+        if (isToday(fuDate)) {
+          todaySet.set(lead.id, { ...lead, next_followup: fuDate, last_note: fuEntry?.note });
+          return;
+        }
+        if (isOverdue(fuDate)) {
+          overdueSet.set(lead.id, { ...lead, next_followup: fuDate, last_note: fuEntry?.note });
+          return;
+        }
+        if (isUpcoming(fuDate)) {
+          upcomingSet.set(lead.id, { ...lead, next_followup: fuDate, last_note: fuEntry?.note });
+          return;
         }
       }
     });
 
-    return { today, overdue, upcoming, all };
+    // Sort overdue: most overdue first
+    const sortedOverdue = [...overdueSet.values()].sort(
+      (a, b) => new Date(a.next_followup) - new Date(b.next_followup)
+    );
+    // Sort upcoming: soonest first
+    const sortedUpcoming = [...upcomingSet.values()].sort(
+      (a, b) => new Date(a.next_followup) - new Date(b.next_followup)
+    );
+
+    return {
+      today:    [...todaySet.values()],
+      overdue:  sortedOverdue,
+      upcoming: sortedUpcoming,
+      all:      [...allSet.values()],
+    };
   }, [allLeads, followUps]);
 
   const counts = {
@@ -328,7 +407,7 @@ const BDAFollowUp = () => {
         </div>
         <div className="fu-sum-card fu-sum-card--purple">
           <span className="fu-sum-card__num">{counts.all}</span>
-          <span className="fu-sum-card__label">All Pending</span>
+          <span className="fu-sum-card__label">All Leads</span>
           <span className="fu-sum-card__icon">📋</span>
         </div>
       </div>
@@ -410,7 +489,7 @@ const BDAFollowUp = () => {
             {activeTab === "today"    ? "No follow-ups due today!"  :
              activeTab === "overdue"  ? "No overdue follow-ups!"    :
              activeTab === "upcoming" ? "No upcoming follow-ups"    :
-             "No follow-ups found"}
+             "No leads found"}
           </p>
           <p className="fu-empty__sub">
             {search ? "Try a different search term" : "Check other tabs or add leads"}
@@ -424,7 +503,7 @@ const BDAFollowUp = () => {
           <div className="fu-grid">
             {filtered.map(lead => (
               <LeadCard
-                key={`${lead.id}-${lead.next_followup}`}
+                key={`${lead.id}-${lead.next_followup || "no-date"}`}
                 lead={lead}
                 badge={activeTab === "all" ? "all" : activeTab}
                 onFollowUp={setModalLead}

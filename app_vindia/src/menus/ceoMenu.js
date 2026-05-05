@@ -6,7 +6,7 @@ export const ceoMenu = [
   { name: "Employee", path: "/employee", icon: "user" },
   { name: "Site Engineer", path: "/site-engineer", icon: "tool" },
   { name: "Client", path: "/client", icon: "briefcase" },
-  { name: "BDA", path: "/bda", icon: "trending-up" },
+  { name: "BDA", path: "/business-development/dashboard", icon: "trending-up" },
   { name: "Reports", path: "/reports", icon: "file-text" },
   { name: "Leads / CRM", path: "/leads", icon: "target" },
   { name: "Analytics", path: "/analytics", icon: "bar-chart-2" },

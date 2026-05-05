@@ -95,34 +95,6 @@
   gap: 6px;
   flex-wrap: wrap;
 }
-.fu-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #64748b;
-  background: #fff;
-  border: 1.5px solid #e2e8f0;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .2s;
-}
-.fu-tab:hover { border-color: #2563eb; color: #2563eb; }
-.fu-tab.active { color: #fff !important; border-color: transparent !important; }
-.fu-tab-badge {
-  background: #f1f5f9;
-  color: #64748b;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 7px;
-  min-width: 20px;
-  text-align: center;
-}
-.fu-tab-badge.active { background: rgba(255,255,255,.25); color: #fff; }
 
 .fu-search-wrap {
   position: relative;
@@ -206,6 +178,14 @@
   font-weight: 600;
   padding: 6px 14px;
   border-bottom: 1px solid #bfdbfe;
+}
+.fu-card__all-bar {
+  background: #faf5ff;
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-bottom: 1px solid #e9d5ff;
 }
 .fu-card__body {
   display: flex;

@@ -96,7 +96,7 @@ const LeadRow = ({ lead, onEdit, onJunk }) => {
           <td colSpan={8}>
             <div className="blr__detail">
               <div className="blr__detail-grid">
-                <DetailItem label="WhatsApp"     value={lead.whatsapp} />
+                <DetailItem label="WhatsApp"      value={lead.whatsapp} />
                 <DetailItem label="Building Type" value={lead.building_type} />
                 <DetailItem label="Floors"        value={lead.floors} />
                 <DetailItem label="Plot Size"     value={lead.measurement} />
@@ -151,18 +151,18 @@ const EditModal = ({ lead, onClose, onSave }) => {
         </div>
         <div className="bda-modal__body">
           <div className="bda-modal__grid">
-            <Field label="Name"       value={form.name}        onChange={v => set("name",v)} />
-            <Field label="Phone"      value={form.phone}       onChange={v => set("phone",v)} />
-            <Field label="Email"      value={form.email}       onChange={v => set("email",v)} />
-            <Field label="City"       value={form.city}        onChange={v => set("city",v)} />
-            <FieldSelect label="Status" value={form.status} onChange={v => set("status",v)} options={ALL_STATUSES} />
-            <FieldSelect label="Source" value={form.source} onChange={v => set("source",v)} options={ALL_SOURCES} />
-            <Field label="Assigned To" value={form.assigned_to} onChange={v => set("assigned_to",v)} />
-            <Field label="Budget (₹)"  value={form.budget}     onChange={v => set("budget",v)} />
+            <Field label="Name"         value={form.name}         onChange={v => set("name",v)} />
+            <Field label="Phone"        value={form.phone}        onChange={v => set("phone",v)} />
+            <Field label="Email"        value={form.email}        onChange={v => set("email",v)} />
+            <Field label="City"         value={form.city}         onChange={v => set("city",v)} />
+            <FieldSelect label="Status" value={form.status}       onChange={v => set("status",v)} options={ALL_STATUSES} />
+            <FieldSelect label="Source" value={form.source}       onChange={v => set("source",v)} options={ALL_SOURCES} />
+            <Field label="Assigned To"  value={form.assigned_to}  onChange={v => set("assigned_to",v)} />
+            <Field label="Budget (₹)"   value={form.budget}       onChange={v => set("budget",v)} />
             <Field label="Building Type" value={form.building_type} onChange={v => set("building_type",v)} />
-            <Field label="Floors"     value={form.floors}      onChange={v => set("floors",v)} />
-            <Field label="Sq. Ft"     value={form.sqft}        onChange={v => set("sqft",v)} />
-            <Field label="Description" value={form.description} onChange={v => set("description",v)} wide />
+            <Field label="Floors"       value={form.floors}       onChange={v => set("floors",v)} />
+            <Field label="Sq. Ft"       value={form.sqft}         onChange={v => set("sqft",v)} />
+            <Field label="Description"  value={form.description}  onChange={v => set("description",v)} wide />
           </div>
         </div>
         <div className="bda-modal__footer">
@@ -198,14 +198,15 @@ const FieldSelect = ({ label, value, onChange, options }) => (
 ════════════════════════════════════════ */
 const BDALeads = () => {
   const navigate = useNavigate();
-  const [leads,   setLeads]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search,  setSearch]  = useState("");
-  const [statusF, setStatusF] = useState("All");
-  const [sourceF, setSourceF] = useState("All");
-  const [sort,    setSort]    = useState("newest");
-  const [page,    setPage]    = useState(1);
-  const [editLead,setEditLead]= useState(null);
+  const [leads,    setLeads]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [search,   setSearch]   = useState("");
+  const [statusF,  setStatusF]  = useState("All");
+  const [sourceF,  setSourceF]  = useState("All");
+  const [assignF,  setAssignF]  = useState("All");
+  const [sort,     setSort]     = useState("newest");
+  const [page,     setPage]     = useState(1);
+  const [editLead, setEditLead] = useState(null);
   const PER_PAGE = 12;
 
   useEffect(() => { fetchLeads(); }, []);
@@ -225,6 +226,7 @@ const BDALeads = () => {
   /* filter + sort */
   const filtered = useMemo(() => {
     let arr = [...leads];
+
     if (search) {
       const q = search.toLowerCase();
       arr = arr.filter(l =>
@@ -233,16 +235,27 @@ const BDALeads = () => {
         l.email?.toLowerCase().includes(q)
       );
     }
-    if (statusF !== "All") arr = arr.filter(l => (l.status||"").toLowerCase() === statusF.toLowerCase());
-    if (sourceF !== "All") arr = arr.filter(l => normalizeSource(l.source) === sourceF);
-    arr.sort((a,b) => {
+
+    if (statusF !== "All")
+      arr = arr.filter(l => (l.status||"").toLowerCase() === statusF.toLowerCase());
+
+    if (sourceF !== "All")
+      arr = arr.filter(l => normalizeSource(l.source) === sourceF);
+
+    if (assignF === "assigned")
+      arr = arr.filter(l => l.assigned_to && l.assigned_to.trim() !== "");
+    if (assignF === "unassigned")
+      arr = arr.filter(l => !l.assigned_to || l.assigned_to.trim() === "");
+
+    arr.sort((a, b) => {
       if (sort === "newest") return new Date(b.created_at) - new Date(a.created_at);
       if (sort === "oldest") return new Date(a.created_at) - new Date(b.created_at);
       if (sort === "name")   return (a.name||"").localeCompare(b.name||"");
       return 0;
     });
+
     return arr;
-  }, [leads, search, statusF, sourceF, sort]);
+  }, [leads, search, statusF, sourceF, assignF, sort]);
 
   const totalPages = Math.ceil(filtered.length / PER_PAGE);
   const paginated  = filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
@@ -257,12 +270,22 @@ const BDALeads = () => {
 
   const handleSaved = () => { setEditLead(null); fetchLeads(); };
 
-  /* summary badges */
+  const clearFilters = () => {
+    setStatusF("All");
+    setSourceF("All");
+    setAssignF("All");
+    setSearch("");
+    setPage(1);
+  };
+
+  const hasFilters = statusF !== "All" || sourceF !== "All" || assignF !== "All" || search;
+
+  /* summary counts */
   const counts = useMemo(() => {
     const c = { total: leads.length, new: 0, followup: 0, converted: 0 };
     leads.forEach(l => {
       const s = (l.status||"").toLowerCase();
-      if (s === "new") c.new++;
+      if (s === "new")       c.new++;
       if (s === "follow up") c.followup++;
       if (s === "converted") c.converted++;
     });
@@ -284,23 +307,38 @@ const BDALeads = () => {
         </div>
       </div>
 
-      {/* ── SUMMARY CHIPS ── */}
+      {/* ── SUMMARY STAT CARDS ── */}
       <div className="bda-leads-chips">
         <div className="bda-chip2 bda-chip2--blue">
-          <span className="bda-chip2__num">{counts.total}</span>
-          <span className="bda-chip2__label">Total</span>
+          <div className="bda-chip2__left">
+            <span className="bda-chip2__num">{counts.total}</span>
+            <span className="bda-chip2__label">Total</span>
+          </div>
+          <span className="bda-chip2__icon">📋</span>
         </div>
+
         <div className="bda-chip2 bda-chip2--green">
-          <span className="bda-chip2__num">{counts.new}</span>
-          <span className="bda-chip2__label">New</span>
+          <div className="bda-chip2__left">
+            <span className="bda-chip2__num">{counts.new}</span>
+            <span className="bda-chip2__label">New</span>
+          </div>
+          <span className="bda-chip2__icon">🔔</span>
         </div>
+
         <div className="bda-chip2 bda-chip2--amber">
-          <span className="bda-chip2__num">{counts.followup}</span>
-          <span className="bda-chip2__label">Follow-up</span>
+          <div className="bda-chip2__left">
+            <span className="bda-chip2__num">{counts.followup}</span>
+            <span className="bda-chip2__label">Follow-up</span>
+          </div>
+          <span className="bda-chip2__icon">⚠️</span>
         </div>
+
         <div className="bda-chip2 bda-chip2--purple">
-          <span className="bda-chip2__num">{counts.converted}</span>
-          <span className="bda-chip2__label">Converted</span>
+          <div className="bda-chip2__left">
+            <span className="bda-chip2__num">{counts.converted}</span>
+            <span className="bda-chip2__label">Converted</span>
+          </div>
+          <span className="bda-chip2__icon">✅</span>
         </div>
       </div>
 
@@ -331,6 +369,13 @@ const BDALeads = () => {
           {ALL_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
 
+        <select className="bda-filter-sel" value={assignF}
+          onChange={e => { setAssignF(e.target.value); setPage(1); }}>
+          <option value="All">All Assignments</option>
+          <option value="assigned">Assigned</option>
+          <option value="unassigned">Unassigned</option>
+        </select>
+
         <select className="bda-filter-sel" value={sort}
           onChange={e => setSort(e.target.value)}>
           <option value="newest">Newest First</option>
@@ -338,9 +383,9 @@ const BDALeads = () => {
           <option value="name">Name A–Z</option>
         </select>
 
-        {(statusF !== "All" || sourceF !== "All" || search) && (
+        {hasFilters && (
           <button className="bda-btn-outline" style={{ fontSize:12, padding:"6px 14px" }}
-            onClick={() => { setStatusF("All"); setSourceF("All"); setSearch(""); setPage(1); }}>
+            onClick={clearFilters}>
             Clear Filters
           </button>
         )}

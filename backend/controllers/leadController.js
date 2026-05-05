@@ -140,17 +140,48 @@ exports.updateLead = async (req, res) => {
 
 /* ══════════════════════════════════════
    FOLLOW UPS
+   
+   KEY FIX: When a nextFollowUp date is provided,
+   we also write it to leads.snooze_until so the
+   frontend Today/Upcoming tabs pick it up correctly.
 ══════════════════════════════════════ */
 exports.addFollowUp = async (req, res) => {
   const { leadId } = req.params;
   const { note, status, nextFollowUp } = req.body;
   if (!note) return res.status(400).json({ error: "Note required" });
+
   try {
+    // 1. Insert follow-up record
     await pool.query(
-      "INSERT INTO followups (lead_id,note,status,next_followup) VALUES ($1,$2,$3,$4)",
+      "INSERT INTO followups (lead_id, note, status, next_followup) VALUES ($1, $2, $3, $4)",
       [leadId, note, status || null, nextFollowUp || null]
     );
-    if (status) await pool.query("UPDATE leads SET status=$1 WHERE id=$2", [status, leadId]);
+
+    // 2. Build the UPDATE for the leads table
+    //    - Always update status if provided
+    //    - Always update snooze_until with the next follow-up date
+    //      (set to NULL if no date given, so it falls out of Today/Overdue/Upcoming)
+    const updateFields = [];
+    const updateVals   = [];
+    let n = 1;
+
+    if (status) {
+      updateFields.push(`status = $${n++}`);
+      updateVals.push(status);
+    }
+
+    // Write snooze_until regardless — this is what drives Today/Upcoming/Overdue
+    updateFields.push(`snooze_until = $${n++}`);
+    updateVals.push(nextFollowUp || null);
+
+    if (updateFields.length) {
+      updateVals.push(leadId);
+      await pool.query(
+        `UPDATE leads SET ${updateFields.join(", ")} WHERE id = $${n}`,
+        updateVals
+      );
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error("Add followup error:", err.message);
@@ -214,7 +245,6 @@ exports.importLeadsFromExcel = async (req, res) => {
       inserted++;
     }
 
-    // clean up uploaded file
     fs.unlinkSync(req.file.path);
     res.json({ success: true, affectedRows: inserted });
   } catch (err) {
@@ -248,7 +278,6 @@ exports.importJustDialPDF = async (req, res) => {
         const phone = String(keys["user number"] || keys["mobile no"] || keys["mobile"] || keys["phone"] || "").trim();
         if (!name || !phone) continue;
 
-        /* format date */
         let formattedDate = null;
         const rawDate = keys["date and time"] || keys["date & time"] || keys["date_and_time"];
         if (rawDate) {
@@ -283,7 +312,7 @@ exports.importJustDialPDF = async (req, res) => {
 
     /* ── PDF ── */
     else if (fileExt === ".pdf") {
-      const pdfParse  = require("pdf-parse");
+      const pdfParse   = require("pdf-parse");
       const dataBuffer = fs.readFileSync(req.file.path);
       const data       = await pdfParse(dataBuffer);
       const lines      = data.text.split("\n").filter(l => l.trim());
@@ -368,31 +397,8 @@ exports.permanentDeleteLead = async (req, res) => {
 };
 
 /* ══════════════════════════════════════
-   TODAY / PENDING FOLLOW UPS
+   TODAY'S FOLLOW-UPS
 ══════════════════════════════════════ */
-exports.getTodaysFollowUps = async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT f.*, l.name, l.phone FROM followups f
-       JOIN leads l ON f.lead_id = l.id
-       WHERE DATE(f.next_followup) = CURRENT_DATE`
-    );
-    res.json({ todayFollowUps: rows });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-};
-
-exports.getPendingFollowUps = async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT f.*, l.name, l.phone FROM followups f
-       JOIN leads l ON f.lead_id = l.id
-       WHERE DATE(f.next_followup) < CURRENT_DATE`
-    );
-    res.json({ pendingFollowUps: rows });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-};
-
-/* ── GET TODAY'S FOLLOW-UPS ── */
 exports.getTodaysFollowUps = async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -409,8 +415,10 @@ exports.getTodaysFollowUps = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
- 
-/* ── GET PENDING / OVERDUE FOLLOW-UPS ── */
+
+/* ══════════════════════════════════════
+   PENDING / OVERDUE FOLLOW-UPS
+══════════════════════════════════════ */
 exports.getPendingFollowUps = async (req, res) => {
   try {
     const { rows } = await pool.query(

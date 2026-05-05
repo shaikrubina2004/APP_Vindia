@@ -229,6 +229,49 @@
   font-size: 12px;
   margin-bottom: 4px;
 }
+/* ── RESTRICTED MASK ── */
+.rp-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(240, 244, 250, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  min-height: 400px;
+}
+
+.rp-mask__box {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 40px 48px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.rp-mask__icon {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.rp-mask__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a2a4a;
+  margin-bottom: 8px;
+}
+
+.rp-mask__sub {
+  font-size: 13px;
+  color: #94a3b8;
+  max-width: 280px;
+  line-height: 1.6;
+}
 
 /* ── RESPONSIVE ── */
 @media (max-width: 1100px) {

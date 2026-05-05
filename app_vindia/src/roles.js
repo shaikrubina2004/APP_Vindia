@@ -5,7 +5,7 @@ export const ROLES = {
   MARKETING: "marketing",
   CLIENT: "client",
   SITE_ENGINEER: "site_engineer",
-  BDA: "bda",
+  BDA: "business_development_analyst", 
   PROJECT_COORDINATOR: "project_coordinator",
   PROJECT_MANAGER: "project_manager",
   QUANTITY_SURVEYOR: "quantity_surveyor",

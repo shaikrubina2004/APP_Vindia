@@ -85,14 +85,14 @@ import ArchitectLayout from "../layouts/ArchitectLayout";
 import BDALayout from "../layouts/BDALayout"; {/* ← ADDED */}
 import BDALeads from "../pages/business-development/business-development-analyst/BDALeads";
 import BDAAddLead from "../pages/business-development/business-development-analyst/BDAAddLead";
-import BDAReports  from "../pages/business-development/business-development-analyst/BDAReports";
+import BDAReportsWithRole from "../pages/business-development/business-development-analyst/BDAReportsWithRole";
 import BDAFollowUp from "../pages/business-development/business-development-analyst/BDAFollowUp";
 
 /* COMMON */
 import Timesheet from "../pages/timesheet/Timesheet";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
-import { NotificationProvider } from "../context/NotificationContext";
+import { NotificationProvider } from "../context/Notificationcontext";
 
 const AppRoutes = () => {
   const PROJECT_ROLES = [
@@ -620,10 +620,10 @@ const AppRoutes = () => {
     path="/bda/reports"   
     element={
       <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
-      <BDALayout><BDAReports /></BDALayout>
+        <BDALayout><BDAReportsWithRole /></BDALayout>
       </ProtectedRoute>
     } 
-    />
+  />
 
 
       {/* FALLBACK */}

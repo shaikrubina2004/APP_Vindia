@@ -24,6 +24,7 @@ const getRoleDashboard = (role) => {
     case "qc_engineer":          return "/qc/dashboard";
     case "safety_officer":       return "/safety/dashboard";
     case "project_coordinator":  return "/project-coordinator/dashboard";
+    case "business_development_analyst": return "/business-development/dashboard"; // ← was "bda"
     default:                     return "/";
   }
 };

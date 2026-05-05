@@ -48,8 +48,8 @@ const STATUS_FUNNEL = [
   { key: "Converted",      label: "Converted",       color: "#10b981", bg: "#f0fdf4" },
   { key: "Not Interested", label: "Not Interested",  color: "#64748b", bg: "#f8fafc" },
   { key: "Junk",           label: "Junk / Lost",     color: "#ef4444", bg: "#fef2f2" },
+  { key: "__other__",      label: "Other / Untagged", color: "#94a3b8", bg: "#f1f5f9" },
 ];
-
 /* ─────────────────────────────────────────
    DATE FILTER HELPER
 ───────────────────────────────────────── */
@@ -225,15 +225,28 @@ const BDADashboard = () => {
 
   /* ── Funnel — case-insensitive match ── */
   const funnelData = useMemo(() => {
-    return STATUS_FUNNEL.map(s => ({
+  const KNOWN_STATUSES = ["new", "interested", "intrested", "follow up",
+    "converted", "not interested", "junk", "junk_requested"];
+
+  return STATUS_FUNNEL.map(s => {
+    if (s.key === "__other__") {
+      return {
+        ...s,
+        count: leads.filter(l => {
+          const norm = (l.status || "").toLowerCase();
+          return !KNOWN_STATUSES.includes(norm);
+        }).length,
+      };
+    }
+    return {
       ...s,
       count: leads.filter(l =>
         (l.status || "").toLowerCase() === s.key.toLowerCase() ||
-        // handle "Intrested" typo
         (s.key === "Interested" && (l.status || "").toLowerCase() === "intrested")
       ).length,
-    }));
-  }, [leads]);
+    };
+  });
+}, [leads]);
   const maxFunnel = Math.max(...funnelData.map(f => f.count), 1);
 
   const recentLeads = leads.slice(0, 6);

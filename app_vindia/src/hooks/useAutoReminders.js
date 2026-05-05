@@ -3,7 +3,7 @@
 // It runs checks every hour and pushes notifications via NotificationContext.
 import { useEffect, useRef } from "react";
 import api from "../services/api";
-import { useNotifications } from "../context/NotificationContext";
+import { useNotifications } from "../context/Notificationcontext";
 
 const CHECKED_KEY = "se:reminders:checked:v1";
 const ls = {

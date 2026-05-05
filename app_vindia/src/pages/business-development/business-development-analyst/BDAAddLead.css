@@ -99,6 +99,7 @@
   background: #fff;
   transition: border-color .2s, box-shadow .2s;
   width: 100%;
+  box-sizing: border-box;
 }
 .al-input:focus {
   border-color: #2563eb;
@@ -108,6 +109,92 @@
 .al-input--err:focus { box-shadow: 0 0 0 3px rgba(239,68,68,.08); }
 .al-textarea { resize: vertical; min-height: 80px; }
 .al-err { font-size: 11px; color: #ef4444; margin-top: 2px; }
+
+/* ════════════════════════════════════
+   WHATSAPP SAME-AS-PHONE CHECKBOX
+════════════════════════════════════ */
+.al-wa-same-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 2px;
+}
+.al-wa-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+  cursor: pointer;
+  flex-shrink: 0;
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  -moz-appearance: checkbox;
+  opacity: 1;
+  visibility: visible;
+  display: inline-block;
+  border: 1.5px solid #94a3b8;
+  border-radius: 3px;
+}
+.al-wa-same-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #2563eb;
+}
+.al-wa-input {
+  margin-top: 2px;
+}
+/* Preview pill shown when "same" is ticked */
+.al-wa-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0fdf4;
+  border: 1.5px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 2px;
+}
+.al-wa-preview-icon { font-size: 14px; }
+.al-wa-preview-num {
+  font-size: 13px;
+  font-weight: 600;
+  color: #16a34a;
+  letter-spacing: .3px;
+}
+
+/* ════════════════════════════════════
+   ASSIGNED TO — AUTO-FILL
+════════════════════════════════════ */
+.al-assigned-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.al-assigned-input {
+  background: #f8fafc !important;
+  color: #475569 !important;
+  cursor: not-allowed;
+  padding-right: 52px !important;
+}
+.al-assigned-input:focus {
+  border-color: #e2e8f0 !important;
+  box-shadow: none !important;
+}
+.al-assigned-badge {
+  position: absolute;
+  right: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  padding: 2px 6px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 
 /* ── TOGGLE ── */
 .al-toggle-row { margin-top: 16px; }
