@@ -53,7 +53,7 @@ const architectProjectsRoutes = require("./routes/architectProjects");
 const architectDailyLogRoutes = require("./routes/architectDailyLogRoutes");
 const architectDesignRoutes = require("./routes/architectDesignRoutes");
 const architectDrawingUploadRoutes = require("./routes/architectDrawingUploadRoutes");
-
+const architectAssignRoutes = require("./routes/architectAssignRoutes");
 /* ── STRUCTURAL ENGINEER MODULES ───────────────────────────────── */
 const structuralRoutes = require("./routes/structuralRoutes");
 const seDailyRoutes = require("./routes/seDailyupdatesRoutes");
@@ -158,7 +158,7 @@ try {
   app.use("/api/architect-daily-log", architectDailyLogRoutes);
   app.use("/api/architect-designs", architectDesignRoutes);
   app.use("/api/architect-drawings", architectDrawingUploadRoutes);
-
+  app.use("/api/architect-assign", architectAssignRoutes);
   /* ── Site Engineer Modules ─────────────────────────────── */
   app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes);
   app.use("/api/ncr", ncrRoutes);
