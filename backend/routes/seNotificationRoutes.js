@@ -5,19 +5,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const express = require("express");
-const router  = express.Router();
+const router = express.Router();
 const protect = require("../middleware/authMiddleware");
-const pool    = require("../config/db");
+const pool = require("../config/db");
 
 // ── Link map: type → frontend route ──────────────────────────────────────────
 const TYPE_LINK = {
-  drawing:  "/structural-engineer/shared/drawings",
-  rfi:      "/structural-engineer/rfi",
+  drawing: "/structural-engineer/shared/drawings",
+  rfi: "/structural-engineer/rfi",
   incident: "/structural-engineer/incidents",
   approval: "/structural-engineer/shared/drawings",
-  work:     "/structural-engineer/daily-updates",
-  boq:      "/structural-engineer/boq",
-  task:     "/structural-engineer/incidents?page=tasks",
+  work: "/structural-engineer/daily-updates",
+  boq: "/structural-engineer/boq",
+  task: "/structural-engineer/incidents?page=tasks",
   handover: "/structural-engineer/shared/drawings",
   analysis: "/structural-engineer/daily-updates",
 };
@@ -25,14 +25,14 @@ const TYPE_LINK = {
 // ── Helper: shape a DB row into the frontend-expected object ─────────────────
 function shapeRow(n) {
   return {
-    id:          n.id,
-    type:        n.type        || "work",
-    severity:    n.severity    || "info",
-    title:       n.message,
+    id: n.id,
+    type: n.type || "work",
+    severity: n.severity || "info",
+    title: n.message,
     description: n.description || n.message,
-    created_at:  n.created_at,
-    is_read:     n.is_read,
-    link:        TYPE_LINK[n.type] || "/structural-engineer/dashboard",
+    created_at: n.created_at,
+    is_read: n.is_read,
+    link: TYPE_LINK[n.type] || "/structural-engineer/dashboard",
   };
 }
 
@@ -45,15 +45,14 @@ router.get("/", protect, async (req, res) => {
 
     const result = await pool.query(
       `SELECT id, message, description, type, severity, is_read, created_at
-         FROM notifications
-        WHERE role = 'structural_engineer'
-          AND is_read = false
-        ORDER BY created_at DESC
-        LIMIT 50`
+   FROM notifications
+   WHERE role = 'structural_engineer'
+   ORDER BY created_at DESC
+   LIMIT 50`,
     );
 
     return res.json({
-      success:       true,
+      success: true,
       notifications: result.rows.map(shapeRow),
     });
   } catch (err) {
@@ -73,12 +72,12 @@ router.get("/count", protect, async (req, res) => {
       `SELECT COUNT(*) AS count
          FROM notifications
         WHERE role = 'structural_engineer'
-          AND is_read = false`
+          AND is_read = false`,
     );
 
     return res.json({
       success: true,
-      count:   parseInt(result.rows[0].count, 10),
+      count: parseInt(result.rows[0].count, 10),
     });
   } catch (err) {
     console.error("GET /se-notifications/count error:", err.message);
@@ -97,7 +96,7 @@ router.patch("/read-all", protect, async (req, res) => {
       `UPDATE notifications
           SET is_read = true
         WHERE role = 'structural_engineer'
-          AND is_read = false`
+          AND is_read = false`,
     );
 
     return res.json({ success: true });
@@ -116,12 +115,14 @@ router.patch("/:id/read", protect, async (req, res) => {
 
     const realId = parseInt(req.params.id, 10);
     if (isNaN(realId) || realId <= 0) {
-      return res.status(400).json({ error: `Invalid notification ID: "${req.params.id}"` });
+      return res
+        .status(400)
+        .json({ error: `Invalid notification ID: "${req.params.id}"` });
     }
 
     const result = await pool.query(
       `UPDATE notifications SET is_read = true WHERE id = $1 RETURNING id`,
-      [realId]
+      [realId],
     );
 
     if (result.rowCount === 0) {

@@ -4,7 +4,8 @@ import { useAuth } from "../../context/useAuth";
 
 import NotificationBell from "../../components/notifications/NotificationBell";
 import SENotificationBell from "../../components/notifications/SENotificationBell";
-
+import QSNotificationBell from "../../components/notifications/QSNotificationBell";
+import MEPNotificationBell from "../notifications/MepNotificationBell";
 import "../../styles/layout/Navbar.css";
 import logo from "../../assets/logo.png.png";
 
@@ -24,6 +25,8 @@ function Navbar() {
   const NOTIFICATION_COMPONENTS = {
     project_coordinator: NotificationBell,
     structural_engineer: SENotificationBell,
+    quantity_surveyor: QSNotificationBell,
+    mep_engineer: MEPNotificationBell,
 
     // 🔥 Future roles (just plug here)
     // site_engineer: SiteNotificationBell,
@@ -77,14 +80,20 @@ function Navbar() {
 
       {/* Right Section */}
       <div className="navbar-right">
-
         {/* Timesheet */}
         <button
           className="navbar-icon-btn timesheet-btn"
           onClick={() => navigate("/timesheet")}
           title="Timesheet"
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
           </svg>
@@ -98,7 +107,14 @@ function Navbar() {
           onMouseLeave={() => setIsQuickAddOpen(false)}
         >
           <button className="quick-add-btn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
@@ -106,25 +122,20 @@ function Navbar() {
           </button>
 
           <div className={`quick-add-menu ${isQuickAddOpen ? "show" : ""}`}>
-            <button className="quick-add-item" onClick={() => navigate("/hr/add-employee")}>
+            <button
+              className="quick-add-item"
+              onClick={() => navigate("/hr/add-employee")}
+            >
               Add Employee
             </button>
-            <button className="quick-add-item">
-              Create Project
-            </button>
-            <button className="quick-add-item">
-              Add Lead
-            </button>
-            <button className="quick-add-item">
-              Submit Expense
-            </button>
+            <button className="quick-add-item">Create Project</button>
+            <button className="quick-add-item">Add Lead</button>
+            <button className="quick-add-item">Submit Expense</button>
           </div>
         </div>
 
         {/* 🔥 Role-Based Notifications */}
-        {RoleNotification && (
-          <RoleNotification userId={user.id} />
-        )}
+        {RoleNotification && <RoleNotification userId={user.id} />}
 
         {/* Profile */}
         <div
@@ -134,7 +145,14 @@ function Navbar() {
         >
           <button className="profile-btn">
             <div className="avatar">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
@@ -157,7 +175,6 @@ function Navbar() {
             </button>
           </div>
         </div>
-
       </div>
     </nav>
   );

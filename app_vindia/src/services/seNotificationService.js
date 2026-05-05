@@ -1,67 +1,74 @@
-// FILE PATH: src/services/seNotificationService.js
-// ─────────────────────────────────────────────────────────────────────────────
-// All API calls for SE notifications.
-// Reads the JWT token from localStorage (same key your auth flow uses).
-// ─────────────────────────────────────────────────────────────────────────────
-
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-/** Read the JWT stored by your login flow */
 function getToken() {
-  // Adjust the key to match what you store in localStorage on login
-  return localStorage.getItem("token") || localStorage.getItem("authToken") || "";
+  return (
+    localStorage.getItem("token") ||
+    localStorage.getItem("authToken") ||
+    localStorage.getItem("userToken") || // 🔥 fallback
+    ""
+  );
 }
 
 function authHeaders() {
+  const token = getToken();
+
+  if (!token) {
+    console.warn("⚠️ No token found in localStorage");
+    return {
+      "Content-Type": "application/json",
+    };
+  }
+
   return {
     "Content-Type": "application/json",
-    Authorization:  `Bearer ${getToken()}`,
+    Authorization: `Bearer ${token}`,
   };
 }
 
-// ── Fetch unread notifications ────────────────────────────────────────────────
+// ── Fetch notifications ─────────────────────────────
 export async function fetchSENotifications() {
   const res = await fetch(`${BASE}/api/se-notifications`, {
     headers: authHeaders(),
   });
 
   if (!res.ok) {
-    throw new Error(`fetchSENotifications: ${res.status} ${res.statusText}`);
+    console.error("❌ Fetch notifications failed:", res.status);
+    return [];
   }
 
   const body = await res.json();
-  // backend returns { success, notifications }
+  console.log("✅ API RESPONSE:", body);
+
   return body.notifications || [];
 }
 
-// ── Mark a single notification read ──────────────────────────────────────────
+// ── Mark one read ───────────────────────────────────
 export async function markSENotificationRead(id) {
-  // Static IDs (strings like "s1") are local-only; skip the API call
   if (typeof id === "string" && isNaN(Number(id))) return;
 
   const res = await fetch(`${BASE}/api/se-notifications/${id}/read`, {
-    method:  "PATCH",
+    method: "PATCH",
     headers: authHeaders(),
   });
 
   if (!res.ok) {
-    throw new Error(`markSENotificationRead: ${res.status}`);
+    console.error("❌ mark read failed:", res.status);
   }
 }
 
-// ── Mark all notifications read ───────────────────────────────────────────────
+// ── Mark all read ───────────────────────────────────
 export async function markAllSENotificationsRead() {
   const res = await fetch(`${BASE}/api/se-notifications/read-all`, {
-    method:  "PATCH",
+    method: "PATCH",
     headers: authHeaders(),
   });
 
   if (!res.ok) {
-    throw new Error(`markAllSENotificationsRead: ${res.status}`);
+    console.error("❌ mark all failed:", res.status);
   }
 }
 
-// ── Get unread count (used by dashboard card) ─────────────────────────────────
+// ── Count ───────────────────────────────────────────
 export async function fetchSENotificationCount() {
   const res = await fetch(`${BASE}/api/se-notifications/count`, {
     headers: authHeaders(),

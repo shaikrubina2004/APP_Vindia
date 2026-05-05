@@ -1,426 +1,16 @@
 import { useState, useEffect } from "react";
 import { useProject } from "../../context/ProjectContext";
+import { API } from "../../services/authService";
 import ProjectSwitcher from "../../components/project/ProjectSwitcher";
 import "../../styles/MEPEngineer.css";
 
 /* ═══════════════════════════════════════
    FILE LIST
 ═══════════════════════════════════════ */
-const FILES = {
-  p1: [
-    {
-      key: "hvac3",
-      name: "HVAC Level 3",
-      sub: "Rev-5 · Today",
-      badge: "badge-mep-m",
-    },
-    {
-      key: "plumb",
-      name: "Plumbing GF",
-      sub: "Rev-3 · Today",
-      badge: "badge-mep-p",
-    },
-    {
-      key: "elec",
-      name: "Electrical SLD",
-      sub: "Rev-5 · Yesterday",
-      badge: "badge-mep-e",
-    },
-    {
-      key: "drain",
-      name: "Drainage L2",
-      sub: "Rev-4 · Yesterday",
-      badge: "badge-mep-p",
-    },
-    {
-      key: "hvac1",
-      name: "HVAC Level 1",
-      sub: "Rev-3 · 2 days ago",
-      badge: "badge-mep-m",
-    },
-    {
-      key: "cond",
-      name: "Conduit GF",
-      sub: "Rev-2 · 3 days ago",
-      badge: "badge-mep-e",
-    },
-    {
-      key: "chiller",
-      name: "Chiller Plant",
-      sub: "Rev-1 · 1 week ago",
-      badge: "badge-mep-m",
-    },
-    {
-      key: "fire",
-      name: "Fire Fighting",
-      sub: "Rev-1 · 2 weeks ago",
-      badge: "badge-mep-p",
-    },
-  ],
-  p2: [
-    {
-      key: "hvac_gf",
-      name: "HVAC Layout GF",
-      sub: "Rev-2 · 3 days ago",
-      badge: "badge-mep-m",
-    },
-    {
-      key: "elec_sld",
-      name: "Electrical SLD",
-      sub: "Rev-1 · 5 days ago",
-      badge: "badge-mep-e",
-    },
-    {
-      key: "plumb_gf",
-      name: "Plumbing GF",
-      sub: "Rev-2 · 4 days ago",
-      badge: "badge-mep-p",
-    },
-  ],
-  p3: [
-    {
-      key: "hvac_sch",
-      name: "HVAC Schematic",
-      sub: "Rev-1 · 1 week ago",
-      badge: "badge-mep-m",
-    },
-    {
-      key: "plumb_sch",
-      name: "Plumbing Schematic",
-      sub: "Rev-1 · 1 week ago",
-      badge: "badge-mep-p",
-    },
-  ],
-};
 
 /* ═══════════════════════════════════════
    VERSION DATA  (keyed by file key)
 ═══════════════════════════════════════ */
-const VERSIONS = {
-  hvac3: {
-    name: "HVAC Level 3",
-    disc: "Mechanical",
-    discBadge: "badge-mep-m",
-    entries: [
-      {
-        rev: "Rev-5",
-        current: true,
-        date: "Today · 10:32 AM",
-        uploader: "MEP Engineer (You)",
-        title: "Duct sizing corrected after structural review",
-        note: "Revised duct dimensions in Zone C to avoid structural clash. All team members notified. Previous version archived.",
-        adds: ["Zone C duct resize"],
-        mods: ["AHU position adjusted"],
-        dels: [],
-      },
-      {
-        rev: "Rev-4",
-        current: false,
-        date: "3 days ago",
-        uploader: "MEP Engineer",
-        title: "Added exhaust ventilation for stairwell",
-        note: "New exhaust vent added as per Architect requirement. Coordinated with Structural for slab penetration.",
-        adds: ["Stairwell exhaust"],
-        mods: ["Riser routing updated"],
-        dels: [],
-      },
-      {
-        rev: "Rev-3",
-        current: false,
-        date: "1 week ago",
-        uploader: "MEP Engineer",
-        title: "Initial MEP-Structural coordination pass",
-        note: "First coordination with Structural team. Some clashes identified and flagged for resolution.",
-        adds: [],
-        mods: ["Duct routing Zone A", "Zone B supply air"],
-        dels: ["Obsolete branch duct"],
-      },
-      {
-        rev: "Rev-2",
-        current: false,
-        date: "2 weeks ago",
-        uploader: "MEP Engineer",
-        title: "Fresh air supply incorporated",
-        note: "Added fresh air supply points per client walkthrough comments.",
-        adds: ["Fresh air supply points"],
-        mods: [],
-        dels: [],
-      },
-      {
-        rev: "Rev-1",
-        current: false,
-        date: "3 weeks ago",
-        uploader: "MEP Engineer",
-        title: "Initial issue for coordination",
-        note: "First version issued for inter-discipline coordination review.",
-        adds: ["Initial drawing"],
-        mods: [],
-        dels: [],
-      },
-    ],
-  },
-  plumb: {
-    name: "Plumbing GF",
-    disc: "Plumbing",
-    discBadge: "badge-mep-p",
-    entries: [
-      {
-        rev: "Rev-3",
-        current: true,
-        date: "Today · 08:20 AM",
-        uploader: "MEP Engineer (You)",
-        title: "Pipe routing updated after beam layout change",
-        note: "Structural issued new beam positions. Pipe routes updated to avoid conflicts on Ground Floor.",
-        adds: [],
-        mods: ["Cold water main rerouted", "HW return loop adjusted"],
-        dels: [],
-      },
-      {
-        rev: "Rev-2",
-        current: false,
-        date: "4 days ago",
-        uploader: "MEP Engineer",
-        title: "Toilet block added — Type B unit",
-        note: "New toilet block added as per Architect layout Rev4.",
-        adds: ["Type B toilet block"],
-        mods: [],
-        dels: [],
-      },
-      {
-        rev: "Rev-1",
-        current: false,
-        date: "2 weeks ago",
-        uploader: "MEP Engineer",
-        title: "Initial issue for coordination",
-        note: "First version issued for coordination.",
-        adds: ["Initial drawing"],
-        mods: [],
-        dels: [],
-      },
-    ],
-  },
-  elec: {
-    name: "Electrical SLD",
-    disc: "Electrical",
-    discBadge: "badge-mep-e",
-    entries: [
-      {
-        rev: "Rev-5",
-        current: true,
-        date: "Yesterday · 04:10 PM",
-        uploader: "MEP Engineer (You)",
-        title: "Load schedule updated — Level 3 additions",
-        note: "Additional electrical loads from Level 3 MEP equipment incorporated into single line diagram.",
-        adds: ["Level 3 load schedule"],
-        mods: ["Main incomer rating updated"],
-        dels: [],
-      },
-      {
-        rev: "Rev-4",
-        current: false,
-        date: "5 days ago",
-        uploader: "MEP Engineer",
-        title: "Emergency lighting circuit added",
-        note: "Emergency lighting circuit added per fire safety consultant review.",
-        adds: ["Emergency lighting circuit"],
-        mods: [],
-        dels: [],
-      },
-      {
-        rev: "Rev-3",
-        current: false,
-        date: "10 days ago",
-        uploader: "MEP Engineer",
-        title: "UPS system incorporated",
-        note: "UPS system for server room added to single line diagram.",
-        adds: ["UPS system"],
-        mods: ["Distribution board DB-3 updated"],
-        dels: [],
-      },
-      {
-        rev: "Rev-2",
-        current: false,
-        date: "2 weeks ago",
-        uploader: "MEP Engineer",
-        title: "HVAC electrical loads added",
-        note: "MEP coordination — HVAC electrical loads incorporated.",
-        adds: ["HVAC loads"],
-        mods: [],
-        dels: [],
-      },
-      {
-        rev: "Rev-1",
-        current: false,
-        date: "3 weeks ago",
-        uploader: "MEP Engineer",
-        title: "Initial issue for coordination",
-        note: "First version issued.",
-        adds: ["Initial drawing"],
-        mods: [],
-        dels: [],
-      },
-    ],
-  },
-  drain: {
-    name: "Drainage L2",
-    disc: "Plumbing",
-    discBadge: "badge-mep-p",
-    entries: [
-      {
-        rev: "Rev-4",
-        current: true,
-        date: "Yesterday · 09:00 AM",
-        uploader: "MEP Engineer (You)",
-        title: "Drainage gradient corrected — East Wing",
-        note: "Pipe gradient in East Wing adjusted to meet minimum fall requirement of 1:80.",
-        adds: [],
-        mods: [
-          "East Wing gradient corrected",
-          "Inspection chamber repositioned",
-        ],
-        dels: [],
-      },
-      {
-        rev: "Rev-3",
-        current: false,
-        date: "1 week ago",
-        uploader: "MEP Engineer",
-        title: "Additional floor drain added — Lobby",
-        note: "Floor drain added in Lobby area per Architect instruction.",
-        adds: ["Lobby floor drain"],
-        mods: [],
-        dels: [],
-      },
-      {
-        rev: "Rev-2",
-        current: false,
-        date: "2 weeks ago",
-        uploader: "MEP Engineer",
-        title: "Drainage connection to main stack",
-        note: "Level 2 drainage connected to main stack. Structural penetration approved.",
-        adds: ["Stack connection"],
-        mods: [],
-        dels: [],
-      },
-      {
-        rev: "Rev-1",
-        current: false,
-        date: "3 weeks ago",
-        uploader: "MEP Engineer",
-        title: "Initial issue",
-        note: "First version issued for coordination.",
-        adds: ["Initial drawing"],
-        mods: [],
-        dels: [],
-      },
-    ],
-  },
-  hvac1: {
-    name: "HVAC Level 1",
-    disc: "Mechanical",
-    discBadge: "badge-mep-m",
-    entries: [
-      {
-        rev: "Rev-3",
-        current: true,
-        date: "2 days ago",
-        uploader: "MEP Engineer",
-        title: "FCU positions revised per Architect",
-        note: "Fan coil unit positions revised to match updated ceiling grid from Architect Rev5.",
-        adds: [],
-        mods: ["FCU positions updated", "Supply air grille layout revised"],
-        dels: [],
-      },
-      {
-        rev: "Rev-2",
-        current: false,
-        date: "1 week ago",
-        uploader: "MEP Engineer",
-        title: "Duct insulation specification added",
-        note: "Duct insulation thickness and specification added to drawing notes.",
-        adds: ["Insulation spec notes"],
-        mods: [],
-        dels: [],
-      },
-      {
-        rev: "Rev-1",
-        current: false,
-        date: "2 weeks ago",
-        uploader: "MEP Engineer",
-        title: "Initial issue for coordination",
-        note: "First version issued.",
-        adds: ["Initial drawing"],
-        mods: [],
-        dels: [],
-      },
-    ],
-  },
-  cond: {
-    name: "Conduit GF",
-    disc: "Electrical",
-    discBadge: "badge-mep-e",
-    entries: [
-      {
-        rev: "Rev-2",
-        current: true,
-        date: "3 days ago",
-        uploader: "MEP Engineer",
-        title: "Conduit route revised — MEP shaft conflict",
-        note: "Conduit route revised to avoid MEP shaft restricted zone. Incident #INC-038 resolved.",
-        adds: [],
-        mods: ["Conduit route revised", "Junction box repositioned"],
-        dels: ["Conflicting conduit segment"],
-      },
-      {
-        rev: "Rev-1",
-        current: false,
-        date: "2 weeks ago",
-        uploader: "MEP Engineer",
-        title: "Initial issue for coordination",
-        note: "First version issued.",
-        adds: ["Initial drawing"],
-        mods: [],
-        dels: [],
-      },
-    ],
-  },
-  chiller: {
-    name: "Chiller Plant",
-    disc: "Mechanical",
-    discBadge: "badge-mep-m",
-    entries: [
-      {
-        rev: "Rev-1",
-        current: true,
-        date: "1 week ago",
-        uploader: "MEP Engineer",
-        title: "Initial issue for coordination",
-        note: "Chiller plant layout issued for Structural and Architect coordination. Equipment weights provided.",
-        adds: ["Initial drawing", "Equipment schedule"],
-        mods: [],
-        dels: [],
-      },
-    ],
-  },
-  fire: {
-    name: "Fire Fighting",
-    disc: "Plumbing",
-    discBadge: "badge-mep-p",
-    entries: [
-      {
-        rev: "Rev-1",
-        current: true,
-        date: "2 weeks ago",
-        uploader: "MEP Engineer",
-        title: "Initial issue for coordination",
-        note: "Fire fighting layout issued for coordination. Sprinkler head positions subject to ceiling grid confirmation from Architect.",
-        adds: ["Initial drawing"],
-        mods: [],
-        dels: [],
-      },
-    ],
-  },
-};
 
 /* ═══════════════════════════════════════
    CHANGE CHIP
@@ -441,22 +31,85 @@ function ChangeChip({ label, type }) {
 ═══════════════════════════════════════ */
 export default function MEPVersionControl() {
   const { activeProject } = useProject();
-  if (!activeProject) return null; // ← add this line
 
-  const files = FILES[activeProject.id] || [];
-
-  const [sel, setSel] = useState("hvac3");
+  const [sel, setSel] = useState(null);
   const [notified, setNotif] = useState(false);
   const [search, setSearch] = useState("");
+  const [rawDrawings, setRawDrawings] = useState([]);
+  const [versions, setVersions] = useState([]);
+  const [loadingDrawings, setLoadingDrawings] = useState(false);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+
+  const currentUserId = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user"))?.id;
+    } catch {
+      return null;
+    }
+  })();
 
   useEffect(() => {
-    const projectFiles = FILES[activeProject.id] || [];
-    if (projectFiles.length > 0) {
-      setSel(projectFiles[0].key);
-    }
-  }, [activeProject.id]);
+    if (!activeProject) return;
+    setLoadingDrawings(true);
+    API.get(`/drawings/project/${activeProject.id}`)
+      .then((res) => {
+        const myDrawings = currentUserId
+          ? res.data.filter((d) => d.created_by === currentUserId)
+          : res.data;
+        setRawDrawings(myDrawings);
+        if (myDrawings.length > 0 && !sel) {
+          setSel(myDrawings[0].id);
+        }
+      })
+      .catch((err) => console.error("Failed to load drawings:", err))
+      .finally(() => setLoadingDrawings(false));
+  }, [activeProject]);
 
-  const data = VERSIONS[sel] || VERSIONS.hvac3;
+  useEffect(() => {
+    if (!sel) return;
+    setLoadingVersions(true);
+    API.get(`/drawings/${sel}/versions`)
+      .then((res) => {
+        const mapped = res.data.map((v) => ({
+          ...v,
+          rev: v.revision_number,
+          current: v.is_latest,
+          uploader: v.uploaded_by_name || "Unknown",
+          note: v.change_notes || "—",
+          date: new Date(v.uploaded_at).toLocaleDateString(),
+          adds: [],
+          mods: [],
+          dels: [],
+        }));
+        setVersions(mapped);
+      })
+      .catch(() => setVersions([]))
+      .finally(() => setLoadingVersions(false));
+  }, [sel]);
+
+  if (!activeProject) return null;
+
+  const files = rawDrawings.map((d) => ({
+    key: d.id,
+    name: d.name,
+    sub: `${d.revision_number || "—"} · ${d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString() : "—"}`,
+    badge:
+      d.sub_discipline === "Mechanical"
+        ? "badge-mep-m"
+        : d.sub_discipline === "Electrical"
+          ? "badge-mep-e"
+          : "badge-mep-p",
+    disc: d.sub_discipline,
+    discBadge:
+      d.sub_discipline === "Mechanical"
+        ? "badge-mep-m"
+        : d.sub_discipline === "Electrical"
+          ? "badge-mep-e"
+          : "badge-mep-p",
+  }));
+
+  const selectedFile = files.find((f) => f.key === sel);
+  const currentVersion = versions.find((v) => v.current);
 
   const filteredFiles = files.filter((f) =>
     f.name.toLowerCase().includes(search.toLowerCase()),
@@ -512,14 +165,11 @@ export default function MEPVersionControl() {
             value: files.length,
             ic: "ic-green",
           },
-          { icon: "🔔", label: "Notified Today", value: "3", ic: "ic-amber" },
+          { icon: "🔔", label: "Notified Today", value: "—", ic: "ic-amber" },
           {
             icon: "🗂️",
             label: "Total Revisions",
-            value: Object.values(VERSIONS).reduce(
-              (s, v) => s + v.entries.length,
-              0,
-            ),
+            value: versions.length,
             ic: "ic-purple",
           },
         ].map((s) => (
@@ -616,12 +266,14 @@ export default function MEPVersionControl() {
           <div className="mep-card-head">
             <span className="card-title">
               🗂️ Version History —{" "}
-              <span style={{ color: "var(--primary-blue)" }}>{data.name}</span>
+              <span style={{ color: "var(--primary-blue)" }}>
+                {selectedFile?.name || "—"}
+              </span>
               <span
-                className={`badge ${data.discBadge}`}
+                className={`badge ${selectedFile?.discBadge || ""}`}
                 style={{ fontSize: 9, marginLeft: 8 }}
               >
-                {data.disc}
+                {selectedFile?.disc || ""}
               </span>
             </span>
             <button
@@ -668,7 +320,7 @@ export default function MEPVersionControl() {
                   fontFamily: "Monaco,monospace",
                 }}
               >
-                {data.entries[0]?.rev}
+                {currentVersion?.rev || "—"}{" "}
               </div>
             </div>
             <div>
@@ -691,7 +343,7 @@ export default function MEPVersionControl() {
                   color: "var(--text-primary)",
                 }}
               >
-                {data.entries.length}
+                {versions.length}{" "}
               </div>
             </div>
             <div>
@@ -714,7 +366,7 @@ export default function MEPVersionControl() {
                   color: "var(--text-primary)",
                 }}
               >
-                {data.entries[0]?.date}
+                {currentVersion?.date || "—"}
               </div>
             </div>
             <div style={{ marginLeft: "auto" }}>
@@ -737,20 +389,23 @@ export default function MEPVersionControl() {
                   color: "var(--text-primary)",
                 }}
               >
-                {data.entries[0]?.uploader}
+                {currentVersion?.uploader || "—"}
               </div>
             </div>
           </div>
 
           <div className="mep-card-body" style={{ paddingTop: 16 }}>
+            {loadingVersions && (
+              <p style={{ padding: 16, fontSize: 13 }}>Loading versions...</p>
+            )}
             <div className="ver-timeline">
-              {data.entries.map((v, i) => (
+              {versions.map((v, i) => (
                 <div className="ver-entry" key={v.rev}>
                   <div className="ver-spine">
                     <div
                       className={`ver-dot ${v.current ? "current" : "old"}`}
                     />
-                    {i < data.entries.length - 1 && (
+                    {i < versions.length - 1 && (
                       <div className="ver-connector" />
                     )}
                   </div>
@@ -779,15 +434,27 @@ export default function MEPVersionControl() {
                       ))}
                     </div>
                     <div className="ver-actions">
-                      <button
+                      <a
+                        href={`http://localhost:5000${v.file_url}`}
+                        download
                         className={v.current ? "btn-primary" : "btn-outline"}
-                        style={{ fontSize: 11, padding: "6px 12px" }}
+                        style={{
+                          fontSize: 11,
+                          padding: "6px 12px",
+                          textDecoration: "none",
+                        }}
                       >
                         📥 {v.current ? "Download Current" : "Download"}
-                      </button>
+                      </a>
                       <button
                         className="btn-outline"
                         style={{ fontSize: 11, padding: "6px 12px" }}
+                        onClick={() =>
+                          window.open(
+                            `http://localhost:5000${v.file_url}`,
+                            "_blank",
+                          )
+                        }
                       >
                         👁 View
                       </button>
@@ -812,8 +479,8 @@ export default function MEPVersionControl() {
       {/* ── TOAST ── */}
       {notified && (
         <div className="toast">
-          🔔 Team notified of latest version — {data.name}{" "}
-          {data.entries[0]?.rev}
+          🔔 Team notified of latest version — {selectedFile?.name}{" "}
+          {currentVersion?.rev}
         </div>
       )}
     </div>

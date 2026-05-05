@@ -21,12 +21,12 @@ export const ArchitectMenu = [
     /* Blueprints, Coordination, and Versions */
     name: "The Designs", 
     path: "/architect/designs", 
-    icon: "layers" 
+    icon: "file" 
   },
   { 
     /* Official approvals and milestones */
-    name: "Sign Off", 
-    path: "/architect/sign-off", 
+    name: "assign", 
+    path: "/architect/assign", 
     icon: "user-check" 
   },
   { 
@@ -41,4 +41,5 @@ export const ArchitectMenu = [
     path: "/architect/projects",
     icon: "grid"
   }
+  /*{ name: "Drawings", path: "/site-engineer/designs", icon: "file" },*/
 ];

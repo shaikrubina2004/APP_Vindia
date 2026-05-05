@@ -44,6 +44,21 @@ function ChangeChip({ label, type }) {
 function VersionsPanel({ drawing, onClose }) {
   const [versions, setVersions] = useState([]);
   const [loadingV, setLoadingV] = useState(true);
+  const [clashDetails, setClashDetails] = useState([]);
+
+  const currentUserId = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user"))?.id;
+    } catch {
+      return null;
+    }
+  })();
+
+  useEffect(() => {
+    API.get(`/drawings/clashes/${drawing.id}`)
+      .then((res) => setClashDetails(res.data))
+      .catch(() => setClashDetails([]));
+  }, [drawing.id]);
 
   useEffect(() => {
     API.get(`/drawings/${drawing.id}/versions`)
@@ -200,6 +215,69 @@ function VersionsPanel({ drawing, onClose }) {
                   <div className="ver-uploader">👤 {v.uploader}</div>
                   <div className="ver-title">{v.title}</div>
                   <div className="ver-note">{v.note}</div>
+
+                  {clashDetails
+                    .filter(
+                      (c) => c.version_id_1 === v.id || c.version_id_2 === v.id,
+                    )
+                    .map((c) => (
+                      <div
+                        key={c.id}
+                        style={{
+                          background: "rgba(200,50,50,0.06)",
+                          border: "1px solid rgba(200,50,50,0.2)",
+                          borderRadius: 6,
+                          padding: "8px 10px",
+                          marginBottom: 8,
+                          fontSize: 11,
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        <strong>🚩 {c.clash_type}</strong> — {c.description}
+                        <br />
+                        <span style={{ color: "var(--text-secondary)" }}>
+                          Conflicts with:{" "}
+                          <strong>
+                            {c.drawing_1_id === drawing.id
+                              ? c.drawing_2_name
+                              : c.drawing_1_name}
+                          </strong>
+                          {" · "}Raised by: <strong>{c.raised_by_name}</strong>
+                          {" · "}
+                          {new Date(c.created_at).toLocaleDateString()}
+                          {" · "}Status: <strong>{c.status}</strong>
+                        </span>
+                        {currentUserId &&
+                          c.raised_by_id === currentUserId &&
+                          c.status === "Open" && (
+                            <div style={{ marginTop: 6 }}>
+                              <button
+                                style={{
+                                  padding: "4px 10px",
+                                  fontSize: 10,
+                                  cursor: "pointer",
+                                }}
+                                onClick={() => {
+                                  API.put(`/drawings/clashes/${c.id}/resolve`)
+                                    .then(() => {
+                                      setClashDetails((prev) =>
+                                        prev.map((x) =>
+                                          x.id === c.id
+                                            ? { ...x, status: "Resolved" }
+                                            : x,
+                                        ),
+                                      );
+                                    })
+                                    .catch(() => {});
+                                }}
+                              >
+                                ✓ Mark Resolved
+                              </button>
+                            </div>
+                          )}
+                      </div>
+                    ))}
+
                   <div className="ver-changes">
                     {(v.adds || []).map((a) => (
                       <ChangeChip key={a} label={a} type="add" />
@@ -253,7 +331,7 @@ function VersionsPanel({ drawing, onClose }) {
             Open Full Version Control
           </a>
           <a
-            href="/mep/upload"
+            href={`/mep/upload?drawing_id=${drawing.id}&drawing_name=${encodeURIComponent(drawing.name)}`}
             className="btn-primary"
             style={{ flex: 1, justifyContent: "center" }}
           >
@@ -281,7 +359,19 @@ export default function MEPDrawings() {
     if (!activeProject) return;
     setLoading(true);
     API.get(`/drawings/project/${activeProject.id}`)
-      .then((res) => setDrawings(res.data))
+      .then((res) => {
+        const currentUserId = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("user"))?.id;
+          } catch {
+            return null;
+          }
+        })();
+        const filtered = currentUserId
+          ? res.data.filter((d) => d.created_by === currentUserId)
+          : res.data;
+        setDrawings(filtered);
+      })
       .catch((err) => console.error("Failed to load drawings:", err))
       .finally(() => setLoading(false));
   }, [activeProject]);

@@ -1,51 +1,34 @@
-// ══════════════════════════════════════════════════════════════════════════════
-//  boqRoutes.js
-//  Register in server.js:
-//    const boqRoutes = require("./routes/boqRoutes");
-//    app.use("/api/boq", boqRoutes);
-// ══════════════════════════════════════════════════════════════════════════════
 const express = require("express");
-const router  = express.Router();
+const router = express.Router();
+const c = require("../controllers/boqController");
 
-const {
-  getProjects,
-  getMilestones,
-  getAllBoqs,
-  getBoqById,
-  createBoq,
-  updateBoq,
-  pmApprove,
-  pmReject,
-  seApprove,
-  seReject,
-  deleteBoq,
-} = require("../controllers/boqController");
+// ═══════════════════════════════════════
+// PROJECTS & MILESTONES
+// ═══════════════════════════════════════
 
-// Optional auth middleware — uncomment if you have one:
-// const { protect } = require("../middleware/authMiddleware");
-// router.use(protect);
+// GET projects
+router.get("/projects", c.getProjects);
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  ⚠️  ORDER MATTERS:
-//  Named routes (approve/pm, reject/pm etc.) MUST come BEFORE /:id
-//  Otherwise Express matches "approve" as the :id parameter
-// ─────────────────────────────────────────────────────────────────────────────
+// GET milestones by project
+router.get("/milestones/:projectId", c.getMilestones);
 
-// ── Dropdown data ──
-router.get("/projects",              getProjects);       // GET  all projects
-router.get("/milestones/:projectId", getMilestones);     // GET  WBS top-level items for a project
+// ═══════════════════════════════════════
+// BOQ CRUD
+// ═══════════════════════════════════════
 
-// ── Approval / rejection routes (BEFORE /:id) ──
-router.put("/approve/pm/:id",        pmApprove);         // PUT  PM approves  → pending_se
-router.put("/reject/pm/:id",         pmReject);          // PUT  PM rejects   → rejected
-router.put("/approve/se/:id",        seApprove);         // PUT  SE approves  → finalised + sent_to_se
-router.put("/reject/se/:id",         seReject);          // PUT  SE rejects   → rejected
+// GET all BOQs (with filters)
+router.get("/", c.getAllBoqs);
 
-// ── BOQ CRUD ──
-router.get   ("/",    getAllBoqs);                        // GET  all BOQs  (?projectId=&status=)
-router.post  ("/",    createBoq);                        // POST create BOQ
-router.get   ("/:id", getBoqById);                       // GET  single BOQ
-router.put   ("/:id", updateBoq);                        // PUT  edit & resubmit BOQ
-router.delete("/:id", deleteBoq);                        // DELETE BOQ
+// GET single BOQ
+router.get("/:id", c.getBoqById);
+
+// CREATE BOQ
+router.post("/", c.createBoq);
+
+// UPDATE BOQ
+router.put("/:id", c.updateBoq);
+
+// DELETE BOQ
+router.delete("/:id", c.deleteBoq);
 
 module.exports = router;

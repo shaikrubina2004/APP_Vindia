@@ -8,18 +8,18 @@ export const StructuralEngineerMenu = [
   },
   {
     name: "Drawings",
-    path: "/structural-engineer/shared/drawings",   // ← fixed path
+    path: "/structural-engineer/shared/drawings", // ← fixed path
     icon: "file-text",
-  },
-  {
-    name: "BOQ",
-    path: "/structural-engineer/boq",               // ← now has a real route
-    icon: "clipboard",
   },
   {
     name: "RFI",
     path: "/structural-engineer/rfi",
     icon: "help-circle",
+  },
+  {
+    name: "Coordination",
+    path: "/structural-engineer/coordination",
+    icon: "users",
   },
   {
     name: "Incidents",
@@ -36,7 +36,6 @@ export const StructuralEngineerMenu = [
     path: "/structural-engineer/daily-updates",
     icon: "calendar",
   },
-
 
   { name: "Upload", path: "/structural-engineer/upload", icon: "upload" },
 ];

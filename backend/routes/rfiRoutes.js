@@ -1,110 +1,216 @@
 // FILE PATH: backend/routes/rfiRoutes.js
-// ─────────────────────────────────────────────────────────────────────────────
-// RFI endpoints.  When any role RESPONDS to an RFI, the Structural Engineer
-// receives a real notification.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Cross-role RFI — any role can raise to any role, both sides see the thread.
+// Mount in server.js as: app.use("/api/rfis", rfiRoutes)
+//structural_engineer, mep_engineer, architect, project_coordinator, quantity_surveyor, site_engineer, project_manager, planning_engineer, qc_engineer, safety_officer, hr_manager
+//created for structural engineer but can be used by other roles as well
 const express = require("express");
 const router  = express.Router();
 const pool    = require("../config/db");
+const multer  = require("multer");
+const path    = require("path");
+const protect = require("../middleware/authMiddleware");
 const createSENotification = require("../utils/createSENotification");
 
-// ── GET all RFIs ──────────────────────────────────────────────────────────────
-router.get("/", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM rfis ORDER BY created_at DESC");
-    return res.json(result.rows);
-  } catch (err) {
-    console.error("Fetch RFIs error:", err.message);
-    return res.status(500).json({ error: "Failed to fetch RFIs" });
-  }
+// ── Multer ────────────────────────────────────────────────────────────────────
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, "uploads/"),
+  filename:    (_req,  file, cb) =>
+    cb(null, `rfi-${Date.now()}${path.extname(file.originalname)}`),
 });
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
-// ── POST  create a new RFI ────────────────────────────────────────────────────
-router.post("/", async (req, res) => {
+const ROLE_LABELS = {
+  structural_engineer:  "Structural Engineer",
+  mep_engineer:         "MEP Engineer",
+  architect:            "Architect",
+  project_coordinator:  "Project Coordinator",
+  quantity_surveyor:    "Quantity Surveyor",
+  site_engineer:        "Site Engineer",
+  project_manager:      "Project Manager",
+  planning_engineer:    "Planning Engineer",
+  qc_engineer:          "QC Engineer",
+  safety_officer:       "Safety Officer",
+  hr_manager:           "HR Manager",
+};
+
+// ── GET /api/rfis?view=all|sent|received ──────────────────────────────────────
+router.get("/", protect, async (req, res) => {
   try {
-    const { subject, description, raised_by, priority = "medium" } = req.body;
+    const role = req.user?.role;
+    const view = req.query.view || "all";
+
+    let where, params;
+    if (view === "sent")     { where = "WHERE r.raised_by_role = $1";   params = [role]; }
+    else if (view === "received") { where = "WHERE r.assigned_to_role = $1"; params = [role]; }
+    else { where = "WHERE r.raised_by_role = $1 OR r.assigned_to_role = $1"; params = [role]; }
 
     const result = await pool.query(
-      `INSERT INTO rfis (subject, description, raised_by, priority, status, created_at)
-       VALUES ($1, $2, $3, $4, 'open', NOW()) RETURNING *`,
-      [subject, description, raised_by, priority]
+      `SELECT r.*,
+         (SELECT COUNT(*) FROM rfi_responses rp WHERE rp.rfi_id = r.id) AS response_count
+       FROM rfis r
+       ${where}
+       ORDER BY r.created_at DESC`,
+      params
     );
 
-    return res.status(201).json(result.rows[0]);
+    return res.json({ success: true, rfis: result.rows });
   } catch (err) {
-    console.error("Create RFI error:", err.message);
-    return res.status(500).json({ error: "Failed to create RFI" });
+    console.error("GET /api/rfis:", err.message);
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// ── PATCH /:id/respond  – another role responds to an RFI ────────────────────
-// Body: { response: "...", respondedBy: "John – Architect", role: "architect" }
-router.patch("/:id/respond", async (req, res) => {
+// ── GET /api/rfis/:id — full thread ─────────────────────────────────────────
+router.get("/:id", protect, async (req, res) => {
   try {
-    const { id }                         = req.params;
-    const { response, respondedBy, role } = req.body;
+    const role = req.user?.role;
+    const { id } = req.params;
 
-    if (!response) {
-      return res.status(400).json({ error: "Response text is required" });
-    }
-
-    await pool.query(
-      `UPDATE rfis
-          SET response = $1, responded_by = $2, status = 'responded', updated_at = NOW()
-        WHERE id = $3`,
-      [response, respondedBy || role, id]
+    const rfiRes = await pool.query(
+      `SELECT * FROM rfis
+       WHERE id = $1 AND (raised_by_role = $2 OR assigned_to_role = $2)`,
+      [id, role]
     );
+    if (rfiRes.rowCount === 0)
+      return res.status(404).json({ success: false, message: "Not found or access denied" });
 
-    // Fetch RFI subject for a meaningful message
-    let subject = `RFI #${id}`;
-    try {
-      const rfi = await pool.query("SELECT subject FROM rfis WHERE id = $1", [id]);
-      if (rfi.rows[0]) subject = rfi.rows[0].subject;
-    } catch { /* ignore */ }
-
-    await createSENotification({
-      type:        "rfi",
-      severity:    "info",
-      title:       `RFI Responded: ${subject}`,
-      description: `${respondedBy || role} responded to "${subject}".`,
-    });
-
-    return res.json({ message: "RFI response saved and SE notified." });
-  } catch (err) {
-    console.error("Respond RFI error:", err.message);
-    return res.status(500).json({ error: "Failed to respond to RFI" });
-  }
-});
-
-// ── PATCH /:id/close  – close an RFI ─────────────────────────────────────────
-router.patch("/:id/close", async (req, res) => {
-  try {
-    const { id }       = req.params;
-    const { closedBy } = req.body;
-
-    await pool.query(
-      `UPDATE rfis SET status = 'closed', updated_at = NOW() WHERE id = $1`,
+    const responses = await pool.query(
+      `SELECT * FROM rfi_responses WHERE rfi_id = $1 ORDER BY created_at ASC`,
       [id]
     );
 
-    let subject = `RFI #${id}`;
-    try {
-      const rfi = await pool.query("SELECT subject FROM rfis WHERE id = $1", [id]);
-      if (rfi.rows[0]) subject = rfi.rows[0].subject;
-    } catch { /* ignore */ }
-
-    await createSENotification({
-      type:        "rfi",
-      severity:    "ok",
-      title:       `RFI Closed: ${subject}`,
-      description: `"${subject}" has been closed by ${closedBy || "a team member"}.`,
-    });
-
-    return res.json({ message: "RFI closed and SE notified." });
+    return res.json({ success: true, rfi: rfiRes.rows[0], responses: responses.rows });
   } catch (err) {
-    console.error("Close RFI error:", err.message);
-    return res.status(500).json({ error: "Failed to close RFI" });
+    console.error("GET /api/rfis/:id:", err.message);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── POST /api/rfis — create RFI ───────────────────────────────────────────────
+router.post("/", protect, upload.single("file"), async (req, res) => {
+  try {
+    const { subject, description, priority = "medium", assigned_to_role, project_name } = req.body;
+    const raisedByRole = req.user?.role;
+    const raisedByName = req.user?.name || ROLE_LABELS[raisedByRole] || raisedByRole;
+    const raisedById   = req.user?.id;
+
+    if (!subject || !assigned_to_role)
+      return res.status(400).json({ success: false, message: "subject and assigned_to_role required" });
+
+    const result = await pool.query(
+      `INSERT INTO rfis
+         (subject, description, priority, status, raised_by_role, raised_by_name,
+          raised_by_id, assigned_to_role, project_name)
+       VALUES ($1,$2,$3,'open',$4,$5,$6,$7,$8) RETURNING *`,
+      [subject, description, priority, raisedByRole, raisedByName, raisedById, assigned_to_role, project_name]
+    );
+    const newRFI = result.rows[0];
+
+    // If file attached, save as first response
+    if (req.file) {
+      await pool.query(
+        `INSERT INTO rfi_responses
+           (rfi_id, responder_role, responder_name, responder_id, message, file_url, file_name)
+         VALUES ($1,$2,$3,$4,'[File attached with RFI]',$5,$6)`,
+        [newRFI.id, raisedByRole, raisedByName, raisedById,
+         `/uploads/${req.file.filename}`, req.file.originalname]
+      );
+    }
+
+    // Notify SE if assigned to structural_engineer
+    if (assigned_to_role === "structural_engineer") {
+      await createSENotification({
+        type:        "rfi",
+        severity:    ["critical","high"].includes(priority) ? "critical" : "warn",
+        title:       `New RFI: ${subject}`,
+        description: `${ROLE_LABELS[raisedByRole] || raisedByRole} raised an RFI to you: "${subject}"`,
+      });
+    }
+
+    return res.status(201).json({ success: true, rfi: newRFI });
+  } catch (err) {
+    console.error("POST /api/rfis:", err.message);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── POST /api/rfis/:id/respond — add reply + optional file ───────────────────
+router.post("/:id/respond", protect, upload.single("file"), async (req, res) => {
+  try {
+    const { id }      = req.params;
+    const { message } = req.body;
+    const role        = req.user?.role;
+    const name        = req.user?.name || ROLE_LABELS[role] || role;
+    const userId      = req.user?.id;
+
+    if (!message && !req.file)
+      return res.status(400).json({ success: false, message: "Message or file required" });
+
+    const rfiRes = await pool.query(
+      `SELECT * FROM rfis
+       WHERE id = $1 AND (raised_by_role = $2 OR assigned_to_role = $2)`,
+      [id, role]
+    );
+    if (rfiRes.rowCount === 0)
+      return res.status(404).json({ success: false, message: "Not found or access denied" });
+
+    const rfi = rfiRes.rows[0];
+
+    const fileUrl  = req.file ? `/uploads/${req.file.filename}` : null;
+    const fileName = req.file ? req.file.originalname : null;
+
+    const resp = await pool.query(
+      `INSERT INTO rfi_responses
+         (rfi_id, responder_role, responder_name, responder_id, message, file_url, file_name)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [id, role, name, userId, message || "[File attached]", fileUrl, fileName]
+    );
+
+    // Auto-update status to 'responded'
+    if (rfi.status === "open") {
+      await pool.query(`UPDATE rfis SET status='responded', updated_at=NOW() WHERE id=$1`, [id]);
+    }
+
+    // Notify SE if another role responded to SE's RFI
+    const otherRole = rfi.raised_by_role === role ? rfi.assigned_to_role : rfi.raised_by_role;
+    if (otherRole === "structural_engineer" && role !== "structural_engineer") {
+      await createSENotification({
+        type:        "rfi",
+        severity:    "info",
+        title:       `RFI Response: ${rfi.subject}`,
+        description: `${ROLE_LABELS[role] || role} responded to your RFI "${rfi.subject}"`,
+      });
+    }
+
+    return res.json({ success: true, response: resp.rows[0] });
+  } catch (err) {
+    console.error("POST /api/rfis/:id/respond:", err.message);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── PATCH /api/rfis/:id/status ────────────────────────────────────────────────
+router.patch("/:id/status", protect, async (req, res) => {
+  try {
+    const { id }     = req.params;
+    const { status } = req.body;
+    const role       = req.user?.role;
+
+    if (!["open","responded","closed"].includes(status))
+      return res.status(400).json({ success: false, message: "Invalid status" });
+
+    const result = await pool.query(
+      `UPDATE rfis SET status=$1, updated_at=NOW()
+       WHERE id=$2 AND (raised_by_role=$3 OR assigned_to_role=$3) RETURNING *`,
+      [status, id, role]
+    );
+    if (result.rowCount === 0)
+      return res.status(404).json({ success: false, message: "Not found or access denied" });
+
+    return res.json({ success: true, rfi: result.rows[0] });
+  } catch (err) {
+    console.error("PATCH /api/rfis/:id/status:", err.message);
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 

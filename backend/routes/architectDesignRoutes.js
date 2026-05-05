@@ -1,22 +1,13 @@
-// routes/architectDesignRoutes.js
 const express = require("express");
-const router  = express.Router();
-const ctrl    = require("../controllers/architectDesignController");
+const router = express.Router();
 
-// Stats (must be before /:drawingId to avoid conflict)
-router.get("/stats",                      ctrl.getStats);
+const controller = require("../controllers/architectDesignController");
 
-// Drawings
-router.post("/",                          ctrl.createDrawing);
-router.get("/project/:projectId",         ctrl.getDrawingsByProject);
-router.get("/:drawingId",                 ctrl.getDrawingById);
-router.delete("/:drawingId",              ctrl.deleteDrawing);
+router.post("/", controller.createDrawing);
+router.get("/", controller.getDrawings);
+router.post("/:drawingId/send", controller.sendDrawing);
 
-// Revisions
-router.post("/:drawingId/revision",       ctrl.addRevision);
-router.get("/:drawingId/revisions",       ctrl.getRevisions);
-
-// Workflow
-router.post("/:drawingId/workflow",       ctrl.updateWorkflow);
+router.post("/request", controller.requestDrawing);
+router.get("/requests", controller.getRequests);
 
 module.exports = router;

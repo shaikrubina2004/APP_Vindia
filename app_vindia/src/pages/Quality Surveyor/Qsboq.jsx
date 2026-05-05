@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import "./Qsboq.css";
 
-// ── API base ──────────────────────────────────────────────────
-const API = "/api/boq";
+const API    = "/api/boq";
+const CR_API = "/api/cost-report";
+const QR_API = "/api/quantity-report";
 
-// ── Status config ─────────────────────────────────────────────
 const STATUS = {
   pending_pm: { label: "Awaiting PM Approval", color: "amber", icon: "⏳" },
   pending_se: { label: "Awaiting SE Approval", color: "blue",  icon: "⏳" },
@@ -13,70 +13,92 @@ const STATUS = {
 };
 
 const UNITS = ["m³", "m²", "m", "kg", "nos", "ltr", "ton", "bag", "rft"];
-
 const uid   = () => Math.random().toString(36).substr(2, 9);
 const blank = () => ({ id: uid(), material: "", unit: "m²", quantity: "", unitPrice: "" });
+const fmtN  = (n) => parseFloat(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
-// ── Component ─────────────────────────────────────────────────
 export default function Qsboq() {
 
-  // ── UI state ──
-  const [tab,           setTab]           = useState("create");
-  const [toast,         setToast]         = useState(null);
-  const [loading,       setLoading]       = useState(false);
-  const [apiError,      setApiError]      = useState(null);
+  // ── UI ──
+  const [tab,        setTab]        = useState("create"); // create | list | detail
+  const [toast,      setToast]      = useState(null);
+  const [loading,    setLoading]    = useState(false);
+  const [apiError,   setApiError]   = useState(null);
 
-  // ── Dropdown data from API ──
-  const [projects,      setProjects]      = useState([]);
-  const [milestones,    setMilestones]    = useState([]); // WBS top-level for selected project
+  // ── Dropdowns ──
+  const [projects,           setProjects]           = useState([]);
+  const [milestones,         setMilestones]         = useState([]);
+  const [milestonesLoading,  setMilestonesLoading]  = useState(false);
 
   // ── Create / Edit form ──
-  const [project,       setProject]       = useState("");   // project id (number)
-  const [milestone,     setMilestone]     = useState("");   // milestone object { id, name }
-  const [rows,          setRows]          = useState([blank(), blank()]);
-  const [editingId,     setEditingId]     = useState(null);
-  const [milestonesLoading, setMilestonesLoading] = useState(false);
+  const [project,   setProject]   = useState("");
+  const [milestone, setMilestone] = useState("");
+  const [rows,      setRows]      = useState([blank(), blank()]);
+  const [editingId, setEditingId] = useState(null);
 
-  // ── BOQ list ──
+  // ── List ──
   const [boqs,          setBoqs]          = useState([]);
   const [boqsLoading,   setBoqsLoading]   = useState(false);
   const [filterProject, setFilterProject] = useState("");
   const [filterStatus,  setFilterStatus]  = useState("");
+  const [filterFrom,    setFilterFrom]    = useState(() => {
+    // Default: last 7 days
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split("T")[0];
+  });
+  const [filterTo,      setFilterTo]      = useState(() => new Date().toISOString().split("T")[0]);
 
-  // ── Detail view ──
+  // ── Detail ──
   const [viewingBoq,    setViewingBoq]    = useState(null);
+  const [crStatus,      setCrStatus]      = useState(null); // cost report status for viewed boq
+  const [qrStatus,      setQrStatus]      = useState(null); // qty report status for viewed boq
+  const [crComment,     setCrComment]     = useState("");
+  const [qrComment,     setQrComment]     = useState("");
+  const [reportsLoading, setReportsLoading] = useState(false);
 
-  // ── Notify ────────────────────────────────────────────────────
+  // ── Creating reports ──
+  const [creatingReports, setCreatingReports] = useState(false);
+
+  // ── Track which BOQs have been sent to SE (persists in session) ──
+  const [sentToSeIds, setSentToSeIds] = useState([]);
+
+  const markSentToSe = (boqId) => {
+    setSentToSeIds((prev) => [...new Set([...prev, boqId])]);
+    notify("🚀 BOQ sent to Site Engineer successfully!");
+  };
+
+  // ── Notify ──
   const notify = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ── Row helpers ───────────────────────────────────────────────
+  // ── Row helpers ──
   const change     = (id, field, val) =>
     setRows((p) => p.map((r) => (r.id === id ? { ...r, [field]: val } : r)));
   const rowTotal   = (r) => (parseFloat(r.quantity) || 0) * (parseFloat(r.unitPrice) || 0);
   const grandTotal = rows.reduce((s, r) => s + rowTotal(r), 0);
 
   // ═══════════════════════════════════════════════════════════════
-  //  API CALLS
+  //  FETCH — Projects
   // ═══════════════════════════════════════════════════════════════
-
-  // ── Fetch projects for dropdown ──
   useEffect(() => {
     (async () => {
       try {
         const res  = await fetch(`${API}/projects`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load projects");
-        setProjects(data); // [{ id, name }]
+        if (!res.ok) throw new Error(data.error || "Failed");
+        setProjects(data);
       } catch (err) {
         setApiError("Could not load projects: " + err.message);
       }
     })();
   }, []);
 
-  // ── Fetch milestones when project changes ──
+  // ═══════════════════════════════════════════════════════════════
+  //  FETCH — Milestones
+  // ═══════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!project) { setMilestones([]); setMilestone(""); return; }
     (async () => {
@@ -85,8 +107,8 @@ export default function Qsboq() {
       try {
         const res  = await fetch(`${API}/milestones/${project}`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load milestones");
-        setMilestones(data); // [{ id, name, code, status, progress }]
+        if (!res.ok) throw new Error(data.error || "Failed");
+        setMilestones(data);
       } catch (err) {
         notify("Could not load milestones: " + err.message, "error");
         setMilestones([]);
@@ -96,7 +118,9 @@ export default function Qsboq() {
     })();
   }, [project]);
 
-  // ── Fetch all BOQs (with optional filters) ──
+  // ═══════════════════════════════════════════════════════════════
+  //  FETCH — BOQ list
+  // ═══════════════════════════════════════════════════════════════
   const fetchBoqs = useCallback(async () => {
     setBoqsLoading(true);
     try {
@@ -105,7 +129,7 @@ export default function Qsboq() {
       if (filterStatus)  params.append("status",    filterStatus);
       const res  = await fetch(`${API}?${params.toString()}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load BOQs");
+      if (!res.ok) throw new Error(data.error || "Failed");
       setBoqs(data);
     } catch (err) {
       notify("Could not load BOQs: " + err.message, "error");
@@ -114,22 +138,40 @@ export default function Qsboq() {
     }
   }, [filterProject, filterStatus]);
 
-  // Fetch BOQs whenever list tab is active or filters change
   useEffect(() => {
     if (tab === "list") fetchBoqs();
   }, [tab, fetchBoqs]);
 
-  // ── Refresh detail view after approval actions ──
-  const refreshDetail = async (id) => {
+  // ═══════════════════════════════════════════════════════════════
+  //  FETCH — Linked reports status for detail view
+  // ═══════════════════════════════════════════════════════════════
+  const fetchReportStatuses = async (boqId) => {
+    setReportsLoading(true);
+    setCrStatus(null);
+    setQrStatus(null);
+    setCrComment("");
+    setQrComment("");
     try {
-      const res  = await fetch(`${API}/${id}`);
-      const data = await res.json();
-      if (res.ok) setViewingBoq(data);
+      const [crRes, qrRes] = await Promise.all([
+        fetch(`${CR_API}?boqId=${boqId}`),
+        fetch(`${QR_API}?boqId=${boqId}`),
+      ]);
+      const crData = await crRes.json();
+      const qrData = await qrRes.json();
+      if (Array.isArray(crData) && crData.length > 0) {
+        setCrStatus(crData[0].status);
+        setCrComment(crData[0].pmComment || "");
+      }
+      if (Array.isArray(qrData) && qrData.length > 0) {
+        setQrStatus(qrData[0].status);
+        setQrComment(qrData[0].seComment || "");
+      }
     } catch (_) {}
+    finally { setReportsLoading(false); }
   };
 
   // ═══════════════════════════════════════════════════════════════
-  //  SUBMIT / RESUBMIT
+  //  SUBMIT BOQ — create or resubmit
   // ═══════════════════════════════════════════════════════════════
   const handleSubmit = async () => {
     if (!project)   return notify("Please select a project.", "error");
@@ -137,7 +179,6 @@ export default function Qsboq() {
     if (rows.some((r) => !r.material || !r.quantity || !r.unitPrice))
       return notify("Please fill in all row fields.", "error");
 
-    // Find selected milestone object
     const milestoneObj = milestones.find((m) => String(m.id) === String(milestone));
     if (!milestoneObj) return notify("Invalid milestone selected.", "error");
 
@@ -145,7 +186,7 @@ export default function Qsboq() {
       projectId:     parseInt(project),
       milestoneId:   milestoneObj.id,
       milestoneName: milestoneObj.name,
-      rows:          rows.map((r) => ({
+      rows: rows.map((r) => ({
         ...r,
         total:     rowTotal(r),
         quantity:  parseFloat(r.quantity),
@@ -158,29 +199,23 @@ export default function Qsboq() {
     try {
       let res, data;
       if (editingId) {
-        // Resubmit — PUT /api/boq/:id
         res  = await fetch(`${API}/${editingId}`, {
-          method:  "PUT",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(payload),
+          method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
         data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to update BOQ");
-        notify("BOQ resubmitted → sent to PM for re-approval ✓");
+        notify("BOQ updated ✓ — now create Cost & Quantity Reports");
         setEditingId(null);
       } else {
-        // Create — POST /api/boq
         res  = await fetch(API, {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(payload),
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
         data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to create BOQ");
-        notify("BOQ submitted → sent to PM for approval ✓");
+        notify("BOQ created ✓ — now create Cost & Quantity Reports");
       }
-
-      // Reset form and go to list
       setRows([blank(), blank()]);
       setProject("");
       setMilestone("");
@@ -193,12 +228,118 @@ export default function Qsboq() {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  //  EDIT — load a BOQ into the form
+  //  CREATE COST + QUANTITY REPORTS — called from BOQ detail/list
+  //  One click creates BOTH reports automatically
   // ═══════════════════════════════════════════════════════════════
-  const handleEdit = async (boq) => {
+  const handleCreateReports = async (boq) => {
+    setCreatingReports(true);
+    try {
+      const projObj = projects.find((p) => String(p.id) === String(boq.projectId));
+
+      // ── Create Cost Report (from pending_pm BOQ) ──
+      const crPayload = {
+        projectId:     boq.projectId,
+        projectName:   boq.projectName || projObj?.name,
+        milestoneId:   boq.milestoneId,
+        milestoneName: boq.milestoneName,
+        boqId:         boq.id,
+        items: boq.rows.map((r) => ({
+          material:  r.material,
+          unit:      r.unit,
+          quantity:  parseFloat(r.quantity),
+          unitPrice: parseFloat(r.unitPrice),
+          total:     parseFloat(r.total || 0),
+        })),
+        totalCost: parseFloat(boq.grandTotal),
+      };
+
+      const crRes  = await fetch(CR_API, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(crPayload),
+      });
+      const crData = await crRes.json();
+
+      // Cost report created (or already exists — both are fine)
+      const crOk = crRes.ok || crRes.status === 409;
+      if (!crOk) throw new Error("Cost Report: " + (crData.error || "Failed"));
+
+      // ── BOQ must move to pending_se before creating qty report ──
+      // We don't wait — just notify user to proceed step by step
+      notify(
+        crRes.status === 409
+          ? "Reports already created ✓"
+          : "Cost Report created & sent to PM ✓ — Quantity Report will be available after PM approves",
+        "success"
+      );
+
+      // Refresh list
+      fetchBoqs();
+      if (viewingBoq?.id === boq.id) {
+        fetchReportStatuses(boq.id);
+        refreshDetail(boq.id);
+      }
+    } catch (err) {
+      notify(err.message, "error");
+    } finally {
+      setCreatingReports(false);
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  //  CREATE QUANTITY REPORT — separate, after PM approves CR
+  // ═══════════════════════════════════════════════════════════════
+  const handleCreateQtyReport = async (boq) => {
+    setCreatingReports(true);
+    try {
+      const projObj = projects.find((p) => String(p.id) === String(boq.projectId));
+
+      const qrPayload = {
+        projectId:     boq.projectId,
+        projectName:   boq.projectName || projObj?.name,
+        milestoneId:   boq.milestoneId,
+        milestoneName: boq.milestoneName,
+        boqId:         boq.id,
+        items: boq.rows.map((r) => ({
+          material: r.material,
+          unit:     r.unit,
+          quantity: parseFloat(r.quantity),
+        })),
+        totalItems: boq.rows.length,
+      };
+
+      const qrRes  = await fetch(QR_API, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(qrPayload),
+      });
+      const qrData = await qrRes.json();
+
+      if (!qrRes.ok && qrRes.status !== 409) {
+        throw new Error("Quantity Report: " + (qrData.error || "Failed"));
+      }
+
+      notify(
+        qrRes.status === 409
+          ? "Quantity Report already created ✓"
+          : "Quantity Report created & sent to SE ✓"
+      );
+
+      fetchBoqs();
+      if (viewingBoq?.id === boq.id) {
+        fetchReportStatuses(boq.id);
+        refreshDetail(boq.id);
+      }
+    } catch (err) {
+      notify(err.message, "error");
+    } finally {
+      setCreatingReports(false);
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  //  EDIT BOQ
+  // ═══════════════════════════════════════════════════════════════
+  const handleEdit = (boq) => {
     setProject(String(boq.projectId));
-    // Milestones will re-fetch via useEffect when project changes
-    // We store the milestone id temporarily; after milestones load we select it
     setMilestone(String(boq.milestoneId));
     setRows(boq.rows.map((r) => ({ ...r, id: r.id || uid() })));
     setEditingId(boq.id);
@@ -213,72 +354,27 @@ export default function Qsboq() {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  //  APPROVALS — call backend endpoints
-  // ═══════════════════════════════════════════════════════════════
-  const callApproval = async (url, method = "PUT", body = null) => {
-    const res  = await fetch(url, {
-      method,
-      headers: body ? { "Content-Type": "application/json" } : {},
-      body:    body ? JSON.stringify(body) : null,
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Action failed");
-    return data;
-  };
-
-  const pmApprove = async (id) => {
-    try {
-      await callApproval(`${API}/approve/pm/${id}`);
-      notify("PM approved ✓ — sent to Site Engineer");
-      fetchBoqs();
-      if (viewingBoq?.id === id) refreshDetail(id);
-    } catch (err) { notify(err.message, "error"); }
-  };
-
-  const pmReject = async (id) => {
-    try {
-      await callApproval(`${API}/reject/pm/${id}`, "PUT", { note: "Please review the cost estimates." });
-      notify("PM requested changes ↩️");
-      fetchBoqs();
-      if (viewingBoq?.id === id) refreshDetail(id);
-    } catch (err) { notify(err.message, "error"); }
-  };
-
-  const seApprove = async (id) => {
-    try {
-      await callApproval(`${API}/approve/se/${id}`);
-      notify("BOQ Finalised ✅ — automatically sent to Site Engineer!");
-      fetchBoqs();
-      if (viewingBoq?.id === id) refreshDetail(id);
-    } catch (err) { notify(err.message, "error"); }
-  };
-
-  const seReject = async (id) => {
-    try {
-      await callApproval(`${API}/reject/se/${id}`, "PUT", { note: "Quantity revision needed." });
-      notify("SE requested changes ↩️");
-      fetchBoqs();
-      if (viewingBoq?.id === id) refreshDetail(id);
-    } catch (err) { notify(err.message, "error"); }
-  };
-
-  // ═══════════════════════════════════════════════════════════════
-  //  DETAIL VIEW
+  //  DETAIL
   // ═══════════════════════════════════════════════════════════════
   const openDetail = async (boq) => {
     setTab("detail");
+    setViewingBoq(boq);
+    fetchReportStatuses(boq.id);
+    refreshDetail(boq.id);
+  };
+
+  const refreshDetail = async (id) => {
     try {
-      const res  = await fetch(`${API}/${boq.id}`);
+      const res  = await fetch(`${API}/${id}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setViewingBoq(data);
-    } catch (_) {
-      setViewingBoq(boq); // fallback to list data
-    }
+      if (res.ok) setViewingBoq(data);
+    } catch (_) {}
   };
 
   const closeDetail = () => {
     setViewingBoq(null);
+    setCrStatus(null);
+    setQrStatus(null);
     setTab("list");
   };
 
@@ -300,17 +396,55 @@ export default function Qsboq() {
     a.click();
   };
 
-  // ── Derived ───────────────────────────────────────────────────
+
+  // ── Safe date parser — handles all formats, always returns LOCAL date ──
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    // Handle "DD MMM YYYY" e.g. "02 May 2026"
+    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const parts = String(dateStr).trim().split(/\s+/);
+    if (parts.length === 3 && months[parts[1]] !== undefined) {
+      return new Date(parseInt(parts[2]), months[parts[1]], parseInt(parts[0]), 12, 0, 0);
+    }
+    // Handle ISO "2026-05-02" or "2026-05-02T..."
+    if (String(dateStr).includes("-")) {
+      const iso = String(dateStr).split("T")[0]; // "2026-05-02"
+      const [y, m, d] = iso.split("-").map(Number);
+      return new Date(y, m - 1, d, 12, 0, 0); // noon local time avoids TZ shifts
+    }
+    return null;
+  };
+
+  // ── Derived ──
   const filtered = boqs.filter((b) => {
     if (filterProject && String(b.projectId) !== String(filterProject)) return false;
     if (filterStatus  && b.status !== filterStatus)                      return false;
+    if (filterFrom || filterTo) {
+      const boqDate = parseDate(b.date);
+      if (boqDate) {
+        if (filterFrom) {
+          const [fy,fm,fd] = filterFrom.split("-").map(Number);
+          const from = new Date(fy, fm-1, fd, 0, 0, 0, 0);
+          if (boqDate < from) return false;
+        }
+        if (filterTo) {
+          const [ty,tm,td] = filterTo.split("-").map(Number);
+          const to = new Date(ty, tm-1, td, 23, 59, 59, 999);
+          if (boqDate > to) return false;
+        }
+      }
+    }
     return true;
   });
 
-  // milestone name for detail header
-  const detailTitle = viewingBoq
-    ? `${viewingBoq.projectName} · ${viewingBoq.milestoneName}`
-    : "Bill of Quantities";
+  // Quick date range helpers
+  const setRange = (days) => {
+    const to   = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - days);
+    setFilterFrom(from.toISOString().split("T")[0]);
+    setFilterTo(to.toISOString().split("T")[0]);
+  };
 
   // ═══════════════════════════════════════════════════════════════
   //  RENDER
@@ -329,60 +463,57 @@ export default function Qsboq() {
           )}
           <div>
             <h1 className="boq__title">
-              {tab === "detail" ? detailTitle : "Bill of Quantities"}
+              {tab === "detail" && viewingBoq
+                ? `${viewingBoq.projectName} · ${viewingBoq.milestoneName}`
+                : "Bill of Quantities"}
             </h1>
             <p className="boq__subtitle">Quantity Surveyor · BOQ Management</p>
           </div>
         </div>
-
         {tab !== "detail" && (
           <div className="boq__tabs">
-            <button
-              className={`boq__tab ${tab === "create" ? "active" : ""}`}
-              onClick={() => { cancelEdit(); setTab("create"); }}
-            >
+            <button className={`boq__tab ${tab === "create" ? "active" : ""}`}
+              onClick={() => { cancelEdit(); setTab("create"); }}>
               {editingId ? "✏️ Editing BOQ" : "+ Create BOQ"}
             </button>
-            <button
-              className={`boq__tab ${tab === "list" ? "active" : ""}`}
-              onClick={() => setTab("list")}
-            >
-              View BOQs
-              {boqs.length > 0 && <span className="boq__badge">{boqs.length}</span>}
+            <button className={`boq__tab ${tab === "list" ? "active" : ""}`}
+              onClick={() => setTab("list")}>
+              My BOQs {boqs.length > 0 && <span className="boq__badge">{boqs.length}</span>}
             </button>
           </div>
         )}
       </div>
 
-      {/* ── FLOW BANNER ── */}
+      {/* ── FLOW STEPS ── */}
       <div className="boq__flow-bar">
-        {["QS Creates BOQ", "PM Approves (Cost)", "SE Approves (Quantity)", "Finalised → Sent to SE"]
-          .map((s, i, arr) => (
-            <React.Fragment key={i}>
-              <div className="boq__flow-step">
-                <span className="boq__flow-dot">{i + 1}</span>
-                <span className="boq__flow-label">{s}</span>
-              </div>
-              {i < arr.length - 1 && <span className="boq__flow-arrow">›</span>}
-            </React.Fragment>
-          ))}
+        {[
+          "1. Create BOQ",
+          "2. Create Reports",
+          "3. PM Approves Cost",
+          "4. SE Approves Qty",
+          "5. BOQ Finalised",
+        ].map((s, i, arr) => (
+          <React.Fragment key={i}>
+            <div className="boq__flow-step">
+              <span className="boq__flow-label">{s}</span>
+            </div>
+            {i < arr.length - 1 && <span className="boq__flow-arrow">›</span>}
+          </React.Fragment>
+        ))}
       </div>
 
-      {/* ── API Error Banner ── */}
-      {apiError && (
-        <div className="boq__api-error">⚠️ {apiError}</div>
-      )}
+      {apiError && <div className="boq__api-error">⚠️ {apiError}</div>}
 
       <div className="boq__body">
 
-        {/* ════════════════════════════════════════
+        {/* ══════════════════════════════════════
             CREATE / EDIT TAB
-        ════════════════════════════════════════ */}
+        ══════════════════════════════════════ */}
         {tab === "create" && (
           <>
             {editingId && (
               <div className="boq__edit-banner">
-                <span>✏️ Editing submitted BOQ — on resubmit it will go back to PM for re-approval.</span>
+                <span>✏️ Editing rejected BOQ — make changes based on the suggestion and resubmit.</span>
                 <button className="boq__cancel-edit"
                   onClick={() => { cancelEdit(); setTab("list"); }}>✕ Cancel</button>
               </div>
@@ -391,45 +522,29 @@ export default function Qsboq() {
             {/* Step 1 — Project & Milestone */}
             <div className="boq__block">
               <div className="boq__block-label">
-                <span className="boq__num">1</span>
-                Select Project &amp; Milestone
+                <span className="boq__num">1</span> Select Project &amp; Milestone
               </div>
               <div className="boq__selectors">
-
-                {/* Project */}
                 <div className="boq__sel-group">
                   <label className="boq__sel-label">Project</label>
-                  <select
-                    className="boq__select"
-                    value={project}
+                  <select className="boq__select" value={project}
                     onChange={(e) => setProject(e.target.value)}
-                    disabled={projects.length === 0}
-                  >
+                    disabled={projects.length === 0}>
                     <option value="">
                       {projects.length === 0 ? "Loading projects…" : "— Choose project —"}
                     </option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
+                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
-
-                {/* Milestone — from WBS parent_id IS NULL */}
                 <div className="boq__sel-group">
-                  <label className="boq__sel-label">Milestone</label>
-                  <select
-                    className="boq__select"
-                    value={milestone}
+                  <label className="boq__sel-label">Milestone (WBS)</label>
+                  <select className="boq__select" value={milestone}
                     onChange={(e) => setMilestone(e.target.value)}
-                    disabled={!project || milestonesLoading}
-                  >
+                    disabled={!project || milestonesLoading}>
                     <option value="">
-                      {milestonesLoading
-                        ? "Loading milestones…"
-                        : !project
-                        ? "— Select project first —"
-                        : milestones.length === 0
-                        ? "No milestones found"
+                      {milestonesLoading ? "Loading…"
+                        : !project ? "— Select project first —"
+                        : milestones.length === 0 ? "No milestones found"
                         : "— Choose milestone —"}
                     </option>
                     {milestones.map((m) => (
@@ -439,10 +554,7 @@ export default function Qsboq() {
                     ))}
                   </select>
                 </div>
-
               </div>
-
-              {/* Selected tag */}
               {project && milestone && (() => {
                 const proj = projects.find((p) => String(p.id) === String(project));
                 const ms   = milestones.find((m) => String(m.id) === String(milestone));
@@ -454,17 +566,15 @@ export default function Qsboq() {
               })()}
             </div>
 
-            {/* Step 2 — Materials Table */}
+            {/* Step 2 — Materials */}
             <div className="boq__block">
               <div className="boq__block-label">
-                <span className="boq__num">2</span>
-                Add Materials
+                <span className="boq__num">2</span> Add Materials
                 <button className="boq__add-btn"
                   onClick={() => setRows((p) => [...p, blank()])}>
                   + Add Row
                 </button>
               </div>
-
               <div className="boq__table-scroll">
                 <table className="boq__table">
                   <colgroup>
@@ -484,8 +594,7 @@ export default function Qsboq() {
                       <tr key={row.id}>
                         <td className="td-num">{i + 1}</td>
                         <td>
-                          <input className="boq__inp"
-                            placeholder="e.g. M25 Concrete, Steel Bar…"
+                          <input className="boq__inp" placeholder="e.g. M25 Concrete, Steel Bar…"
                             value={row.material}
                             onChange={(e) => change(row.id, "material", e.target.value)} />
                         </td>
@@ -505,9 +614,7 @@ export default function Qsboq() {
                             placeholder="0.00" value={row.unitPrice}
                             onChange={(e) => change(row.id, "unitPrice", e.target.value)} />
                         </td>
-                        <td className="td-total">
-                          ₹ {rowTotal(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </td>
+                        <td className="td-total">₹ {fmtN(rowTotal(row))}</td>
                         <td>
                           <button className="boq__del"
                             onClick={() =>
@@ -521,43 +628,81 @@ export default function Qsboq() {
               </div>
             </div>
 
-            {/* Step 3 — Grand Total + Submit */}
+            {/* Grand Total + Submit */}
             <div className="boq__footer-row">
               <div className="boq__grand">
                 <span className="boq__grand-lbl">Grand Total</span>
-                <span className="boq__grand-amt">
-                  ₹ {grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                </span>
+                <span className="boq__grand-amt">₹ {fmtN(grandTotal)}</span>
               </div>
               <button className="boq__submit-btn" onClick={handleSubmit} disabled={loading}>
-                {loading
-                  ? "Saving…"
-                  : editingId
-                  ? "Resubmit for Approval →"
-                  : "Submit BOQ → PM Approval"}
+                {loading ? "Saving…"
+                  : editingId ? "Update BOQ →"
+                  : "Save BOQ →"}
               </button>
             </div>
           </>
         )}
 
-        {/* ════════════════════════════════════════
+        {/* ══════════════════════════════════════
             LIST TAB
-        ════════════════════════════════════════ */}
+        ══════════════════════════════════════ */}
         {tab === "list" && (
           <>
             <div className="boq__view-head">
-              <h2 className="boq__view-h">All BOQs</h2>
+              <h2 className="boq__view-h">My BOQs</h2>
+            </div>
+
+            {/* Filter bar */}
+            <div className="boq__filter-bar">
+              {/* Quick range buttons */}
+              <div className="boq__range-btns">
+                <span className="boq__range-label">📅 Show:</span>
+                {[
+                  { label: "Today",   days: 0  },
+                  { label: "1 Week",  days: 7  },
+                  { label: "1 Month", days: 30 },
+                  { label: "3 Months",days: 90 },
+                ].map(({ label, days }) => {
+                  const isActive = (() => {
+                    const from = new Date(); from.setDate(from.getDate() - days);
+                    const to   = new Date();
+                    return filterFrom === from.toISOString().split("T")[0] &&
+                           filterTo   === to.toISOString().split("T")[0];
+                  })();
+                  return (
+                    <button key={label}
+                      className={`boq__range-btn ${isActive ? "active" : ""}`}
+                      onClick={() => setRange(days)}>
+                      {label}
+                    </button>
+                  );
+                })}
+                <button className="boq__range-btn"
+                  onClick={() => { setFilterFrom(""); setFilterTo(""); }}>
+                  All Time
+                </button>
+              </div>
+
+              {/* Custom date range */}
+              <div className="boq__date-range">
+                <span className="boq__date-range-label">From</span>
+                <input type="date" className="boq__date-input"
+                  value={filterFrom}
+                  onChange={(e) => setFilterFrom(e.target.value)} />
+                <span className="boq__date-range-label">To</span>
+                <input type="date" className="boq__date-input"
+                  value={filterTo}
+                  onChange={(e) => setFilterTo(e.target.value)} />
+              </div>
+
+              {/* Project + Status filters */}
               <div className="boq__filters">
-                <select className="boq__select boq__select--sm"
-                  value={filterProject}
+                <select className="boq__select boq__select--sm" value={filterProject}
                   onChange={(e) => setFilterProject(e.target.value)}>
                   <option value="">All Projects</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
+                  {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <select className="boq__select boq__select--sm"
-                  value={filterStatus}
+                <select className="boq__select boq__select--sm" value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}>
                   <option value="">All Statuses</option>
                   {Object.entries(STATUS).map(([k, v]) => (
@@ -568,10 +713,7 @@ export default function Qsboq() {
             </div>
 
             {boqsLoading ? (
-              <div className="boq__loading">
-                <div className="boq__spinner" />
-                Loading BOQs…
-              </div>
+              <div className="boq__loading"><div className="boq__spinner" /> Loading BOQs…</div>
             ) : filtered.length === 0 ? (
               <div className="boq__empty">
                 <span>📋</span>
@@ -581,255 +723,429 @@ export default function Qsboq() {
                 </button>
               </div>
             ) : (
-              <div className="boq__list-table-wrap">
-                <table className="boq__list-table">
-                  <thead>
-                    <tr>
-                      <th>Project</th>
-                      <th>Milestone</th>
-                      <th>Date</th>
-                      <th>Grand Total</th>
-                      <th>Status</th>
-                      <th>Sent to SE</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((boq) => {
-                      const st      = STATUS[boq.status] || STATUS.pending_pm;
-                      const canEdit = ["rejected", "pending_pm", "pending_se"].includes(boq.status);
-                      return (
-                        <tr key={boq.id} className="boq__list-row">
-                          <td className="boq__list-proj">{boq.projectName}</td>
-                          <td>
-                            <span className="boq__milestone-tag">🏗️ {boq.milestoneName}</span>
-                          </td>
-                          <td className="boq__list-date">
-                            {boq.date}
-                            {boq.updatedDate && (
-                              <><br /><span className="boq__updated">Updated {boq.updatedDate}</span></>
-                            )}
-                          </td>
-                          <td className="boq__list-total">
-                            ₹ {parseFloat(boq.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td>
-                            <span className={`boq__status-badge boq__status--${st.color}`}>
-                              {st.icon} {st.label}
-                            </span>
-                          </td>
-                          <td className="boq__list-se">
-                            {boq.sentToSE
-                              ? <span className="boq__se-sent">✅ Sent</span>
-                              : <span className="boq__se-pending">—</span>}
-                          </td>
-                          <td>
-                            <div className="boq__list-actions">
-                              <button className="boq__view-btn"
-                                onClick={() => openDetail(boq)}>👁 View</button>
-                              {canEdit && (
-                                <button className="boq__edit-btn"
-                                  onClick={() => handleEdit(boq)}>✏️ Edit</button>
-                              )}
-                              {boq.status === "pending_pm" && (
-                                <>
-                                  <button className="boq__approve-btn"
-                                    onClick={() => pmApprove(boq.id)}>✔ PM OK</button>
-                                  <button className="boq__reject-btn"
-                                    onClick={() => pmReject(boq.id)}>✘ PM Reject</button>
-                                </>
-                              )}
-                              {boq.status === "pending_se" && (
-                                <>
-                                  <button className="boq__approve-btn"
-                                    onClick={() => seApprove(boq.id)}>✔ SE OK</button>
-                                  <button className="boq__reject-btn"
-                                    onClick={() => seReject(boq.id)}>✘ SE Reject</button>
-                                </>
-                              )}
-                              {boq.status === "finalised" && (
-                                <button className="boq__export-btn"
-                                  onClick={() => exportCSV(boq)}>⬇ CSV</button>
-                              )}
+              <div className="boq__cards-list">
+                {filtered.map((boq) => {
+                  const st = STATUS[boq.status] || STATUS.pending_pm;
+                  return (
+                    <div key={boq.id} className={`boq__card boq__card--${st.color}`}>
+                      <div className="boq__card-top">
+                        <div className="boq__card-info">
+                          <div className="boq__card-proj">{boq.projectName}</div>
+                          <div className="boq__card-meta">
+                            🏗️ {boq.milestoneName}
+                            &nbsp;·&nbsp; 📅 {boq.date}
+                            {boq.updatedDate && <span className="boq__updated"> · Updated {boq.updatedDate}</span>}
+                          </div>
+                        </div>
+                        <div className="boq__card-right">
+                          <div className="boq__card-total">₹ {fmtN(boq.grandTotal)}</div>
+                          <span className={`boq__status-badge boq__status--${st.color}`}>
+                            {st.icon} {st.label}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Report status pills */}
+                      <div className="boq__card-reports">
+                        <div className="boq__report-pill">
+                          <span className="boq__report-pill-lbl">💰 Cost Report (PM)</span>
+                          <span className={`boq__report-pill-val ${
+                            boq.costReportStatus === "approved" ? "green"
+                            : boq.costReportStatus === "rejected" ? "red"
+                            : boq.costReportStatus ? "amber" : "grey"
+                          }`}>
+                            {boq.costReportStatus === "approved" ? "✅ Approved"
+                              : boq.costReportStatus === "rejected" ? "↩️ Rejected"
+                              : boq.costReportStatus === "pending_pm" ? "⏳ Pending PM"
+                              : "— Not Created"}
+                          </span>
+                        </div>
+                        <div className="boq__report-pill">
+                          <span className="boq__report-pill-lbl">📐 Qty Report (SE)</span>
+                          <span className={`boq__report-pill-val ${
+                            boq.qtyReportStatus === "approved" ? "green"
+                            : boq.qtyReportStatus === "rejected" ? "red"
+                            : boq.qtyReportStatus ? "blue" : "grey"
+                          }`}>
+                            {boq.qtyReportStatus === "approved" ? "✅ Approved"
+                              : boq.qtyReportStatus === "rejected" ? "↩️ Rejected"
+                              : boq.qtyReportStatus === "pending_se" ? "⏳ Pending SE"
+                              : "— Not Created"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="boq__card-actions">
+                        <button className="boq__view-btn" onClick={() => openDetail(boq)}>
+                          👁 View BOQ
+                        </button>
+
+                        {/* Create Reports button — only when pending_pm and no CR yet */}
+                        {boq.status === "pending_pm" && !boq.costReportStatus && (
+                          <button className="boq__create-reports-btn"
+                            onClick={() => handleCreateReports(boq)}
+                            disabled={creatingReports}>
+                            {creatingReports ? "Creating…" : "📄 Create Cost Report"}
+                          </button>
+                        )}
+
+                        {/* Create Qty Report — only when pending_se and no QR yet */}
+                        {boq.status === "pending_se" && !boq.qtyReportStatus && (
+                          <button className="boq__create-qty-btn"
+                            onClick={() => handleCreateQtyReport(boq)}
+                            disabled={creatingReports}>
+                            {creatingReports ? "Creating…" : "📐 Create Qty Report"}
+                          </button>
+                        )}
+
+                        {/* Edit — only when rejected */}
+                        {boq.status === "rejected" && (
+                          <button className="boq__edit-btn" onClick={() => handleEdit(boq)}>
+                            ✏️ Edit BOQ
+                          </button>
+                        )}
+
+                        {/* Export — only when finalised */}
+                        {boq.status === "finalised" && (
+                          <>
+                            {sentToSeIds.includes(boq.id) || boq.sentToSE ? (
+                              <div className="boq__card-sent-confirm">
+                              <span className="boq__card-sent-icon">✅</span>
+                              <span className="boq__card-sent-title">✅ Submitted to SE</span>
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            ) : (
+                              <button className="boq__send-se-btn"
+                                onClick={() => markSentToSe(boq.id)}>
+                                🚀 Submit to SE
+                              </button>
+                            )}
+                            <button className="boq__export-btn" onClick={() => exportCSV(boq)}>
+                              ⬇ Export CSV
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </>
         )}
 
-        {/* ════════════════════════════════════════
+        {/* ══════════════════════════════════════
             DETAIL TAB
-        ════════════════════════════════════════ */}
+        ══════════════════════════════════════ */}
         {tab === "detail" && viewingBoq && (() => {
           const boq = viewingBoq;
           const st  = STATUS[boq.status] || STATUS.pending_pm;
+
           return (
             <div className="boq__detail">
 
               {/* Info Bar */}
               <div className="boq__detail-infobar">
-                {[
-                  { label: "Project",      value: boq.projectName },
-                  { label: "Milestone",    value: `🏗️ ${boq.milestoneName}` },
-                  { label: "Created",      value: boq.date },
-                  ...(boq.updatedDate ? [{ label: "Last Updated", value: boq.updatedDate }] : []),
-                  { label: "Status",       value: null, badge: true },
-                  ...(boq.sentToSE ? [{ label: "Sent to SE", value: `✅ Sent on ${boq.finalisedDate}`, green: true }] : []),
-                ].map((item, i) => (
-                  <div key={i} className="boq__detail-infoitem">
-                    <span className="boq__detail-infolbl">{item.label}</span>
-                    {item.badge
-                      ? <span className={`boq__status-badge boq__status--${st.color}`}>{st.icon} {st.label}</span>
-                      : <span className={`boq__detail-infoval${item.green ? " boq__se-sent" : ""}`}>{item.value}</span>
-                    }
+                <div className="boq__detail-infoitem">
+                  <span className="boq__detail-infolbl">Project</span>
+                  <span className="boq__detail-infoval">{boq.projectName}</span>
+                </div>
+                <div className="boq__detail-infoitem">
+                  <span className="boq__detail-infolbl">Milestone</span>
+                  <span className="boq__detail-infoval">🏗️ {boq.milestoneName}</span>
+                </div>
+                <div className="boq__detail-infoitem">
+                  <span className="boq__detail-infolbl">Created</span>
+                  <span className="boq__detail-infoval">{boq.date}</span>
+                </div>
+                {boq.updatedDate && (
+                  <div className="boq__detail-infoitem">
+                    <span className="boq__detail-infolbl">Updated</span>
+                    <span className="boq__detail-infoval">{boq.updatedDate}</span>
                   </div>
-                ))}
+                )}
+                <div className="boq__detail-infoitem">
+                  <span className="boq__detail-infolbl">Status</span>
+                  <span className={`boq__status-badge boq__status--${st.color}`}>
+                    {st.icon} {st.label}
+                  </span>
+                </div>
               </div>
 
-              {/* Rejection note */}
-              {boq.status === "rejected" && (boq.pmNote || boq.seNote) && (
-                <div className="boq__note">
-                  <strong>
-                    💬 Suggestion from {boq.pmNote ? "Project Manager" : "Site Engineer"}:
-                  </strong>
-                  &nbsp;{boq.pmNote || boq.seNote}
+              {/* Rejection suggestions from PM / SE */}
+              {boq.status === "rejected" && (
+                <div className="boq__rejection-box">
+                  <div className="boq__rejection-box-title">
+                    ↩️ Changes Requested — Please review the suggestions below and edit your BOQ
+                  </div>
+                  <div className="boq__rejection-comments">
+                    {/* PM comment from cost report */}
+                    {(boq.pmNote || crComment) && (
+                      <div className="boq__rejection-comment boq__rejection-comment--pm">
+                        <div className="boq__rejection-comment-from">
+                          <span className="boq__rejection-avatar boq__rejection-avatar--pm">PM</span>
+                          <span>Project Manager — Cost Report</span>
+                        </div>
+                        <div className="boq__rejection-comment-text">
+                          {crComment || boq.pmNote}
+                        </div>
+                      </div>
+                    )}
+                    {/* SE comment from quantity report */}
+                    {(boq.seNote || qrComment) && (
+                      <div className="boq__rejection-comment boq__rejection-comment--se">
+                        <div className="boq__rejection-comment-from">
+                          <span className="boq__rejection-avatar boq__rejection-avatar--se">SE</span>
+                          <span>Site Engineer — Quantity Report</span>
+                        </div>
+                        <div className="boq__rejection-comment-text">
+                          {qrComment || boq.seNote}
+                        </div>
+                      </div>
+                    )}
+                    {/* No comment fallback */}
+                    {!boq.pmNote && !crComment && !boq.seNote && !qrComment && (
+                      <div className="boq__rejection-no-comment">
+                        No specific comments provided. Please review and resubmit.
+                      </div>
+                    )}
+                  </div>
                   <button className="boq__edit-inline" onClick={() => handleEdit(boq)}>
-                    ✏️ Edit &amp; Resubmit
+                    ✏️ Edit BOQ &amp; Resubmit
                   </button>
                 </div>
               )}
 
-              {/* Approval Tracker */}
+              {/* ── APPROVAL STATUS TRACKER ── */}
               <div className="boq__block">
                 <div className="boq__block-label">
-                  <span className="boq__num">📊</span> Approval Progress
+                  <span className="boq__num">📊</span> Approval Status
                 </div>
                 <div className="boq__approval-track">
                   {[
+                    { label: "BOQ Created",           done: true },
                     {
-                      label:   "Submitted by QS",
-                      done:    ["pending_pm","pending_se","finalised","rejected"].includes(boq.status),
+                      label:   "Cost Report → PM",
+                      done:    crStatus === "approved",
+                      current: crStatus === "pending_pm",
+                      rejected: crStatus === "rejected",
+                      sub:     crStatus === "approved" ? "✅ PM Approved"
+                               : crStatus === "rejected" ? "↩️ PM Rejected"
+                               : crStatus === "pending_pm" ? "⏳ Waiting for PM"
+                               : "Not created yet",
                     },
                     {
-                      label:   "PM Approved\n(Cost Report)",
-                      done:    ["pending_se","finalised"].includes(boq.status),
-                      current: boq.status === "pending_pm",
+                      label:   "Qty Report → SE",
+                      done:    qrStatus === "approved",
+                      current: qrStatus === "pending_se",
+                      rejected: qrStatus === "rejected",
+                      sub:     qrStatus === "approved" ? "✅ SE Approved"
+                               : qrStatus === "rejected" ? "↩️ SE Rejected"
+                               : qrStatus === "pending_se" ? "⏳ Waiting for SE"
+                               : "Not created yet",
                     },
                     {
-                      label:   "SE Approved\n(Qty Report)",
-                      done:    boq.status === "finalised",
-                      current: boq.status === "pending_se",
-                    },
-                    {
-                      label:   "Finalised &\nSent to SE",
-                      done:    boq.status === "finalised",
+                      label: "BOQ Finalised",
+                      done:  boq.status === "finalised",
+                      sub:   boq.status === "finalised" ? `Sent to SE on ${boq.finalisedDate}` : "Pending both approvals",
                     },
                   ].map((step, i, arr) => (
                     <React.Fragment key={i}>
-                      <div className={`boq__approval-step ${step.done ? "done" : step.current ? "active" : ""}`}>
-                        <span className="boq__ap-dot">{step.done ? "✓" : i + 1}</span>
+                      <div className={`boq__ap-step ${
+                        step.done ? "done"
+                        : step.rejected ? "rejected"
+                        : step.current ? "active" : ""
+                      }`}>
+                        <span className="boq__ap-dot">
+                          {step.done ? "✓" : step.rejected ? "✘" : i + 1}
+                        </span>
                         <span className="boq__ap-label">{step.label}</span>
+                        {step.sub && <span className="boq__ap-sub">{step.sub}</span>}
                       </div>
                       {i < arr.length - 1 && <div className="boq__ap-line" />}
                     </React.Fragment>
                   ))}
                 </div>
+
+                {/* PM/SE comments if rejected */}
+                {(crStatus === "rejected" || qrStatus === "rejected") && (
+                  <div className="boq__approval-comments">
+                    {crStatus === "rejected" && crComment && (
+                      <div className="boq__approval-comment boq__approval-comment--pm">
+                        <strong>💬 PM Comment:</strong> {crComment}
+                      </div>
+                    )}
+                    {qrStatus === "rejected" && qrComment && (
+                      <div className="boq__approval-comment boq__approval-comment--se">
+                        <strong>💬 SE Comment:</strong> {qrComment}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Finalised Banner */}
+              {/* ── ACTION BUTTONS ── */}
+              <div className="boq__detail-action-bar">
+                {/* Create Cost Report */}
+                {boq.status === "pending_pm" && !crStatus && (
+                  <button className="boq__create-reports-btn boq__create-reports-btn--lg"
+                    onClick={() => handleCreateReports(boq)}
+                    disabled={creatingReports}>
+                    {creatingReports ? "Creating…" : "📄 Create Cost Report & Send to PM"}
+                  </button>
+                )}
+
+                {/* Create Qty Report — after PM approves cost report */}
+                {boq.status === "pending_se" && !qrStatus && (
+                  <button className="boq__create-qty-btn boq__create-qty-btn--lg"
+                    onClick={() => handleCreateQtyReport(boq)}
+                    disabled={creatingReports}>
+                    {creatingReports ? "Creating…" : "📐 Create Quantity Report & Send to SE"}
+                  </button>
+                )}
+
+                {/* Edit — rejected */}
+                {boq.status === "rejected" && (
+                  <button className="boq__edit-btn boq__edit-btn--lg"
+                    onClick={() => handleEdit(boq)}>
+                    ✏️ Edit BOQ
+                  </button>
+                )}
+              </div>
+
+              {/* ── FINALISED BOQ — show only when both approved ── */}
               {boq.status === "finalised" && (
-                <div className="boq__finalised-banner">
-                  <span className="boq__finalised-icon">✅</span>
-                  <div>
-                    <div className="boq__finalised-title">BOQ Finalised &amp; Sent to Site Engineer</div>
-                    <div className="boq__finalised-sub">
-                      Finalised on {boq.finalisedDate} · Site Engineer has received this BOQ.
+                <>
+                  <div className="boq__finalised-banner">
+                    <span className="boq__finalised-icon">✅</span>
+                    <div>
+                      <div className="boq__finalised-title">BOQ Finalised</div>
+                      <div className="boq__finalised-sub">
+                        Both Cost Report (PM) and Quantity Report (SE) approved.
+                        Finalised on {boq.finalisedDate}.
+                      </div>
+                    </div>
+                    <div className="boq__finalised-btns">
+                      {sentToSeIds.includes(boq.id) || boq.sentToSE ? (
+                        <div className="boq__sent-confirmation">
+                          <span className="boq__sent-check">✅</span>
+                          <div>
+                            <div className="boq__sent-title">Submitted to Site Engineer</div>
+                            <div className="boq__sent-sub">
+                              Site Engineer has received this BOQ for execution.
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <button className="boq__send-se-btn"
+                          onClick={() => markSentToSe(boq.id)}>
+                          🚀 Submit to Site Engineer
+                        </button>
+                      )}
+                      <button className="boq__export-btn boq__export-btn--lg"
+                        onClick={() => exportCSV(boq)}>⬇ Export CSV</button>
                     </div>
                   </div>
-                  <button className="boq__export-btn boq__export-btn--lg"
-                    onClick={() => exportCSV(boq)}>⬇ Export CSV</button>
-                </div>
+
+                  {/* Final BOQ table */}
+                  <div className="boq__block">
+                    <div className="boq__block-label">
+                      <span className="boq__num">📋</span> Final Bill of Quantities
+                    </div>
+                    <div className="boq__table-scroll">
+                      <table className="boq__table">
+                        <colgroup>
+                          <col style={{width:"44px"}} /><col />
+                          <col style={{width:"88px"}} /><col style={{width:"120px"}} />
+                          <col style={{width:"150px"}} /><col style={{width:"155px"}} />
+                        </colgroup>
+                        <thead>
+                          <tr>
+                            <th>#</th><th>Material</th><th>Unit</th>
+                            <th>Quantity</th><th>Unit Price (₹)</th><th>Total (₹)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {boq.rows.map((r, i) => (
+                            <tr key={r.id || i}>
+                              <td className="td-num">{i + 1}</td>
+                              <td><strong>{r.material}</strong></td>
+                              <td>{r.unit}</td>
+                              <td className="td-num">
+                                {parseFloat(r.quantity).toLocaleString("en-IN")}
+                              </td>
+                              <td className="td-num">
+                                ₹ {parseFloat(r.unitPrice).toLocaleString("en-IN")}
+                              </td>
+                              <td className="td-total">₹ {fmtN(r.total || 0)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan={5} className="tfoot-lbl">Grand Total</td>
+                            <td className="tfoot-val">₹ {fmtN(boq.grandTotal)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                </>
               )}
 
-              {/* Approval action buttons in detail view */}
-              {boq.status === "pending_pm" && (
-                <div className="boq__demo-actions">
-                  <span className="boq__demo-label">[ PM Actions ]</span>
-                  <button className="boq__approve-btn" onClick={() => pmApprove(boq.id)}>✔ PM Approve</button>
-                  <button className="boq__reject-btn"  onClick={() => pmReject(boq.id)}>✘ Request Changes</button>
-                </div>
-              )}
-              {boq.status === "pending_se" && (
-                <div className="boq__demo-actions">
-                  <span className="boq__demo-label">[ SE Actions ]</span>
-                  <button className="boq__approve-btn" onClick={() => seApprove(boq.id)}>✔ SE Approve</button>
-                  <button className="boq__reject-btn"  onClick={() => seReject(boq.id)}>✘ Request Changes</button>
-                </div>
-              )}
-
-              {/* Materials Table */}
-              <div className="boq__block">
-                <div className="boq__block-label">
-                  <span className="boq__num">📋</span> Bill of Quantities
-                </div>
-                <div className="boq__table-scroll">
-                  <table className="boq__table">
-                    <colgroup>
-                      <col style={{width:"44px"}} /><col />
-                      <col style={{width:"88px"}} /><col style={{width:"120px"}} />
-                      <col style={{width:"150px"}} /><col style={{width:"150px"}} />
-                    </colgroup>
-                    <thead>
-                      <tr>
-                        <th>#</th><th>Material</th><th>Unit</th>
-                        <th>Quantity</th><th>Unit Price (₹)</th><th>Total (₹)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {boq.rows.map((r, i) => (
-                        <tr key={r.id || i}>
-                          <td className="td-num">{i + 1}</td>
-                          <td><strong>{r.material}</strong></td>
-                          <td>{r.unit}</td>
-                          <td className="td-num">
-                            {parseFloat(r.quantity).toLocaleString("en-IN")}
-                          </td>
-                          <td className="td-num">
-                            ₹ {parseFloat(r.unitPrice).toLocaleString("en-IN")}
-                          </td>
-                          <td className="td-total">
-                            ₹ {parseFloat(r.total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                          </td>
+              {/* ── PENDING BOQ TABLE — always visible ── */}
+              {boq.status !== "finalised" && (
+                <div className="boq__block">
+                  <div className="boq__block-label">
+                    <span className="boq__num">📋</span> BOQ Items
+                    <span className="boq__pending-note">
+                      Waiting for approvals before finalisation
+                    </span>
+                  </div>
+                  <div className="boq__table-scroll">
+                    <table className="boq__table">
+                      <colgroup>
+                        <col style={{width:"44px"}} /><col />
+                        <col style={{width:"88px"}} /><col style={{width:"120px"}} />
+                        <col style={{width:"150px"}} /><col style={{width:"155px"}} />
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th>#</th><th>Material</th><th>Unit</th>
+                          <th>Quantity</th><th>Unit Price (₹)</th><th>Total (₹)</th>
                         </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <td colSpan={5} className="tfoot-lbl">Grand Total</td>
-                        <td className="tfoot-val">
-                          ₹ {parseFloat(boq.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {boq.rows.map((r, i) => (
+                          <tr key={r.id || i}>
+                            <td className="td-num">{i + 1}</td>
+                            <td>{r.material}</td>
+                            <td>{r.unit}</td>
+                            <td className="td-num">
+                              {parseFloat(r.quantity).toLocaleString("en-IN")}
+                            </td>
+                            <td className="td-num">
+                              ₹ {parseFloat(r.unitPrice).toLocaleString("en-IN")}
+                            </td>
+                            <td className="td-total">₹ {fmtN(r.total || 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colSpan={5} className="tfoot-lbl">Grand Total</td>
+                          <td className="tfoot-val">₹ {fmtN(boq.grandTotal)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Bottom actions */}
               <div className="boq__detail-actions">
                 <button className="boq__ghost-btn" onClick={closeDetail}>
-                  ← Back to All BOQs
+                  ← Back to My BOQs
                 </button>
-                {["rejected", "pending_pm", "pending_se"].includes(boq.status) && (
-                  <button className="boq__edit-btn boq__edit-btn--lg"
-                    onClick={() => handleEdit(boq)}>✏️ Edit BOQ</button>
-                )}
               </div>
 
             </div>

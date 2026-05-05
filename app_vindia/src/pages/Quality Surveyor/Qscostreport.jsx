@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import "./Qscostreport.css";
 
-// ── API endpoints ─────────────────────────────────────────────
 const BOQ_API = "/api/boq";
 const CR_API  = "/api/cost-report";
 
-// ── Status config ─────────────────────────────────────────────
 const STATUS = {
   pending_pm: { label: "Awaiting PM Approval", color: "amber", icon: "⏳" },
   approved:   { label: "Approved by PM",        color: "green", icon: "✅" },
@@ -15,44 +13,31 @@ const STATUS = {
 const fmt = (n) =>
   "₹ " + (parseFloat(n) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
-// ── Component ─────────────────────────────────────────────────
 export default function Qscostreport() {
-  // ── UI state ──
-  const [tab,         setTab]         = useState("create"); // create | list | detail
-  const [toast,       setToast]       = useState(null);
-  const [loading,     setLoading]     = useState(false);
-  const [apiError,    setApiError]    = useState(null);
+  const [tab,            setTab]           = useState("list");
+  const [toast,          setToast]         = useState(null);
+  const [loading,        setLoading]       = useState(false);
+  const [apiError,       setApiError]      = useState(null);
+  const [projects,       setProjects]      = useState([]);
+  const [reports,        setReports]       = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [filterProject,  setFilterProject]  = useState("");
+  const [filterStatus,   setFilterStatus]   = useState("");
+  const [filterFrom,     setFilterFrom]     = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 7);
+    return d.toISOString().split("T")[0];
+  });
+  const [filterTo,       setFilterTo]       = useState(() => new Date().toISOString().split("T")[0]);
+  const [viewingReport,  setViewingReport]  = useState(null);
+  const [rejectModal,    setRejectModal]    = useState(null); // { id } when open
+  const [rejectComment,  setRejectComment]  = useState("");
 
-  // ── Dropdown data ──
-  const [projects,    setProjects]    = useState([]);
-  const [milestones,  setMilestones]  = useState([]);   // WBS parent_id IS NULL for project
-  const [pendingBoqs, setPendingBoqs] = useState([]);   // BOQs with status=pending_pm
-
-  // ── Form ──
-  const [project,     setProject]     = useState("");
-  const [milestone,   setMilestone]   = useState("");   // milestone id
-  const [sourceBoq,   setSourceBoq]   = useState(null); // matched BOQ object
-  const [boqLoading,  setBoqLoading]  = useState(false);
-  const [editingId,   setEditingId]   = useState(null);
-
-  // ── List ──
-  const [reports,         setReports]         = useState([]);
-  const [reportsLoading,  setReportsLoading]  = useState(false);
-  const [filterProject,   setFilterProject]   = useState("");
-  const [filterStatus,    setFilterStatus]    = useState("");
-
-  // ── Detail ──
-  const [viewingReport, setViewingReport] = useState(null);
-
-  // ── Notify ──
   const notify = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ═══════════════════════════════════════════════════════════
-  //  FETCH — Projects
-  // ═══════════════════════════════════════════════════════════
+  // ── Fetch projects ──
   useEffect(() => {
     (async () => {
       try {
@@ -66,58 +51,7 @@ export default function Qscostreport() {
     })();
   }, []);
 
-  // ═══════════════════════════════════════════════════════════
-  //  FETCH — Milestones when project changes
-  // ═══════════════════════════════════════════════════════════
-  useEffect(() => {
-    if (!project) { setMilestones([]); setMilestone(""); setSourceBoq(null); return; }
-    (async () => {
-      try {
-        const res  = await fetch(`${BOQ_API}/milestones/${project}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed");
-        setMilestones(data);
-        setMilestone("");
-        setSourceBoq(null);
-      } catch (err) {
-        notify("Could not load milestones: " + err.message, "error");
-        setMilestones([]);
-      }
-    })();
-  }, [project]);
-
-  // ═══════════════════════════════════════════════════════════
-  //  FETCH — BOQ when milestone changes
-  //  Only picks BOQs with status = pending_pm
-  // ═══════════════════════════════════════════════════════════
-  useEffect(() => {
-    if (!project || !milestone) { setSourceBoq(null); return; }
-    (async () => {
-      setBoqLoading(true);
-      setSourceBoq(null);
-      try {
-        const res  = await fetch(
-          `${BOQ_API}?projectId=${project}&status=pending_pm`
-        );
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed");
-
-        // Find BOQ matching selected milestone
-        const matched = data.find(
-          (b) => String(b.milestoneId) === String(milestone)
-        );
-        setSourceBoq(matched || null);
-      } catch (err) {
-        notify("Could not load BOQ: " + err.message, "error");
-      } finally {
-        setBoqLoading(false);
-      }
-    })();
-  }, [project, milestone]);
-
-  // ═══════════════════════════════════════════════════════════
-  //  FETCH — Cost Reports list
-  // ═══════════════════════════════════════════════════════════
+  // ── Fetch reports ──
   const fetchReports = useCallback(async () => {
     setReportsLoading(true);
     try {
@@ -135,132 +69,67 @@ export default function Qscostreport() {
     }
   }, [filterProject, filterStatus]);
 
-  useEffect(() => {
-    if (tab === "list") fetchReports();
-  }, [tab, fetchReports]);
+  useEffect(() => { fetchReports(); }, [fetchReports]);
 
-  // ═══════════════════════════════════════════════════════════
-  //  SUBMIT — Create / Resubmit Cost Report
-  // ═══════════════════════════════════════════════════════════
-  const handleSubmit = async () => {
-    if (!project)   return notify("Please select a project.", "error");
-    if (!milestone) return notify("Please select a milestone.", "error");
-    if (!sourceBoq) return notify("No pending BOQ found for this milestone.", "error");
-
-    const milestoneObj = milestones.find((m) => String(m.id) === String(milestone));
-    const projectObj   = projects.find((p) => String(p.id) === String(project));
-
-    const payload = {
-      projectId:     parseInt(project),
-      projectName:   projectObj?.name,
-      milestoneId:   milestoneObj?.id,
-      milestoneName: milestoneObj?.name,
-      boqId:         sourceBoq.id,
-      items:         sourceBoq.rows.map((r) => ({
-        material:  r.material,
-        unit:      r.unit,
-        quantity:  parseFloat(r.quantity),
-        unitPrice: parseFloat(r.unitPrice),
-        total:     parseFloat(r.total || 0),
-      })),
-      totalCost: parseBoq(sourceBoq),
-    };
-
-    setLoading(true);
+  // ── PM Approve ──
+  const pmApprove = async (id) => {
     try {
-      let res, data;
-      if (editingId) {
-        res  = await fetch(`${CR_API}/${editingId}`, {
-          method:  "PUT",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(payload),
-        });
-        data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to update");
-        notify("Cost Report resubmitted to PM ✓");
-        setEditingId(null);
-      } else {
-        res  = await fetch(CR_API, {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(payload),
-        });
-        data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to create");
-        notify("Cost Report created & sent to PM for approval ✓");
-      }
-      setProject("");
-      setMilestone("");
-      setSourceBoq(null);
-      setTab("list");
-    } catch (err) {
-      notify(err.message, "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ═══════════════════════════════════════════════════════════
-  //  EDIT
-  // ═══════════════════════════════════════════════════════════
-  const handleEdit = (report) => {
-    setProject(String(report.projectId));
-    setMilestone(String(report.milestoneId));
-    setEditingId(report.id);
-    setTab("create");
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setProject("");
-    setMilestone("");
-    setSourceBoq(null);
-  };
-
-  // ═══════════════════════════════════════════════════════════
-  //  PM ACTIONS (demo — replace with role-based auth)
-  // ═══════════════════════════════════════════════════════════
-  const pmAction = async (id, action, comment = "") => {
-    try {
-      const res  = await fetch(`${CR_API}/${action}/${id}`, {
-        method:  "PUT",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ comment }),
+      const res  = await fetch(`${CR_API}/approve/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}",
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      notify(action === "approve" ? "PM approved ✅" : "PM requested changes ↩️");
+      notify("PM approved ✅ — BOQ moved to SE approval stage");
       fetchReports();
       if (viewingReport?.id === id) {
         const r = await fetch(`${CR_API}/${id}`);
         setViewingReport(await r.json());
       }
-    } catch (err) {
-      notify(err.message, "error");
-    }
+    } catch (err) { notify(err.message, "error"); }
   };
 
-  // ═══════════════════════════════════════════════════════════
-  //  DETAIL VIEW
-  // ═══════════════════════════════════════════════════════════
+  // ── PM Reject — opens comment modal ──
+  const openRejectModal = (id) => {
+    setRejectComment("");
+    setRejectModal({ id });
+  };
+
+  const submitReject = async () => {
+    if (!rejectModal) return;
+    const id = rejectModal.id;
+    try {
+      const res  = await fetch(`${CR_API}/reject/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comment: rejectComment.trim() || "Please review the cost figures." }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      notify("Changes requested ↩️ — BOQ rejected, QS must edit and resubmit");
+      setRejectModal(null);
+      setRejectComment("");
+      fetchReports();
+      if (viewingReport?.id === id) {
+        const r = await fetch(`${CR_API}/${id}`);
+        setViewingReport(await r.json());
+      }
+    } catch (err) { notify(err.message, "error"); }
+  };
+
+  // ── Open detail ──
   const openDetail = async (report) => {
     setTab("detail");
     try {
       const res  = await fetch(`${CR_API}/${report.id}`);
       const data = await res.json();
       setViewingReport(res.ok ? data : report);
-    } catch (_) {
-      setViewingReport(report);
-    }
+    } catch (_) { setViewingReport(report); }
   };
 
-  // ═══════════════════════════════════════════════════════════
-  //  EXPORT CSV
-  // ═══════════════════════════════════════════════════════════
+  // ── Export CSV ──
   const exportCSV = (report) => {
     const lines = [
       `Cost Report — ${report.projectName} · ${report.milestoneName}`,
-      `Generated: ${new Date().toLocaleDateString("en-IN")}  |  BOQ Ref: #${report.boqId}`,
+      `Generated: ${new Date().toLocaleDateString("en-IN")} | BOQ Ref: #${report.boqId}`,
       "",
       ["#", "Material", "Unit", "Quantity", "Unit Price (₹)", "Total (₹)"].join(","),
       ...(report.items || []).map((item, i) =>
@@ -268,7 +137,7 @@ export default function Qscostreport() {
           parseFloat(item.unitPrice).toFixed(2),
           parseFloat(item.total).toFixed(2)].join(",")
       ),
-      `,,,,,Total Cost,${parseFloat(report.totalCost).toFixed(2)}`,
+      `,,,,Total Cost,${parseFloat(report.totalCost).toFixed(2)}`,
     ];
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
@@ -276,24 +145,50 @@ export default function Qscostreport() {
     a.click();
   };
 
-  // ── Helpers ──
-  const parseBoq  = (boq) => boq?.rows?.reduce((s, r) => s + parseFloat(r.total || 0), 0) || 0;
-  const pct       = (part, total) => total ? ((part / total) * 100).toFixed(1) : "0.0";
+  const pct      = (part, total) => total ? ((part / total) * 100).toFixed(1) : "0.0";
 
-  const filtered  = reports.filter((r) => {
+  // ── Safe date parser — handles "02 May 2026" format ──
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    // Handle "DD MMM YYYY" format e.g. "02 May 2026"
+    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const parts = dateStr.split(" ");
+    if (parts.length === 3 && months[parts[1]] !== undefined) {
+      return new Date(parseInt(parts[2]), months[parts[1]], parseInt(parts[0]));
+    }
+    // Fallback: ISO string
+    const d = new Date(dateStr);
+    return isNaN(d) ? null : d;
+  };
+
+  const setRange = (days) => {
+    const to = new Date(); const from = new Date();
+    from.setDate(from.getDate() - days);
+    setFilterFrom(from.toISOString().split("T")[0]);
+    setFilterTo(to.toISOString().split("T")[0]);
+  };
+  const filtered = reports.filter((r) => {
     if (filterProject && String(r.projectId) !== String(filterProject)) return false;
     if (filterStatus  && r.status !== filterStatus)                      return false;
+    if (filterFrom || filterTo) {
+      const d = parseDate(r.createdDate);
+      if (d) {
+        if (filterFrom) {
+          const [fy,fm,fd] = filterFrom.split("-").map(Number);
+          if (d < new Date(fy, fm-1, fd, 0,0,0,0)) return false;
+        }
+        if (filterTo) {
+          const [ty,tm,td] = filterTo.split("-").map(Number);
+          if (d > new Date(ty, tm-1, td, 23,59,59,999)) return false;
+        }
+      }
+    }
     return true;
   });
 
-  // ═══════════════════════════════════════════════════════════
-  //  RENDER
-  // ═══════════════════════════════════════════════════════════
   return (
     <div className="cr">
-      {toast && (
-        <div className={`cr__toast cr__toast--${toast.type}`}>{toast.msg}</div>
-      )}
+      {toast && <div className={`cr__toast cr__toast--${toast.type}`}>{toast.msg}</div>}
 
       {/* ── HEADER ── */}
       <div className="cr__header">
@@ -313,23 +208,12 @@ export default function Qscostreport() {
             <p className="cr__subtitle">Quantity Surveyor · Cost Management</p>
           </div>
         </div>
-
         {tab !== "detail" && (
           <div className="cr__tabs">
-            <button
-              className={`cr__tab ${tab === "create" ? "active" : ""}`}
-              onClick={() => { cancelEdit(); setTab("create"); }}
-            >
-              {editingId ? "✏️ Editing Report" : "+ New Cost Report"}
-            </button>
-            <button
-              className={`cr__tab ${tab === "list" ? "active" : ""}`}
-              onClick={() => setTab("list")}
-            >
+            <button className={`cr__tab ${tab === "list" ? "active" : ""}`}
+              onClick={() => setTab("list")}>
               All Reports
-              {reports.length > 0 && (
-                <span className="cr__badge">{reports.length}</span>
-              )}
+              {reports.length > 0 && <span className="cr__badge">{reports.length}</span>}
             </button>
           </div>
         )}
@@ -337,7 +221,7 @@ export default function Qscostreport() {
 
       {/* ── FLOW BANNER ── */}
       <div className="cr__flow-bar">
-        {["Select Milestone", "BOQ Auto-Loaded", "Review Cost", "Submit to PM", "PM Approves"].map(
+        {["BOQ Created by QS", "Cost Report Auto-Created", "Sent to PM", "PM Approves / Rejects", "BOQ → SE Stage"].map(
           (s, i, arr) => (
             <React.Fragment key={i}>
               <div className="cr__flow-step">
@@ -354,340 +238,113 @@ export default function Qscostreport() {
 
       <div className="cr__body">
 
-        {/* ══════════════════════════════════════
-            CREATE TAB
-        ══════════════════════════════════════ */}
-        {tab === "create" && (
-          <>
-            {editingId && (
-              <div className="cr__edit-banner">
-                <span>✏️ Editing Cost Report — on resubmit it will go to PM for re-approval.</span>
-                <button className="cr__cancel-btn"
-                  onClick={() => { cancelEdit(); setTab("list"); }}>✕ Cancel</button>
-              </div>
-            )}
-
-            {/* ── Step 1: Select Project & Milestone ── */}
-            <div className="cr__block">
-              <div className="cr__block-label">
-                <span className="cr__num">1</span>
-                Select Project &amp; Milestone
-              </div>
-              <div className="cr__selectors">
-                <div className="cr__sel-group">
-                  <label className="cr__sel-label">Project</label>
-                  <select
-                    className="cr__select"
-                    value={project}
-                    onChange={(e) => setProject(e.target.value)}
-                    disabled={projects.length === 0}
-                  >
-                    <option value="">
-                      {projects.length === 0 ? "Loading projects…" : "— Choose project —"}
-                    </option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="cr__sel-group">
-                  <label className="cr__sel-label">Milestone (WBS)</label>
-                  <select
-                    className="cr__select"
-                    value={milestone}
-                    onChange={(e) => setMilestone(e.target.value)}
-                    disabled={!project || milestones.length === 0}
-                  >
-                    <option value="">
-                      {!project
-                        ? "— Select project first —"
-                        : milestones.length === 0
-                        ? "No milestones found"
-                        : "— Choose milestone —"}
-                    </option>
-                    {milestones.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.code ? `${m.code} · ` : ""}{m.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Selected tag */}
-              {project && milestone && (() => {
-                const proj = projects.find((p) => String(p.id) === String(project));
-                const ms   = milestones.find((m) => String(m.id) === String(milestone));
-                return proj && ms ? (
-                  <div className="cr__proj-tag">
-                    📌 {proj.name} &nbsp;·&nbsp; 🏗️ {ms.name}
-                  </div>
-                ) : null;
-              })()}
-            </div>
-
-            {/* ── Step 2: BOQ Auto-Load ── */}
-            <div className="cr__block">
-              <div className="cr__block-label">
-                <span className="cr__num">2</span>
-                BOQ Cost Breakdown
-                <span className="cr__auto-tag">⚡ Auto-loaded from BOQ</span>
-              </div>
-
-              {/* States */}
-              {!project || !milestone ? (
-                <div className="cr__hint">
-                  👆 Select a project and milestone above to load the BOQ cost data.
-                </div>
-              ) : boqLoading ? (
-                <div className="cr__loading">
-                  <div className="cr__spinner" /> Loading BOQ data…
-                </div>
-              ) : !sourceBoq ? (
-                <div className="cr__no-boq">
-                  <span>⚠️</span>
-                  <div>
-                    <strong>No pending BOQ found</strong> for this milestone.
-                    <p>Only BOQs awaiting PM approval can be used to create a Cost Report. Please submit a BOQ for this milestone first.</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* BOQ source info card */}
-                  <div className="cr__boq-source">
-                    <div className="cr__boq-source-left">
-                      <span className="cr__boq-source-icon">🔗</span>
-                      <div>
-                        <div className="cr__boq-source-title">
-                          Linked BOQ #{sourceBoq.id}
-                        </div>
-                        <div className="cr__boq-source-meta">
-                          {sourceBoq.projectName} · {sourceBoq.milestoneName}
-                          &nbsp;·&nbsp; {sourceBoq.rows?.length || 0} line items
-                          &nbsp;·&nbsp; Submitted {sourceBoq.date}
-                        </div>
-                      </div>
-                    </div>
-                    <span className="cr__pending-badge">⏳ Pending PM Approval</span>
-                  </div>
-
-                  {/* Cost table */}
-                  <div className="cr__table-scroll">
-                    <table className="cr__table">
-                      <colgroup>
-                        <col style={{width:"44px"}} />
-                        <col />
-                        <col style={{width:"80px"}} />
-                        <col style={{width:"110px"}} />
-                        <col style={{width:"145px"}} />
-                        <col style={{width:"155px"}} />
-                        <col style={{width:"90px"}} />
-                      </colgroup>
-                      <thead>
-                        <tr>
-                          <th>#</th>
-                          <th>Material / Item</th>
-                          <th>Unit</th>
-                          <th>Quantity</th>
-                          <th>Unit Price (₹)</th>
-                          <th>Total Cost (₹)</th>
-                          <th>% Share</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sourceBoq.rows?.map((row, i) => {
-                          const total    = parseFloat(row.total || 0);
-                          const boqTotal = parseBoq(sourceBoq);
-                          const share    = pct(total, boqTotal);
-                          return (
-                            <tr key={row.id || i}>
-                              <td className="cr-num">{i + 1}</td>
-                              <td className="cr-material">{row.material}</td>
-                              <td className="cr-center">{row.unit}</td>
-                              <td className="cr-center">
-                                {parseFloat(row.quantity).toLocaleString("en-IN")}
-                              </td>
-                              <td className="cr-mono">
-                                ₹ {parseFloat(row.unitPrice).toLocaleString("en-IN")}
-                              </td>
-                              <td className="cr-total">{fmt(total)}</td>
-                              <td className="cr-pct">
-                                <div className="cr-pct-wrap">
-                                  <span>{share}%</span>
-                                  <div className="cr-pct-bar">
-                                    <div className="cr-pct-fill"
-                                      style={{width: `${share}%`}} />
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot>
-                        <tr>
-                          <td colSpan={5} className="cr-tfoot-lbl">Total BOQ Cost</td>
-                          <td className="cr-tfoot-val">{fmt(parseBoq(sourceBoq))}</td>
-                          <td className="cr-tfoot-pct">100%</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* ── Step 3: Summary + Submit ── */}
-            {sourceBoq && (
-              <div className="cr__footer-row">
-                <div className="cr__summary-pills">
-                  <div className="cr__pill">
-                    <span className="cr__pill-lbl">Line Items</span>
-                    <span className="cr__pill-val">{sourceBoq.rows?.length || 0}</span>
-                  </div>
-                  <div className="cr__pill cr__pill--highlight">
-                    <span className="cr__pill-lbl">Total Cost</span>
-                    <span className="cr__pill-val">{fmt(parseBoq(sourceBoq))}</span>
-                  </div>
-                  <div className="cr__pill">
-                    <span className="cr__pill-lbl">BOQ Ref</span>
-                    <span className="cr__pill-val">#{sourceBoq.id}</span>
-                  </div>
-                </div>
-                <button
-                  className="cr__submit-btn"
-                  onClick={handleSubmit}
-                  disabled={loading}
-                >
-                  {loading
-                    ? "Submitting…"
-                    : editingId
-                    ? "Resubmit to PM →"
-                    : "Submit Cost Report to PM →"}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ══════════════════════════════════════
-            LIST TAB
-        ══════════════════════════════════════ */}
+        {/* ══════ LIST TAB ══════ */}
         {tab === "list" && (
           <>
             <div className="cr__view-head">
               <h2 className="cr__view-h">All Cost Reports</h2>
+            </div>
+            <div className="cr__filter-bar">
+              <div className="cr__range-btns">
+                <span className="cr__range-label">📅 Show:</span>
+                {[{l:"Today",d:0},{l:"1 Week",d:7},{l:"1 Month",d:30},{l:"3 Months",d:90}].map(({l,d}) => {
+                  const from = new Date(); from.setDate(from.getDate()-d);
+                  const isActive = filterFrom===from.toISOString().split("T")[0] && filterTo===new Date().toISOString().split("T")[0];
+                  return <button key={l} className={`cr__range-btn ${isActive?"active":""}`} onClick={()=>setRange(d)}>{l}</button>;
+                })}
+                <button className="cr__range-btn" onClick={()=>{setFilterFrom("");setFilterTo("");}}>All Time</button>
+              </div>
+              <div className="cr__date-range">
+                <span className="cr__date-range-label">From</span>
+                <input type="date" className="cr__date-input" value={filterFrom} onChange={(e)=>setFilterFrom(e.target.value)} />
+                <span className="cr__date-range-label">To</span>
+                <input type="date" className="cr__date-input" value={filterTo} onChange={(e)=>setFilterTo(e.target.value)} />
+              </div>
               <div className="cr__filters">
-                <select className="cr__select cr__select--sm"
-                  value={filterProject}
-                  onChange={(e) => setFilterProject(e.target.value)}>
+                <select className="cr__select cr__select--sm" value={filterProject} onChange={(e)=>setFilterProject(e.target.value)}>
                   <option value="">All Projects</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
+                  {projects.map((p)=><option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <select className="cr__select cr__select--sm"
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}>
+                <select className="cr__select cr__select--sm" value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)}>
                   <option value="">All Statuses</option>
-                  {Object.entries(STATUS).map(([k, v]) => (
-                    <option key={k} value={k}>{v.label}</option>
-                  ))}
+                  {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
             </div>
 
             {reportsLoading ? (
-              <div className="cr__loading">
-                <div className="cr__spinner" /> Loading reports…
-              </div>
+              <div className="cr__loading"><div className="cr__spinner" /> Loading…</div>
             ) : filtered.length === 0 ? (
               <div className="cr__empty">
                 <span>💰</span>
                 <p>No cost reports yet.</p>
-                <button className="cr__ghost-btn" onClick={() => setTab("create")}>
-                  Create your first report →
-                </button>
+                <p className="cr__empty-hint">Cost reports are automatically created when you click "Create Cost Report" in the BOQ page.</p>
               </div>
             ) : (
-              <div className="cr__list-table-wrap">
-                <table className="cr__list-table">
-                  <thead>
-                    <tr>
-                      <th>Project</th>
-                      <th>Milestone</th>
-                      <th>BOQ Ref</th>
-                      <th>Total Cost</th>
-                      <th>Created</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((r) => {
-                      const st      = STATUS[r.status] || STATUS.pending_pm;
-                      const canEdit = ["rejected", "pending_pm"].includes(r.status);
-                      return (
-                        <tr key={r.id} className="cr__list-row">
-                          <td className="cr__list-proj">{r.projectName}</td>
-                          <td>
-                            <span className="cr__milestone-tag">🏗️ {r.milestoneName}</span>
-                          </td>
-                          <td className="cr__list-boqref">#{r.boqId}</td>
-                          <td className="cr__list-total">{fmt(r.totalCost)}</td>
-                          <td className="cr__list-date">
-                            {r.createdDate}
-                            {r.updatedDate && (
-                              <><br />
-                                <span className="cr__updated">Updated {r.updatedDate}</span>
-                              </>
-                            )}
-                          </td>
-                          <td>
-                            <span className={`cr__status-badge cr__status--${st.color}`}>
-                              {st.icon} {st.label}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="cr__list-actions">
-                              <button className="cr__view-btn"
-                                onClick={() => openDetail(r)}>👁 View</button>
-                              {canEdit && (
-                                <button className="cr__edit-btn"
-                                  onClick={() => handleEdit(r)}>✏️ Edit</button>
-                              )}
-                              {/* Demo PM actions */}
-                              {r.status === "pending_pm" && (
-                                <>
-                                  <button className="cr__approve-btn"
-                                    onClick={() => pmAction(r.id, "approve")}>✔ Approve</button>
-                                  <button className="cr__reject-btn"
-                                    onClick={() => pmAction(r.id, "reject", "Please review.")}>✘ Reject</button>
-                                </>
-                              )}
-                              {r.status === "approved" && (
-                                <button className="cr__export-btn"
-                                  onClick={() => exportCSV(r)}>⬇ CSV</button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="cr__cards-list">
+                {filtered.map((r) => {
+                  const st = STATUS[r.status] || STATUS.pending_pm;
+                  return (
+                    <div key={r.id} className={`cr__card cr__card--${st.color}`}>
+                      <div className="cr__card-top">
+                        <div>
+                          <div className="cr__card-proj">{r.projectName}</div>
+                          <div className="cr__card-meta">
+                            🏗️ {r.milestoneName} &nbsp;·&nbsp;
+                            BOQ #{r.boqId} &nbsp;·&nbsp;
+                            📅 {r.createdDate}
+                            {r.updatedDate && <span> · Updated {r.updatedDate}</span>}
+                          </div>
+                        </div>
+                        <div className="cr__card-right">
+                          <div className="cr__card-total">{fmt(r.totalCost)}</div>
+                          <span className={`cr__status-badge cr__status--${st.color}`}>
+                            {st.icon} {st.label}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* PM Comment if rejected */}
+                      {r.status === "rejected" && r.pmComment && (
+                        <div className="cr__card-comment">
+                          <strong>💬 PM:</strong> {r.pmComment}
+                        </div>
+                      )}
+
+                      <div className="cr__card-actions">
+                        <button className="cr__view-btn" onClick={() => openDetail(r)}>
+                          👁 View Report
+                        </button>
+                        {/* PM approve/reject demo buttons */}
+                        {r.status === "pending_pm" && (
+                          <>
+                            <button className="cr__approve-btn" onClick={() => pmApprove(r.id)}>
+                              ✔ PM Approve
+                            </button>
+                            <button className="cr__reject-btn"
+                              onClick={() => openRejectModal(r.id)}>
+                              ✘ PM Reject
+                            </button>
+                          </>
+                        )}
+                        {r.status === "approved" && (
+                          <button className="cr__export-btn" onClick={() => exportCSV(r)}>
+                            ⬇ Export CSV
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </>
         )}
 
-        {/* ══════════════════════════════════════
-            DETAIL TAB
-        ══════════════════════════════════════ */}
+        {/* ══════ DETAIL TAB ══════ */}
         {tab === "detail" && viewingReport && (() => {
-          const r  = viewingReport;
-          const st = STATUS[r.status] || STATUS.pending_pm;
+          const r       = viewingReport;
+          const st      = STATUS[r.status] || STATUS.pending_pm;
           const boqTotal = (r.items || []).reduce((s, i) => s + parseFloat(i.total || 0), 0);
 
           return (
@@ -696,29 +353,27 @@ export default function Qscostreport() {
               {/* Info bar */}
               <div className="cr__detail-infobar">
                 {[
-                  { label: "Project",    value: r.projectName },
-                  { label: "Milestone",  value: `🏗️ ${r.milestoneName}` },
-                  { label: "BOQ Ref",    value: `#${r.boqId}` },
-                  { label: "Created",    value: r.createdDate },
+                  { label: "Project",   value: r.projectName },
+                  { label: "Milestone", value: `🏗️ ${r.milestoneName}` },
+                  { label: "BOQ Ref",   value: `#${r.boqId}` },
+                  { label: "Created",   value: r.createdDate },
                   ...(r.updatedDate ? [{ label: "Updated", value: r.updatedDate }] : []),
-                  { label: "Status",     badge: true },
+                  { label: "Status",    badge: true },
                 ].map((item, i) => (
                   <div key={i} className="cr__detail-infoitem">
                     <span className="cr__detail-infolbl">{item.label}</span>
                     {item.badge
                       ? <span className={`cr__status-badge cr__status--${st.color}`}>{st.icon} {st.label}</span>
-                      : <span className="cr__detail-infoval">{item.value}</span>
-                    }
+                      : <span className="cr__detail-infoval">{item.value}</span>}
                   </div>
                 ))}
               </div>
 
-              {/* PM Comment / Rejection note */}
+              {/* Rejection note */}
               {r.status === "rejected" && r.pmComment && (
                 <div className="cr__note">
                   <strong>💬 PM Comment:</strong> {r.pmComment}
-                  <button className="cr__edit-inline"
-                    onClick={() => handleEdit(r)}>✏️ Edit &amp; Resubmit</button>
+                  <span className="cr__note-hint">Go to BOQ page → Edit BOQ → Resubmit</span>
                 </div>
               )}
 
@@ -727,11 +382,9 @@ export default function Qscostreport() {
                 <div className="cr__approved-banner">
                   <span className="cr__approved-icon">✅</span>
                   <div>
-                    <div className="cr__approved-title">
-                      Cost Report Approved by Project Manager
-                    </div>
+                    <div className="cr__approved-title">Approved by Project Manager</div>
                     <div className="cr__approved-sub">
-                      This cost report has been reviewed and approved for budget allocation.
+                      BOQ has moved to SE approval stage. QS can now create the Quantity Report.
                     </div>
                   </div>
                   <button className="cr__export-btn cr__export-btn--lg"
@@ -746,24 +399,10 @@ export default function Qscostreport() {
                 </div>
                 <div className="cr__approval-track">
                   {[
-                    {
-                      label:   "QS Created Report",
-                      done:    ["pending_pm","approved","rejected"].includes(r.status),
-                    },
-                    {
-                      label:   "Sent to PM",
-                      done:    ["pending_pm","approved","rejected"].includes(r.status),
-                      current: r.status === "pending_pm",
-                    },
-                    {
-                      label:   "PM Approved",
-                      done:    r.status === "approved",
-                      current: r.status === "pending_pm",
-                    },
-                    {
-                      label:   "Cost Finalised",
-                      done:    r.status === "approved",
-                    },
+                    { label: "Cost Report Created",   done: true },
+                    { label: "Sent to PM",             done: ["pending_pm","approved","rejected"].includes(r.status), current: r.status === "pending_pm" },
+                    { label: "PM Approved",            done: r.status === "approved",  current: r.status === "pending_pm" },
+                    { label: "BOQ → SE Stage",         done: r.status === "approved" },
                   ].map((step, i, arr) => (
                     <React.Fragment key={i}>
                       <div className={`cr__ap-step ${step.done ? "done" : step.current ? "active" : ""}`}>
@@ -776,16 +415,14 @@ export default function Qscostreport() {
                 </div>
               </div>
 
-              {/* PM action buttons in detail */}
+              {/* PM action buttons */}
               {r.status === "pending_pm" && (
                 <div className="cr__pm-actions">
                   <span className="cr__pm-actions-label">[ PM Actions ]</span>
                   <button className="cr__approve-btn cr__approve-btn--lg"
-                    onClick={() => pmAction(r.id, "approve")}>
-                    ✔ Approve Cost Report
-                  </button>
+                    onClick={() => pmApprove(r.id)}>✔ Approve Cost Report</button>
                   <button className="cr__reject-btn cr__reject-btn--lg"
-                    onClick={() => pmAction(r.id, "reject", "Please review the cost figures.")}>
+                    onClick={() => openRejectModal(r.id)}>
                     ✘ Request Changes
                   </button>
                 </div>
@@ -801,23 +438,16 @@ export default function Qscostreport() {
                 <div className="cr__table-scroll">
                   <table className="cr__table">
                     <colgroup>
-                      <col style={{width:"44px"}} />
-                      <col />
-                      <col style={{width:"80px"}} />
-                      <col style={{width:"110px"}} />
-                      <col style={{width:"145px"}} />
-                      <col style={{width:"155px"}} />
+                      <col style={{width:"44px"}} /><col />
+                      <col style={{width:"80px"}} /><col style={{width:"110px"}} />
+                      <col style={{width:"145px"}} /><col style={{width:"155px"}} />
                       <col style={{width:"90px"}} />
                     </colgroup>
                     <thead>
                       <tr>
-                        <th>#</th>
-                        <th>Material / Item</th>
-                        <th>Unit</th>
-                        <th>Quantity</th>
-                        <th>Unit Price (₹)</th>
-                        <th>Total Cost (₹)</th>
-                        <th>% Share</th>
+                        <th>#</th><th>Material / Item</th><th>Unit</th>
+                        <th>Quantity</th><th>Unit Price (₹)</th>
+                        <th>Total Cost (₹)</th><th>% Share</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -839,7 +469,7 @@ export default function Qscostreport() {
                               <div className="cr-pct-wrap">
                                 <span>{share}%</span>
                                 <div className="cr-pct-bar">
-                                  <div className="cr-pct-fill" style={{width: `${share}%`}} />
+                                  <div className="cr-pct-fill" style={{width:`${share}%`}} />
                                 </div>
                               </div>
                             </td>
@@ -879,23 +509,47 @@ export default function Qscostreport() {
                 </div>
               </div>
 
-              {/* Bottom actions */}
               <div className="cr__detail-actions">
                 <button className="cr__ghost-btn"
                   onClick={() => { setViewingReport(null); setTab("list"); }}>
                   ← Back to All Reports
                 </button>
-                {["rejected", "pending_pm"].includes(r.status) && (
-                  <button className="cr__edit-btn cr__edit-btn--lg"
-                    onClick={() => handleEdit(r)}>✏️ Edit Report</button>
-                )}
               </div>
-
             </div>
           );
         })()}
-
       </div>
+    {/* ── REJECT COMMENT MODAL ── */}
+    {rejectModal && (
+      <div className="cr__modal-overlay">
+        <div className="cr__modal">
+          <div className="cr__modal-header">
+            <span className="cr__modal-icon">↩️</span>
+            <div>
+              <div className="cr__modal-title">Request Changes</div>
+              <div className="cr__modal-sub">Add a suggestion for the Quantity Surveyor</div>
+            </div>
+          </div>
+          <textarea
+            className="cr__modal-textarea"
+            placeholder="e.g. Please review the unit prices for steel and concrete…"
+            value={rejectComment}
+            onChange={(e) => setRejectComment(e.target.value)}
+            rows={4}
+            autoFocus
+          />
+          <div className="cr__modal-actions">
+            <button className="cr__modal-cancel"
+              onClick={() => { setRejectModal(null); setRejectComment(""); }}>
+              Cancel
+            </button>
+            <button className="cr__modal-submit" onClick={submitReject}>
+              ✘ Send Rejection &amp; Suggestion
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }

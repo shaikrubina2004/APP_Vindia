@@ -1,36 +1,37 @@
 // ══════════════════════════════════════════════════════════════════════════════
 //  boqController.js
-//  Uses existing tables:
-//    projects  (id, name)
-//    wbs       (id, project_id, code, name, parent_id)
-//    boqs      (our new workflow table)
-//    boq_items (id, boq_id, material, unit, quantity, unit_price, total)
+//  Workflow:
+//    QS creates BOQ → status: pending_pm
+//    PM approves Cost Report → BOQ: pending_se  (handled in costReportController)
+//    SE approves Qty Report  → BOQ: finalised   (handled in quantityReportController)
+//    Any rejection           → BOQ: rejected    → QS edits & resubmits
 // ══════════════════════════════════════════════════════════════════════════════
 const pool = require("../config/db");
 
-// ── Auto-create boqs table (uses existing projects table, no FK issues) ───────
+// ── Auto-create boqs table ────────────────────────────────────────────────────
 (async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS boqs (
         id              SERIAL        PRIMARY KEY,
         project_id      INTEGER       NOT NULL,
+        project_name    VARCHAR(255)  NOT NULL,
         milestone_id    INTEGER       NOT NULL,
         milestone_name  VARCHAR(255)  NOT NULL,
         rows            JSONB         NOT NULL DEFAULT '[]',
         grand_total     NUMERIC(15,2) NOT NULL DEFAULT 0,
         status          VARCHAR(50)   NOT NULL DEFAULT 'pending_pm',
-        pm_note         TEXT                   DEFAULT '',
-        se_note         TEXT                   DEFAULT '',
-        sent_to_se      BOOLEAN                DEFAULT FALSE,
+        pm_note         TEXT          DEFAULT '',
+        se_note         TEXT          DEFAULT '',
+        sent_to_se      BOOLEAN       DEFAULT FALSE,
         finalised_date  DATE,
         updated_date    DATE,
-        created_at      TIMESTAMP              DEFAULT NOW(),
-        updated_at      TIMESTAMP              DEFAULT NOW()
+        created_at      TIMESTAMP     DEFAULT NOW(),
+        updated_at      TIMESTAMP     DEFAULT NOW()
       );
-      CREATE INDEX IF NOT EXISTS idx_boqs_project   ON boqs (project_id);
-      CREATE INDEX IF NOT EXISTS idx_boqs_status    ON boqs (status);
-      CREATE INDEX IF NOT EXISTS idx_boqs_milestone ON boqs (milestone_id);
+      CREATE INDEX IF NOT EXISTS idx_boqs_project_id   ON boqs (project_id);
+      CREATE INDEX IF NOT EXISTS idx_boqs_milestone_id ON boqs (milestone_id);
+      CREATE INDEX IF NOT EXISTS idx_boqs_status       ON boqs (status);
     `);
     console.log("✅ boqs table ready");
   } catch (err) {
@@ -38,10 +39,7 @@ const pool = require("../config/db");
   }
 })();
 
-// ── Auto-create cost_reports table ────────────────────────────────────────────
-
-
-// ── Format BOQ row for API response ──────────────────────────────────────────
+// ── Format helper ─────────────────────────────────────────────────────────────
 function formatBoq(r) {
   return {
     id:            r.id,
@@ -70,12 +68,14 @@ function formatBoq(r) {
           day: "2-digit", month: "short", year: "numeric",
         })
       : null,
+    // Report statuses joined from cost_reports / quantity_reports
+    costReportStatus: r.cost_report_status || null,
+    qtyReportStatus:  r.qty_report_status  || null,
   };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  GET PROJECTS  —  GET /api/boq/projects
-//  Reads from existing `projects` table  (id, name)
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getProjects = async (req, res) => {
   try {
@@ -91,7 +91,7 @@ exports.getProjects = async (req, res) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  GET MILESTONES  —  GET /api/boq/milestones/:projectId
-//  Reads from existing `wbs` table WHERE parent_id IS NULL (top-level = milestones)
+//  Returns WBS rows where parent_id IS NULL (top-level = milestones)
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getMilestones = async (req, res) => {
   try {
@@ -113,7 +113,7 @@ exports.getMilestones = async (req, res) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  GET ALL BOQs  —  GET /api/boq
-//  Joins boqs with projects to get project name
+//  Includes cost_report_status and qty_report_status from linked reports
 //  Optional: ?projectId=&status=&milestoneId=
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getAllBoqs = async (req, res) => {
@@ -137,14 +137,14 @@ exports.getAllBoqs = async (req, res) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const result = await pool.query(
-      `SELECT b.*, p.name AS project_name
-       FROM boqs b
-       JOIN projects p ON p.id = b.project_id
-       ${where}
-       ORDER BY b.created_at DESC`,
-      values
-    );
+   const result = await pool.query(`
+  SELECT 
+    b.*,
+    p.name AS project_name
+  FROM boqs b
+  LEFT JOIN projects p ON b.project_id = p.id
+  ORDER BY b.created_at DESC
+`);
     res.json(result.rows.map(formatBoq));
   } catch (err) {
     console.error("getAllBoqs:", err.message);
@@ -158,9 +158,20 @@ exports.getAllBoqs = async (req, res) => {
 exports.getBoqById = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT b.*, p.name AS project_name
+      `SELECT b.*,
+              cr.status AS cost_report_status,
+              qr.status AS qty_report_status
        FROM boqs b
-       JOIN projects p ON p.id = b.project_id
+       LEFT JOIN LATERAL (
+         SELECT status FROM cost_reports
+         WHERE boq_id = b.id
+         ORDER BY created_at DESC LIMIT 1
+       ) cr ON true
+       LEFT JOIN LATERAL (
+         SELECT status FROM quantity_reports
+         WHERE boq_id = b.id
+         ORDER BY created_at DESC LIMIT 1
+       ) qr ON true
        WHERE b.id = $1`,
       [req.params.id]
     );
@@ -177,6 +188,7 @@ exports.getBoqById = async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 //  CREATE BOQ  —  POST /api/boq
 //  Body: { projectId, milestoneId, milestoneName, rows, grandTotal }
+//  Status starts as 'pending_pm'
 // ══════════════════════════════════════════════════════════════════════════════
 exports.createBoq = async (req, res) => {
   try {
@@ -191,15 +203,15 @@ exports.createBoq = async (req, res) => {
       return res.status(400).json({ error: "rows must be a non-empty array" });
     }
 
-    // Verify project exists
+    // Get project name from projects table
     const projCheck = await pool.query(
-      "SELECT id FROM projects WHERE id = $1", [projectId]
+      "SELECT id, name FROM projects WHERE id = $1", [projectId]
     );
     if (!projCheck.rows.length) {
       return res.status(404).json({ error: "Project not found" });
     }
 
-    // Verify milestone exists in wbs
+    // Verify milestone exists in wbs as top-level (parent_id IS NULL)
     const wbsCheck = await pool.query(
       "SELECT id, name FROM wbs WHERE id = $1 AND project_id = $2 AND parent_id IS NULL",
       [milestoneId, projectId]
@@ -210,10 +222,17 @@ exports.createBoq = async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO boqs
-         (project_id, milestone_id, milestone_name, rows, grand_total, status)
-       VALUES ($1, $2, $3, $4, $5, 'pending_pm')
+         (project_id, project_name, milestone_id, milestone_name, rows, grand_total, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending_pm')
        RETURNING id`,
-      [projectId, milestoneId, milestoneName, JSON.stringify(rows), grandTotal || 0]
+      [
+        projectId,
+        projCheck.rows[0].name,
+        milestoneId,
+        wbsCheck.rows[0].name,
+        JSON.stringify(rows),
+        grandTotal || 0,
+      ]
     );
 
     res.status(201).json({
@@ -229,7 +248,8 @@ exports.createBoq = async (req, res) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  UPDATE BOQ  —  PUT /api/boq/:id
-//  QS edits rejected/pending BOQ and resubmits
+//  QS edits rejected BOQ and resubmits → status resets to 'pending_pm'
+//  Also deletes old rejected cost/quantity reports so fresh ones can be created
 // ══════════════════════════════════════════════════════════════════════════════
 exports.updateBoq = async (req, res) => {
   try {
@@ -242,134 +262,62 @@ exports.updateBoq = async (req, res) => {
       return res.status(403).json({ error: "Cannot edit a finalised BOQ" });
     }
 
+    // Get project name
+    let projectName = null;
+    if (projectId) {
+      const p = await pool.query("SELECT name FROM projects WHERE id = $1", [projectId]);
+      if (p.rows.length) projectName = p.rows[0].name;
+    }
+
+    // Get milestone name from wbs
+    let milestoneNameFromDb = milestoneName;
+    if (milestoneId && projectId) {
+      const w = await pool.query(
+        "SELECT name FROM wbs WHERE id = $1 AND project_id = $2 AND parent_id IS NULL",
+        [milestoneId, projectId]
+      );
+      if (w.rows.length) milestoneNameFromDb = w.rows[0].name;
+    }
+
+    // Delete old rejected reports so QS can create fresh ones
+    await pool.query(
+      "DELETE FROM cost_reports WHERE boq_id = $1 AND status = 'rejected'", [id]
+    );
+    await pool.query(
+      "DELETE FROM quantity_reports WHERE boq_id = $1 AND status = 'rejected'", [id]
+    );
+
     const result = await pool.query(
       `UPDATE boqs
        SET project_id     = COALESCE($1, project_id),
-           milestone_id   = COALESCE($2, milestone_id),
-           milestone_name = COALESCE($3, milestone_name),
-           rows           = COALESCE($4, rows),
-           grand_total    = COALESCE($5, grand_total),
+           project_name   = COALESCE($2, project_name),
+           milestone_id   = COALESCE($3, milestone_id),
+           milestone_name = COALESCE($4, milestone_name),
+           rows           = COALESCE($5, rows),
+           grand_total    = COALESCE($6, grand_total),
            status         = 'pending_pm',
            pm_note        = '',
            se_note        = '',
            updated_date   = CURRENT_DATE,
            updated_at     = NOW()
-       WHERE id = $6
+       WHERE id = $7
        RETURNING id, status`,
       [
-        projectId, milestoneId, milestoneName,
+        projectId, projectName,
+        milestoneId, milestoneNameFromDb,
         rows ? JSON.stringify(rows) : null,
         grandTotal, id,
       ]
     );
 
     res.json({
-      message: "BOQ updated and resubmitted to PM",
+      message: "BOQ updated and resubmitted to PM for approval",
       id:      result.rows[0].id,
       status:  result.rows[0].status,
     });
   } catch (err) {
     console.error("updateBoq:", err.message);
     res.status(500).json({ error: "Failed to update BOQ: " + err.message });
-  }
-};
-
-// ══════════════════════════════════════════════════════════════════════════════
-//  PM APPROVE  —  PUT /api/boq/approve/pm/:id
-//  ⚠️  Must be registered BEFORE /:id in routes
-// ══════════════════════════════════════════════════════════════════════════════
-exports.pmApprove = async (req, res) => {
-  try {
-    const result = await pool.query(
-      `UPDATE boqs
-       SET status = 'pending_se', pm_note = '', updated_at = NOW()
-       WHERE id = $1 AND status = 'pending_pm'
-       RETURNING id, status`,
-      [req.params.id]
-    );
-    if (!result.rows.length) {
-      return res.status(404).json({ error: "BOQ not found or not in pending_pm status" });
-    }
-    res.json({
-      message: "PM approved — sent to Site Engineer",
-      id: result.rows[0].id, status: "pending_se",
-    });
-  } catch (err) {
-    console.error("pmApprove:", err.message);
-    res.status(500).json({ error: "Failed to approve: " + err.message });
-  }
-};
-
-// ══════════════════════════════════════════════════════════════════════════════
-//  PM REJECT  —  PUT /api/boq/reject/pm/:id
-// ══════════════════════════════════════════════════════════════════════════════
-exports.pmReject = async (req, res) => {
-  try {
-    const { note } = req.body;
-    const result = await pool.query(
-      `UPDATE boqs
-       SET status = 'rejected', pm_note = $1, updated_at = NOW()
-       WHERE id = $2 AND status = 'pending_pm'
-       RETURNING id, status`,
-      [note || "Please review the cost estimates.", req.params.id]
-    );
-    if (!result.rows.length) {
-      return res.status(404).json({ error: "BOQ not found or not in pending_pm status" });
-    }
-    res.json({ message: "PM requested changes", id: result.rows[0].id, status: "rejected" });
-  } catch (err) {
-    console.error("pmReject:", err.message);
-    res.status(500).json({ error: "Failed to reject: " + err.message });
-  }
-};
-
-// ══════════════════════════════════════════════════════════════════════════════
-//  SE APPROVE  —  PUT /api/boq/approve/se/:id
-//  Finalises BOQ + marks sent_to_se = TRUE
-// ══════════════════════════════════════════════════════════════════════════════
-exports.seApprove = async (req, res) => {
-  try {
-    const result = await pool.query(
-      `UPDATE boqs
-       SET status = 'finalised', sent_to_se = TRUE,
-           finalised_date = CURRENT_DATE, se_note = '', updated_at = NOW()
-       WHERE id = $1 AND status = 'pending_se'
-       RETURNING id, status`,
-      [req.params.id]
-    );
-    if (!result.rows.length) {
-      return res.status(404).json({ error: "BOQ not found or not in pending_se status" });
-    }
-    res.json({
-      message: "BOQ finalised and sent to Site Engineer ✅",
-      id: result.rows[0].id, status: "finalised",
-    });
-  } catch (err) {
-    console.error("seApprove:", err.message);
-    res.status(500).json({ error: "Failed to finalise: " + err.message });
-  }
-};
-
-// ══════════════════════════════════════════════════════════════════════════════
-//  SE REJECT  —  PUT /api/boq/reject/se/:id
-// ══════════════════════════════════════════════════════════════════════════════
-exports.seReject = async (req, res) => {
-  try {
-    const { note } = req.body;
-    const result = await pool.query(
-      `UPDATE boqs
-       SET status = 'rejected', se_note = $1, updated_at = NOW()
-       WHERE id = $2 AND status = 'pending_se'
-       RETURNING id, status`,
-      [note || "Quantity revision needed.", req.params.id]
-    );
-    if (!result.rows.length) {
-      return res.status(404).json({ error: "BOQ not found or not in pending_se status" });
-    }
-    res.json({ message: "SE requested changes", id: result.rows[0].id, status: "rejected" });
-  } catch (err) {
-    console.error("seReject:", err.message);
-    res.status(500).json({ error: "Failed to reject: " + err.message });
   }
 };
 

@@ -1,17 +1,16 @@
 // ══════════════════════════════════════════════════════════════════════════════
 //  costReportController.js
-//  Cost Report CRUD + PM approval workflow
-//  Data is pulled from BOQs with status = 'pending_pm'
 // ══════════════════════════════════════════════════════════════════════════════
 const pool = require("../config/db");
+const { createNotificationDirect } = require("./qsNotificationController");
 
-// ── Auto-create table on startup ──────────────────────────────────────────────
+// ── Auto-create table ─────────────────────────────────────────────────────────
 (async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cost_reports (
         id              SERIAL        PRIMARY KEY,
-        project_id      INTEGER       NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        project_id      INTEGER       NOT NULL,
         project_name    VARCHAR(255)  NOT NULL,
         milestone_id    INTEGER       NOT NULL,
         milestone_name  VARCHAR(255)  NOT NULL,
@@ -19,16 +18,16 @@ const pool = require("../config/db");
         items           JSONB         NOT NULL DEFAULT '[]',
         total_cost      NUMERIC(15,2) NOT NULL DEFAULT 0,
         status          VARCHAR(50)   NOT NULL DEFAULT 'pending_pm',
-        pm_comment      TEXT                   DEFAULT '',
-        created_date    DATE                   DEFAULT CURRENT_DATE,
+        pm_comment      TEXT          DEFAULT '',
+        created_date    DATE          DEFAULT CURRENT_DATE,
         updated_date    DATE,
-        created_at      TIMESTAMP              DEFAULT NOW(),
-        updated_at      TIMESTAMP              DEFAULT NOW()
+        created_at      TIMESTAMP     DEFAULT NOW(),
+        updated_at      TIMESTAMP     DEFAULT NOW()
       );
-      CREATE INDEX IF NOT EXISTS idx_cr_project   ON cost_reports (project_id);
-      CREATE INDEX IF NOT EXISTS idx_cr_status    ON cost_reports (status);
-      CREATE INDEX IF NOT EXISTS idx_cr_milestone ON cost_reports (milestone_id);
-      CREATE INDEX IF NOT EXISTS idx_cr_boq       ON cost_reports (boq_id);
+      CREATE INDEX IF NOT EXISTS idx_cr_project_id   ON cost_reports (project_id);
+      CREATE INDEX IF NOT EXISTS idx_cr_milestone_id ON cost_reports (milestone_id);
+      CREATE INDEX IF NOT EXISTS idx_cr_boq_id       ON cost_reports (boq_id);
+      CREATE INDEX IF NOT EXISTS idx_cr_status       ON cost_reports (status);
     `);
     console.log("✅ cost_reports table ready");
   } catch (err) {
@@ -54,7 +53,7 @@ function formatReport(r) {
           day: "2-digit", month: "short", year: "numeric",
         })
       : null,
-    updatedDate:   r.updated_date
+    updatedDate: r.updated_date
       ? new Date(r.updated_date).toLocaleDateString("en-IN", {
           day: "2-digit", month: "short", year: "numeric",
         })
@@ -64,33 +63,25 @@ function formatReport(r) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  GET ALL  —  GET /api/cost-report
-//  Optional: ?projectId=&status=
 // ══════════════════════════════════════════════════════════════════════════════
 exports.getAllReports = async (req, res) => {
   try {
-    const { projectId, status } = req.query;
+    const { projectId, status, boqId } = req.query;
     const conditions = [];
     const values     = [];
 
-    if (projectId) {
-      values.push(projectId);
-      conditions.push(`project_id = $${values.length}`);
-    }
-    if (status) {
-      values.push(status);
-      conditions.push(`status = $${values.length}`);
-    }
+    if (projectId) { values.push(projectId); conditions.push(`project_id = $${values.length}`); }
+    if (status)    { values.push(status);    conditions.push(`status = $${values.length}`);     }
+    if (boqId)     { values.push(boqId);     conditions.push(`boq_id = $${values.length}`);    }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-
     const result = await pool.query(
-      `SELECT * FROM cost_reports ${where} ORDER BY created_at DESC`,
-      values
+      `SELECT * FROM cost_reports ${where} ORDER BY created_at DESC`, values
     );
     res.json(result.rows.map(formatReport));
   } catch (err) {
     console.error("getAllReports:", err.message);
-    res.status(500).json({ error: "Failed to fetch cost reports" });
+    res.status(500).json({ error: "Failed to fetch cost reports: " + err.message });
   }
 };
 
@@ -100,8 +91,7 @@ exports.getAllReports = async (req, res) => {
 exports.getReportById = async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM cost_reports WHERE id = $1",
-      [req.params.id]
+      "SELECT * FROM cost_reports WHERE id = $1", [req.params.id]
     );
     if (!result.rows.length) {
       return res.status(404).json({ error: "Cost report not found" });
@@ -109,60 +99,39 @@ exports.getReportById = async (req, res) => {
     res.json(formatReport(result.rows[0]));
   } catch (err) {
     console.error("getReportById:", err.message);
-    res.status(500).json({ error: "Failed to fetch cost report" });
+    res.status(500).json({ error: "Failed to fetch cost report: " + err.message });
   }
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  CREATE  —  POST /api/cost-report
-//  Body: { projectId, projectName, milestoneId, milestoneName, boqId, items, totalCost }
-//  Status starts as 'pending_pm'
 // ══════════════════════════════════════════════════════════════════════════════
 exports.createReport = async (req, res) => {
   try {
-    const {
-      projectId,
-      projectName,
-      milestoneId,
-      milestoneName,
-      boqId,
-      items,
-      totalCost,
-    } = req.body;
+    const { projectId, projectName, milestoneId, milestoneName, boqId, items, totalCost } = req.body;
 
-    // Validation
     if (!projectId || !milestoneId || !boqId) {
-      return res.status(400).json({
-        error: "projectId, milestoneId and boqId are required",
-      });
+      return res.status(400).json({ error: "projectId, milestoneId and boqId are required" });
     }
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "items must be a non-empty array" });
     }
 
-    // Check BOQ exists and is pending_pm
-    const boqCheck = await pool.query(
-      "SELECT id, status FROM boqs WHERE id = $1",
-      [boqId]
-    );
+    const boqCheck = await pool.query("SELECT id, status FROM boqs WHERE id = $1", [boqId]);
     if (!boqCheck.rows.length) {
       return res.status(404).json({ error: "Linked BOQ not found" });
     }
     if (boqCheck.rows[0].status !== "pending_pm") {
       return res.status(400).json({
-        error: "Cost report can only be created from a BOQ awaiting PM approval",
+        error: `Cost report requires a pending_pm BOQ. Current BOQ status: ${boqCheck.rows[0].status}`,
       });
     }
 
-    // Check if cost report already exists for this BOQ
     const existing = await pool.query(
-      "SELECT id FROM cost_reports WHERE boq_id = $1 AND status != 'rejected'",
-      [boqId]
+      "SELECT id FROM cost_reports WHERE boq_id = $1 AND status != 'rejected'", [boqId]
     );
     if (existing.rows.length > 0) {
-      return res.status(409).json({
-        error: "A cost report already exists for this BOQ. Edit it instead.",
-      });
+      return res.status(409).json({ error: "A cost report already exists for this BOQ. Edit it instead." });
     }
 
     const result = await pool.query(
@@ -170,15 +139,7 @@ exports.createReport = async (req, res) => {
          (project_id, project_name, milestone_id, milestone_name, boq_id, items, total_cost, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending_pm')
        RETURNING id`,
-      [
-        projectId,
-        projectName,
-        milestoneId,
-        milestoneName,
-        boqId,
-        JSON.stringify(items),
-        totalCost || 0,
-      ]
+      [projectId, projectName, milestoneId, milestoneName, boqId, JSON.stringify(items), totalCost || 0]
     );
 
     res.status(201).json({
@@ -188,27 +149,20 @@ exports.createReport = async (req, res) => {
     });
   } catch (err) {
     console.error("createReport:", err.message);
-    res.status(500).json({ error: "Failed to create cost report" });
+    res.status(500).json({ error: "Failed to create cost report: " + err.message });
   }
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  UPDATE  —  PUT /api/cost-report/:id
-//  QS edits a rejected report and resubmits → status resets to 'pending_pm'
 // ══════════════════════════════════════════════════════════════════════════════
 exports.updateReport = async (req, res) => {
   try {
     const { id } = req.params;
     const { projectId, projectName, milestoneId, milestoneName, boqId, items, totalCost } = req.body;
 
-    // Only allow edit if rejected or pending_pm
-    const check = await pool.query(
-      "SELECT status FROM cost_reports WHERE id = $1",
-      [id]
-    );
-    if (!check.rows.length) {
-      return res.status(404).json({ error: "Cost report not found" });
-    }
+    const check = await pool.query("SELECT status FROM cost_reports WHERE id = $1", [id]);
+    if (!check.rows.length) return res.status(404).json({ error: "Cost report not found" });
     if (check.rows[0].status === "approved") {
       return res.status(403).json({ error: "Cannot edit an approved cost report" });
     }
@@ -228,13 +182,8 @@ exports.updateReport = async (req, res) => {
            updated_at     = NOW()
        WHERE id = $8
        RETURNING id, status`,
-      [
-        projectId, projectName, milestoneId, milestoneName,
-        boqId,
-        items ? JSON.stringify(items) : null,
-        totalCost,
-        id,
-      ]
+      [projectId, projectName, milestoneId, milestoneName, boqId,
+       items ? JSON.stringify(items) : null, totalCost, id]
     );
 
     res.json({
@@ -244,95 +193,119 @@ exports.updateReport = async (req, res) => {
     });
   } catch (err) {
     console.error("updateReport:", err.message);
-    res.status(500).json({ error: "Failed to update cost report" });
+    res.status(500).json({ error: "Failed to update cost report: " + err.message });
   }
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  PM APPROVE  —  PUT /api/cost-report/approve/:id
-//  ⚠️  Register BEFORE /:id in router
 // ══════════════════════════════════════════════════════════════════════════════
 exports.approveReport = async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE cost_reports
-       SET status     = 'approved',
-           pm_comment = '',
-           updated_at = NOW()
+       SET status = 'approved', pm_comment = '', updated_at = NOW()
        WHERE id = $1 AND status = 'pending_pm'
-       RETURNING id, status`,
+       RETURNING id, status, boq_id, project_name, milestone_name`,
       [req.params.id]
     );
     if (!result.rows.length) {
-      return res.status(404).json({
-        error: "Cost report not found or not awaiting PM approval",
-      });
+      return res.status(404).json({ error: "Cost report not found or not awaiting PM approval" });
     }
+
+    const { boq_id, project_name, milestone_name } = result.rows[0];
+
+    await pool.query(
+      `UPDATE boqs SET status = 'pending_se', pm_note = '', updated_at = NOW()
+       WHERE id = $1 AND status = 'pending_pm'`,
+      [boq_id]
+    );
+
+    // ── QS Notification ──────────────────────────────────────
+    await createNotificationDirect({
+      type:         "Cost",
+      project_name: project_name,
+      milestone:    milestone_name,
+      title:        "Cost Report Approved ✅",
+      message:      `Your cost report for ${milestone_name} has been approved by PM.`,
+      status:       "approved",
+    });
+
     res.json({
-      message: "Cost Report approved by PM ✅",
+      message: "Cost Report approved ✅ — BOQ moved to pending SE approval",
       id:      result.rows[0].id,
       status:  "approved",
+      boqId:   boq_id,
     });
   } catch (err) {
     console.error("approveReport:", err.message);
-    res.status(500).json({ error: "Failed to approve cost report" });
+    res.status(500).json({ error: "Failed to approve cost report: " + err.message });
   }
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  PM REJECT  —  PUT /api/cost-report/reject/:id
-//  Body: { comment }
-//  ⚠️  Register BEFORE /:id in router
 // ══════════════════════════════════════════════════════════════════════════════
 exports.rejectReport = async (req, res) => {
   try {
     const { comment } = req.body;
+    const note = comment || "Please review the cost figures.";
+
     const result = await pool.query(
       `UPDATE cost_reports
-       SET status     = 'rejected',
-           pm_comment = $1,
-           updated_at = NOW()
+       SET status = 'rejected', pm_comment = $1, updated_at = NOW()
        WHERE id = $2 AND status = 'pending_pm'
-       RETURNING id, status`,
-      [comment || "Please review the cost figures.", req.params.id]
+       RETURNING id, status, boq_id, project_name, milestone_name`,
+      [note, req.params.id]
     );
     if (!result.rows.length) {
-      return res.status(404).json({
-        error: "Cost report not found or not awaiting PM approval",
-      });
+      return res.status(404).json({ error: "Cost report not found or not awaiting PM approval" });
     }
+
+    const { boq_id, project_name, milestone_name } = result.rows[0];
+
+    await pool.query(
+      `UPDATE boqs SET status = 'rejected', pm_note = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [note, boq_id]
+    );
+
+    // ── QS Notification ──────────────────────────────────────
+    await createNotificationDirect({
+      type:         "Cost",
+      project_name: project_name,
+      milestone:    milestone_name,
+      title:        "Cost Report Rejected ↩️",
+      message:      note,
+      status:       "rejected",
+    });
+
     res.json({
-      message: "PM requested changes ↩️",
+      message: "PM requested changes ↩️ — BOQ rejected, QS must edit and resubmit",
       id:      result.rows[0].id,
       status:  "rejected",
+      boqId:   boq_id,
     });
   } catch (err) {
     console.error("rejectReport:", err.message);
-    res.status(500).json({ error: "Failed to reject cost report" });
+    res.status(500).json({ error: "Failed to reject cost report: " + err.message });
   }
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  DELETE  —  DELETE /api/cost-report/:id
-//  Only rejected reports can be deleted
 // ══════════════════════════════════════════════════════════════════════════════
 exports.deleteReport = async (req, res) => {
   try {
-    const check = await pool.query(
-      "SELECT status FROM cost_reports WHERE id = $1",
-      [req.params.id]
-    );
-    if (!check.rows.length) {
-      return res.status(404).json({ error: "Cost report not found" });
-    }
+    const check = await pool.query("SELECT status FROM cost_reports WHERE id = $1", [req.params.id]);
+    if (!check.rows.length) return res.status(404).json({ error: "Cost report not found" });
     if (check.rows[0].status === "approved") {
       return res.status(403).json({ error: "Cannot delete an approved cost report" });
     }
-
     await pool.query("DELETE FROM cost_reports WHERE id = $1", [req.params.id]);
     res.json({ message: "Cost report deleted", id: parseInt(req.params.id) });
   } catch (err) {
     console.error("deleteReport:", err.message);
-    res.status(500).json({ error: "Failed to delete cost report" });
+    res.status(500).json({ error: "Failed to delete cost report: " + err.message });
   }
 };

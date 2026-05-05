@@ -1,24 +1,8 @@
 import { useState, useEffect } from "react";
 import { useProject } from "../../context/ProjectContext";
+import { API } from "../../services/authService";
 import ProjectSwitcher from "../../components/project/ProjectSwitcher";
 import "../../styles/MEPEngineer.css";
-
-const DRAWINGS_LIST = {
-  p1: [
-    "HVAC Layout — Level 3 (Rev-5)",
-    "Plumbing GF (Rev-3)",
-    "Electrical SLD (Rev-5)",
-    "Drainage L2 (Rev-4)",
-    "Conduit Routing GF (Rev-2)",
-    "Chiller Plant Layout (Rev-1)",
-  ],
-  p2: [
-    "HVAC Layout GF (Rev-2)",
-    "Electrical SLD (Rev-1)",
-    "Plumbing GF (Rev-2)",
-  ],
-  p3: ["HVAC Schematic (Rev-1)", "Plumbing Schematic (Rev-1)"],
-};
 
 const TEAM_OPTIONS = [
   {
@@ -298,364 +282,45 @@ const TEAMS = {
 /* ═══════════════════════════════════════
    THREADS  (keyed by project)
 ═══════════════════════════════════════ */
-const INITIAL_THREADS = {
-  p1: [
-    {
-      id: 1,
-      title: "Beam B-14 clash resolution — Level 3",
-      teams: [
-        { cls: "badge-purple", label: "Structural" },
-        { cls: "badge-mep-m", label: "MEP" },
-        { cls: "badge-red", label: "High" },
-      ],
-      drawing: "HVAC Layout — Level 3 (Rev-5)",
-      disc: "Mechanical",
-      priority: "High",
-      status: "open",
-      resolution: null,
-      messages: [
-        {
-          av: "av-struct",
-          initials: "SE",
-          name: "Structural Eng",
-          time: "Today 11:00 AM",
-          text: "New beam layout uploaded — Beam B-14 has moved 200mm east. Please check if your pipe route is still conflicting.",
-          isDecision: false,
-          isMine: false,
-        },
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "Today 09:15 AM",
-          text: "Checked — conflict still exists at our 100mm CW main. Raising incident #INC-041. We need a 300mm clear passage minimum.",
-          isDecision: false,
-          isMine: true,
-        },
-        {
-          av: "av-struct",
-          initials: "SE",
-          name: "Structural Eng",
-          time: "Today 09:30 AM",
-          text: "Understood. Will discuss with design team. Can we schedule a call this afternoon?",
-          isDecision: false,
-          isMine: false,
-        },
-      ],
-    },
-    {
-      id: 2,
-      title: "Floor Plan Rev4 — MEP compatibility check",
-      teams: [
-        { cls: "badge-blue", label: "Architect" },
-        { cls: "badge-mep-p", label: "Plumbing" },
-        { cls: "badge-amber", label: "Medium" },
-      ],
-      drawing: "Plumbing GF (Rev-3)",
-      disc: "Plumbing",
-      priority: "Medium",
-      status: "awaiting",
-      resolution: null,
-      messages: [
-        {
-          av: "av-arch",
-          initials: "AR",
-          name: "Architect",
-          time: "Today 08:45 AM",
-          text: "Floor Plan Rev4 has been uploaded. Key change — toilet block on Level 2 moved 1.5m north. Please review your plumbing layout for compatibility.",
-          isDecision: false,
-          isMine: false,
-        },
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "Today 09:00 AM",
-          text: "Noted. Will review plumbing drawing and update by end of day. The waste pipe slope may be affected — will confirm after assessment.",
-          isDecision: false,
-          isMine: true,
-        },
-      ],
-    },
-    {
-      id: 3,
-      title: "Conduit shaft routing — Ground Floor conflict",
-      teams: [
-        { cls: "badge-blue", label: "Architect" },
-        { cls: "badge-purple", label: "Structural" },
-        { cls: "badge-grey", label: "Low" },
-      ],
-      drawing: "Conduit Routing GF (Rev-2)",
-      disc: "Electrical",
-      priority: "Low",
-      status: "resolved",
-      resolution:
-        "Conduit route shifted 500mm west as agreed. MEP to issue Rev-3 of Conduit Routing GF drawing. Structural confirmed no impact on beam positions. Architect updated shaft opening dimensions accordingly.",
-      messages: [
-        {
-          av: "av-arch",
-          initials: "AR",
-          name: "Architect",
-          time: "2 days ago",
-          text: "The conduit shaft on GF clashes with the proposed staircase enclosure. We need to reroute before construction starts.",
-          isDecision: false,
-          isMine: false,
-        },
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "2 days ago",
-          text: "Agreed. We can shift the conduit 500mm west without affecting the distribution board clearance. Structural, does that impact any beams?",
-          isDecision: false,
-          isMine: true,
-        },
-        {
-          av: "av-struct",
-          initials: "SE",
-          name: "Structural Eng",
-          time: "2 days ago",
-          text: "No impact on beams. 500mm west shift is fine from structural perspective.",
-          isDecision: false,
-          isMine: false,
-        },
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "2 days ago",
-          text: "Conduit route shifted 500mm west. All parties agreed. Will issue updated drawing Rev-3.",
-          isDecision: true,
-          isMine: true,
-        },
-      ],
-    },
-  ],
-  p2: [
-    {
-      id: 1,
-      title: "Food court exhaust duct — ceiling clash",
-      teams: [
-        { cls: "badge-blue", label: "Architect" },
-        { cls: "badge-mep-m", label: "MEP" },
-        { cls: "badge-red", label: "High" },
-      ],
-      drawing: "HVAC Layout GF (Rev-2)",
-      disc: "Mechanical",
-      priority: "High",
-      status: "open",
-      resolution: null,
-      messages: [
-        {
-          av: "av-arch",
-          initials: "AR",
-          name: "Architect",
-          time: "Today 10:00 AM",
-          text: "The food court exhaust duct shown in HVAC Rev-2 conflicts with the feature ceiling at GL-4. Ceiling height is 3.2m but duct drops to 2.9m.",
-          isDecision: false,
-          isMine: false,
-        },
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "Today 10:30 AM",
-          text: "Acknowledged. We can reduce duct depth by 150mm using a flat oval section. Will update drawing and reissue. Structural please confirm beam soffit at GL-4.",
-          isDecision: false,
-          isMine: true,
-        },
-      ],
-    },
-    {
-      id: 2,
-      title: "Basement slab opening — Zone B drainage",
-      teams: [
-        { cls: "badge-purple", label: "Structural" },
-        { cls: "badge-mep-p", label: "Plumbing" },
-        { cls: "badge-amber", label: "Medium" },
-      ],
-      drawing: "Plumbing GF (Rev-2)",
-      disc: "Plumbing",
-      priority: "Medium",
-      status: "awaiting",
-      resolution: null,
-      messages: [
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "Yesterday 03:00 PM",
-          text: "We need a 300×300mm slab opening at Grid B3 for the basement drainage stack. Please confirm if this conflicts with any rebar arrangement.",
-          isDecision: false,
-          isMine: true,
-        },
-        {
-          av: "av-struct",
-          initials: "SE",
-          name: "Structural Eng",
-          time: "Yesterday 04:15 PM",
-          text: "Checking drawing. Will revert by tomorrow morning. Preliminary view — should be fine but need to verify rebar layout.",
-          isDecision: false,
-          isMine: false,
-        },
-      ],
-    },
-    {
-      id: 3,
-      title: "Roof plant room — electrical cable tray route",
-      teams: [
-        { cls: "badge-blue", label: "Architect" },
-        { cls: "badge-mep-e", label: "Electrical" },
-        { cls: "badge-grey", label: "Low" },
-      ],
-      drawing: "Electrical SLD (Rev-1)",
-      disc: "Electrical",
-      priority: "Low",
-      status: "resolved",
-      resolution:
-        "Cable tray route revised to run along north parapet wall. Architect confirmed no visual impact from mall atrium. MEP to issue Rev-2 of Electrical SLD.",
-      messages: [
-        {
-          av: "av-arch",
-          initials: "AR",
-          name: "Architect",
-          time: "3 days ago",
-          text: "The proposed cable tray on the roof is visible from the mall atrium skylight. Can it be rerouted along the parapet?",
-          isDecision: false,
-          isMine: false,
-        },
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "3 days ago",
-          text: "Yes — we can run it along the north parapet wall. Cable run increases by 8m but no technical issues. Will update the drawing.",
-          isDecision: true,
-          isMine: true,
-        },
-      ],
-    },
-  ],
-  p3: [
-    {
-      id: 1,
-      title: "Tunnel ventilation — structural wall penetration",
-      teams: [
-        { cls: "badge-purple", label: "Structural" },
-        { cls: "badge-mep-m", label: "MEP" },
-        { cls: "badge-red", label: "High" },
-      ],
-      drawing: "HVAC Schematic (Rev-1)",
-      disc: "Mechanical",
-      priority: "High",
-      status: "open",
-      resolution: null,
-      messages: [
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "Today 09:00 AM",
-          text: "We require two 800×600mm openings through the diaphragm wall at Station North end for tunnel ventilation fans. Please review structural implications.",
-          isDecision: false,
-          isMine: true,
-        },
-        {
-          av: "av-struct",
-          initials: "SE",
-          name: "Structural Eng",
-          time: "Today 09:45 AM",
-          text: "This is a critical structural element. We will need to introduce lintels and check water-tightness. Please issue a formal RFI so we can log this properly.",
-          isDecision: false,
-          isMine: false,
-        },
-      ],
-    },
-    {
-      id: 2,
-      title: "Platform slab — MEP duct coordination",
-      teams: [
-        { cls: "badge-purple", label: "Structural" },
-        { cls: "badge-mep-m", label: "MEP" },
-        { cls: "badge-amber", label: "Medium" },
-      ],
-      drawing: "HVAC Schematic (Rev-1)",
-      disc: "Mechanical",
-      priority: "Medium",
-      status: "awaiting",
-      resolution: null,
-      messages: [
-        {
-          av: "av-struct",
-          initials: "SE",
-          name: "Structural Eng",
-          time: "2 days ago",
-          text: "Platform slab structural drawing issued. Please overlay your MEP ducts and check for conflicts before we finalise rebar positions.",
-          isDecision: false,
-          isMine: false,
-        },
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "2 days ago",
-          text: "Will overlay and revert within 48 hours. Initial review shows possible conflict at Grid S-3 with the supply air duct.",
-          isDecision: false,
-          isMine: true,
-        },
-      ],
-    },
-    {
-      id: 3,
-      title: "Authority submission — MEP drawings sign-off",
-      teams: [
-        { cls: "badge-green", label: "Coordinator" },
-        { cls: "badge-mep-m", label: "MEP" },
-        { cls: "badge-grey", label: "Low" },
-      ],
-      drawing: "Plumbing Schematic (Rev-1)",
-      disc: "Plumbing",
-      priority: "Low",
-      status: "resolved",
-      resolution:
-        "All MEP drawings stamped and submitted to authority on 22 Apr. Coordinator confirmed receipt. Approval expected within 15 working days.",
-      messages: [
-        {
-          av: "av-coord",
-          initials: "PC",
-          name: "Project Coordinator",
-          time: "4 days ago",
-          text: "Authority submission deadline is next Monday. Please confirm which MEP drawings are ready for stamping and submission.",
-          isDecision: false,
-          isMine: false,
-        },
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "4 days ago",
-          text: "HVAC and Plumbing schematics are ready. Stamped copies will be with you by Friday EOD.",
-          isDecision: false,
-          isMine: true,
-        },
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "3 days ago",
-          text: "Stamped drawings submitted to coordinator. All MEP disciplines covered for this submission package.",
-          isDecision: true,
-          isMine: true,
-        },
-      ],
-    },
-  ],
-};
 
 const STATUS_INFO = {
   open: { label: "Open", pill: "pill-open" },
   awaiting: { label: "Awaiting Reply", pill: "pill-inprog" },
   resolved: { label: "Resolved", pill: "pill-resolved" },
+};
+
+const ROLE_MAP = {
+  arch: "architect",
+  struct: "structural_engineer",
+  coord: "project_coordinator",
+  qs: "quantity_surveyor",
+  site: "site_engineer",
+};
+
+const DISC_TO_SUBDISCIPLINES = {
+  MEP: ["Mechanical", "Electrical", "Plumbing"],
+  ARCH: ["Architectural"],
+  STR: ["Structural"],
+};
+
+// DB role → badge class
+const ROLE_BADGE = {
+  architect: "badge-blue",
+  structural_engineer: "badge-purple",
+  project_coordinator: "badge-green",
+  quantity_surveyor: "badge-blue",
+  site_engineer: "badge-blue",
+  mep_engineer: "badge-mep-m",
+};
+
+// DB role → display label
+const ROLE_LABEL = {
+  architect: "Architect",
+  structural_engineer: "Structural",
+  project_coordinator: "Coordinator",
+  quantity_surveyor: "QS",
+  site_engineer: "Site Eng",
+  mep_engineer: "MEP",
 };
 
 const PRIORITY_BADGE = {
@@ -665,57 +330,113 @@ const PRIORITY_BADGE = {
 };
 
 /* ── Inline New Thread Form ───────────────────────── */
-function NewThreadForm({ onClose, onAdd, projectName, drawingsList }) {
+function NewThreadForm({
+  onClose,
+  onAdd,
+  projectName,
+  drawingsList,
+  activeProjectId,
+}) {
   const [subject, setSubject] = useState("");
-  const [disc, setDisc] = useState("");
-  const [drawing, setDrawing] = useState("");
+  const [drawingDisc, setDrawingDisc] = useState(""); // MEP | ARCH | STR
+  const [subDisc, setSubDisc] = useState(""); // Mechanical | Electrical etc
+  const [drawing, setDrawing] = useState(""); // UUID
+  const [relatedClash, setRelatedClash] = useState(null); // auto-filled clash
   const [priority, setPriority] = useState("Medium");
   const [note, setNote] = useState("");
-  const [teams, setTeams] = useState({
-    arch: false,
-    struct: false,
-    coord: false,
-    qs: false,
-    site: false,
+
+  // participants: { [roleKey]: { selected: bool, users: [], pickedUserId: "" } }
+  const [participants, setParticipants] = useState(() => {
+    const init = {};
+    TEAM_OPTIONS.forEach((t) => {
+      init[t.key] = { selected: false, users: [], pickedUserId: "" };
+    });
+    return init;
   });
 
-  const toggleTeam = (k) => setTeams((p) => ({ ...p, [k]: !p[k] }));
-  const anyTeam = Object.values(teams).some(Boolean);
-  const canSubmit = subject.trim() !== "" && disc !== "" && anyTeam;
-
-  const handleSubmit = () => {
-    if (!canSubmit) return;
-    const selectedTeams = TEAM_OPTIONS.filter((t) => teams[t.key]).map((t) => ({
-      cls: t.badgeCls,
-      label: t.badgeLabel,
+  // When a role is toggled on → fetch users for that role in this project
+  const toggleRole = async (key) => {
+    const isNowSelected = !participants[key].selected;
+    setParticipants((p) => ({
+      ...p,
+      [key]: { ...p[key], selected: isNowSelected },
     }));
-    selectedTeams.push({
-      cls: PRIORITY_BADGE[priority] || "badge-grey",
-      label: priority,
-    });
 
-    onAdd({
-      id: Date.now(),
-      title: subject,
-      teams: selectedTeams,
-      drawing: drawing || "—",
-      disc,
-      priority,
-      status: "open",
-      resolution: null,
-      messages: [
-        {
-          av: "av-me",
-          initials: "ME",
-          name: "MEP Engineer (You)",
-          time: "Just now",
-          text: note.trim() || `Thread opened: ${subject}`,
-          isDecision: false,
-          isMine: true,
-        },
-      ],
-    });
-    onClose();
+    if (isNowSelected && participants[key].users.length === 0) {
+      try {
+        const res = await API.get(
+          `/drawings/members/${activeProjectId}?role=${ROLE_MAP[key]}`,
+        );
+        setParticipants((p) => ({
+          ...p,
+          [key]: {
+            ...p[key],
+            users: res.data,
+            pickedUserId: res.data[0]?.id || "",
+          },
+        }));
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const setPickedUser = (key, userId) => {
+    setParticipants((p) => ({
+      ...p,
+      [key]: { ...p[key], pickedUserId: userId },
+    }));
+  };
+
+  // Filter drawings by drawingDisc + subDisc
+  const filteredDrawings = drawingsList.filter((d) => {
+    if (!drawingDisc) return false;
+    if (drawingDisc && !subDisc) return d.discipline === drawingDisc;
+    return d.discipline === drawingDisc && d.sub_discipline === subDisc;
+  });
+
+  // When drawing is selected → auto-fetch latest open clash
+  const handleDrawingChange = async (drawingId) => {
+    setDrawing(drawingId);
+    setRelatedClash(null);
+    if (!drawingId) return;
+    try {
+      const res = await API.get(`/drawings/clash-latest/${drawingId}`);
+      if (res.data) setRelatedClash(res.data);
+    } catch {
+      // no clash found — that's fine
+    }
+  };
+
+  const anyParticipant = Object.values(participants).some((p) => p.selected);
+  const canSubmit = subject.trim() !== "" && anyParticipant;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    try {
+      const selectedParticipants = TEAM_OPTIONS.filter(
+        (t) => participants[t.key].selected,
+      ).map((t) => ({
+        role: ROLE_MAP[t.key],
+        user_id: participants[t.key].pickedUserId || null,
+      }));
+
+      await onAdd({
+        title: subject,
+        discipline: subDisc || drawingDisc || null,
+        priority,
+        drawing_id: drawing || null,
+        clash_id: relatedClash?.id || null,
+        opening_note: note.trim(),
+        participants: selectedParticipants,
+      });
+      onClose();
+    } catch (err) {
+      alert(
+        "Failed to create thread: " +
+          (err.response?.data?.error ?? err.message),
+      );
+    }
   };
 
   return (
@@ -744,6 +465,7 @@ function NewThreadForm({ onClose, onAdd, projectName, drawingsList }) {
         className="mep-card-body"
         style={{ display: "flex", flexDirection: "column", gap: 14 }}
       >
+        {/* Subject */}
         <div className="form-group">
           <label>
             Thread Subject <span style={{ color: "var(--danger)" }}>*</span>
@@ -757,23 +479,8 @@ function NewThreadForm({ onClose, onAdd, projectName, drawingsList }) {
           />
         </div>
 
+        {/* Priority */}
         <div className="form-row">
-          <div className="form-group">
-            <label>
-              Discipline <span style={{ color: "var(--danger)" }}>*</span>
-            </label>
-            <select
-              className="form-select"
-              value={disc}
-              onChange={(e) => setDisc(e.target.value)}
-            >
-              <option value="">Select discipline</option>
-              <option>Mechanical</option>
-              <option>Electrical</option>
-              <option>Plumbing</option>
-              <option>All MEP</option>
-            </select>
-          </div>
           <div className="form-group">
             <label>Priority</label>
             <select
@@ -786,60 +493,214 @@ function NewThreadForm({ onClose, onAdd, projectName, drawingsList }) {
               <option>Low</option>
             </select>
           </div>
-          <div className="form-group">
-            <label>Related Drawing</label>
-            <select
-              className="form-select"
-              value={drawing}
-              onChange={(e) => setDrawing(e.target.value)}
-            >
-              <option value="">Select drawing (optional)</option>
-              {drawingsList.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
-          </div>
         </div>
 
-        <div className="form-group">
-          <label>
-            Teams Involved <span style={{ color: "var(--danger)" }}>*</span>
-          </label>
+        {/* Drawing — 3-step filter */}
+        <div
+          style={{
+            background: "var(--bg-light)",
+            borderRadius: 8,
+            padding: 12,
+          }}
+        >
           <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              marginBottom: 10,
+              color: "var(--text-secondary)",
+              letterSpacing: 1,
+            }}
           >
-            {TEAM_OPTIONS.map((t) => (
-              <div
-                key={t.key}
-                className="notify-item"
-                onClick={() => toggleTeam(t.key)}
-                style={{
-                  cursor: "pointer",
-                  borderColor: teams[t.key] ? "var(--primary-blue)" : undefined,
-                  background: teams[t.key] ? "rgba(30,90,150,0.05)" : undefined,
+            RELATED DRAWING (OPTIONAL)
+          </div>
+          <div className="form-row" style={{ gap: 8 }}>
+            {/* Step 1 — Discipline */}
+            <div className="form-group">
+              <label>Discipline</label>
+              <select
+                className="form-select"
+                value={drawingDisc}
+                onChange={(e) => {
+                  setDrawingDisc(e.target.value);
+                  setSubDisc("");
+                  setDrawing("");
+                  setRelatedClash(null);
                 }}
               >
-                <input
-                  type="checkbox"
-                  readOnly
-                  checked={teams[t.key]}
+                <option value="">Select discipline</option>
+                <option value="MEP">MEP</option>
+                <option value="ARCH">Architectural</option>
+                <option value="STR">Structural</option>
+              </select>
+            </div>
+
+            {/* Step 2 — Sub-discipline */}
+            <div className="form-group">
+              <label>Sub-discipline</label>
+              <select
+                className="form-select"
+                value={subDisc}
+                onChange={(e) => {
+                  setSubDisc(e.target.value);
+                  setDrawing("");
+                  setRelatedClash(null);
+                }}
+                disabled={!drawingDisc}
+              >
+                <option value="">Select sub-discipline</option>
+                {(DISC_TO_SUBDISCIPLINES[drawingDisc] || []).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Step 3 — Drawing */}
+            <div className="form-group">
+              <label>Drawing</label>
+              <select
+                className="form-select"
+                value={drawing}
+                onChange={(e) => handleDrawingChange(e.target.value)}
+                disabled={!subDisc}
+              >
+                <option value="">Select drawing</option>
+                {filteredDrawings.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} — {d.revision_number || d.rev || "—"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Auto-filled clash */}
+          {relatedClash && (
+            <div
+              className="alert alert-red"
+              style={{
+                marginTop: 10,
+                padding: "8px 12px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+              }}
+            >
+              <div>
+                <span className="alert-icon">🚩</span>
+                <strong> {relatedClash.clash_no}</strong> —{" "}
+                {relatedClash.clash_type}
+                <div
                   style={{
-                    width: 14,
-                    height: 14,
-                    accentColor: "var(--primary-blue)",
-                    flexShrink: 0,
-                    pointerEvents: "none",
+                    fontSize: 11,
+                    color: "var(--text-secondary)",
+                    marginTop: 3,
                   }}
-                />
-                <div>
-                  <div className="notify-team">{t.label}</div>
-                  <div className="notify-role">{t.role}</div>
+                >
+                  {relatedClash.description}
                 </div>
               </div>
-            ))}
+              <button
+                type="button"
+                className="btn-ghost"
+                style={{ fontSize: 11, padding: "2px 8px", flexShrink: 0 }}
+                onClick={() => setRelatedClash(null)}
+              >
+                ✕ Clear
+              </button>
+            </div>
+          )}
+          {drawing && !relatedClash && (
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-secondary)",
+                marginTop: 8,
+              }}
+            >
+              ✓ No open clashes on this drawing
+            </div>
+          )}
+        </div>
+
+        {/* Participants — role toggle + user picker */}
+        <div className="form-group">
+          <label>
+            Participants <span style={{ color: "var(--danger)" }}>*</span>
+          </label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {TEAM_OPTIONS.map((t) => {
+              const p = participants[t.key];
+              return (
+                <div key={t.key}>
+                  <div
+                    className="notify-item"
+                    onClick={() => toggleRole(t.key)}
+                    style={{
+                      cursor: "pointer",
+                      borderColor: p.selected
+                        ? "var(--primary-blue)"
+                        : undefined,
+                      background: p.selected
+                        ? "rgba(30,90,150,0.05)"
+                        : undefined,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      readOnly
+                      checked={p.selected}
+                      style={{
+                        width: 14,
+                        height: 14,
+                        accentColor: "var(--primary-blue)",
+                        flexShrink: 0,
+                        pointerEvents: "none",
+                      }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div className="notify-team">{t.label}</div>
+                      <div className="notify-role">{t.role}</div>
+                    </div>
+                  </div>
+
+                  {/* User picker — shows only when role is selected */}
+                  {p.selected && (
+                    <div style={{ marginTop: 6, marginLeft: 24 }}>
+                      {p.users.length === 0 ? (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          Loading users…
+                        </div>
+                      ) : (
+                        <select
+                          className="form-select"
+                          value={p.pickedUserId}
+                          onChange={(e) => setPickedUser(t.key, e.target.value)}
+                          style={{ fontSize: 12 }}
+                        >
+                          {p.users.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
+        {/* Opening note */}
         <div className="form-group">
           <label>Opening Note</label>
           <textarea
@@ -850,11 +711,11 @@ function NewThreadForm({ onClose, onAdd, projectName, drawingsList }) {
           />
         </div>
 
-        {!canSubmit && (subject || disc || anyTeam) && (
+        {!canSubmit && (subject || anyParticipant) && (
           <div className="alert alert-amber" style={{ padding: "8px 12px" }}>
             <span className="alert-icon">⚠️</span>
             <span>
-              Please fill in Subject, Discipline, and select at least one Team.
+              Please fill in Subject and select at least one Participant.
             </span>
           </div>
         )}
@@ -883,6 +744,21 @@ function NewThreadForm({ onClose, onAdd, projectName, drawingsList }) {
 /* ── Resolve Form ─────────────────────────────────── */
 function ResolveForm({ thread, onClose, onResolve }) {
   const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const confirm = async () => {
+    if (!text.trim() || saving) return;
+    setSaving(true);
+    try {
+      await onResolve(thread.id, text.trim());
+      onClose();
+    } catch (err) {
+      alert("Failed to resolve: " + (err.response?.data?.error ?? err.message));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div style={{ margin: "10px 14px" }}>
       <div className="alert alert-blue" style={{ marginBottom: 10 }}>
@@ -919,15 +795,11 @@ function ResolveForm({ thread, onClose, onResolve }) {
           style={{
             fontSize: 11,
             padding: "6px 12px",
-            opacity: text.trim() ? 1 : 0.5,
+            opacity: text.trim() && !saving ? 1 : 0.5,
           }}
-          onClick={() => {
-            if (!text.trim()) return;
-            onResolve(thread.id, text.trim());
-            onClose();
-          }}
+          onClick={confirm}
         >
-          ✅ Confirm Resolution
+          {saving ? "Saving…" : "✅ Confirm Resolution"}
         </button>
       </div>
     </div>
@@ -936,12 +808,44 @@ function ResolveForm({ thread, onClose, onResolve }) {
 
 /* ── Single Thread ────────────────────────────────── */
 function CoordThread({ thread, onResolve }) {
-  const [messages, setMessages] = useState(thread.messages);
+  const [messages, setMessages] = useState(thread.messages || []);
   const [reply, setReply] = useState("");
   const [isDecision, setIsDecision] = useState(false);
   const [showResolve, setShowResolve] = useState(false);
   const [expanded, setExpanded] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
+  const [agreementCount, setAgreementCount] = useState(
+    thread.agreement_count || 0,
+  );
+  const [participantCount, setParticipantCount] = useState(
+    thread.participant_count || 0,
+  );
+  const [hasAgreed, setHasAgreed] = useState(false);
+  const [agreeing, setAgreeing] = useState(false);
 
+  useEffect(() => {
+    if (!expanded || messagesLoaded || !thread.id) return;
+    API.get(`/drawings/threads/${thread.id}`)
+      .then((res) => {
+        const msgs = (res.data.messages || []).map((m) => ({
+          av: m.author_id === res.data.created_by_id ? "av-me" : "av-other",
+          initials: m.author_name?.slice(0, 2).toUpperCase() || "??",
+          name: m.author_name || "Unknown",
+          time: new Date(m.created_at).toLocaleString("en", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          }),
+          text: m.body,
+          isDecision: m.is_decision,
+          isMine: false, // backend doesn't know current user here; good enough
+        }));
+        setMessages(msgs);
+        setMessagesLoaded(true);
+      })
+      .catch((err) => console.error("Failed to load messages:", err));
+  }, [expanded]);
   const statusInfo = STATUS_INFO[thread.status] || STATUS_INFO.open;
   const discIcon =
     thread.disc === "Mechanical"
@@ -952,22 +856,52 @@ function CoordThread({ thread, onResolve }) {
           ? "🚿"
           : "📋";
 
-  const send = () => {
-    if (!reply.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      {
-        av: "av-me",
-        initials: "ME",
-        name: "MEP Engineer (You)",
-        time: "Just now",
-        text: reply,
-        isDecision,
-        isMine: true,
-      },
-    ]);
-    setReply("");
-    setIsDecision(false);
+  const agreeToClose = async () => {
+    if (agreeing || hasAgreed) return;
+    setAgreeing(true);
+    try {
+      const res = await API.post(`/drawings/threads/${thread.id}/agree`);
+      setAgreementCount(Number(res.data.agreement_count));
+      setParticipantCount(Number(res.data.participant_count));
+      setHasAgreed(true);
+      // if all agreed the thread is now resolved — update status via parent
+      if (res.data.status === "resolved") {
+        onResolve(thread.id, "__auto__");
+      }
+    } catch (err) {
+      alert("Failed: " + (err.response?.data?.error ?? err.message));
+    } finally {
+      setAgreeing(false);
+    }
+  };
+
+  const send = async () => {
+    if (!reply.trim() || sending) return;
+    setSending(true);
+    try {
+      const res = await API.post(`/drawings/threads/${thread.id}/messages`, {
+        body: reply.trim(),
+        is_decision: isDecision,
+      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          av: "av-me",
+          initials: "ME",
+          name: res.data.author_name || "MEP Engineer (You)",
+          time: "Just now",
+          text: res.data.body,
+          isDecision: res.data.is_decision,
+          isMine: true,
+        },
+      ]);
+      setReply("");
+      setIsDecision(false);
+    } catch (err) {
+      alert("Failed to send: " + (err.response?.data?.error ?? err.message));
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -986,7 +920,9 @@ function CoordThread({ thread, onResolve }) {
             ))}
           </div>
         </div>
-        <span className="ct-meta">{messages.length} msgs</span>
+        <span className="ct-meta">
+          {messages.length || thread.message_count} msgs
+        </span>{" "}
         <span
           className={`status-pill ${statusInfo.pill}`}
           style={{ marginLeft: 8 }}
@@ -1044,15 +980,7 @@ function CoordThread({ thread, onResolve }) {
             ))}
           </div>
 
-          {showResolve && (
-            <ResolveForm
-              thread={thread}
-              onClose={() => setShowResolve(false)}
-              onResolve={onResolve}
-            />
-          )}
-
-          {thread.status !== "resolved" && !showResolve && (
+          {thread.status !== "resolved" && (
             <div className="reply-box">
               <input
                 type="text"
@@ -1079,6 +1007,48 @@ function CoordThread({ thread, onResolve }) {
             </div>
           )}
 
+          {/* Agreement progress bar */}
+          {thread.status !== "resolved" && participantCount > 0 && (
+            <div
+              style={{
+                padding: "10px 14px",
+                borderTop: "1px solid var(--border-color)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 11,
+                  marginBottom: 6,
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>🤝 Close Agreement</span>
+                <span style={{ color: "var(--text-secondary)" }}>
+                  {agreementCount} of {participantCount} participants agreed
+                </span>
+              </div>
+              <div
+                style={{
+                  height: 4,
+                  background: "var(--border-color)",
+                  borderRadius: 4,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${participantCount > 0 ? (agreementCount / participantCount) * 100 : 0}%`,
+                    background: "var(--primary-blue)",
+                    borderRadius: 4,
+                    transition: "width 0.3s",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <div
             className="ct-status-bar"
             style={{
@@ -1090,14 +1060,24 @@ function CoordThread({ thread, onResolve }) {
               <span>📐 {thread.drawing}</span>
             </div>
             <div style={{ display: "flex", gap: 7 }}>
-              {thread.status !== "resolved" && !showResolve && (
+              {thread.status !== "resolved" && (
                 <button
                   type="button"
-                  className="btn-outline"
-                  style={{ fontSize: 11, padding: "5px 11px" }}
-                  onClick={() => setShowResolve(true)}
+                  className={hasAgreed ? "btn-primary" : "btn-outline"}
+                  style={{
+                    fontSize: 11,
+                    padding: "5px 11px",
+                    opacity: hasAgreed || agreeing ? 0.6 : 1,
+                    cursor: hasAgreed ? "not-allowed" : "pointer",
+                  }}
+                  onClick={agreeToClose}
+                  disabled={hasAgreed || agreeing}
                 >
-                  ✅ Mark Resolved
+                  {hasAgreed
+                    ? "✅ You Agreed"
+                    : agreeing
+                      ? "Saving…"
+                      : "🤝 Agree to Close"}
                 </button>
               )}
               <button
@@ -1118,37 +1098,145 @@ function CoordThread({ thread, onResolve }) {
 /* ── Main Page ────────────────────────────────────── */
 export default function MEPCoordination() {
   const { activeProject } = useProject();
-  if (!activeProject) return null; // ← add this line
-
-  const [threadsByProject, setThreadsByProject] = useState(INITIAL_THREADS);
+  const [threads, setThreads] = useState([]);
+  const [drawingsList, setDrawingsList] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState("all");
 
-  // Reset filter and close form when project switches
+  // fetch threads and drawings when project changes
   useEffect(() => {
+    if (!activeProject) return;
     setFilter("all");
     setShowForm(false);
-  }, [activeProject.id]);
+    setThreads([]);
 
-  const threads = threadsByProject[activeProject.id] || [];
-  const teams = TEAMS[activeProject.id] || [];
-  const drawingsList = DRAWINGS_LIST[activeProject.id] || [];
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [threadsRes, drawingsRes] = await Promise.all([
+          API.get(`/drawings/threads/project/${activeProject.id}`),
+          API.get(`/drawings/project/${activeProject.id}`),
+        ]);
 
-  const addThread = (t) => {
-    setThreadsByProject((prev) => ({
+        // normalize threads from DB shape → component shape
+        const normalized = threadsRes.data.map((t) => {
+          // participants from DB is json_agg → array of {role, user_id, user_name}
+          // or it could be a plain array of strings from older data — handle both
+          const rawParticipants = (() => {
+            if (!t.participants) return [];
+            // postgres json_agg comes back as already-parsed array
+            if (Array.isArray(t.participants)) return t.participants;
+            // sometimes it comes as a JSON string
+            try {
+              return JSON.parse(t.participants);
+            } catch {
+              return [];
+            }
+          })();
+
+          return {
+            id: t.id,
+            title: t.title,
+            teams: [
+              ...rawParticipants.map((p) => {
+                const role = typeof p === "string" ? p : p.role;
+                return {
+                  cls: ROLE_BADGE[role] || "badge-blue",
+                  label: ROLE_LABEL[role] || role,
+                };
+              }),
+              {
+                cls: PRIORITY_BADGE[t.priority] || "badge-grey",
+                label: t.priority,
+              },
+            ],
+            drawing: t.drawing_name || "—",
+            drawing_id: t.drawing_id,
+            disc: t.discipline,
+            priority: t.priority,
+            status: t.status,
+            resolution: t.resolution,
+            messages: [],
+            message_count: Number(t.message_count),
+            agreement_count: Number(t.agreement_count || 0),
+            participant_count: Number(t.participant_count || 0),
+            agreed_user_ids: t.agreed_user_ids || [],
+          };
+        });
+
+        setThreads(normalized);
+        setDrawingsList(drawingsRes.data);
+      } catch (err) {
+        console.error("Failed to load coordination data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [activeProject?.id]);
+  const addThread = async (payload) => {
+    const res = await API.post("/drawings/threads", {
+      ...payload,
+      project_id: activeProject.id,
+    });
+    const t = res.data;
+    // add to top of list with empty messages
+    setThreads((prev) => [
+      {
+        id: t.id,
+        title: t.title,
+        teams: [
+          ...(payload.participants || []).map((p) => {
+            // payload.participants is array of {role, user_id}
+            const role = typeof p === "string" ? p : p.role;
+            return {
+              cls: ROLE_BADGE[role] || "badge-blue",
+              label: ROLE_LABEL[role] || role,
+            };
+          }),
+          {
+            cls: PRIORITY_BADGE[t.priority] || "badge-grey",
+            label: t.priority,
+          },
+        ],
+        drawing: "—",
+        drawing_id: t.drawing_id,
+        disc: t.discipline,
+        priority: t.priority,
+        status: t.status,
+        resolution: null,
+        messages: [],
+        message_count: 0,
+        agreement_count: 0,
+        participant_count: payload.participants?.length || 0,
+        agreed_user_ids: [],
+      },
       ...prev,
-      [activeProject.id]: [t, ...(prev[activeProject.id] || [])],
-    }));
+    ]);
     setShowForm(false);
   };
 
-  const resolveThread = (id, resolution) => {
-    setThreadsByProject((prev) => ({
-      ...prev,
-      [activeProject.id]: (prev[activeProject.id] || []).map((t) =>
-        t.id === id ? { ...t, status: "resolved", resolution } : t,
+  const resolveThread = async (id, resolution) => {
+    // "__auto__" means trigger already resolved it — just update local state
+    if (resolution !== "__auto__") {
+      await API.put(`/drawings/threads/${id}/resolve`, { resolution });
+    }
+    setThreads((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              status: "resolved",
+              resolution:
+                resolution === "__auto__"
+                  ? "Resolved by unanimous agreement"
+                  : resolution,
+            }
+          : t,
       ),
-    }));
+    );
   };
 
   const openCount = threads.filter((t) => t.status !== "resolved").length;
@@ -1159,6 +1247,25 @@ export default function MEPCoordination() {
     if (filter === "resolved") return t.status === "resolved";
     return true;
   });
+
+  if (!activeProject) return null;
+
+  if (loading) {
+    return (
+      <div className="mep-page">
+        <div
+          style={{
+            padding: 40,
+            textAlign: "center",
+            color: "var(--text-secondary)",
+            fontSize: 13,
+          }}
+        >
+          Loading coordination threads…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mep-page">
@@ -1198,11 +1305,12 @@ export default function MEPCoordination() {
           onAdd={addThread}
           projectName={activeProject.name}
           drawingsList={drawingsList}
+          activeProjectId={activeProject.id}
         />
       )}
 
       <div className="team-grid">
-        {teams.map((team) => (
+        {(TEAMS[activeProject.id] || []).map((team) => (
           <div className="team-card" key={team.key}>
             <div className="tc-head">
               <div className={`tc-avatar ${team.avatarCls}`}>{team.icon}</div>

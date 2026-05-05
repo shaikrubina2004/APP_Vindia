@@ -1,6 +1,34 @@
 const pool = require("../config/db");
 const { insertNotification } = require("./pcNotificationsController");
 
+// ✅ Helper to parse floor string into rows
+function parseFloors(floorsString) {
+  const floors = [];
+  const upper = floorsString.trim().toUpperCase();
+
+  const hasBasement = upper.startsWith("B+");
+  const hasRooftop = upper.endsWith("+R");
+
+  const match = upper.match(/G\+(\d+)/);
+  const numFloors = match ? parseInt(match[1]) : 0;
+
+  if (hasBasement) {
+    floors.push({ name: "Basement", level_no: -1 });
+  }
+
+  floors.push({ name: "Ground Floor", level_no: 0 });
+
+  for (let i = 1; i <= numFloors; i++) {
+    floors.push({ name: `Level ${i}`, level_no: i });
+  }
+
+  if (hasRooftop) {
+    floors.push({ name: "Rooftop", level_no: numFloors + 1 });
+  }
+
+  return floors;
+}
+
 /**
  * ✅ Create Project
  */
@@ -14,6 +42,7 @@ exports.createProject = async (req, res) => {
       budget,
       manager_id,
       site_engineer_id,
+      coordinator_id,
       location,
       description,
       building_type,
@@ -39,11 +68,11 @@ exports.createProject = async (req, res) => {
     const result = await pool.query(
       `INSERT INTO projects (
         name, client, start_date, end_date, budget,
-        manager_id, site_engineer_id,
+        manager_id, site_engineer_id, coordinator_id,
         location, description,
         building_type, floors, plot_size, phone
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       RETURNING *`,
       [
         name,
@@ -53,43 +82,83 @@ exports.createProject = async (req, res) => {
         budget,
         manager_id,
         site_engineer_id,
+        coordinator_id || null,
         location || null,
         description || null,
         building_type || null,
         floors || null,
         plot_size || null,
         phone || null,
-      ]
+      ],
     );
 
-    const newProject = result.rows[0];
-
-    // ✅ Get coordinator_id for this project
-    const proj = await pool.query(
-      `SELECT coordinator_id FROM projects WHERE id = $1`,
-      [newProject.id]
+    // ✅ Fetch full project with joined fields
+    const fullProject = await pool.query(
+      `SELECT 
+        p.*,
+        m.name AS manager_name,
+        s.name AS site_engineer_name,
+        u.name AS coordinator_name
+       FROM projects p
+       LEFT JOIN employees m ON p.manager_id = m.id
+       LEFT JOIN employees s ON p.site_engineer_id = s.id
+       LEFT JOIN users u ON p.coordinator_id = u.id
+       WHERE p.id = $1`,
+      [result.rows[0].id],
     );
 
-    const coordinatorId = proj.rows[0]?.coordinator_id;
+    const newProject = fullProject.rows[0];
 
-    // ✅ Send notification (only if coordinator exists)
-    if (coordinatorId) {
-      await insertNotification(
-        coordinatorId,
-        "project",
-        "New Project Created",
-        `Project "${name}" is created`,
-        "/project-coordinator/dashboard", // 👈 better navigation
-        "info",
-        newProject.id
-      );
+    // ✅ Auto-create floors in project_floors table
+    if (floors) {
+      const floorRows = parseFloors(floors);
+      for (const floor of floorRows) {
+        await pool.query(
+          `INSERT INTO project_floors (project_id, name, level_no, is_active)
+           VALUES ($1, $2, $3, true)`,
+          [newProject.id, floor.name, floor.level_no],
+        );
+      }
+    }
+
+    // ✅ Send notification to coordinator
+    try {
+      if (coordinator_id) {
+        await insertNotification(
+          coordinator_id,
+          "project",
+          "New Project Created",
+          `Project "${name}" is created`,
+          "/project-coordinator/dashboard",
+          "info",
+          newProject.id,
+        );
+      }
+    } catch (notifErr) {
+      console.warn("⚠️ Notification failed (non-critical):", notifErr.message);
     }
 
     // ✅ Response
     res.status(201).json(newProject);
-
   } catch (err) {
-    console.error("🔥 CREATE ERROR:", err.message);
+    console.error("🔥 CREATE ERROR FULL:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * ✅ Get Coordinators
+ */
+exports.getCoordinators = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name 
+       FROM users
+       WHERE role_id = 33`,
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -102,9 +171,8 @@ exports.getManagers = async (req, res) => {
     const result = await pool.query(
       `SELECT id, name 
        FROM employees
-       WHERE designation = 'Project Manager'`
+       WHERE designation = 'Project Manager'`,
     );
-
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -120,9 +188,8 @@ exports.getSiteEngineers = async (req, res) => {
     const result = await pool.query(
       `SELECT id, name 
        FROM employees
-       WHERE designation = 'Site Engineer'`
+       WHERE designation = 'Site Engineer'`,
     );
-
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -139,19 +206,18 @@ exports.getAllProjects = async (req, res) => {
       `SELECT 
         p.*,
         m.name AS manager_name,
-        s.name AS site_engineer_name
+        s.name AS site_engineer_name,
+        u.name AS coordinator_name
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
        LEFT JOIN employees s ON p.site_engineer_id = s.id
-       ORDER BY p.created_at DESC`
+       LEFT JOIN users u ON p.coordinator_id = u.id
+       ORDER BY p.created_at DESC`,
     );
-
     return res.status(200).json(result.rows);
   } catch (err) {
     console.error("🔥 FETCH ERROR:", err.message);
-    return res.status(500).json({
-      error: "Failed to fetch projects",
-    });
+    return res.status(500).json({ error: "Failed to fetch projects" });
   }
 };
 
@@ -160,32 +226,28 @@ exports.getAllProjects = async (req, res) => {
  */
 exports.getProjectById = async (req, res) => {
   const { id } = req.params;
-
   try {
     const result = await pool.query(
       `SELECT 
         p.*,
         m.name AS manager_name,
-        s.name AS site_engineer_name
+        s.name AS site_engineer_name,
+        u.name AS coordinator_name
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
        LEFT JOIN employees s ON p.site_engineer_id = s.id
+       LEFT JOIN users u ON p.coordinator_id = u.id
        WHERE p.id = $1`,
-      [id]
+      [id],
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
-        message: "Project not found",
-      });
+      return res.status(404).json({ message: "Project not found" });
     }
-
     return res.status(200).json(result.rows[0]);
   } catch (err) {
     console.error("🔥 FETCH BY ID ERROR:", err.message);
-    return res.status(500).json({
-      error: "Failed to fetch project",
-    });
+    return res.status(500).json({ error: "Failed to fetch project" });
   }
 };
 
@@ -194,7 +256,6 @@ exports.getProjectById = async (req, res) => {
  */
 exports.updateProject = async (req, res) => {
   const { id } = req.params;
-
   try {
     const {
       name,
@@ -204,6 +265,7 @@ exports.updateProject = async (req, res) => {
       budget,
       manager_id,
       site_engineer_id,
+      coordinator_id,
       status,
       progress,
       location,
@@ -214,11 +276,8 @@ exports.updateProject = async (req, res) => {
       phone,
     } = req.body;
 
-    // ✅ Phone validation
     if (phone && phone.length !== 10) {
-      return res.status(400).json({
-        error: "Phone must be 10 digits",
-      });
+      return res.status(400).json({ error: "Phone must be 10 digits" });
     }
 
     const result = await pool.query(
@@ -230,16 +289,17 @@ exports.updateProject = async (req, res) => {
         budget = COALESCE($5, budget),
         manager_id = COALESCE($6, manager_id),
         site_engineer_id = COALESCE($7, site_engineer_id),
-        status = COALESCE($8, status),
-        progress = COALESCE($9, progress),
-        location = COALESCE($10, location),
-        description = COALESCE($11, description),
-        building_type = COALESCE($12, building_type),
-        floors = COALESCE($13, floors),
-        plot_size = COALESCE($14, plot_size),
-        phone = COALESCE($15, phone),
+        coordinator_id = COALESCE($8, coordinator_id),
+        status = COALESCE($9, status),
+        progress = COALESCE($10, progress),
+        location = COALESCE($11, location),
+        description = COALESCE($12, description),
+        building_type = COALESCE($13, building_type),
+        floors = COALESCE($14, floors),
+        plot_size = COALESCE($15, plot_size),
+        phone = COALESCE($16, phone),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $16
+       WHERE id = $17
        RETURNING *`,
       [
         name,
@@ -249,6 +309,7 @@ exports.updateProject = async (req, res) => {
         budget,
         manager_id,
         site_engineer_id,
+        coordinator_id,
         status,
         progress,
         location,
@@ -258,22 +319,16 @@ exports.updateProject = async (req, res) => {
         plot_size,
         phone,
         id,
-      ]
+      ],
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
-        message: "Project not found",
-      });
+      return res.status(404).json({ message: "Project not found" });
     }
-
     return res.status(200).json(result.rows[0]);
-
   } catch (err) {
     console.error("🔥 UPDATE ERROR:", err.message);
-    return res.status(500).json({
-      error: "Failed to update project",
-    });
+    return res.status(500).json({ error: "Failed to update project" });
   }
 };
 
@@ -282,27 +337,18 @@ exports.updateProject = async (req, res) => {
  */
 exports.deleteProject = async (req, res) => {
   const { id } = req.params;
-
   try {
     const result = await pool.query(
       `DELETE FROM projects WHERE id = $1 RETURNING *`,
-      [id]
+      [id],
     );
-
     if (result.rows.length === 0) {
-      return res.status(404).json({
-        message: "Project not found",
-      });
+      return res.status(404).json({ message: "Project not found" });
     }
-
-    return res.status(200).json({
-      message: "Project deleted successfully",
-    });
+    return res.status(200).json({ message: "Project deleted successfully" });
   } catch (err) {
     console.error("🔥 DELETE ERROR:", err.message);
-    return res.status(500).json({
-      error: "Failed to delete project",
-    });
+    return res.status(500).json({ error: "Failed to delete project" });
   }
 };
 
@@ -311,19 +357,15 @@ exports.deleteProject = async (req, res) => {
  */
 exports.getProjectsByStatus = async (req, res) => {
   const { status } = req.params;
-
   try {
     const result = await pool.query(
       `SELECT * FROM projects WHERE status = $1`,
-      [status]
+      [status],
     );
-
     return res.status(200).json(result.rows);
   } catch (err) {
     console.error(err);
-    return res.status(500).json({
-      error: "Failed to filter projects",
-    });
+    return res.status(500).json({ error: "Failed to filter projects" });
   }
 };
 
@@ -333,14 +375,9 @@ exports.getProjectsByStatus = async (req, res) => {
 exports.getTotalProjects = async (req, res) => {
   try {
     const result = await pool.query(`SELECT COUNT(*) FROM projects`);
-
-    return res.status(200).json({
-      total: parseInt(result.rows[0].count),
-    });
+    return res.status(200).json({ total: parseInt(result.rows[0].count) });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({
-      error: "Failed to fetch project count",
-    });
+    return res.status(500).json({ error: "Failed to fetch project count" });
   }
 };

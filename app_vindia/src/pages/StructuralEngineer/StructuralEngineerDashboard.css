@@ -1,0 +1,200 @@
+/* ===== MAIN CONTAINER FIX ===== */
+.se-container {
+  padding: 24px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #eef2ff, #f8fafc);
+  font-family: "Inter", sans-serif;
+
+  max-width: 1400px;
+  margin: 0 auto;
+
+  overflow-x: hidden; /* 🔥 prevents page overflow */
+}
+
+/* TITLE */
+.se-title {
+  font-size: 26px;
+  font-weight: 600;
+  margin-bottom: 25px;
+}
+
+.se-alert {
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 12px 18px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+/* ===== CARDS ===== */
+.se-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)); /* 🔥 FIX */
+  gap: 20px;
+}
+
+
+/* ===== CARD ===== */
+.se-card {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(10px);
+  padding: 20px;
+  border-radius: 16px;
+  transition: 0.3s;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.3);
+
+  min-width: 0; /* 🔥 FIX */
+}
+
+
+.se-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+}
+
+/* ICON */
+.card-icon {
+  font-size: 22px;
+  margin-bottom: 10px;
+}
+
+/* COLORS */
+.se-card.primary { border-left: 4px solid #4f46e5; }
+.se-card.warning { border-left: 4px solid #f59e0b; }
+.se-card.info { border-left: 4px solid #06b6d4; }
+.se-card.neutral { border-left: 4px solid #64748b; }
+
+.se-card h3 {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.se-card p {
+  font-size: 26px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.se-charts {
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); /* 🔥 FIX */
+  gap: 20px;
+}
+/* 🔥 VERY IMPORTANT */
+.se-charts > div {
+  min-width: 0; /* prevents overflow */
+}
+
+
+/* ===== CHART BOX ===== */
+.chart-box {
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(10px);
+  padding: 20px;
+  border-radius: 16px;
+  height: 320px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.05);
+
+  overflow: hidden; /* 🔥 prevents chart spill */
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-box:hover,
+.se-activity-box:hover {
+  transform: translateY(-4px);
+  transition: 0.2s;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+/* 🔥 CHART CONTROL */
+.chart-box canvas {
+    pointer-events: none; /* 🔥 allow parent click */
+
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+}
+
+
+/* ACTIVITY */
+.se-activity-box {
+  margin-top: 30px;
+  background: rgba(255,255,255,0.8);
+  padding: 20px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+
+/* LOADER */
+.se-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 80vh;
+}
+
+.loader {
+  width: 40px;
+  height: 40px;
+  border: 5px solid #e5e7eb;
+  border-top: 5px solid #4f46e5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+
+
+/* ─── Skeleton Loader ──────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #e2e8f0 25%,
+    #f1f5f9 50%,
+    #e2e8f0 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-card {
+  height: 118px;
+  border-radius: 16px;
+}
+
+.skeleton-chart {
+  height: 320px;
+  border-radius: 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1024px) {
+  .se-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .se-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .se-cards {
+    grid-template-columns: 1fr;
+  }
+}

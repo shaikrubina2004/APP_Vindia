@@ -26,15 +26,31 @@ export function ProjectProvider({ children }) {
           location: p.location ?? "",
         }));
         setProjects(mapped);
-        setActiveProject(mapped[0] ?? null);
+
+        // restore previously selected project from localStorage
+        const savedId = localStorage.getItem("activeProjectId");
+        const saved = mapped.find((p) => p.id === savedId);
+        setActiveProject(saved ?? mapped[0] ?? null);
       })
       .catch((err) => console.error("Failed to load projects:", err))
       .finally(() => setLoading(false));
   }, []);
 
+  const handleSetActiveProject = (project) => {
+    setActiveProject(project);
+    if (project) {
+      localStorage.setItem("activeProjectId", project.id);
+    }
+  };
+
   return (
     <ProjectContext.Provider
-      value={{ activeProject, setActiveProject, PROJECTS, loading }}
+      value={{
+        activeProject,
+        setActiveProject: handleSetActiveProject,
+        PROJECTS,
+        loading,
+      }}
     >
       {children}
     </ProjectContext.Provider>

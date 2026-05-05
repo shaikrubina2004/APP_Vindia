@@ -1,31 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { login as loginAPI } from "../services/authService";
 import { useAuth } from "../context/useAuth";
 import { getDashboardRoute } from "../utils/dashboardRouter";
-
 import logo from "../assets/logo.png.png";
 import "./Login.css";
-
-import SignInMobile from "./SignInMobile";
 
 function SignIn() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  /* ✅ MOBILE DETECTION */
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  /* FORM STATE */
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -34,7 +18,7 @@ function SignIn() {
   const [showForgot, setShowForgot] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
-  /* HANDLE INPUT */
+  // ✅ HANDLE INPUT
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -44,7 +28,7 @@ function SignIn() {
     }));
   };
 
-  /* 🔥 LOGIN FUNCTION (FIXED) */
+  // ✅ FINAL LOGIN FUNCTION (FIXED)
   const handleLogin = async () => {
     if (!formData.email || !formData.password) {
       alert("Please fill all fields");
@@ -55,38 +39,35 @@ function SignIn() {
       const res = await loginAPI(formData);
       const { token, user } = res.data;
 
-      // ✅ NORMALIZE ROLE (CRITICAL FIX)
-      const normalizedUser = {
-        ...user,
-        role: user.role?.toLowerCase().replace(/\s+/g, "_"),
-      };
+      // 🔥 NORMALIZE ROLE (VERY IMPORTANT)
+      const userData = {
+  ...user,
+  role: user.role?.toLowerCase().replace(/\s+/g, "_"),
+};
 
-      console.log("LOGIN USER:", normalizedUser);
+console.log("USER DATA:", userData);
 
-      // ✅ STORE TOKEN + USER
-      localStorage.setItem("token", token);
-      login(normalizedUser);
+localStorage.setItem("token", token);
+localStorage.setItem("user", JSON.stringify(userData));
 
-      // ✅ REDIRECT BASED ON ROLE
-      navigate(getDashboardRoute(normalizedUser.role));
+login(userData);
+
+const route = getDashboardRoute(userData.role);
+console.log("REDIRECT TO:", route);
+
+navigate(route);
 
     } catch (error) {
-      console.error(error);
+      console.error("LOGIN ERROR:", error);
       alert(error.response?.data?.message || "Invalid credentials");
     }
   };
 
-  /* MOBILE UI */
-  if (isMobile) {
-    return <SignInMobile />;
-  }
-
-  /* DESKTOP UI */
   return (
     <div className="login-bg">
       <div className="login-card">
 
-        {/* LEFT */}
+        {/* LEFT PANEL */}
         <div className="login-left">
           <img src={logo} alt="Logo" className="login-logo" />
           <p>
@@ -94,9 +75,8 @@ function SignIn() {
           </p>
         </div>
 
-        {/* RIGHT */}
+        {/* RIGHT PANEL */}
         <div className="login-right">
-
           <label>Email</label>
           <input
             type="email"
@@ -121,7 +101,22 @@ function SignIn() {
             </span>
           </div>
 
-          <button onClick={handleLogin}>SIGN IN</button>
+          {/* 🔥 BUTTON (WORKING) */}
+          <button
+            onClick={handleLogin}
+            style={{
+              marginTop: "15px",
+              padding: "12px",
+              width: "100%",
+              background: "#007bff",
+              color: "#fff",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            SIGN IN
+          </button>
 
           <p className="signup-text">
             Don't have an account?{" "}
@@ -129,16 +124,14 @@ function SignIn() {
               Sign Up
             </Link>
           </p>
-
         </div>
       </div>
 
-      {/* FORGOT PASSWORD MODAL */}
+      {/* FORGOT PASSWORD */}
       {showForgot && (
         <div className="modal-overlay">
           <div className="modal-box">
             <h3>Reset Password</h3>
-
             <p>Enter your email to receive reset instructions</p>
 
             <input
@@ -150,7 +143,6 @@ function SignIn() {
 
             <div className="modal-buttons">
               <button className="send-btn">Send Link</button>
-
               <button
                 className="cancel-btn"
                 onClick={() => setShowForgot(false)}

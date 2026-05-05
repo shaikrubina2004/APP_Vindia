@@ -1,11 +1,14 @@
+import { Outlet } from "react-router-dom";  // ✅ ADD THIS
 import AppLayout from "./AppLayout";
 import MEPMenu from "../menus/MEPMenu";
 import { ProjectProvider } from "../context/ProjectContext";
 
-function MepLayout({ children }) {
+function MepLayout() {  // ✅ remove { children }
   return (
     <ProjectProvider>
-      <AppLayout menuItems={MEPMenu}>{children}</AppLayout>
+      <AppLayout menuItems={MEPMenu}>
+        <Outlet />  {/* ✅ replace {children} with Outlet */}
+      </AppLayout>
     </ProjectProvider>
   );
 }

@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useProject } from "../../context/ProjectContext";
 import ProjectSwitcher from "../../components/project/ProjectSwitcher";
+import { API } from "../../services/authService";
 import "../../styles/MEPEngineer.css";
 
 /* ═══════════════════════════════════════
@@ -12,56 +13,6 @@ import "../../styles/MEPEngineer.css";
    In production these come from your API
    calculated from daily log submissions
 ═══════════════════════════════════════ */
-const MILESTONE_DATA = {
-  p1: {
-    M: [
-      { floor: "Basement", pct: 100, status: "done" },
-      { floor: "Ground Floor", pct: 100, status: "done" },
-      { floor: "Level 1", pct: 85, status: "inprog" },
-      { floor: "Level 2", pct: 68, status: "inprog" },
-      { floor: "Level 3", pct: 30, status: "inprog" },
-      { floor: "Rooftop", pct: 0, status: "notstart" },
-    ],
-    E: [
-      { floor: "Basement", pct: 100, status: "done" },
-      { floor: "Ground Floor", pct: 90, status: "inprog" },
-      { floor: "Level 1", pct: 60, status: "inprog" },
-      { floor: "Level 2", pct: 40, status: "inprog" },
-      { floor: "Level 3", pct: 0, status: "notstart" },
-      { floor: "Rooftop", pct: 0, status: "notstart" },
-    ],
-    P: [
-      { floor: "Basement", pct: 100, status: "done" },
-      { floor: "Ground Floor", pct: 100, status: "done" },
-      { floor: "Level 1", pct: 95, status: "inprog" },
-      { floor: "Level 2", pct: 74, status: "inprog" },
-      { floor: "Level 3", pct: 20, status: "inprog" },
-      { floor: "Rooftop", pct: 0, status: "notstart" },
-    ],
-  },
-  p2: {
-    M: [
-      { floor: "Ground Floor", pct: 60, status: "inprog" },
-      { floor: "Level 1", pct: 20, status: "inprog" },
-      { floor: "Level 2", pct: 0, status: "notstart" },
-    ],
-    E: [
-      { floor: "Ground Floor", pct: 45, status: "inprog" },
-      { floor: "Level 1", pct: 10, status: "inprog" },
-      { floor: "Level 2", pct: 0, status: "notstart" },
-    ],
-    P: [
-      { floor: "Ground Floor", pct: 70, status: "inprog" },
-      { floor: "Level 1", pct: 30, status: "inprog" },
-      { floor: "Level 2", pct: 0, status: "notstart" },
-    ],
-  },
-  p3: {
-    M: [{ floor: "Ground Floor", pct: 10, status: "inprog" }],
-    E: [{ floor: "Ground Floor", pct: 5, status: "inprog" }],
-    P: [{ floor: "Ground Floor", pct: 15, status: "inprog" }],
-  },
-};
 
 const DISC_META = {
   M: { label: "🔧 Mechanical", barCls: "mf-bar-m" },
@@ -88,144 +39,6 @@ function calcOverall(floors) {
 /* ═══════════════════════════════════════
    STATIC DATA
 ═══════════════════════════════════════ */
-const ACTIVITY = [
-  {
-    dot: "ad-blue",
-    text: (
-      <>
-        <strong>Plumbing-Rev3.dwg</strong> uploaded to Version Control
-      </>
-    ),
-    time: "Today · 10:32 AM",
-  },
-  {
-    dot: "ad-red",
-    text: (
-      <>
-        <strong>#INC-041</strong> raised — Structural clash Level 3
-      </>
-    ),
-    time: "Today · 09:15 AM",
-  },
-  {
-    dot: "ad-amber",
-    text: (
-      <>
-        Coordination note sent to <strong>Architect</strong>
-      </>
-    ),
-    time: "Yesterday · 5:40 PM",
-  },
-  {
-    dot: "ad-green",
-    text: <>Daily log posted — Drainage Floor 2 completed</>,
-    time: "Yesterday · 5:00 PM",
-  },
-  {
-    dot: "ad-blue",
-    text: (
-      <>
-        <strong>HVAC-Layout-Rev2.dwg</strong> uploaded
-      </>
-    ),
-    time: "2 days ago · 3:15 PM",
-  },
-];
-
-const ALERTS = [
-  {
-    dot: "ad-amber",
-    text: (
-      <>
-        <strong>Structural</strong> uploaded new Beam Layout — check MEP clash
-      </>
-    ),
-    time: "Today · 11:00 AM",
-  },
-  {
-    dot: "ad-blue",
-    text: (
-      <>
-        <strong>Architect</strong> updated Floor Plan Rev4 — re-routing may be
-        needed
-      </>
-    ),
-    time: "Today · 08:45 AM",
-  },
-  {
-    dot: "ad-green",
-    text: <>Project Coordinator approved MEP schedule for Level 2</>,
-    time: "Yesterday · 4:00 PM",
-  },
-  {
-    dot: "ad-red",
-    text: (
-      <>
-        <strong>Reminder:</strong> Daily Log not yet submitted today
-      </>
-    ),
-    time: "Today · now",
-  },
-];
-
-const INCIDENTS = [
-  {
-    id: "#INC-041",
-    title: "Plumbing clash with Structural beam — Level 3",
-    team: "Structural",
-    tb: "badge-purple",
-    pri: "High",
-    pb: "badge-red",
-    status: "Open",
-    sb: "pill-open",
-    date: "Today · 09:15",
-  },
-  {
-    id: "#INC-038",
-    title: "Electrical conduit routing through MEP shaft conflict",
-    team: "Architect",
-    tb: "badge-blue",
-    pri: "Medium",
-    pb: "badge-amber",
-    status: "In Progress",
-    sb: "pill-inprog",
-    date: "Yesterday",
-  },
-  {
-    id: "#INC-035",
-    title: "HVAC duct sizing mismatch — revised drawing needed",
-    team: "MEP",
-    tb: "badge-mep-m",
-    pri: "Low",
-    pb: "badge-grey",
-    status: "In Progress",
-    sb: "pill-inprog",
-    date: "3 days ago",
-  },
-];
-
-const TODAY_STATUS = [
-  { icon: "📋", label: "Daily Log", pill: "pill-open", pillLabel: "Pending" },
-  {
-    icon: "📐",
-    label: "Drawing Upload",
-    pill: "pill-submitted",
-    pillLabel: "Done",
-  },
-  {
-    icon: "⚠️",
-    label: "Incidents Checked",
-    pill: "pill-submitted",
-    pillLabel: "Done",
-  },
-  { icon: "🔗", label: "Coord. Update", pill: "pill-inprog", pillLabel: "Due" },
-  {
-    icon: "🗂️",
-    label: "Version Review",
-    pill: "pill-submitted",
-    pillLabel: "Done",
-  },
-];
 
 const QUICK = [
   { icon: "⬆️", label: "Upload Drawing", href: "/mep/upload" },
@@ -242,8 +55,29 @@ const QUICK = [
 export default function MEPDashboard() {
   const [dateStr, setDateStr] = useState("");
   const { activeProject } = useProject();
-
   const [openDisc, setOpenDisc] = useState("M");
+
+  // Backend state
+  const [drawings, setDrawings] = useState([]);
+  const [incidents, setIncidents] = useState([]);
+  const [milestones, setMilestones] = useState({ M: [], E: [], P: [] });
+  const [loading, setLoading] = useState(true);
+
+  const currentUserId = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user"))?.id;
+    } catch {
+      return null;
+    }
+  })();
+
+  const currentUserName = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user"))?.name || "MEP Engineer";
+    } catch {
+      return "MEP Engineer";
+    }
+  })();
 
   useEffect(() => {
     setDateStr(
@@ -255,20 +89,82 @@ export default function MEPDashboard() {
       }),
     );
   }, []);
-  if (!activeProject) return null; // ← add this line
 
-  const milestones = MILESTONE_DATA[activeProject.id] || MILESTONE_DATA.p1;
+  useEffect(() => {
+    if (!activeProject) return;
+    setLoading(true);
+
+    Promise.all([
+      API.get(`/drawings/project/${activeProject.id}`).catch(() => ({
+        data: [],
+      })),
+      API.get("/incidents").catch(() => ({ data: { data: [] } })),
+      API.get(`/drawings/daily-logs/${activeProject.id}?limit=100`).catch(
+        () => ({ data: [] }),
+      ),
+    ])
+      .then(([drawingsRes, incidentsRes, logsRes]) => {
+        // Filter drawings to current user
+        const myDrawings = (drawingsRes.data || []).filter(
+          (d) => d.created_by === currentUserId,
+        );
+        setDrawings(myDrawings);
+
+        // Filter open incidents assigned to or created by current user
+        const allIncidents = incidentsRes.data?.data || [];
+        setIncidents(allIncidents);
+
+        // Build milestones from daily logs
+        const logs = logsRes.data || [];
+        const mFloors = {},
+          eFloors = {},
+          pFloors = {};
+
+        logs.forEach((log) => {
+          const floor = log.floor_name || "Unknown";
+          const pct = log.completion_pct || 0;
+          const statusRaw =
+            pct === 100 ? "done" : pct > 0 ? "inprog" : "notstart";
+
+          if (log.discipline === "Mechanical") {
+            mFloors[floor] = { floor, pct, status: statusRaw };
+          } else if (log.discipline === "Electrical") {
+            eFloors[floor] = { floor, pct, status: statusRaw };
+          } else if (log.discipline === "Plumbing") {
+            pFloors[floor] = { floor, pct, status: statusRaw };
+          }
+        });
+
+        setMilestones({
+          M: Object.values(mFloors),
+          E: Object.values(eFloors),
+          P: Object.values(pFloors),
+        });
+      })
+      .finally(() => setLoading(false));
+  }, [activeProject]);
+
+  if (!activeProject) return null;
+
+  const openIncidents = incidents.filter(
+    (i) => !["Resolved", "Closed"].includes(i.status),
+  );
   const overallM = calcOverall(milestones.M);
   const overallE = calcOverall(milestones.E);
   const overallP = calcOverall(milestones.P);
-  const overallAll = Math.round((overallM + overallE + overallP) / 3);
+  const overallAll =
+    milestones.M.length || milestones.E.length || milestones.P.length
+      ? Math.round((overallM + overallE + overallP) / 3)
+      : 0;
 
   return (
     <div className="mep-page">
       {/* ── HERO BANNER ── */}
       <div className="dash-hero">
         <div className="dash-hero-left">
-          <div className="dash-hero-greeting">MEP Engineer · Person 5</div>
+          <div className="dash-hero-greeting">
+            MEP Engineer · {currentUserName}
+          </div>
           <div className="dash-hero-title">
             Good morning 👋
             <br />
@@ -294,12 +190,12 @@ export default function MEPDashboard() {
         </div>
         <div className="dash-hero-right">
           <div className="dash-hero-stat">
-            <span className="dhs-val">24</span>
+            <span className="dhs-val">{drawings.length}</span>
             <span className="dhs-lbl">Drawings</span>
           </div>
           <div className="dash-hero-stat">
             <span className="dhs-val" style={{ color: "#fbbf24" }}>
-              3
+              {openIncidents.length}
             </span>
             <span className="dhs-lbl">Incidents</span>
           </div>
@@ -338,22 +234,24 @@ export default function MEPDashboard() {
             {
               icon: "📐",
               label: "Drawings Uploaded",
-              value: "24",
-              sub: "Last: Plumbing Rev-3",
+              value: drawings.length,
+              sub: drawings[0]?.name
+                ? `Last: ${drawings[0].name}`
+                : "No drawings yet",
               ic: "ic-blue",
             },
             {
               icon: "⚠️",
               label: "Open Incidents",
-              value: "3",
-              sub: "1 high priority",
+              value: openIncidents.length,
+              sub: `${openIncidents.filter((i) => i.priority === "P1").length} high priority`,
               ic: "ic-red",
             },
             {
               icon: "🔗",
-              label: "Coord. Tasks",
-              value: "5",
-              sub: "Arch: 2 · Struct: 3",
+              label: "Clash Flagged",
+              value: drawings.filter((d) => d.has_clash).length,
+              sub: "Drawings with open clashes",
               ic: "ic-amber",
             },
             {
@@ -543,7 +441,42 @@ export default function MEPDashboard() {
               className="mep-card-body"
               style={{ paddingTop: 10, paddingBottom: 10 }}
             >
-              {TODAY_STATUS.map((s) => (
+              {[
+                {
+                  icon: "📋",
+                  label: "Daily Log",
+                  pill: "pill-open",
+                  pillLabel: "Pending",
+                },
+                {
+                  icon: "📐",
+                  label: "Drawing Upload",
+                  pill: "pill-submitted",
+                  pillLabel: drawings.length > 0 ? "Done" : "Pending",
+                },
+                {
+                  icon: "⚠️",
+                  label: "Incidents Checked",
+                  pill:
+                    openIncidents.length > 0 ? "pill-open" : "pill-submitted",
+                  pillLabel:
+                    openIncidents.length > 0
+                      ? `${openIncidents.length} Open`
+                      : "Clear",
+                },
+                {
+                  icon: "🔗",
+                  label: "Coord. Update",
+                  pill: "pill-inprog",
+                  pillLabel: "Due",
+                },
+                {
+                  icon: "🗂️",
+                  label: "Version Review",
+                  pill: "pill-submitted",
+                  pillLabel: "Done",
+                },
+              ].map((s) => (
                 <div className="status-row" key={s.label}>
                   <span className="status-icon">{s.icon}</span>
                   <span className="status-label">{s.label}</span>
@@ -560,7 +493,9 @@ export default function MEPDashboard() {
         <div className="mep-card-head">
           <span className="card-title">⚠️ Open Incidents</span>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span className="badge badge-red">3 Active</span>
+            <span className="badge badge-red">
+              {openIncidents.length} Active
+            </span>
             <a
               href="/mep/incidents"
               className="btn-outline"
@@ -583,7 +518,7 @@ export default function MEPDashboard() {
               </tr>
             </thead>
             <tbody>
-              {INCIDENTS.map((inc) => (
+              {openIncidents.slice(0, 5).map((inc) => (
                 <tr key={inc.id}>
                   <td data-label="#">
                     <span
@@ -594,7 +529,7 @@ export default function MEPDashboard() {
                         color: "var(--text-secondary)",
                       }}
                     >
-                      {inc.id}
+                      {inc.incident_no}
                     </span>
                   </td>
                   <td
@@ -603,14 +538,22 @@ export default function MEPDashboard() {
                   >
                     {inc.title}
                   </td>
-                  <td data-label="Team">
-                    <span className={`badge ${inc.tb}`}>{inc.team}</span>
+                  <td data-label="Assigned To">
+                    <span style={{ fontSize: 11 }}>
+                      {inc.assigned_to_name || "—"}
+                    </span>
                   </td>
                   <td data-label="Priority">
-                    <span className={`badge ${inc.pb}`}>{inc.pri}</span>
+                    <span
+                      className={`badge ${inc.priority === "P1" ? "badge-red" : inc.priority === "P2" ? "badge-amber" : "badge-grey"}`}
+                    >
+                      {inc.priority}
+                    </span>
                   </td>
                   <td data-label="Status">
-                    <span className={`status-pill ${inc.sb}`}>
+                    <span
+                      className={`status-pill ${inc.status === "In Progress" ? "pill-inprog" : inc.status === "Resolved" ? "pill-resolved" : "pill-open"}`}
+                    >
                       {inc.status}
                     </span>
                   </td>
@@ -622,10 +565,25 @@ export default function MEPDashboard() {
                       fontWeight: 600,
                     }}
                   >
-                    {inc.date}
+                    {new Date(inc.created_at).toLocaleDateString()}
                   </td>
                 </tr>
               ))}
+              {openIncidents.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={6}
+                    style={{
+                      textAlign: "center",
+                      padding: 20,
+                      color: "var(--text-secondary)",
+                      fontSize: 12,
+                    }}
+                  >
+                    No open incidents
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -639,15 +597,33 @@ export default function MEPDashboard() {
           </div>
           <div className="mep-card-body">
             <div className="activity-list">
-              {ACTIVITY.map((a, i) => (
+              {drawings.slice(0, 5).map((d, i) => (
                 <div className="act-item" key={i}>
-                  <div className={`act-dot ${a.dot}`} />
+                  <div className="act-dot ad-blue" />
                   <div>
-                    <div className="act-text">{a.text}</div>
-                    <div className="act-time">{a.time}</div>
+                    <div className="act-text">
+                      <strong>{d.name}</strong> — {d.revision_number || "Rev-1"}{" "}
+                      uploaded
+                    </div>
+                    <div className="act-time">
+                      {d.uploaded_at
+                        ? new Date(d.uploaded_at).toLocaleDateString()
+                        : "—"}
+                    </div>
                   </div>
                 </div>
               ))}
+              {drawings.length === 0 && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                    padding: "8px 0",
+                  }}
+                >
+                  No recent activity
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -658,15 +634,35 @@ export default function MEPDashboard() {
           </div>
           <div className="mep-card-body">
             <div className="activity-list">
-              {ALERTS.map((a, i) => (
+              {openIncidents.slice(0, 4).map((inc, i) => (
                 <div className="act-item" key={i}>
-                  <div className={`act-dot ${a.dot}`} />
+                  <div
+                    className={`act-dot ${inc.priority === "P1" ? "ad-red" : inc.priority === "P2" ? "ad-amber" : "ad-blue"}`}
+                  />
                   <div>
-                    <div className="act-text">{a.text}</div>
-                    <div className="act-time">{a.time}</div>
+                    <div className="act-text">
+                      <strong>{inc.incident_no}</strong> —{" "}
+                      {inc.title?.substring(0, 50)}
+                      {inc.title?.length > 50 ? "…" : ""}
+                    </div>
+                    <div className="act-time">
+                      {inc.status} ·{" "}
+                      {new Date(inc.created_at).toLocaleDateString()}
+                    </div>
                   </div>
                 </div>
               ))}
+              {openIncidents.length === 0 && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                    padding: "8px 0",
+                  }}
+                >
+                  No coordination alerts
+                </div>
+              )}
             </div>
           </div>
         </div>

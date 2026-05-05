@@ -15,8 +15,20 @@ const {
   issueForConstruction,
   flagClash,
   getClashesByDrawing,
+  resolveClash,
   getFloorsByProject,
   deleteDrawing,
+  upsertDailyLog,
+  getDailyLogsByProject,
+  checkTodayLog,
+  getThreadsByProject,
+  getThreadById,
+  createThread,
+  addMessage,
+  resolveThread,
+  agreeToClose,
+  getProjectMembersByRole,
+  getLatestClashForDrawing,
 } = require("../controllers/drawingUploadController");
 
 /* ══════════════════════════════════════
@@ -92,9 +104,31 @@ router.put(
 
 router.post("/clashes", flagClash);
 router.get("/clashes/:drawing_id", getClashesByDrawing);
+router.put("/clashes/:clash_id/resolve", resolveClash);
 // ── Floors ────────────────────────────
 // GET /api/drawings/floors/:project_id
 
 router.get("/floors/:project_id", getFloorsByProject);
+
+// ── Daily Logs ────────────────────────
+router.post("/daily-logs", upsertDailyLog);
+router.get("/daily-logs/check", checkTodayLog);
+router.get("/daily-logs/:project_id", getDailyLogsByProject);
+
+// ── Coordination Threads ──────────────
+router.get("/threads/project/:project_id", getThreadsByProject);
+router.get("/threads/:thread_id", getThreadById);
+router.post("/threads", createThread);
+router.post("/threads/:thread_id/messages", addMessage);
+router.put("/threads/:thread_id/resolve", resolveThread);
+router.post("/threads/:thread_id/agree", agreeToClose);
+
+// ── Project members (for participant picker) ──────────
+// GET /api/drawings/members/:project_id?role=architect
+router.get("/members/:project_id", getProjectMembersByRole);
+
+// ── Latest clash for a drawing (for auto-fill) ────────
+// GET /api/drawings/clash-latest/:drawing_id
+router.get("/clash-latest/:drawing_id", getLatestClashForDrawing);
 
 module.exports = router;

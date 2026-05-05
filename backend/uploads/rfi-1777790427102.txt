@@ -1,0 +1,7 @@
+Ability to capture and manage all incoming leads.
+Export /Import excel/pdf for bulk lead entry to system
+Proper follow-up tracking against each lead (calls, Description,messages, status, next follow-up date)
+Clear ownership of who is following up on each lead
+Daily reporting visibility for the person handling follow-ups
+Daily consolidated report visibility for management, including myself
+The objective is to ensure that no leads are missed, follow-ups are structured, and outcomes are measurable on a daily basis. This module should function independently, even if other application components are still under development.
