@@ -92,6 +92,7 @@ import BDAFollowUp from "../pages/business-development/business-development-anal
 import Timesheet from "../pages/timesheet/Timesheet";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
+import { NotificationProvider } from "../context/NotificationContext";
 
 const AppRoutes = () => {
   const PROJECT_ROLES = [
@@ -107,6 +108,8 @@ const AppRoutes = () => {
   ];
 
   return (
+    <NotificationProvider>
+
     <Routes>
       {/* AUTH */}
       <Route path="/" element={<SignIn />} />
@@ -591,7 +594,7 @@ const AppRoutes = () => {
             </BDALayout>
           </ProtectedRoute>
         }
-      />
+        />
        <Route path="/bda/leads" element={
         <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
           <BDALayout><BDALeads /></BDALayout>
@@ -599,7 +602,7 @@ const AppRoutes = () => {
       } 
       />
       <Route path="/bda/add-lead" element={
-      <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
+        <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
         <BDALayout><BDAAddLead /></BDALayout>
       </ProtectedRoute>
     } 
@@ -616,7 +619,7 @@ const AppRoutes = () => {
     <Route 
     path="/bda/reports"   
     element={
-    <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
+      <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
       <BDALayout><BDAReports /></BDALayout>
       </ProtectedRoute>
     } 
@@ -626,6 +629,7 @@ const AppRoutes = () => {
       {/* FALLBACK */}
       <Route path="*" element={<h2>Page Not Found</h2>} />
     </Routes>
+    </NotificationProvider>
   );
 };
 

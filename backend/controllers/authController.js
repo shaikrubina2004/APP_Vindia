@@ -1,83 +1,94 @@
+// src/controllers/authController.js
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
+const jwt    = require("jsonwebtoken");
 const { createUser, getUserByEmail } = require("../models/User");
 
-/* ================= SIGNUP ================= */
-const signup = async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
+/* ── TOKEN ──────────────────────────────────────────────── */
+const generateToken = (user) => {
+  return jwt.sign(
+    { id: user.id, role: user.role },
+    process.env.JWT_SECRET || "secret",
+    { expiresIn: "1d" }
+  );
+};
 
-    const existing = await getUserByEmail(email);
-    if (existing) {
+/* ── SIGNUP ─────────────────────────────────────────────── */
+const signup = async (req, res) => {
+  const { name, email, password } = req.body;
+
+  try {
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Name, email and password are required" });
+    }
+
+    const trimmedName  = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+
+    const existingUser = await getUserByEmail(trimmedEmail);
+    if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    const hashed = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    await createUser({
-      name,
-      email,
-      password: hashed,
-      role_id: null,
-      status: "pending",
+    const user = await createUser({
+      name: trimmedName,
+      email: trimmedEmail,
+      password: hashedPassword,
+      role_id: 1,
+      status: "active",
     });
 
-    res.json({ message: "Signup successful" });
+    res.status(201).json({ message: "Signup successful", user });
 
-  } catch (err) {
-    console.error("SIGNUP ERROR:", err);
+  } catch (error) {
+    console.error("Signup error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-/* ================= LOGIN ================= */
+/* ── LOGIN ──────────────────────────────────────────────── */
 const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    const user = await getUserByEmail(email);
+  try {
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const trimmedEmail = email.trim().toLowerCase();
+    const user = await getUserByEmail(trimmedEmail);
 
     if (!user) {
-      return res.status(400).json({ message: "User not found" });
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const match = await bcrypt.compare(password, user.password);
-
-    if (!match) {
-      return res.status(400).json({ message: "Invalid password" });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    if (!user.role_id) {
-      return res.status(403).json({
-        message: "Wait for admin approval",
-      });
-    }
+    // ── FIX: was user.role_code (column doesn't exist).
+    //         getUserByEmail already JOINs roles and returns
+    //         r.name AS role — so user.role is the role name.
+    const token = generateToken(user);
 
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
-    res.json({
+    res.status(200).json({
+      message: "Login successful",
       token,
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
+        id:     user.id,
+        name:   user.name,
+        email:  user.email,
+        role:   user.role,    // ← was user.role_code — FIXED
         status: user.status,
       },
     });
 
-  } catch (err) {
-    console.error("LOGIN ERROR:", err);
+  } catch (error) {
+    console.error("Login error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-/* ✅ VERY IMPORTANT EXPORT */
-module.exports = {
-  signup,
-  login,
-};
+module.exports = { signup, login };
