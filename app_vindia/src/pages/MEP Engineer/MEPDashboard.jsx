@@ -33,7 +33,9 @@ const STATUS_CLS = {
 
 function calcOverall(floors) {
   if (!floors || !floors.length) return 0;
-  return Math.round(floors.reduce((s, f) => s + f.pct, 0) / floors.length);
+  return Math.round(
+    floors.reduce((s, f) => s + (parseFloat(f.pct) || 0), 0) / floors.length,
+  );
 }
 
 /* ═══════════════════════════════════════
@@ -122,7 +124,7 @@ export default function MEPDashboard() {
 
         logs.forEach((log) => {
           const floor = log.floor_name || "Unknown";
-          const pct = log.completion_pct || 0;
+          const pct = parseFloat(log.completion_pct) || 0;
           const statusRaw =
             pct === 100 ? "done" : pct > 0 ? "inprog" : "notstart";
 
@@ -152,9 +154,12 @@ export default function MEPDashboard() {
   const overallM = calcOverall(milestones.M);
   const overallE = calcOverall(milestones.E);
   const overallP = calcOverall(milestones.P);
+  const nonEmptyCount = [milestones.M, milestones.E, milestones.P].filter(
+    (a) => a.length > 0,
+  ).length;
   const overallAll =
-    milestones.M.length || milestones.E.length || milestones.P.length
-      ? Math.round((overallM + overallE + overallP) / 3)
+    nonEmptyCount > 0
+      ? Math.round((overallM + overallE + overallP) / nonEmptyCount)
       : 0;
 
   return (
@@ -409,6 +414,257 @@ export default function MEPDashboard() {
                 completed zone logged by the MEP team updates these figures
                 automatically.
               </span>
+            </div>
+
+            {/* ── Drawing Activity Chart ── */}
+            <div
+              style={{
+                marginTop: 18,
+                borderTop: "1px solid var(--border-color)",
+                paddingTop: 14,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--text-secondary)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.4px",
+                  }}
+                >
+                  📈 Drawing Upload Activity — Last 6 Months
+                </span>
+              </div>
+
+              {(() => {
+                const now = new Date();
+                const months = Array.from({ length: 6 }, (_, i) => {
+                  const d = new Date(
+                    now.getFullYear(),
+                    now.getMonth() - (5 - i),
+                    1,
+                  );
+                  return {
+                    key: `${d.getFullYear()}-${d.getMonth()}`,
+                    label: d.toLocaleDateString("en-IN", { month: "short" }),
+                    total: 0,
+                    M: 0,
+                    E: 0,
+                    P: 0,
+                  };
+                });
+                drawings.forEach((d) => {
+                  const date = new Date(d.uploaded_at);
+                  const key = `${date.getFullYear()}-${date.getMonth()}`;
+                  const bucket = months.find((m) => m.key === key);
+                  if (!bucket) return;
+                  bucket.total++;
+                  if (d.sub_discipline === "Mechanical") bucket.M++;
+                  else if (d.sub_discipline === "Electrical") bucket.E++;
+                  else if (d.sub_discipline === "Plumbing") bucket.P++;
+                });
+
+                const maxVal = Math.max(...months.map((m) => m.total), 1);
+                const W = 600,
+                  H = 110,
+                  PAD = 20;
+                const pts = months.map((m, i) => ({
+                  x: PAD + (i / (months.length - 1)) * (W - PAD * 2),
+                  y: H - PAD - (m.total / maxVal) * (H - PAD * 2),
+                  ...m,
+                }));
+                const pathD = pts
+                  .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
+                  .join(" ");
+                const areaD = `${pathD} L ${pts[pts.length - 1].x} ${H - PAD} L ${pts[0].x} ${H - PAD} Z`;
+
+                return (
+                  <div>
+                    {/* Summary chips */}
+                    <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                      {[
+                        {
+                          label: "Mechanical",
+                          val: drawings.filter(
+                            (d) => d.sub_discipline === "Mechanical",
+                          ).length,
+                          color: "#1e5a96",
+                          bg: "#e0f0fb",
+                        },
+                        {
+                          label: "Electrical",
+                          val: drawings.filter(
+                            (d) => d.sub_discipline === "Electrical",
+                          ).length,
+                          color: "#6d28d9",
+                          bg: "#ede9fe",
+                        },
+                        {
+                          label: "Plumbing",
+                          val: drawings.filter(
+                            (d) => d.sub_discipline === "Plumbing",
+                          ).length,
+                          color: "#059669",
+                          bg: "#ecfdf5",
+                        },
+                        {
+                          label: "Total",
+                          val: drawings.length,
+                          color: "#854f0b",
+                          bg: "#faeeda",
+                        },
+                      ].map((s) => (
+                        <div
+                          key={s.label}
+                          style={{
+                            background: s.bg,
+                            borderRadius: 8,
+                            padding: "8px 14px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            flex: 1,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 20,
+                              fontWeight: 700,
+                              color: s.color,
+                              fontFamily: "Monaco,monospace",
+                              lineHeight: 1,
+                            }}
+                          >
+                            {s.val}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: s.color,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.3px",
+                            }}
+                          >
+                            {s.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* SVG chart */}
+                    <svg
+                      viewBox={`0 0 ${W} ${H + 20}`}
+                      width="100%"
+                      style={{ display: "block", overflow: "visible" }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="areaGradFull"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="#1e5a96"
+                            stopOpacity="0.2"
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="#1e5a96"
+                            stopOpacity="0.02"
+                          />
+                        </linearGradient>
+                      </defs>
+                      {/* Grid lines */}
+                      {[0, 0.33, 0.66, 1].map((v, i) => (
+                        <line
+                          key={i}
+                          x1={PAD}
+                          y1={PAD + v * (H - PAD * 2)}
+                          x2={W - PAD}
+                          y2={PAD + v * (H - PAD * 2)}
+                          stroke="#e6e8ec"
+                          strokeWidth="1"
+                          strokeDasharray="4 4"
+                        />
+                      ))}
+                      {/* Y axis value hints */}
+                      {[0, 0.5, 1].map((v, i) => (
+                        <text
+                          key={i}
+                          x={PAD - 4}
+                          y={PAD + v * (H - PAD * 2) + 3}
+                          textAnchor="end"
+                          fontSize="8"
+                          fill="#b0b0c0"
+                          fontFamily="Monaco,monospace"
+                        >
+                          {Math.round((1 - v) * maxVal)}
+                        </text>
+                      ))}
+                      {/* Area */}
+                      <path d={areaD} fill="url(#areaGradFull)" />
+                      {/* Line */}
+                      <path
+                        d={pathD}
+                        fill="none"
+                        stroke="#1e5a96"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      {/* Dots + labels */}
+                      {pts.map((p, i) => (
+                        <g key={i}>
+                          <circle
+                            cx={p.x}
+                            cy={p.y}
+                            r="5"
+                            fill="white"
+                            stroke="#1e5a96"
+                            strokeWidth="2.5"
+                          />
+                          {p.total > 0 && (
+                            <text
+                              x={p.x}
+                              y={p.y - 10}
+                              textAnchor="middle"
+                              fontSize="9"
+                              fontWeight="700"
+                              fill="#1e5a96"
+                              fontFamily="Monaco,monospace"
+                            >
+                              {p.total}
+                            </text>
+                          )}
+                          <text
+                            x={p.x}
+                            y={H + 4}
+                            textAnchor="middle"
+                            fontSize="9"
+                            fontWeight="700"
+                            fill="#7a7a8a"
+                          >
+                            {p.label}
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

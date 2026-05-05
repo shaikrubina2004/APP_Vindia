@@ -15,8 +15,28 @@ import "../../styles/MEPEngineer.css";
 
 /* fallback versions for drawings without specific data */
 
-const DISC_ICON = { M: "🔧", E: "⚡", P: "🚿" };
+const downloadFile = async (fileUrl, fileName) => {
+  try {
+    const response = await fetch(`http://localhost:5000${fileUrl}`);
+    const blob = await response.blob();
+    const ext = fileUrl.split(".").pop().toLowerCase();
+    const forcedBlob = new Blob([blob], { type: "application/octet-stream" });
+    const url = window.URL.createObjectURL(forcedBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download =
+      (fileName || fileUrl.split("/").pop()) +
+      (fileName && !fileName.includes(".") ? `.${ext}` : "");
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Download failed:", err);
+  }
+};
 
+const DISC_ICON = { M: "🔧", E: "⚡", P: "🚿" };
 const FILTERS = [
   { key: "all", label: "All" },
   { key: "M", label: "🔧 Mechanical" },
@@ -290,18 +310,15 @@ function VersionsPanel({ drawing, onClose }) {
                     ))}
                   </div>
                   <div className="ver-actions">
-                    <a
-                      href={`http://localhost:5000${v.file_url}`}
-                      download
+                    <button
                       className={v.current ? "btn-primary" : "btn-outline"}
-                      style={{
-                        padding: "5px 12px",
-                        fontSize: 11,
-                        textDecoration: "none",
-                      }}
+                      style={{ padding: "5px 12px", fontSize: 11 }}
+                      onClick={() =>
+                        downloadFile(v.file_url, `${drawing.name}-${v.rev}`)
+                      }
                     >
                       📥 {v.current ? "Download Current" : "Download"}
-                    </a>
+                    </button>
                     <button
                       className="btn-outline"
                       style={{ padding: "5px 12px", fontSize: 11 }}
@@ -625,18 +642,13 @@ export default function MEPDrawings() {
               >
                 👁 View
               </button>
-              <a
-                href={`http://localhost:5000${d.file_url}`}
-                download
+              <button
                 className="btn-outline"
-                style={{
-                  padding: "6px 12px",
-                  fontSize: 11,
-                  textDecoration: "none",
-                }}
+                style={{ padding: "6px 12px", fontSize: 11 }}
+                onClick={() => downloadFile(d.file_url, d.name)}
               >
                 ⬇ Download
-              </a>
+              </button>
               {/* ── Versions button opens slide-out panel ── */}
               <button
                 className="btn-primary"

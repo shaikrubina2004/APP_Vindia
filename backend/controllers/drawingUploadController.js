@@ -311,9 +311,12 @@ exports.approveDrawing = async (req, res) => {
           owner.uploaded_by,
           "approval",
           `Drawing ${status} — ${owner.name}`,
-          `Your drawing was ${status.toLowerCase()} by the ${role.toUpperCase()} team.`,
+          `Your drawing "${owner.name}" was ${status.toLowerCase()} by the ${role.toUpperCase()} team.`,
           status === "Approved" ? "ok" : "warn",
           version_id,
+        );
+        console.log(
+          `✅ Approval notification sent → user:${owner.uploaded_by} drawing:${owner.name} status:${status}`,
         );
       }
     } catch (notifErr) {
@@ -473,6 +476,28 @@ exports.flagClash = async (req, res) => {
       ],
     );
 
+    // Notify assignee about the auto-created incident (MEP bell only)
+    if (assigned_to) {
+      try {
+        const { rows: roleCheck } = await pool.query(
+          `SELECT r.code FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1`,
+          [assigned_to],
+        );
+        if (roleCheck[0]?.code === "mep_engineer") {
+          await insertMEPNotification(
+            assigned_to,
+            "incident",
+            `New Incident Assigned — Clash: ${name1} vs ${name2}`,
+            `${clash_type} — ${description}`,
+            "warn",
+            null,
+          );
+        }
+      } catch (notifErr) {
+        console.error("Clash incident notify error:", notifErr.message);
+      }
+    }
+
     // Link incident back to clash
     if (incidentResult.rows.length > 0) {
       await client.query(
@@ -485,20 +510,21 @@ exports.flagClash = async (req, res) => {
 
     // Notify drawing owner about the clash (non-fatal)
     try {
-      const drawingCreator = await pool.query(
-        `SELECT created_by FROM drawings WHERE id = $1`,
-        [drawing_id_1],
+      const bothOwners = await pool.query(
+        `SELECT created_by FROM drawings WHERE id = $1 OR id = $2`,
+        [drawing_id_1, drawing_id_2],
       );
-      const ownerId = drawingCreator.rows[0]?.created_by;
-      if (ownerId && ownerId !== raised_by_id) {
-        await insertMEPNotification(
-          ownerId,
-          "clash",
-          `Clash Flagged on Your Drawing`,
-          `${clash_type} — ${description}`,
-          "warn",
-          clash.id,
-        );
+      for (const row of bothOwners.rows) {
+        if (row.created_by && row.created_by !== raised_by_id) {
+          await insertMEPNotification(
+            row.created_by,
+            "clash",
+            `Clash Flagged on Your Drawing`,
+            `${clash_type} — ${description}`,
+            "warn",
+            clash.id,
+          );
+        }
       }
     } catch (notifErr) {
       console.error("Clash notify error (non-fatal):", notifErr.message);

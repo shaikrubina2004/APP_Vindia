@@ -87,10 +87,10 @@ export default function MEPNotificationBell({ userId }) {
     setOpen(false);
     const routes = {
       incident: "/mep/incidents",
-      clash: "/shared-drawings",
-      drawing: "/shared-drawings",
-      approval: "/mep/drawings",
-      task: "/mep/incidents",
+      clash: "/mep/shared/drawings",
+      drawing: "/mep/shared/drawings",
+      approval: "/mep/shared/drawings",
+      task: "/mep/incidents?page=tasks",
     };
     navigate(routes[n.type] ?? "/mep/dashboard");
   };

@@ -4,6 +4,37 @@ import { useProject } from "../../context/ProjectContext";
 import { API } from "../../services/authService";
 import "../../styles/DrawingRegister.css";
 
+const downloadFile = async (fileUrl, fileName) => {
+  try {
+    const response = await fetch(`http://localhost:5000${fileUrl}`);
+    const blob = await response.blob();
+    const ext = fileUrl.split(".").pop().toLowerCase();
+    const mimeTypes = {
+      pdf: "application/octet-stream",
+      dwg: "application/octet-stream",
+      dxf: "application/octet-stream",
+      rvt: "application/octet-stream",
+      ifc: "application/octet-stream",
+    };
+    const forcedBlob = new Blob([blob], {
+      type: mimeTypes[ext] || "application/octet-stream",
+    });
+    const url = window.URL.createObjectURL(forcedBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download =
+      (fileName || fileUrl.split("/").pop()).replace(/[^a-zA-Z0-9._-]/g, "_") +
+      (fileName && !fileName.includes(".") ? `.${ext}` : "");
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Download failed:", err);
+    alert("Download failed. Please try again.");
+  }
+};
+
 /* ═══════════════════════════════════════
    ROLE CONFIG
 ═══════════════════════════════════════ */
@@ -805,20 +836,17 @@ function VersionsPanel({
                       ))}
 
                     <div className="dr-ver-actions">
-                      <a
-                        href={`http://localhost:5000${v.file_url}`}
-                        download
+                      <button
                         className={
                           v.current ? "dr-btn-primary" : "dr-btn-outline"
                         }
-                        style={{
-                          padding: "5px 12px",
-                          fontSize: 11,
-                          textDecoration: "none",
-                        }}
+                        style={{ padding: "5px 12px", fontSize: 11 }}
+                        onClick={() =>
+                          downloadFile(v.file_url, `${drawing.name}-${v.rev}`)
+                        }
                       >
                         📥 {v.current ? "Download Current" : "Download"}
-                      </a>
+                      </button>
                       <button
                         className="dr-btn-outline"
                         style={{ padding: "5px 12px", fontSize: 11 }}
@@ -1443,15 +1471,13 @@ export default function DrawingRegister({ resolvedRole: resolvedRoleProp }) {
                   👁
                 </button>
 
-                <a
-                  href={`http://localhost:5000${d.file_url}`}
-                  download
+                <button
                   className="dr-btn-icon"
                   title="Download"
-                  style={{ textDecoration: "none" }}
+                  onClick={() => downloadFile(d.file_url, d.name)}
                 >
                   ⬇
-                </a>
+                </button>
 
                 {/* Approve button — eligible non-owners only, not yet finalized */}
 
