@@ -13,23 +13,26 @@ function ProjectManagement() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [animate, setAnimate] = useState(true);
 
+  // ✅ NEW: See More / See Less state
+  const [showAllProjects, setShowAllProjects] = useState(false);
+  const PROJECTS_INITIAL_COUNT = 8;
+
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         setAnimate(false);
-
         setTimeout(() => {
           setAnimate(true);
-        }, 200); // 🔥 increased delay (important)
+        }, 200);
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibility);
-
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
+
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,15 +40,11 @@ function ProjectManagement() {
     fetch("http://localhost:5000/api/projects")
       .then((res) => res.json())
       .then((data) => {
-        console.log("PROJECT DATA:", data); // 👈 debug
-
+        console.log("PROJECT DATA:", data);
         setProjects(data);
-
-        // auto select first project
         if (data.length > 0) {
           setSelectedProject(data[0]);
         }
-
         setLoading(false);
       })
       .catch((err) => {
@@ -53,6 +52,7 @@ function ProjectManagement() {
         setLoading(false);
       });
   }, []);
+
   const [siteEngineers, setSiteEngineers] = useState([]);
   useEffect(() => {
     fetch("http://localhost:5000/api/projects/site-engineers")
@@ -60,6 +60,7 @@ function ProjectManagement() {
       .then((data) => setSiteEngineers(data))
       .catch((err) => console.error(err));
   }, []);
+
   const [managers, setManagers] = useState([]);
   useEffect(() => {
     fetch("http://localhost:5000/api/projects/managers")
@@ -75,14 +76,12 @@ function ProjectManagement() {
       .then((data) => setCoordinators(data))
       .catch((err) => console.error(err));
   }, []);
-  // 🔥 MOVE THIS UP
-  const [selectedProject, setSelectedProject] = useState(null);
 
+  const [selectedProject, setSelectedProject] = useState(null);
   const [costSummary, setCostSummary] = useState([]);
 
   useEffect(() => {
     if (!selectedProject || !selectedProject.id) return;
-
     fetch(`http://localhost:5000/api/cost-summary/${selectedProject.id}`)
       .then((res) => res.json())
       .then((data) => {
@@ -148,7 +147,7 @@ function ProjectManagement() {
     budget: "",
     manager: "",
     teamSize: "",
-    coordinator_id: "", // ✅ added
+    coordinator_id: "",
     building_type: "",
     floors: "",
     description: "",
@@ -156,6 +155,7 @@ function ProjectManagement() {
     plot_size: "",
     phone: "",
   });
+
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [payments, setPayments] = useState([
     {
@@ -186,7 +186,21 @@ function ProjectManagement() {
     reference: "",
   });
 
-  // Add new project
+  // ✅ Filter projects by status
+  const filteredProjects =
+    statusFilter === "All"
+      ? projects
+      : projects.filter(
+          (p) => p.status?.toLowerCase() === statusFilter.toLowerCase()
+        );
+
+  // ✅ Sliced projects for See More / See Less
+  const visibleProjects = showAllProjects
+    ? filteredProjects
+    : filteredProjects.slice(0, PROJECTS_INITIAL_COUNT);
+
+  const hiddenCount = filteredProjects.length - PROJECTS_INITIAL_COUNT;
+
   const handleAddProject = async () => {
     try {
       if (!newProject.name || !newProject.client || !newProject.budget) {
@@ -203,11 +217,12 @@ function ProjectManagement() {
           name: newProject.name,
           client: newProject.client,
           budget: newProject.budget,
+           status: "Active",
           start_date: newProject.startDate,
           end_date: newProject.endDate,
           manager_id: newProject.manager_id,
           site_engineer_id: newProject.site_engineer_id,
-          coordinator_id: newProject.coordinator_id, // ✅ added
+          coordinator_id: newProject.coordinator_id,
           building_type: newProject.building_type,
           floors: newProject.floors,
           description: newProject.description,
@@ -215,9 +230,8 @@ function ProjectManagement() {
           plot_size: newProject.plot_size,
           phone: newProject.phone,
         }),
-      }); // ✅ fetch ends here
+      });
 
-      // ✅ THIS MUST BE OUTSIDE
       const data = await res.json();
 
       if (data && data.id) {
@@ -225,7 +239,6 @@ function ProjectManagement() {
         setSelectedProject(data);
       }
 
-      // ✅ Reset form
       setNewProject({
         name: "",
         client: "",
@@ -234,7 +247,7 @@ function ProjectManagement() {
         endDate: "",
         budget: "",
         site_engineer_id: "",
-        coordinator_id: "", // ✅ added
+        coordinator_id: "",
         building_type: "",
         floors: "",
         description: "",
@@ -248,7 +261,6 @@ function ProjectManagement() {
     }
   };
 
-  // Add payment
   const handleAddPayment = () => {
     if (newPayment.date && newPayment.amount) {
       const payment = {
@@ -261,26 +273,21 @@ function ProjectManagement() {
           `INV-${String(payments.length + 1).padStart(3, "0")}`,
       };
       setPayments([...payments, payment]);
-
-      // Update selectedProject with new payment
       const updatedProject = {
         ...selectedProject,
         clientPaid:
           (selectedProject.clientPaid || 0) + parseInt(newPayment.amount),
       };
       setSelectedProject(updatedProject);
-
       setNewPayment({ date: "", amount: "", reference: "" });
       setShowPaymentModal(false);
     }
   };
 
-  // Calculate remaining budget
   const calculateRemaining = (budget, spent) => budget - spent;
   const calculatePercentage = (spent, budget) =>
     ((spent / budget) * 100).toFixed(1);
 
-  // Add timesheet
   const handleAddTimesheet = () => {
     if (newTimesheet.employee && newTimesheet.task && newTimesheet.hours) {
       const newEntry = {
@@ -302,20 +309,21 @@ function ProjectManagement() {
     }
   };
 
-  // Calculate project cost breakdown
   const safeData = Array.isArray(costSummary) ? costSummary : [];
 
   const costBreakdown = {
     labour: costSummary.reduce((s, w) => s + Number(w.labour_cost || 0), 0),
-    material: costSummary.reduce((s, w) => s + Number(w.material_cost || 0), 0),
+    material: costSummary.reduce(
+      (s, w) => s + Number(w.material_cost || 0),
+      0
+    ),
     equipment: costSummary.reduce(
       (s, w) => s + Number(w.equipment_cost || 0),
-      0,
+      0
     ),
     misc: costSummary.reduce((s, w) => s + Number(w.misc_cost || 0), 0),
   };
 
-  // Calculate performance metrics
   const performanceMetrics = {
     totalHours: timesheets.reduce((sum, t) => sum + t.hours, 0),
     approvedHours: timesheets
@@ -355,20 +363,22 @@ function ProjectManagement() {
 
       {/* Content */}
       <div className="pm-content">
-        {/* OVERVIEW TAB */}
         <div className="overview-section">
           {/* FILTER BUTTONS */}
           <div className="filter-buttons">
-            {["All", "In Progress", "Pending", "Completed", "Rejected"].map(
+            {["All", "Active", "In Progress", "Pending", "Completed", "Rejected"].map(
               (status) => (
                 <button
                   key={status}
                   className={`filter-btn ${statusFilter === status ? "active" : ""}`}
-                  onClick={() => setStatusFilter(status)}
+                  onClick={() => {
+                    setStatusFilter(status);
+                    setShowAllProjects(false); // ✅ reset to collapsed when filter changes
+                  }}
                 >
                   {status}
                 </button>
-              ),
+              )
             )}
           </div>
 
@@ -376,20 +386,36 @@ function ProjectManagement() {
           {loading ? (
             <p>Loading projects...</p>
           ) : (
-            <div className="projects-grid">
-              {projects.map((proj) => (
-                <ProjectCard
-                  key={proj.id}
-                  proj={proj}
-                  isActive={selectedProject?.id === proj.id}
-                  onClick={() => setSelectedProject(proj)}
-                  variant="overview"
-                />
-              ))}
-            </div>
+            <>
+              <div className="projects-grid">
+                {visibleProjects.map((proj) => (
+                  <ProjectCard
+                    key={proj.id}
+                    proj={proj}
+                    isActive={selectedProject?.id === proj.id}
+                    onClick={() => setSelectedProject(proj)}
+                    variant="overview"
+                  />
+                ))}
+              </div>
+
+              {/* ✅ SEE MORE / SEE LESS BUTTON */}
+              {filteredProjects.length > PROJECTS_INITIAL_COUNT && (
+                <div className="see-more-container">
+                  <button
+                    className="see-more-btn"
+                    onClick={() => setShowAllProjects(!showAllProjects)}
+                  >
+                    {showAllProjects
+                      ? "See Less ↑"
+                      : `See More ↓ (${hiddenCount} more)`}
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
-          {/* ✅ TABS (ONLY BUTTONS HERE) */}
+          {/* TABS */}
           <div className="pm-tabs">
             <button
               className={activeTab === "overview" ? "active" : ""}
@@ -397,28 +423,24 @@ function ProjectManagement() {
             >
               ≡ Project Overview
             </button>
-
             <button
               className={activeTab === "wbs" ? "active" : ""}
               onClick={() => setActiveTab("wbs")}
             >
-              ⬚ WBS & Tasks
+              ⬚ WBS &amp; Tasks
             </button>
-
             <button
               className={activeTab === "timesheet" ? "active" : ""}
               onClick={() => setActiveTab("timesheet")}
             >
               🗂 Timesheet
             </button>
-
             <button
               className={activeTab === "cost" ? "active" : ""}
               onClick={() => setActiveTab("cost")}
             >
               📊 Cost Tracking
             </button>
-
             <button
               className={activeTab === "payments" ? "active" : ""}
               onClick={() => setActiveTab("payments")}
@@ -427,11 +449,9 @@ function ProjectManagement() {
             </button>
           </div>
 
-          {/* 🔥 TAB CONTENT (SEPARATE) */}
-
+          {/* TAB CONTENT */}
           {activeTab === "overview" && (
             <div className="three-column-layout">
-              {/* QUICK INSIGHTS */}
               <ProjectCard variant="overview">
                 <div className="quick-insights animate">
                   <h3>Quick Insights</h3>
@@ -441,7 +461,6 @@ function ProjectManagement() {
                 </div>
               </ProjectCard>
 
-              {/* TIMESHEET */}
               <ProjectCard variant="overview">
                 <div className="timesheet-section-new">
                   <h3>Timesheet Submissions</h3>
@@ -463,7 +482,6 @@ function ProjectManagement() {
                 </div>
               </ProjectCard>
 
-              {/* RECENT ACTIVITIES */}
               <ProjectCard variant="overview">
                 <div className="recent-activity">
                   <h3>
@@ -477,7 +495,9 @@ function ProjectManagement() {
             </div>
           )}
 
-          {activeTab === "wbs" && <WbsPage selectedProject={selectedProject} />}
+          {activeTab === "wbs" && (
+            <WbsPage selectedProject={selectedProject} />
+          )}
 
           {activeTab === "timesheet" && (
             <div className="timesheet-section">Timesheet content</div>
@@ -508,7 +528,10 @@ function ProjectManagement() {
             className="modal-overlay"
             onClick={() => setShowProjectModal(false)}
           >
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="modal-header">
                 <h2>Create New Project</h2>
                 <button
@@ -592,7 +615,6 @@ function ProjectManagement() {
                   />
                 </div>
                 <div className="form-row">
-                  {/* BUILDING TYPE */}
                   <div className="form-group">
                     <label>Building Type</label>
                     <select
@@ -609,9 +631,6 @@ function ProjectManagement() {
                       <option value="Residential">Residential</option>
                     </select>
                   </div>
-
-                  {/* FLOORS */}
-                  {/* FLOORS */}
                   <div className="form-group">
                     <label>Floors</label>
                     <input
@@ -624,8 +643,6 @@ function ProjectManagement() {
                     />
                   </div>
                 </div>
-
-                {/* LOCATION */}
                 <div className="form-group">
                   <label>Location</label>
                   <input
@@ -633,12 +650,13 @@ function ProjectManagement() {
                     placeholder="Enter location"
                     value={newProject.location}
                     onChange={(e) =>
-                      setNewProject({ ...newProject, location: e.target.value })
+                      setNewProject({
+                        ...newProject,
+                        location: e.target.value,
+                      })
                     }
                   />
                 </div>
-
-                {/* PLOT SIZE */}
                 <div className="form-group">
                   <label>Plot Size (sq ft)</label>
                   <input
@@ -653,8 +671,6 @@ function ProjectManagement() {
                     }
                   />
                 </div>
-
-                {/* DESCRIPTION */}
                 <div className="form-group">
                   <label>Description</label>
                   <textarea
@@ -708,7 +724,6 @@ function ProjectManagement() {
                     </select>
                   </div>
                 </div>
-
                 <div className="form-row">
                   <div className="form-group">
                     <label>Project Coordinator</label>
