@@ -11,6 +11,7 @@ import "./styles/Layout.css";
 import "./styles/Dashboard.css";
 import "./styles/cards.css";
 import "./styles/responsive.css";
+// import { NotificationProvider } from "./context/NotificationContext";
 
 // ─── Global React Query Config ──────────────────────────────────────────────
 const queryClient = new QueryClient({
@@ -29,7 +30,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <AuthProvider>
       {/* ✅ Wrap entire app — all useQuery calls inherit the config above */}
       <QueryClientProvider client={queryClient}>
-        <App />
+
+{/* <NotificationProvider> */}
+  <App />
+{/* </NotificationProvider> */}
         {/* <ReactQueryDevtools initialIsOpen={false} /> */}
       </QueryClientProvider>
     </AuthProvider>

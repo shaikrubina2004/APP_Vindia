@@ -1,22 +1,38 @@
-// src/pages/dailyDiary/DailyDiary.jsx
+// src/pages/siteEngineer/DailyDiary.jsx
+// MODIFIED: Added delay_type dropdown, linked_rfi, linked_incident fields
 import React, { useEffect, useRef, useState } from "react";
 import api from "../../services/api";
 import "../../styles/shared-pages.css";
 import "../../styles/DailyDiary.css";
+
 const DRAFT_KEY = "dailyDiary:draft:v3";
 const QUEUE_KEY = "dailyDiary:queue:v3";
 const WEATHER_OPTS = ["Sunny / Clear","Partly Cloudy","Overcast","Light Rain","Heavy Rain","Fog / Mist"];
+const DELAY_TYPES  = [
+  { value: "",                label: "No delay today" },
+  { value: "material",        label: "Material shortage / late delivery" },
+  { value: "weather",         label: "Adverse weather" },
+  { value: "design",          label: "Design / drawing conflict" },
+  { value: "labour",          label: "Labour shortage" },
+  { value: "equipment",       label: "Equipment breakdown" },
+  { value: "rfi_pending",     label: "Waiting for RFI response" },
+  { value: "inspection_hold", label: "Inspection / approval hold" },
+  { value: "ncr_hold",        label: "NCR work hold" },
+  { value: "other",           label: "Other" },
+];
 
 const ls = {
   load: k => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch { return null; } },
   save: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   del:  k => { try { localStorage.removeItem(k); } catch {} },
 };
+
 function enqueue(payload) {
   const q = ls.load(QUEUE_KEY) || [];
   q.push({ id: `q_${Date.now()}`, payload, createdAt: new Date().toISOString() });
   ls.save(QUEUE_KEY, q);
 }
+
 async function flushQueue() {
   const q = ls.load(QUEUE_KEY);
   if (!Array.isArray(q) || !q.length) return;
@@ -30,7 +46,9 @@ async function flushQueue() {
   }
   ls.save(QUEUE_KEY, rem);
 }
+
 function nowISO() { return new Date().toISOString().slice(0, 10); }
+
 function validate(f) {
   const e = {};
   if (!f.date) e.date = "Date is required";
@@ -40,7 +58,23 @@ function validate(f) {
   return e;
 }
 
-const BLANK = { date: "", shift: "morning", site: "", zone: "", weather_am: "Partly Cloudy", weather_pm: "Partly Cloudy", temp_c: "", work_done: "", plant: "", labour_carpenters: 0, labour_steel: 0, labour_masons: 0, labour_mep: 0, labour_general: 0, labour_supervisors: 0, labour_skilled: 0, labour_unskilled: 0, materials: [{ name: "", qty: "", notes: "" }], issues: "", instructions: "", next_day: "", notes: "", attachments: [] };
+const BLANK = {
+  date: "", shift: "morning", site: "", zone: "",
+  weather_am: "Partly Cloudy", weather_pm: "Partly Cloudy", temp_c: "",
+  work_done: "", plant: "",
+  labour_carpenters: 0, labour_steel: 0, labour_masons: 0,
+  labour_mep: 0, labour_general: 0, labour_supervisors: 0,
+  labour_skilled: 0, labour_unskilled: 0,
+  materials: [{ name: "", qty: "", notes: "" }],
+  issues: "",
+  // NEW fields
+  delay_type: "",
+  delay_description: "",
+  linked_rfi: "",
+  linked_incident: "",
+  //
+  instructions: "", next_day: "", notes: "", attachments: [],
+};
 
 export default function DailyDiary() {
   const draft = ls.load(DRAFT_KEY);
@@ -49,8 +83,8 @@ export default function DailyDiary() {
   const [status, setStatus]   = useState("");
   const [submitting, setSub]  = useState(false);
   const [diaries, setDiaries] = useState([]);
-  const [viewIdx, setViewIdx] = useState(null); // index of diary to view
-  const [tab, setTab]         = useState("new"); // new | history
+  const [viewIdx, setViewIdx] = useState(null);
+  const [tab, setTab]         = useState("new");
   const autoSave = useRef(null);
   const alive    = useRef(true);
 
@@ -85,16 +119,26 @@ export default function DailyDiary() {
   const handleFiles = e => { setForm(f => ({ ...f, attachments: [...f.attachments, ...Array.from(e.target.files || [])] })); e.target.value = null; };
   const removeFile  = i => setForm(f => ({ ...f, attachments: f.attachments.filter((_, j) => j !== i) }));
 
-  const totalLabour = ["labour_carpenters","labour_steel","labour_masons","labour_mep","labour_general","labour_supervisors"].reduce((s, k) => s + (Number(form[k]) || 0), 0);
+  const totalLabour = ["labour_carpenters","labour_steel","labour_masons","labour_mep","labour_general","labour_supervisors"]
+    .reduce((s, k) => s + (Number(form[k]) || 0), 0);
 
   const submit = async ev => {
     ev?.preventDefault();
     if (submitting) return;
-    const errs = validate({ ...form, labour_skilled: form.labour_carpenters + form.labour_steel + form.labour_masons + form.labour_mep, labour_unskilled: form.labour_general });
+    const errs = validate({
+      ...form,
+      labour_skilled: form.labour_carpenters + form.labour_steel + form.labour_masons + form.labour_mep,
+      labour_unskilled: form.labour_general,
+    });
     setErrors(errs);
     if (Object.keys(errs).length) { setStatus("Fix errors above"); return; }
     setSub(true); setStatus("Saving…");
-    const payload = { ...form, labour_total: totalLabour, labour_skilled: form.labour_carpenters + form.labour_steel + form.labour_masons + form.labour_mep, labour_unskilled: form.labour_general };
+    const payload = {
+      ...form,
+      labour_total: totalLabour,
+      labour_skilled: form.labour_carpenters + form.labour_steel + form.labour_masons + form.labour_mep,
+      labour_unskilled: form.labour_general,
+    };
     delete payload.attachments;
     try {
       let res;
@@ -116,7 +160,9 @@ export default function DailyDiary() {
     } finally { if (alive.current) setSub(false); }
   };
 
-  const fmtDate = s => s ? new Date(s + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—";
+  const fmtDate = s => s
+    ? new Date(s + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+    : "—";
 
   return (
     <div className="dd-page">
@@ -200,7 +246,14 @@ export default function DailyDiary() {
                   <div className="dd-form-section">
                     <div className="dd-section-title">Labour Headcount</div>
                     <div className="dd-grid-3">
-                      {[["labour_carpenters","Carpenters"],["labour_steel","Steel Fixers"],["labour_masons","Masons"],["labour_mep","MEP Trades"],["labour_general","General Labour"],["labour_supervisors","Supervisors"]].map(([k, l]) => (
+                      {[
+                        ["labour_carpenters","Carpenters"],
+                        ["labour_steel","Steel Fixers"],
+                        ["labour_masons","Masons"],
+                        ["labour_mep","MEP Trades"],
+                        ["labour_general","General Labour"],
+                        ["labour_supervisors","Supervisors"],
+                      ].map(([k, l]) => (
                         <div key={k} className="dd-field">
                           <label className="dd-label">{l}</label>
                           <input type="number" min="0" className="dd-input" value={form[k]} onChange={e => setF(k, e.target.value)} placeholder="0" />
@@ -217,12 +270,17 @@ export default function DailyDiary() {
                     <div className="dd-section-title">Work Executed</div>
                     <div className="dd-field">
                       <label className="dd-label">Activities — Zone by Zone</label>
-                      <textarea className="dd-textarea" style={{ minHeight: 130 }} value={form.work_done} onChange={e => setF("work_done", e.target.value)}
-                        placeholder={"Describe all work completed today, zone by zone. Reference grid lines and drawing numbers.\n\ne.g. Level 3 / Grid A–D: Completed rebar fixing for 12 of 18 column bases.\nLevel 2 / Grid E: Formwork striking complete."} />
+                      <textarea
+                        className="dd-textarea"
+                        style={{ minHeight: 130 }}
+                        value={form.work_done}
+                        onChange={e => setF("work_done", e.target.value)}
+                        placeholder={"Describe all work completed today, zone by zone.\n\ne.g. Level 3 / Grid A–D: Completed rebar fixing for 12 of 18 column bases.\nLevel 2 / Grid E: Formwork striking complete."}
+                      />
                       {errors.work_done && <div className="dd-error">{errors.work_done}</div>}
                     </div>
                     <div className="dd-field" style={{ marginTop: 10 }}>
-                      <label className="dd-label">Plant & Equipment</label>
+                      <label className="dd-label">Plant &amp; Equipment</label>
                       <textarea className="dd-textarea" style={{ minHeight: 70 }} value={form.plant} onChange={e => setF("plant", e.target.value)} placeholder="List all plant/machinery on site today with hours worked." />
                     </div>
                   </div>
@@ -249,26 +307,58 @@ export default function DailyDiary() {
                     <button type="button" className="dd-btn dd-btn--ghost" style={{ fontSize: 11, padding: "5px 12px" }} onClick={addMat}>+ Add Delivery</button>
                   </div>
 
-                  {/* ISSUES & INSTRUCTIONS */}
+                  {/* ISSUES, DELAYS & LINKS — MODIFIED SECTION */}
                   <div className="dd-form-section">
-                    <div className="dd-section-title">Issues & Instructions</div>
+                    <div className="dd-section-title">Issues, Delays &amp; Links</div>
+
                     <div className="dd-field">
                       <label className="dd-label">Issues / Problems Encountered</label>
                       <textarea className="dd-textarea" value={form.issues} onChange={e => setF("issues", e.target.value)} placeholder="Any delays, material shortages, design conflicts, safety issues, NCRs raised today…" />
                     </div>
-                    <div className="dd-field" style={{ marginTop: 10 }}>
-                      <label className="dd-label">Instructions Received</label>
-                      <textarea className="dd-textarea" style={{ minHeight: 70 }} value={form.instructions} onChange={e => setF("instructions", e.target.value)} placeholder="Verbal or written instructions from PM, Architect, or other team members…" />
+
+                    {/* NEW: Delay Type */}
+                    <div className="dd-grid-2" style={{ marginTop: 12 }}>
+                      <div className="dd-field">
+                        <label className="dd-label">Delay Reason</label>
+                        <select className="dd-select" value={form.delay_type} onChange={e => setF("delay_type", e.target.value)}>
+                          {DELAY_TYPES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                        </select>
+                      </div>
+                      {form.delay_type && (
+                        <div className="dd-field">
+                          <label className="dd-label">Delay Details</label>
+                          <input className="dd-input" value={form.delay_description} onChange={e => setF("delay_description", e.target.value)} placeholder="Brief description of the delay…" />
+                        </div>
+                      )}
                     </div>
-                    <div className="dd-field" style={{ marginTop: 10 }}>
-                      <label className="dd-label">Next Day Plan</label>
-                      <textarea className="dd-textarea" style={{ minHeight: 70 }} value={form.next_day} onChange={e => setF("next_day", e.target.value)} placeholder="Planned activities for tomorrow…" />
+
+                    {/* NEW: Linked RFI / Incident */}
+                    <div className="dd-grid-2" style={{ marginTop: 8 }}>
+                      <div className="dd-field">
+                        <label className="dd-label">Linked RFI</label>
+                        <input className="dd-input" value={form.linked_rfi} onChange={e => setF("linked_rfi", e.target.value)} placeholder="e.g. RFI-007 (if raised today)" />
+                      </div>
+                      <div className="dd-field">
+                        <label className="dd-label">Linked Incident</label>
+                        <input className="dd-input" value={form.linked_incident} onChange={e => setF("linked_incident", e.target.value)} placeholder="e.g. INC-002 (if raised today)" />
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 12 }}>
+                      <div className="dd-field">
+                        <label className="dd-label">Instructions Received</label>
+                        <textarea className="dd-textarea" style={{ minHeight: 70 }} value={form.instructions} onChange={e => setF("instructions", e.target.value)} placeholder="Verbal or written instructions from PM, Architect, or other team members…" />
+                      </div>
+                      <div className="dd-field" style={{ marginTop: 10 }}>
+                        <label className="dd-label">Next Day Plan</label>
+                        <textarea className="dd-textarea" style={{ minHeight: 70 }} value={form.next_day} onChange={e => setF("next_day", e.target.value)} placeholder="Planned activities for tomorrow…" />
+                      </div>
                     </div>
                   </div>
 
                   {/* ATTACHMENTS */}
                   <div className="dd-form-section">
-                    <div className="dd-section-title">Attachments & Notes</div>
+                    <div className="dd-section-title">Attachments &amp; Notes</div>
                     <div className="dd-field">
                       <label className="dd-label">Additional Notes</label>
                       <textarea className="dd-textarea" style={{ minHeight: 70 }} value={form.notes} onChange={e => setF("notes", e.target.value)} placeholder="Any other observations or safety items…" />
@@ -303,22 +393,39 @@ export default function DailyDiary() {
           <aside className="dd-aside">
             <div className="dd-aside-card">
               <div className="dd-aside-title">Quick Summary</div>
-              {[["Date", fmtDate(form.date)],["Shift", form.shift],["Site", form.site || "—"],["Zone", form.zone || "—"],["Total Labour", `${totalLabour} workers`]].map(([l, v]) => (
+              {[
+                ["Date",          fmtDate(form.date)],
+                ["Shift",         form.shift],
+                ["Site",          form.site || "—"],
+                ["Zone",          form.zone || "—"],
+                ["Total Labour",  `${totalLabour} workers`],
+                ["Delay",         form.delay_type ? DELAY_TYPES.find(d => d.value === form.delay_type)?.label : "None"],
+                ["Linked RFI",    form.linked_rfi || "—"],
+                ["Linked Incident", form.linked_incident || "—"],
+              ].map(([l, v]) => (
                 <div key={l} className="dd-aside-row"><span>{l}</span><strong>{v}</strong></div>
               ))}
             </div>
             <div className="dd-aside-card">
               <div className="dd-aside-title">Labour Breakdown</div>
-              {[["Carpenters", form.labour_carpenters],["Steel Fixers", form.labour_steel],["Masons", form.labour_masons],["MEP Trades", form.labour_mep],["General", form.labour_general],["Supervisors", form.labour_supervisors]].map(([l, v]) => (
+              {[
+                ["Carpenters", form.labour_carpenters],
+                ["Steel Fixers", form.labour_steel],
+                ["Masons", form.labour_masons],
+                ["MEP Trades", form.labour_mep],
+                ["General", form.labour_general],
+                ["Supervisors", form.labour_supervisors],
+              ].map(([l, v]) => (
                 <div key={l} className="dd-aside-row"><span>{l}</span><strong>{Number(v) || 0}</strong></div>
               ))}
             </div>
             <div className="dd-aside-card">
               <div className="dd-aside-title">Tips</div>
               <ul className="dd-tips">
+                <li>Always link RFI or Incident refs raised today.</li>
+                <li>Select a delay reason if work was impacted.</li>
                 <li>Attach photos for critical observations.</li>
                 <li>Record all verbal instructions received.</li>
-                <li>Include drawing reference numbers.</li>
                 <li>Drafts auto-save every second.</li>
                 <li>Submit by 17:30 daily.</li>
               </ul>
@@ -341,6 +448,13 @@ export default function DailyDiary() {
                     <div className="dd-item-tags">
                       <span style={{ fontFamily: "var(--c-mono)", fontSize: 12, fontWeight: 700, color: "var(--c-navy-700)" }}>{fmtDate(d.date)}</span>
                       <span className="dd-badge dd-badge--closed">Submitted</span>
+                      {d.delay_type && (
+                        <span style={{ fontSize: 11, padding: "2px 8px", background: "#FAEEDA", color: "#633806", borderRadius: 20, border: "0.5px solid #EF9F27" }}>
+                          Delay: {DELAY_TYPES.find(dt => dt.value === d.delay_type)?.label || d.delay_type}
+                        </span>
+                      )}
+                      {d.linked_rfi && <span style={{ fontSize: 11, padding: "2px 8px", background: "#E6F1FB", color: "#185FA5", borderRadius: 20 }}>{d.linked_rfi}</span>}
+                      {d.linked_incident && <span style={{ fontSize: 11, padding: "2px 8px", background: "#FCEBEB", color: "#791F1F", borderRadius: 20 }}>{d.linked_incident}</span>}
                     </div>
                     <div className="dd-item-meta">
                       <span>Labour: {d.labour_total || d.labour_skilled || 0} workers</span>
@@ -349,8 +463,27 @@ export default function DailyDiary() {
                     </div>
                     {viewIdx === i && (
                       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-                        {d.work_done && <div><div style={{ fontSize: 10, color: "var(--c-teal-400)", textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 700, marginBottom: 5 }}>Work Done</div><div style={{ fontSize: 13, color: "var(--c-text-2)", lineHeight: 1.65, whiteSpace: "pre-wrap", background: "var(--c-surface-2)", padding: "10px 12px", borderRadius: "var(--c-r)" }}>{d.work_done}</div></div>}
-                        {d.issues && <div><div style={{ fontSize: 10, color: "var(--c-teal-400)", textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 700, marginBottom: 5 }}>Issues</div><div style={{ fontSize: 13, color: "var(--c-text-2)", lineHeight: 1.65, background: "var(--c-surface-2)", padding: "10px 12px", borderRadius: "var(--c-r)" }}>{d.issues}</div></div>}
+                        {d.work_done && (
+                          <div>
+                            <div style={{ fontSize: 10, color: "var(--c-teal-400)", textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 700, marginBottom: 5 }}>Work Done</div>
+                            <div style={{ fontSize: 13, color: "var(--c-text-2)", lineHeight: 1.65, whiteSpace: "pre-wrap", background: "var(--c-surface-2)", padding: "10px 12px", borderRadius: "var(--c-r)" }}>{d.work_done}</div>
+                          </div>
+                        )}
+                        {d.issues && (
+                          <div>
+                            <div style={{ fontSize: 10, color: "var(--c-teal-400)", textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 700, marginBottom: 5 }}>Issues</div>
+                            <div style={{ fontSize: 13, color: "var(--c-text-2)", lineHeight: 1.65, background: "var(--c-surface-2)", padding: "10px 12px", borderRadius: "var(--c-r)" }}>{d.issues}</div>
+                          </div>
+                        )}
+                        {d.delay_type && (
+                          <div>
+                            <div style={{ fontSize: 10, color: "#BA7517", textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 700, marginBottom: 5 }}>Delay</div>
+                            <div style={{ fontSize: 13, color: "var(--c-text-2)", lineHeight: 1.65, background: "#FAEEDA", padding: "10px 12px", borderRadius: "var(--c-r)" }}>
+                              {DELAY_TYPES.find(dt => dt.value === d.delay_type)?.label || d.delay_type}
+                              {d.delay_description && ` — ${d.delay_description}`}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

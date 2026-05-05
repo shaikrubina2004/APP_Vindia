@@ -2,18 +2,18 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { login as loginAPI } from "../services/authService";
 import { useAuth } from "../context/useAuth";
-import logo from "../assets/logo.png.png";
-import "./Login.css";
 import { getDashboardRoute } from "../utils/dashboardRouter";
 
-/* ✅ IMPORT MOBILE COMPONENT */
+import logo from "../assets/logo.png.png";
+import "./Login.css";
+
 import SignInMobile from "./SignInMobile";
 
 function SignIn() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  /* ✅ MOBILE DETECTION (BEST WAY) */
+  /* ✅ MOBILE DETECTION */
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   useEffect(() => {
@@ -25,9 +25,7 @@ function SignIn() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  /* =========================
-     FORM STATE
-  ========================= */
+  /* FORM STATE */
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -36,9 +34,7 @@ function SignIn() {
   const [showForgot, setShowForgot] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
-  /* =========================
-     HANDLE INPUT CHANGE
-  ========================= */
+  /* HANDLE INPUT */
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -48,9 +44,7 @@ function SignIn() {
     }));
   };
 
-  /* =========================
-     HANDLE LOGIN
-  ========================= */
+  /* 🔥 LOGIN FUNCTION (FIXED) */
   const handleLogin = async () => {
     if (!formData.email || !formData.password) {
       alert("Please fill all fields");
@@ -61,37 +55,37 @@ function SignIn() {
       const res = await loginAPI(formData);
       const { token, user } = res.data;
 
-      console.log("USER:", user); // 🔥 ADD THIS LINE
+      // ✅ NORMALIZE ROLE (CRITICAL FIX)
+      const normalizedUser = {
+        ...user,
+        role: user.role?.toLowerCase().replace(/\s+/g, "_"),
+      };
 
+      console.log("LOGIN USER:", normalizedUser);
+
+      // ✅ STORE TOKEN + USER
       localStorage.setItem("token", token);
-      login(user);
+      login(normalizedUser);
 
-      if (!user.role) {
-        alert("Your account is not approved yet. Please wait for admin.");
-        return;
-      }
+      // ✅ REDIRECT BASED ON ROLE
+      navigate(getDashboardRoute(normalizedUser.role));
 
-      navigate(getDashboardRoute(user.role));
     } catch (error) {
+      console.error(error);
       alert(error.response?.data?.message || "Invalid credentials");
     }
   };
 
-  /* =========================
-     🔥 CONDITIONAL RENDER
-  ========================= */
-
+  /* MOBILE UI */
   if (isMobile) {
     return <SignInMobile />;
   }
 
-  /* =========================
-     DESKTOP UI
-  ========================= */
-
+  /* DESKTOP UI */
   return (
     <div className="login-bg">
       <div className="login-card">
+
         {/* LEFT */}
         <div className="login-left">
           <img src={logo} alt="Logo" className="login-logo" />
@@ -102,6 +96,7 @@ function SignIn() {
 
         {/* RIGHT */}
         <div className="login-right">
+
           <label>Email</label>
           <input
             type="email"
@@ -134,6 +129,7 @@ function SignIn() {
               Sign Up
             </Link>
           </p>
+
         </div>
       </div>
 

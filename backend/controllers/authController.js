@@ -2,120 +2,81 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { createUser, getUserByEmail } = require("../models/User");
 
-/* GENERATE TOKEN */
-const generateToken = (user) => {
-  return jwt.sign(
-    { id: user.id, role: user.role_code },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" },
-  );
-};
-
-/* SIGNUP (PUBLIC USER REGISTRATION) */
+/* ================= SIGNUP ================= */
 const signup = async (req, res) => {
-  const { name, email, password } = req.body;
-
   try {
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        message: "Name, email and password are required",
-      });
+    const { name, email, password } = req.body;
+
+    const existing = await getUserByEmail(email);
+    if (existing) {
+      return res.status(400).json({ message: "User already exists" });
     }
 
-    const trimmedName = String(name).trim();
-    const trimmedEmail = String(email).trim().toLowerCase();
-    const trimmedPassword = String(password);
+    const hashed = await bcrypt.hash(password, 10);
 
-    // 🔥 Check existing user
-    const existingUser = await getUserByEmail(trimmedEmail);
-    if (existingUser) {
-      return res.status(400).json({
-        message: "User already exists",
-      });
-    }
-
-    // 🔐 Hash password
-    const hashedPassword = await bcrypt.hash(trimmedPassword, 10);
-
-    // 🔥 Create user WITHOUT role
-    const user = await createUser({
-      name: trimmedName,
-      email: trimmedEmail,
-      password: hashedPassword,
-      role_id: null, // ❗ No role assigned
-      status: "pending", // ❗ Waiting for CEO approval
+    await createUser({
+      name,
+      email,
+      password: hashed,
+      role_id: null,
+      status: "pending",
     });
 
-    return res.status(201).json({
-      message: "Signup successful. Wait for admin approval.",
-      user,
-    });
-  } catch (error) {
-    console.error("Signup error:", error);
-    return res.status(500).json({
-      message: "Server error",
-    });
+    res.json({ message: "Signup successful" });
+
+  } catch (err) {
+    console.error("SIGNUP ERROR:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-/* LOGIN */
+/* ================= LOGIN ================= */
 const login = async (req, res) => {
-  const { email, password } = req.body;
-
   try {
-    if (!email || !password) {
-      return res.status(400).json({
-        message: "Email and password are required",
-      });
-    }
+    const { email, password } = req.body;
 
-    const trimmedEmail = String(email).trim().toLowerCase();
-
-    const user = await getUserByEmail(trimmedEmail);
-    console.log("USER:", user); // 🔥 DEBUG
+    const user = await getUserByEmail(email);
 
     if (!user) {
-      return res.status(400).json({
-        message: "Invalid credentials",
-      });
+      return res.status(400).json({ message: "User not found" });
     }
 
-    // 🔐 Check password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({
-        message: "Invalid credentials",
-      });
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+      return res.status(400).json({ message: "Invalid password" });
     }
 
-    // 🔥 BLOCK LOGIN IF NOT APPROVED
     if (!user.role_id) {
       return res.status(403).json({
-        message: "Your account is not approved yet. Please wait for admin.",
+        message: "Wait for admin approval",
       });
     }
 
-    const token = generateToken(user);
+    const token = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
-    return res.status(200).json({
-      message: "Login successful",
+    res.json({
       token,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role_code, // comes from roles table
+        role: user.role,
         status: user.status,
       },
     });
-  } catch (error) {
-    console.error("Login error:", error);
-    return res.status(500).json({
-      message: "Server error",
-    });
+
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
+/* ✅ VERY IMPORTANT EXPORT */
 module.exports = {
   signup,
   login,

@@ -1,4 +1,5 @@
-// src/pages/rfi/RFI.jsx
+// src/pages/siteEngineer/RFI.jsx
+// MODIFIED: Added drawing_ref and grid_ref fields (required by workflow — Step 5)
 import React, {
   useCallback, useEffect, useMemo, useRef, useState,
 } from "react";
@@ -6,7 +7,6 @@ import api from "../../services/api";
 import "../../styles/shared-pages.css";
 import "../../styles/RFI.css";
 
-/* ── constants ───────────────────────────────────────────── */
 const DRAFT_KEY = "rfi:draft:v3";
 const QUEUE_KEY = "rfi:queue:v3";
 const PAGE_SIZE = 8;
@@ -18,9 +18,12 @@ const BLANK = {
   title: "", description: "", zone: "",
   discipline: "architectural", priority: "medium",
   assignedTo: "", attachments: [],
+  // NEW
+  drawing_ref: "",
+  grid_ref: "",
+  response_required_by: "",
 };
 
-/* ── localStorage helpers ────────────────────────────────── */
 const ls = {
   load: k => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch { return null; } },
   save: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
@@ -47,23 +50,20 @@ async function flushQueue() {
   ls.save(QUEUE_KEY, rem);
 }
 
-/* ── validation ──────────────────────────────────────────── */
 function validate(f) {
   const e = {};
-  if (!f.title || f.title.trim().length < 3)        e.title       = "Title required (min 3 chars)";
+  if (!f.title || f.title.trim().length < 3)             e.title       = "Title required (min 3 chars)";
   if (!f.description || f.description.trim().length < 8) e.description = "Description required (min 8 chars)";
-  if (!f.priority)                                   e.priority    = "Select a priority";
+  if (!f.priority)                                        e.priority    = "Select a priority";
   return e;
 }
 
-/* ── stable dedup key ────────────────────────────────────── */
 function stableKey(it) {
   if (!it) return "";
   if (it.id != null) return String(it.id);
   return `${it.title || ""}|${it.zone || ""}|${it.createdAt || ""}`;
 }
 
-/* ── small components ────────────────────────────────────── */
 function PBadge({ p }) {
   const cls = { critical: "rfi-badge--critical", high: "rfi-badge--high", medium: "rfi-badge--medium", low: "rfi-badge--low" };
   return <span className={`rfi-badge ${cls[p] || "rfi-badge--low"}`}>{p || "medium"}</span>;
@@ -76,11 +76,7 @@ function SBadge({ s }) {
 
 function cap(str) { return str ? str.charAt(0).toUpperCase() + str.slice(1) : ""; }
 
-/* ═══════════════════════════════════════════════════════════
-   COMPONENT
-═══════════════════════════════════════════════════════════ */
 export default function RFI() {
-  /* ── state ────────────────────────────────────────────── */
   const draft = ls.load(DRAFT_KEY);
   const [form, setForm]        = useState({ ...BLANK, ...draft, attachments: [] });
   const [errors, setErrors]    = useState({});
@@ -92,11 +88,11 @@ export default function RFI() {
   const [search, setSearch]    = useState("");
   const [filterPri, setFPri]   = useState("all");
   const [filterDisc, setFDisc] = useState("all");
+  const [filterStat, setFStat] = useState("all");
   const [page, setPage]        = useState(1);
   const autoSave = useRef(null);
   const alive    = useRef(true);
 
-  /* ── load data ────────────────────────────────────────── */
   useEffect(() => {
     alive.current = true;
     loadAll();
@@ -120,12 +116,11 @@ export default function RFI() {
         return true;
       }));
       setUsers(Array.isArray(ur?.data) ? ur.data : []);
-      flushQueue().catch(() => {});          // fire-and-forget
+      flushQueue().catch(() => {});
     } catch (e) { console.error("RFI loadAll:", e); }
     finally { if (alive.current) setLL(false); }
   }
 
-  /* ── autosave draft ───────────────────────────────────── */
   useEffect(() => {
     clearTimeout(autoSave.current);
     autoSave.current = setTimeout(() => {
@@ -135,7 +130,6 @@ export default function RFI() {
     return () => clearTimeout(autoSave.current);
   }, [form]);
 
-  /* ── field handlers (stable refs) ────────────────────── */
   const setF = useCallback((k, v) => {
     setForm(f => ({ ...f, [k]: v }));
     setErrors(e => { const c = { ...e }; delete c[k]; return c; });
@@ -163,7 +157,6 @@ export default function RFI() {
     setStatus("Draft saved");
   }, [form]);
 
-  /* ── submit ───────────────────────────────────────────── */
   const submit = useCallback(async ev => {
     ev?.preventDefault();
     if (submitting) return;
@@ -188,12 +181,10 @@ export default function RFI() {
       let res;
       if (form.attachments.length) {
         const fd = new FormData();
-        ["title","description","zone","discipline","priority","assignedTo"]
+        ["title","description","zone","discipline","priority","assignedTo","drawing_ref","grid_ref","response_required_by"]
           .forEach(k => fd.append(k, form[k] || ""));
         form.attachments.forEach(f => fd.append("attachments", f, f.name));
-        res = await api.post("/site-engineer/rfi", fd, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        res = await api.post("/site-engineer/rfi", fd, { headers: { "Content-Type": "multipart/form-data" } });
       } else {
         const { attachments: _, ...payload } = form;
         res = await api.post("/site-engineer/rfi", payload);
@@ -217,7 +208,6 @@ export default function RFI() {
     }
   }, [form, submitting]);
 
-  /* ── filter + paginate (memoised) ────────────────────── */
   const filtered = useMemo(() => {
     let list = rfis.slice();
     if (search.trim()) {
@@ -225,23 +215,21 @@ export default function RFI() {
       list = list.filter(it =>
         (it.title || "").toLowerCase().includes(q) ||
         (it.description || "").toLowerCase().includes(q) ||
-        (it.zone || "").toLowerCase().includes(q)
+        (it.zone || "").toLowerCase().includes(q) ||
+        (it.drawing_ref || "").toLowerCase().includes(q) ||
+        (it.grid_ref || "").toLowerCase().includes(q)
       );
     }
     if (filterPri  !== "all") list = list.filter(it => (it.priority   || "medium")       === filterPri);
     if (filterDisc !== "all") list = list.filter(it => (it.discipline || "architectural") === filterDisc);
+    if (filterStat !== "all") list = list.filter(it => (it.status || "open") === filterStat);
     return list;
-  }, [rfis, search, filterPri, filterDisc]);
+  }, [rfis, search, filterPri, filterDisc, filterStat]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages]);
 
-  // clamp page when filtered set shrinks
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [totalPages]);
-
-  /* ── sidebar stats (memoised) ─────────────────────────── */
   const stats = useMemo(() => ({
     total:     rfis.length,
     open:      rfis.filter(r => !r.status || r.status === "open").length,
@@ -254,16 +242,13 @@ export default function RFI() {
     [rfis]
   );
 
-  /* ── search / filter handlers with page reset ─────────── */
-  const onSearch   = useCallback(e => { setSearch(e.target.value); setPage(1); }, []);
+  const onSearch     = useCallback(e => { setSearch(e.target.value); setPage(1); }, []);
   const onFilterPri  = useCallback(e => { setFPri(e.target.value);  setPage(1); }, []);
   const onFilterDisc = useCallback(e => { setFDisc(e.target.value); setPage(1); }, []);
+  const onFilterStat = useCallback(e => { setFStat(e.target.value); setPage(1); }, []);
 
-  /* ── render ───────────────────────────────────────────── */
   return (
     <div className="rfi-page">
-
-      {/* ── PAGE HEADER ── */}
       <div className="rfi-page-header">
         <div>
           <h1 className="rfi-title">RFI Register</h1>
@@ -276,51 +261,54 @@ export default function RFI() {
       </div>
 
       <div className="rfi-layout">
-        {/* ══ MAIN COLUMN ══════════════════════════════════ */}
         <div className="rfi-main">
 
-          {/* ── NEW RFI FORM ── */}
+          {/* NEW RFI FORM */}
           <div className="rfi-panel">
             <div className="rfi-panel-head">
               <div className="rfi-panel-title">New RFI</div>
               <div className="rfi-panel-actions">
-                <button type="button" className="rfi-btn rfi-btn--ghost" onClick={saveDraft}>
-                  Save Draft
-                </button>
-                <button type="button" className="rfi-btn rfi-btn--ghost" onClick={clearForm}>
-                  Clear
-                </button>
+                <button type="button" className="rfi-btn rfi-btn--ghost" onClick={saveDraft}>Save Draft</button>
+                <button type="button" className="rfi-btn rfi-btn--ghost" onClick={clearForm}>Clear</button>
               </div>
             </div>
 
             <div className="rfi-panel-body">
               <form onSubmit={submit} noValidate>
-
-                {/* Details section */}
                 <div className="rfi-form-section">
                   <div className="rfi-grid-2">
 
                     <div className="rfi-field rfi-full">
                       <label className="rfi-label">Title *</label>
-                      <input
-                        className="rfi-input"
-                        value={form.title}
-                        onChange={e => setF("title", e.target.value)}
-                        placeholder="Short descriptive title"
-                        autoComplete="off"
-                      />
+                      <input className="rfi-input" value={form.title} onChange={e => setF("title", e.target.value)} placeholder="Short descriptive title" autoComplete="off" />
                       {errors.title && <div className="rfi-error">{errors.title}</div>}
                     </div>
 
                     <div className="rfi-field rfi-full">
                       <label className="rfi-label">Description *</label>
-                      <textarea
-                        className="rfi-textarea"
-                        value={form.description}
-                        onChange={e => setF("description", e.target.value)}
-                        placeholder="Describe the information required or the conflict on site. Reference drawing numbers and spec clauses."
-                      />
+                      <textarea className="rfi-textarea" value={form.description} onChange={e => setF("description", e.target.value)} placeholder="Describe the information required or the conflict on site. Reference drawing numbers and spec clauses." />
                       {errors.description && <div className="rfi-error">{errors.description}</div>}
+                    </div>
+
+                    {/* NEW: Drawing Reference fields */}
+                    <div className="rfi-field">
+                      <label className="rfi-label">Drawing Reference</label>
+                      <input
+                        className="rfi-input"
+                        value={form.drawing_ref}
+                        onChange={e => setF("drawing_ref", e.target.value)}
+                        placeholder="e.g. STR-FDN-001 Rev 2"
+                      />
+                    </div>
+
+                    <div className="rfi-field">
+                      <label className="rfi-label">Grid / Zone Reference</label>
+                      <input
+                        className="rfi-input"
+                        value={form.grid_ref}
+                        onChange={e => setF("grid_ref", e.target.value)}
+                        placeholder="e.g. Grid C3 / Level 2"
+                      />
                     </div>
 
                     <div className="rfi-field">
@@ -340,11 +328,16 @@ export default function RFI() {
 
                     <div className="rfi-field">
                       <label className="rfi-label">Zone / Location</label>
+                      <input className="rfi-input" value={form.zone} onChange={e => setF("zone", e.target.value)} placeholder="e.g. Level 2 / Grid C3" />
+                    </div>
+
+                    <div className="rfi-field">
+                      <label className="rfi-label">Response Required By</label>
                       <input
+                        type="date"
                         className="rfi-input"
-                        value={form.zone}
-                        onChange={e => setF("zone", e.target.value)}
-                        placeholder="e.g. Level 2 / Grid C3"
+                        value={form.response_required_by}
+                        onChange={e => setF("response_required_by", e.target.value)}
                       />
                     </div>
 
@@ -366,17 +359,8 @@ export default function RFI() {
                           {form.attachments.map((f, i) => (
                             <div key={`${f.name}-${i}`} className="rfi-file-item">
                               <span>📎</span>
-                              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {f.name}
-                              </span>
-                              <button
-                                type="button"
-                                className="rfi-file-remove"
-                                onClick={() => removeFile(i)}
-                                aria-label={`Remove ${f.name}`}
-                              >
-                                ×
-                              </button>
+                              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                              <button type="button" className="rfi-file-remove" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>×</button>
                             </div>
                           ))}
                         </div>
@@ -386,14 +370,13 @@ export default function RFI() {
                   </div>
                 </div>
 
-                {/* Submit */}
                 <div className="rfi-submit-row">
                   <button type="submit" className="rfi-btn rfi-btn--primary" disabled={submitting}>
                     {submitting ? "Submitting…" : "Submit RFI"}
                   </button>
                   {status && (
                     <span className={`rfi-status ${
-                      status.includes("✓")       ? "rfi-status--ok"
+                      status.includes("✓")        ? "rfi-status--ok"
                       : status.includes("Offline") ? "rfi-status--err"
                       : "rfi-status--saving"
                     }`}>
@@ -401,48 +384,43 @@ export default function RFI() {
                     </span>
                   )}
                 </div>
-
               </form>
             </div>
           </div>
 
-          {/* ── RFI LIST ── */}
+          {/* RFI LIST */}
           <div className="rfi-panel">
             <div className="rfi-panel-head">
               <div className="rfi-panel-title">Register</div>
               <span className="rfi-pill rfi-pill--muted">{filtered.length} results</span>
             </div>
 
-            {/* Filter bar */}
             <div className="rfi-controls">
               <div className="rfi-search">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.6" />
                   <path d="M20 20l-3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                 </svg>
-                <input
-                  value={search}
-                  onChange={onSearch}
-                  placeholder="Search title, description, zone…"
-                  aria-label="Search RFIs"
-                />
+                <input value={search} onChange={onSearch} placeholder="Search title, drawing ref, zone…" aria-label="Search RFIs" />
               </div>
-              <select className="rfi-select rfi-select--sm" value={filterPri} onChange={onFilterPri} aria-label="Filter by priority">
+              <select className="rfi-select rfi-select--sm" value={filterPri} onChange={onFilterPri} aria-label="Priority">
                 <option value="all">All priorities</option>
                 {PRIORITIES.map(p => <option key={p} value={p}>{cap(p)}</option>)}
               </select>
-              <select className="rfi-select rfi-select--sm" value={filterDisc} onChange={onFilterDisc} aria-label="Filter by discipline">
+              <select className="rfi-select rfi-select--sm" value={filterDisc} onChange={onFilterDisc} aria-label="Discipline">
                 <option value="all">All disciplines</option>
                 {DISCIPLINES.map(d => <option key={d} value={d}>{cap(d)}</option>)}
               </select>
+              <select className="rfi-select rfi-select--sm" value={filterStat} onChange={onFilterStat} aria-label="Status">
+                <option value="all">All status</option>
+                <option value="open">Open</option>
+                <option value="responded">Responded</option>
+                <option value="closed">Closed</option>
+              </select>
             </div>
 
-            {/* List body */}
             {listLoading ? (
-              <div className="rfi-loading">
-                <div className="rfi-spinner" role="status" aria-label="Loading" />
-                Loading…
-              </div>
+              <div className="rfi-loading"><div className="rfi-spinner" role="status" aria-label="Loading" />Loading…</div>
             ) : pageItems.length === 0 ? (
               <div className="rfi-empty">No RFIs match this filter</div>
             ) : (
@@ -451,9 +429,7 @@ export default function RFI() {
                   <div key={stableKey(r)} className="rfi-list-item">
                     <div className="rfi-item-main">
                       <div className="rfi-item-tags">
-                        <span className="rfi-ref">
-                          {r.refNo || `RFI-${String(r.id ?? "").padStart(3, "0")}`}
-                        </span>
+                        <span className="rfi-ref">{r.refNo || `RFI-${String(r.id ?? "").padStart(3, "0")}`}</span>
                         <PBadge p={r.priority || "medium"} />
                         <SBadge s={r.status} />
                         {r.queued    && <span className="rfi-badge rfi-badge--low">Queued</span>}
@@ -461,14 +437,15 @@ export default function RFI() {
                       </div>
                       <div className="rfi-item-title">{r.title}</div>
                       {r.description && (
-                        <div className="rfi-item-desc">
-                          {r.description.slice(0, 180)}{r.description.length > 180 ? "…" : ""}
-                        </div>
+                        <div className="rfi-item-desc">{r.description.slice(0, 180)}{r.description.length > 180 ? "…" : ""}</div>
                       )}
                       <div className="rfi-item-meta">
-                        {r.discipline && <span>{cap(r.discipline)}</span>}
-                        {r.zone       && <span>Zone: {r.zone}</span>}
-                        {r.createdAt  && <span>{new Date(r.createdAt).toLocaleDateString("en-GB")}</span>}
+                        {r.discipline   && <span>{cap(r.discipline)}</span>}
+                        {r.zone         && <span>Zone: {r.zone}</span>}
+                        {r.drawing_ref  && <span style={{ color: "#185FA5", fontWeight: 500 }}>Dwg: {r.drawing_ref}</span>}
+                        {r.grid_ref     && <span>Grid: {r.grid_ref}</span>}
+                        {r.response_required_by && <span>Due: {new Date(r.response_required_by + "T12:00:00").toLocaleDateString("en-GB")}</span>}
+                        {r.createdAt    && <span>{new Date(r.createdAt).toLocaleDateString("en-GB")}</span>}
                       </div>
                     </div>
                     <div className="rfi-item-assignee">
@@ -477,26 +454,11 @@ export default function RFI() {
                   </div>
                 ))}
 
-                {/* Pagination */}
                 <div className="rfi-pagination">
-                  <span className="rfi-page-info">
-                    Page {page} of {totalPages} · {filtered.length} records
-                  </span>
+                  <span className="rfi-page-info">Page {page} of {totalPages} · {filtered.length} records</span>
                   <div className="rfi-page-btns">
-                    <button
-                      className="rfi-page-btn"
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page <= 1}
-                    >
-                      ← Prev
-                    </button>
-                    <button
-                      className="rfi-page-btn"
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page >= totalPages}
-                    >
-                      Next →
-                    </button>
+                    <button className="rfi-page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>← Prev</button>
+                    <button className="rfi-page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Next →</button>
                   </div>
                 </div>
               </>
@@ -504,26 +466,14 @@ export default function RFI() {
           </div>
         </div>
 
-        {/* ══ ASIDE ════════════════════════════════════════ */}
+        {/* ASIDE */}
         <aside className="rfi-aside">
-
-          {/* Stats */}
           <div className="rfi-aside-card">
             <div className="rfi-aside-title">Stats</div>
-            {[
-              ["Total",     stats.total],
-              ["Open",      stats.open],
-              ["Responded", stats.responded],
-              ["Closed",    stats.closed],
-            ].map(([l, v]) => (
-              <div key={l} className="rfi-aside-row">
-                <span>{l}</span>
-                <strong className="rfi-aside-value" style={{ color: "var(--c-navy-700)" }}>{v}</strong>
-              </div>
+            {[["Total", stats.total],["Open", stats.open],["Responded", stats.responded],["Closed", stats.closed]].map(([l, v]) => (
+              <div key={l} className="rfi-aside-row"><span>{l}</span><strong style={{ color: "var(--c-navy-700)" }}>{v}</strong></div>
             ))}
           </div>
-
-          {/* Priority breakdown */}
           <div className="rfi-aside-card">
             <div className="rfi-aside-title">Priority Breakdown</div>
             {priorityBreakdown.map(({ p, count }) => (
@@ -533,39 +483,30 @@ export default function RFI() {
               </div>
             ))}
           </div>
-
-          {/* Quick filters */}
           <div className="rfi-aside-card">
             <div className="rfi-aside-title">Quick Filter</div>
             {[
-              { label: "All",       pri: "all",      disc: "all"           },
-              { label: "Critical",  pri: "critical",  disc: "all"          },
-              { label: "Structural",pri: "all",      disc: "structural"    },
-              { label: "MEP",       pri: "all",      disc: "mep"           },
-              { label: "Open",      pri: "all",      disc: "all"           },
+              { label: "All",        pri: "all",       disc: "all",        stat: "all"  },
+              { label: "Critical",   pri: "critical",  disc: "all",        stat: "all"  },
+              { label: "Open only",  pri: "all",       disc: "all",        stat: "open" },
+              { label: "Structural", pri: "all",       disc: "structural", stat: "all"  },
+              { label: "MEP",        pri: "all",       disc: "mep",        stat: "all"  },
             ].map(f => (
-              <button
-                key={f.label}
-                onClick={() => { setFPri(f.pri); setFDisc(f.disc); setPage(1); }}
-                className="rfi-btn rfi-btn--ghost"
-                style={{ width: "100%", justifyContent: "flex-start", marginBottom: 6, fontSize: 12 }}
-              >
+              <button key={f.label} onClick={() => { setFPri(f.pri); setFDisc(f.disc); setFStat(f.stat); setPage(1); }} className="rfi-btn rfi-btn--ghost" style={{ width: "100%", justifyContent: "flex-start", marginBottom: 6, fontSize: 12 }}>
                 {f.label}
               </button>
             ))}
           </div>
-
-          {/* Tips */}
           <div className="rfi-aside-card">
             <div className="rfi-aside-title">Tips</div>
             <ul className="rfi-tips">
-              <li>Attach a drawing reference or photo when possible.</li>
-              <li>Use discipline and zone to speed up routing.</li>
-              <li>Mark critical RFIs to trigger faster responses.</li>
+              <li>Always fill in drawing ref and grid — required for formal RFI.</li>
+              <li>Set a response date to trigger urgency for the SE.</li>
+              <li>Attach a photo of the conflict on site.</li>
+              <li>No site work proceeds until RFI is closed.</li>
               <li>Drafts auto-save every 1.2 seconds.</li>
             </ul>
           </div>
-
         </aside>
       </div>
     </div>
