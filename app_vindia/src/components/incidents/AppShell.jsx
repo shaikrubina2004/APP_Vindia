@@ -150,8 +150,9 @@ export default function AppShell() {
 
         // Find tasks whose incident is NOT in the current user's incident list
         const existingIds = new Set(prev.map((i) => i.id));
-        const orphanTasks = tasks.filter((t) => !existingIds.has(t.incidentId));
-
+        const orphanTasks = tasks.filter(
+          (t) => t.incidentId && !existingIds.has(t.incidentId),
+        );
         // Group orphan tasks by incidentId
         const orphanGroups = orphanTasks.reduce((acc, t) => {
           if (!acc[t.incidentId]) acc[t.incidentId] = [];
@@ -236,7 +237,7 @@ export default function AppShell() {
           }));
           const existingIds = new Set(prev.map((i) => i.id));
           const orphanTasks = tasks.filter(
-            (t) => !existingIds.has(t.incidentId),
+            (t) => t.incidentId && !existingIds.has(t.incidentId),
           );
           const orphanGroups = orphanTasks.reduce((acc, t) => {
             if (!acc[t.incidentId]) acc[t.incidentId] = [];

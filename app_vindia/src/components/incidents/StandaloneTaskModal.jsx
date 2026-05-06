@@ -1,6 +1,11 @@
 import React, { useState, useMemo, useRef } from "react";
 import { PRIORITY_CONFIG } from "./incidentConfig";
-export default function StandaloneTaskModal({ users = [], onClose, onSubmit }) {
+export default function StandaloneTaskModal({
+  users = [],
+  onClose,
+  onSubmit,
+  activeProject,
+}) {
   const roles = useMemo(
     () => [...new Set(users.map((u) => u.roleName).filter(Boolean))].sort(),
     [users],
@@ -42,7 +47,7 @@ export default function StandaloneTaskModal({ users = [], onClose, onSubmit }) {
 
   const handleSubmit = () => {
     if (!task.title.trim() || !task.assignedId) return;
-    onSubmit({ ...task, photoPreview });
+    onSubmit({ ...task, photoPreview, projectId: activeProject?.id ?? null });
     onClose();
   };
 
@@ -58,7 +63,9 @@ export default function StandaloneTaskModal({ users = [], onClose, onSubmit }) {
           <div>
             <h3>Create New Task</h3>
             <p className="modal-sub">
-              Assign a task directly to any team member
+              {activeProject?.id
+                ? `${activeProject.name} — project task`
+                : "Open task — not linked to any project"}
             </p>
           </div>
           <button className="inc-modal-close" onClick={onClose}>
@@ -67,6 +74,23 @@ export default function StandaloneTaskModal({ users = [], onClose, onSubmit }) {
         </div>
 
         <div className="inc-modal-body">
+          {activeProject?.id && (
+            <div className="inc-form-group">
+              <label>Project</label>
+              <input
+                className="inc-form-input"
+                value={`${activeProject.code} — ${activeProject.name}`}
+                readOnly
+                style={{
+                  background: "#f7f9fc",
+                  color: "#7a7a8a",
+                  cursor: "not-allowed",
+                }}
+              />
+            </div>
+          )}
+          {/* Title + Priority */}
+          <div className="ctm-row"></div>
           {/* Title + Priority */}
           <div className="ctm-row">
             <div className="inc-form-group" style={{ flex: 2 }}>

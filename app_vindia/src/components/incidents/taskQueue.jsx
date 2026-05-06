@@ -3,6 +3,7 @@ import { API } from "../../services/authService";
 import { useAuth } from "../../context/useAuth";
 import StandaloneTaskModal from "./StandaloneTaskModal";
 import { useRef } from "react";
+import ProjectSwitcher from "../project/ProjectSwitcher";
 
 import {
   PRIORITY_CONFIG,
@@ -104,6 +105,7 @@ export default function TaskQueue({
   users,
   onNavigateBack,
   refreshAllTasks,
+  activeProject,
 }) {
   const { user: currentUser } = useAuth();
 
@@ -264,6 +266,7 @@ export default function TaskQueue({
         note: task.note,
         priority: task.priority,
         assigned_to_user_id: task.assignedId,
+        project_id: task.projectId ?? null,
       });
 
       // Upload photo if attached
@@ -331,6 +334,7 @@ export default function TaskQueue({
           </div>
         </div>
         <div className="inc-header-actions">
+          <ProjectSwitcher />
           <button
             className="inc-create-btn"
             onClick={() => setShowNewTask(true)}
@@ -920,6 +924,7 @@ export default function TaskQueue({
           users={users}
           onClose={() => setShowNewTask(false)}
           onSubmit={handleCreateStandaloneTask}
+          activeProject={activeProject}
         />
       )}
       {lightboxUrl && (
