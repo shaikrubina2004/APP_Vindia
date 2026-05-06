@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import IncidentManagement from "./IncidentManagement";
 import TaskQueue from "./taskQueue";
 import { API } from "../../services/authService";
+import { useProject } from "../../context/ProjectContext";
 
 function normaliseIncident(inc) {
   return {
@@ -71,6 +72,7 @@ function normaliseTask(t) {
 }
 
 export default function AppShell() {
+  const { activeProject } = useProject();
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(
     searchParams.get("page") === "tasks" ? "taskqueue" : "incidents",
@@ -78,7 +80,6 @@ export default function AppShell() {
   const [incidents, setIncidents] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [error, setError] = useState(null);
 
   // Sync page state when URL query param changes
@@ -102,7 +103,10 @@ export default function AppShell() {
   /* ── Fetch all incidents (list view) ── */
   const fetchIncidents = useCallback(async () => {
     try {
-      const res = await API.get("/incidents");
+      const url = activeProject?.id
+        ? `/incidents?project_id=${activeProject.id}`
+        : `/incidents?open_only=true`;
+      const res = await API.get(url);
       const data = res.data.data.map(normaliseIncident);
       setIncidents(data);
       return data;
@@ -131,7 +135,10 @@ export default function AppShell() {
   /* ── Fetch all tasks assigned to current user and merge into incidents ── */
   const fetchAllTasks = useCallback(async () => {
     try {
-      const res = await API.get("/incidents/tasks");
+      const url = activeProject?.id
+        ? `/incidents/tasks?project_id=${activeProject.id}`
+        : `/incidents/tasks?open_only=true`;
+      const res = await API.get(url);
       const tasks = res.data.data.map(normaliseTask);
 
       setIncidents((prev) => {
@@ -186,33 +193,109 @@ export default function AppShell() {
   }, []);
 
   useEffect(() => {
-    if (initialLoadDone) {
-      // Already loaded before — refresh in background without showing spinner
-      Promise.all([fetchIncidents(), fetchUsers()]).then(() => fetchAllTasks());
-      return;
-    }
-    // First load — show spinner
-    Promise.all([fetchIncidents(), fetchUsers()])
-      .then(() => fetchAllTasks())
-      .finally(() => {
+    setIncidents([]);
+    setLoading(true);
+    setError(null);
+
+    const projectId = activeProject?.id ?? null;
+
+    const load = async () => {
+      try {
+        const incUrl = projectId
+          ? `/incidents?project_id=${projectId}`
+          : `/incidents?open_only=true`;
+        const taskUrl = projectId
+          ? `/incidents/tasks?project_id=${projectId}`
+          : `/incidents/tasks?open_only=true`;
+
+        const [incRes, usersRes] = await Promise.all([
+          API.get(incUrl),
+          API.get("/users"),
+        ]);
+
+        const normalisedInc = incRes.data.data.map(normaliseIncident);
+        setIncidents(normalisedInc);
+
+        const normalisedUsers = (
+          Array.isArray(usersRes.data) ? usersRes.data : []
+        ).map((u) => ({
+          id: u.id,
+          name: u.name,
+          roleId: u.role_id,
+          roleName: u.role ?? "",
+        }));
+        setUsers(normalisedUsers);
+
+        const taskRes = await API.get(taskUrl);
+        const tasks = taskRes.data.data.map(normaliseTask);
+
+        setIncidents((prev) => {
+          const merged = prev.map((inc) => ({
+            ...inc,
+            tasks: tasks.filter((t) => t.incidentId === inc.id),
+          }));
+          const existingIds = new Set(prev.map((i) => i.id));
+          const orphanTasks = tasks.filter(
+            (t) => !existingIds.has(t.incidentId),
+          );
+          const orphanGroups = orphanTasks.reduce((acc, t) => {
+            if (!acc[t.incidentId]) acc[t.incidentId] = [];
+            acc[t.incidentId].push(t);
+            return acc;
+          }, {});
+          const placeholders = Object.entries(orphanGroups).map(
+            ([incId, incTasks]) => ({
+              id: incId,
+              incidentNo: incTasks[0]?.incidentId ?? incId,
+              title: incTasks[0]?.incidentTitle ?? "External Incident",
+              description: "",
+              priority: incTasks[0]?.incidentPriority ?? "P2",
+              status: "In Progress",
+              assignedTo: "",
+              assignedName: "",
+              assignedId: null,
+              createdById: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              deadlineAt: null,
+              resolvedAt: null,
+              taskCount: incTasks.length,
+              commentCount: 0,
+              photoCount: 0,
+              comments: [],
+              tasks: incTasks,
+              photos: [],
+            }),
+          );
+          return [...merged, ...placeholders];
+        });
+      } catch (err) {
+        console.error("load error:", err);
+        setError("Failed to load incidents");
+      } finally {
         setLoading(false);
-        setInitialLoadDone(true);
-      });
-  }, [fetchIncidents, fetchUsers, fetchAllTasks]);
+      }
+    };
+
+    load();
+  }, [activeProject?.id]);
 
   /* ── Re-fetch a single incident after mutation and merge it in ── */
-  const refreshIncident = useCallback(async (incidentId) => {
-    try {
-      const res = await API.get(`/incidents/${incidentId}`);
-      const updated = normaliseIncident(res.data.data);
-      setIncidents((prev) =>
-        prev.map((inc) => (inc.id === incidentId ? updated : inc)),
-      );
-      return updated;
-    } catch (err) {
-      console.error("refreshIncident:", err);
-    }
-  }, []);
+  const refreshIncident = useCallback(
+    async (incidentId) => {
+      try {
+        const res = await API.get(`/incidents/${incidentId}`);
+        const updated = normaliseIncident(res.data.data);
+        setIncidents((prev) =>
+          prev.map((inc) => (inc.id === incidentId ? updated : inc)),
+        );
+        return updated;
+      } catch (err) {
+        console.error("refreshIncident:", err);
+      }
+    },
+    [activeProject],
+  );
 
   if (loading) {
     return (
@@ -274,6 +357,7 @@ export default function AppShell() {
           users={users}
           refreshIncident={refreshIncident}
           onNavigateToQueue={navigateToQueue}
+          activeProject={activeProject}
         />
       ) : (
         <TaskQueue
@@ -283,6 +367,7 @@ export default function AppShell() {
           refreshIncident={refreshIncident}
           onNavigateBack={navigateToIncidents}
           refreshAllTasks={fetchAllTasks}
+          activeProject={activeProject}
         />
       )}
     </>

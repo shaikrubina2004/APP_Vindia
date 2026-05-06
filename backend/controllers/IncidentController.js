@@ -220,7 +220,7 @@ exports.getUsersByRole = async (req, res) => {
 
 exports.getAllIncidents = async (req, res) => {
   try {
-    const { status, priority, search } = req.query;
+    const { status, priority, search, project_id, open_only } = req.query;
     const userId = req.user?.id ?? null;
 
     let conditions = [],
@@ -233,6 +233,13 @@ exports.getAllIncidents = async (req, res) => {
       );
       params.push(userId, userId);
       idx += 2;
+    }
+    if (project_id) {
+      conditions.push(`project_id = $${idx++}`);
+      params.push(project_id);
+    }
+    if (open_only === "true") {
+      conditions.push(`project_id IS NULL`);
     }
     if (status) {
       conditions.push(`status = $${idx++}`);
@@ -350,7 +357,13 @@ exports.getIncidentById = async (req, res) => {
 };
 
 exports.createIncident = async (req, res) => {
-  const { title, description, priority = "P2", assigned_to_user_id } = req.body;
+  const {
+    title,
+    description,
+    priority = "P2",
+    assigned_to_user_id,
+    project_id,
+  } = req.body;
   const created_by = req.user?.id ?? null;
 
   console.log("🔔 createIncident payload:", {
@@ -387,6 +400,7 @@ exports.createIncident = async (req, res) => {
       "priority",
       "assigned_to",
       "deadline_at",
+      "project_id",
     ];
     const vals = [
       title.trim(),
@@ -394,6 +408,7 @@ exports.createIncident = async (req, res) => {
       priority,
       assigned_to_user_id ?? null,
       deadline_at,
+      project_id ?? null,
     ];
     if (created_by !== null) {
       cols.push("created_by");
@@ -438,13 +453,11 @@ exports.createIncident = async (req, res) => {
     });
   } catch (err) {
     console.error("createIncident ERROR:", err.message);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to create incident",
-        detail: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create incident",
+      detail: err.message,
+    });
   }
 };
 
@@ -504,13 +517,11 @@ exports.createStandaloneTask = async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("createStandaloneTask:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to create task",
-        detail: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create task",
+      detail: err.message,
+    });
   } finally {
     client.release();
   }
@@ -750,7 +761,7 @@ exports.addIncidentPhoto = async (req, res) => {
 
 exports.getAllTasks = async (req, res) => {
   try {
-    const { role, status, priority, search } = req.query;
+    const { role, status, priority, search, project_id, open_only } = req.query;
     const userId = req.user?.id ?? null;
 
     let conditions = [],
@@ -761,6 +772,13 @@ exports.getAllTasks = async (req, res) => {
       conditions.push(`(assignee_id = $${idx} OR created_by_id = $${idx + 1})`);
       params.push(userId, userId);
       idx += 2;
+    }
+    if (project_id) {
+      conditions.push(`project_id = $${idx++}`);
+      params.push(project_id);
+    }
+    if (open_only === "true") {
+      conditions.push(`incident_id IS NULL`);
     }
     if (role) {
       conditions.push(`role_name = $${idx++}`);
@@ -930,13 +948,11 @@ exports.createTasks = async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("createTasks:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to create tasks",
-        detail: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create tasks",
+      detail: err.message,
+    });
   } finally {
     client.release();
   }
@@ -951,12 +967,10 @@ exports.updateTaskStatus = async (req, res) => {
   if (!validStatuses.includes(status))
     return res.status(400).json({ success: false, message: "Invalid status" });
   if (status === "Blocked" && !blocked_reason?.trim())
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "blocked_reason is required when marking Blocked",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "blocked_reason is required when marking Blocked",
+    });
 
   const client = await pool.connect();
   try {

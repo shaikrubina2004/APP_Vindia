@@ -3,6 +3,7 @@ import ConvertToTasksModal from "./ConvertToTasksModal";
 import "../../styles/IncidentManagement.css";
 import { API } from "../../services/authService";
 import { useAuth } from "../../context/useAuth";
+import ProjectSwitcher from "../project/ProjectSwitcher";
 
 import {
   PRIORITY_CONFIG,
@@ -18,6 +19,7 @@ export default function IncidentManagement({
   users = [],
   refreshIncident,
   onNavigateToQueue,
+  activeProject,
 }) {
   const { user: currentUser } = useAuth();
 
@@ -76,60 +78,68 @@ export default function IncidentManagement({
   };
 
   const handleCreate = async () => {
-  if (!form.title.trim() || !form.assignedId) return;
-  setSaving(true);
+    if (!form.title.trim() || !form.assignedId) return;
+    setSaving(true);
 
-  try {
-    // ✅ DEFINE payload FIRST
-    const payload = {
-      title: form.title.trim(),
-      description: form.description.trim(),
-      priority: form.priority,
-      assigned_to_user_id: form.assignedId,
-    };
+    try {
+      // ✅ DEFINE payload FIRST
+      const payload = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        priority: form.priority,
+        assigned_to_user_id: form.assignedId,
+        project_id: activeProject?.id ?? null,
+      };
 
-    // ✅ NOW log it
-    console.log("📤 INCIDENT PAYLOAD:", payload);
+      // ✅ NOW log it
+      console.log("📤 INCIDENT PAYLOAD:", payload);
 
-    // ✅ USE payload
-    const res = await API.post("/incidents", payload);
+      // ✅ USE payload
+      const res = await API.post("/incidents", payload);
 
-    const newIncidentId = res.data.data.id;
+      const newIncidentId = res.data.data.id;
 
-    if (photoPreview && newIncidentId) {
-      await API.post(`/incidents/${newIncidentId}/photos`, {
-        url: photoPreview,
+      if (photoPreview && newIncidentId) {
+        await API.post(`/incidents/${newIncidentId}/photos`, {
+          url: photoPreview,
+        });
+      }
+
+      const newInc = await refreshIncident(newIncidentId);
+      if (newInc) {
+        setIncidents((prev) => {
+          const exists = prev.some((i) => i.id === newInc.id);
+          return exists
+            ? prev.map((i) => (i.id === newInc.id ? newInc : i))
+            : [newInc, ...prev];
+        });
+      }
+
+      setForm({
+        title: "",
+        description: "",
+        priority: "P2",
+        assignedId: "",
+        roleName: "",
       });
+
+      setPhotoPreview(null);
+      setShowCreate(false);
+
+      // ✅ ADD THIS LINE
+      setTimeout(() => window.refreshNotifications?.(), 1500);
+    } catch (err) {
+      console.error("createIncident:", err);
+      alert(
+        "Failed to create incident: " +
+          (err.response?.data?.detail ??
+            err.response?.data?.message ??
+            err.message),
+      );
+    } finally {
+      setSaving(false);
     }
-
-    await refreshIncident(newIncidentId);
-
-    setForm({
-      title: "",
-      description: "",
-      priority: "P2",
-      assignedId: "",
-      roleName: "",
-    });
-
-    setPhotoPreview(null);
-    setShowCreate(false);
-
-    // ✅ ADD THIS LINE
-    setTimeout(() => window.refreshNotifications?.(), 1500);
-
-  } catch (err) {
-    console.error("createIncident:", err);
-    alert(
-      "Failed to create incident: " +
-      (err.response?.data?.detail ??
-       err.response?.data?.message ??
-       err.message)
-    );
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   const advanceStatus = async (inc) => {
     const idx = STATUS_FLOW.indexOf(inc.status);
@@ -268,10 +278,15 @@ export default function IncidentManagement({
         <div className="inc-header-left">
           <div>
             <h1>Incident Management</h1>
-            <p>Track, assign and resolve project issues</p>
+            <p>
+              {activeProject?.id
+                ? `${activeProject.name} — project incidents`
+                : "Open incidents — not linked to any project"}
+            </p>{" "}
           </div>
         </div>
         <div className="inc-header-actions">
+          <ProjectSwitcher />
           {allTaskCount > 0 && (
             <button className="task-queue-nav-btn" onClick={onNavigateToQueue}>
               <svg
@@ -900,7 +915,11 @@ export default function IncidentManagement({
         <div className="inc-modal-overlay" onClick={() => setShowCreate(false)}>
           <div className="inc-modal" onClick={(e) => e.stopPropagation()}>
             <div className="inc-modal-header">
-              <h3>Create New Incident</h3>
+              <h3>
+                {activeProject?.id
+                  ? `New Incident — ${activeProject.name}`
+                  : "New Open Incident"}
+              </h3>
               <button
                 className="inc-modal-close"
                 onClick={() => setShowCreate(false)}
@@ -909,6 +928,21 @@ export default function IncidentManagement({
               </button>
             </div>
             <div className="inc-modal-body">
+              {activeProject?.id && (
+                <div className="inc-form-group">
+                  <label>Project</label>
+                  <input
+                    className="inc-form-input"
+                    value={`${activeProject.code} — ${activeProject.name}`}
+                    readOnly
+                    style={{
+                      background: "#f7f9fc",
+                      color: "#7a7a8a",
+                      cursor: "not-allowed",
+                    }}
+                  />
+                </div>
+              )}
               <div className="inc-form-group">
                 <label>
                   Title <span className="req">*</span>

@@ -19,18 +19,23 @@ export function ProjectProvider({ children }) {
           generate it from the id — replace with your actual
           code field if you add one to the projects table later.
         */
+        const openOption = {
+          id: null,
+          code: "OPEN",
+          name: "Open Incidents",
+          location: "Not project-specific",
+        };
         const mapped = data.map((p) => ({
           id: String(p.id),
           code: p.code ?? `PRJ-${String(p.id).padStart(3, "0")}`,
           name: p.name,
           location: p.location ?? "",
         }));
-        setProjects(mapped);
-
-        // restore previously selected project from localStorage
+        const allOptions = [openOption, ...mapped];
+        setProjects(allOptions);
         const savedId = localStorage.getItem("activeProjectId");
-        const saved = mapped.find((p) => p.id === savedId);
-        setActiveProject(saved ?? mapped[0] ?? null);
+        const saved = allOptions.find((p) => String(p.id) === savedId);
+        setActiveProject(saved ?? openOption);
       })
       .catch((err) => console.error("Failed to load projects:", err))
       .finally(() => setLoading(false));
