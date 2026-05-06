@@ -485,9 +485,16 @@ exports.createStandaloneTask = async (req, res) => {
     await client.query("BEGIN");
 
     const { rows } = await client.query(
-      `INSERT INTO tasks (title, note, priority, assigned_to, created_by)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [title.trim(), note ?? null, priority, assigned_to_user_id, created_by],
+      `INSERT INTO tasks (title, note, priority, assigned_to, created_by, project_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [
+        title.trim(),
+        note ?? null,
+        priority,
+        assigned_to_user_id,
+        created_by,
+        project_id ?? null,
+      ],
     );
 
     await client.query("COMMIT");
@@ -774,11 +781,14 @@ exports.getAllTasks = async (req, res) => {
       idx += 2;
     }
     if (project_id) {
-      conditions.push(`project_id = $${idx++}`);
-      params.push(project_id);
+      conditions.push(
+        `(project_id = $${idx} OR incident_project_id = $${idx + 1})`,
+      );
+      params.push(project_id, project_id);
+      idx += 2;
     }
     if (open_only === "true") {
-      conditions.push(`incident_id IS NULL`);
+      conditions.push(`(incident_id IS NULL AND project_id IS NULL)`);
     }
     if (role) {
       conditions.push(`role_name = $${idx++}`);
