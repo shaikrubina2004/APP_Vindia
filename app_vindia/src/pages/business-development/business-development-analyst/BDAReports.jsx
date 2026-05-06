@@ -37,22 +37,21 @@ const ChartTooltip = ({ active, payload, label }) => {
 /* ════════════════════════════════════════
    MAIN PAGE
 ════════════════════════════════════════ */
-const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
-  const isCEO = role === "ceo";     {/* ← TRUE only for CEO */}
+const BDAReports = ({ role }) => {
+  const isCEO = role === "ceo";
 
-  const [loading, setLoading]   = useState(true);
-  const [overview, setOverview] = useState(null);
-  const [bda, setBda]           = useState([]);
-  const [sources, setSources]   = useState([]);
-  const [leads, setLeads]       = useState([]);
-  const [exporting, setExporting] = useState(false);
+  const [loading, setLoading]     = useState(true);
+  const [overview, setOverview]   = useState(null);
+  const [bda, setBda]             = useState([]);
+  const [sources, setSources]     = useState([]);
+  const [exporting, setExporting] = useState(null); // null | "all" | "converted" | "bda"
 
   /* Filters */
-  const [from, setFrom]             = useState("");
-  const [to, setTo]                 = useState("");
-  const [statusF, setStatusF]       = useState("");
-  const [sourceF, setSourceF]       = useState("");
-  const [assignedF, setAssignedF]   = useState("");
+  const [from, setFrom]         = useState("");
+  const [to, setTo]             = useState("");
+  const [statusF, setStatusF]   = useState("");
+  const [sourceF, setSourceF]   = useState("");
+  const [assignedF, setAssignedF] = useState("");
   const [activeSection, setActiveSection] = useState("overview");
 
   useEffect(() => { loadAll(); }, []);
@@ -67,17 +66,15 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
       if (filters.source)      params.source      = filters.source;
       if (filters.assigned_to) params.assigned_to = filters.assigned_to;
 
-      const [ovRes, bdaRes, srcRes, leadsRes] = await Promise.all([
+      const [ovRes, bdaRes, srcRes] = await Promise.all([
         axios.get(`${API}/reports/overview`, { params }),
         axios.get(`${API}/reports/user-performance`),
         axios.get(`${API}/reports/source-performance`),
-        axios.get(`${API}/reports/leads`, { params }),
       ]);
 
       setOverview(ovRes.data);
       setBda(bdaRes.data.data || []);
       setSources(srcRes.data.data || []);
-      setLeads(leadsRes.data.leads || []);
     } catch (err) {
       console.error("Reports load error:", err);
     } finally {
@@ -94,8 +91,20 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
     loadAll({});
   };
 
-  const handleExport = async () => {
-    setExporting(true);
+  /* ── EXPORT HELPER ── */
+  const triggerDownload = (blob, filename) => {
+    const url  = window.URL.createObjectURL(new Blob([blob]));
+    const link = document.createElement("a");
+    link.href  = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  /* Export all leads */
+  const handleExportAll = async () => {
+    setExporting("all");
     try {
       const params = {};
       if (from)      params.from        = from;
@@ -103,50 +112,99 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
       if (statusF)   params.status      = statusF;
       if (sourceF)   params.source      = sourceF;
       if (assignedF) params.assigned_to = assignedF;
-
-      const res = await axios.get(`${API}/reports/export`, {
-        params, responseType:"blob",
-      });
-      const url  = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href  = url;
-      link.setAttribute("download", `leads-report-${Date.now()}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (err) {
-      alert("Export failed: " + err.message);
-    } finally {
-      setExporting(false);
-    }
+      const res = await axios.get(`${API}/reports/export`, { params, responseType:"blob" });
+      triggerDownload(res.data, `all-leads-${Date.now()}.xlsx`);
+    } catch (err) { alert("Export failed: " + err.message); }
+    finally { setExporting(null); }
   };
 
-  /* Pie data for status */
+  /* Export converted leads only */
+  const handleExportConverted = async () => {
+    setExporting("converted");
+    try {
+      const params = { status: "Converted" };
+      if (from)      params.from        = from;
+      if (to)        params.to          = to;
+      if (sourceF)   params.source      = sourceF;
+      if (assignedF) params.assigned_to = assignedF;
+      const res = await axios.get(`${API}/reports/export`, { params, responseType:"blob" });
+      triggerDownload(res.data, `converted-leads-${Date.now()}.xlsx`);
+    } catch (err) { alert("Export failed: " + err.message); }
+    finally { setExporting(null); }
+  };
+
+  /* Export BDA performance report */
+  const handleExportBDA = async () => {
+    setExporting("bda");
+    try {
+      const res = await axios.get(`${API}/reports/export-bda-performance`, { responseType:"blob" });
+      triggerDownload(res.data, `bda-performance-${Date.now()}.xlsx`);
+    } catch (err) { alert("Export failed: " + err.message); }
+    finally { setExporting(null); }
+  };
+
+  /* ── Pie data — normalize status to fix "New" vs "new" duplicates ── */
   const statusPieData = useMemo(() => {
     if (!overview?.byStatus) return [];
-    return overview.byStatus.map(s => ({
-      name:  s.status || "Unknown",
-      value: parseInt(s.count),
+    // Merge entries that differ only by case
+    const merged = {};
+    overview.byStatus.forEach(s => {
+      const key = (s.status || "Unknown").toLowerCase();
+      merged[key] = (merged[key] || 0) + parseInt(s.count);
+    });
+    return Object.entries(merged).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value,
     }));
   }, [overview]);
 
-  /* Bar data for BDA performance */
+  /* ── BDA bar data — filter out Unassigned ── */
   const bdaBarData = useMemo(() =>
-    bda.map(b => ({
-      name:       b.bda_name?.split("@")[0] || "Unassigned",
-      total:      parseInt(b.total_leads),
-      converted:  parseInt(b.converted),
-      followups:  parseInt(b.followups),
-    }))
+    bda
+      .filter(b => b.bda_name !== "Unassigned")
+      .map(b => ({
+        name:      b.bda_name?.split("@")[0] || "Unknown",
+        total:     parseInt(b.total_leads),
+        converted: parseInt(b.converted),
+        followups: parseInt(b.followups),
+      }))
   , [bda]);
 
-  const bdaNames = useMemo(() => [...new Set(leads.map(l => l.assigned_to).filter(Boolean))], [leads]);
+  /* ── BDA table — filter out Unassigned ── */
+  const bdaTableData = useMemo(() =>
+    bda.filter(b => b.bda_name !== "Unassigned")
+  , [bda]);
 
+  /* ── Sources — normalize source casing to fix "meta" vs "Meta" duplicates ── */
+  const normalizedSources = useMemo(() => {
+    const merged = {};
+    sources.forEach(s => {
+      const key = (s.source || "Unknown").toLowerCase();
+      if (!merged[key]) {
+        merged[key] = {
+          source: s.source.charAt(0).toUpperCase() + s.source.slice(1).toLowerCase(),
+          total: 0, converted: 0,
+        };
+      }
+      merged[key].total     += parseInt(s.total);
+      merged[key].converted += parseInt(s.converted);
+    });
+    return Object.values(merged).map(s => ({
+      ...s,
+      conversion_rate: s.total > 0 ? ((s.converted / s.total) * 100).toFixed(1) : "0.0",
+    }));
+  }, [sources]);
+
+  /* ── Assigned-to names for filter dropdown — deduplicated ── */
+  const bdaNames = useMemo(() =>
+    [...new Set(bda.filter(b => b.bda_name !== "Unassigned").map(b => b.bda_name))]
+  , [bda]);
+
+  /* ── Tabs — Lead Details removed ── */
   const SECTIONS = [
-    { key:"overview",    label:"📊 Overview" },
-    { key:"bda",         label:"👤 BDA Performance" },
-    { key:"sources",     label:"🎯 Source Analysis" },
-    { key:"leads",       label:"📋 Lead Details" },
+    { key:"overview", label:"📊 Overview" },
+    { key:"bda",      label:"👤 BDA Performance" },
+    { key:"sources",  label:"🎯 Source Analysis" },
   ];
 
   return (
@@ -160,16 +218,39 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
         </div>
         <div className="bda-header-actions">
           <button className="bda-btn-outline" onClick={() => loadAll({})}>↻ Refresh</button>
-          {/* Only CEO can export */}
+          {/* 3 export buttons — CEO only */}
           {isCEO && (
-            <button className="bda-btn-primary" onClick={handleExport} disabled={exporting}>
-              {exporting ? "Exporting…" : "📥 Export Excel"}
-            </button>
+            <>
+              <button
+                className="bda-btn-outline"
+                onClick={handleExportAll}
+                disabled={exporting !== null}
+                title="Export all leads to Excel"
+              >
+                {exporting === "all" ? "Exporting…" : "📥 All Leads"}
+              </button>
+              <button
+                className="bda-btn-outline rp-btn--green"
+                onClick={handleExportConverted}
+                disabled={exporting !== null}
+                title="Export only converted leads"
+              >
+                {exporting === "converted" ? "Exporting…" : "✅ Converted Leads"}
+              </button>
+              <button
+                className="bda-btn-primary"
+                onClick={handleExportBDA}
+                disabled={exporting !== null}
+                title="Download BDA performance report"
+              >
+                {exporting === "bda" ? "Exporting…" : "👤 BDA Report"}
+              </button>
+            </>
           )}
         </div>
       </div>
 
-      {/* ── FILTERS ── (only CEO can filter) */}
+      {/* ── FILTERS — CEO only ── */}
       {isCEO && (
         <div className="rp-filters">
           <div className="rp-filters__row">
@@ -237,7 +318,6 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
         {/* ════════════ OVERVIEW ════════════ */}
         {activeSection === "overview" && (
           <>
-            {/* KPI Cards */}
             <div className="rp-kpis">
               {loading ? [1,2,3,4].map(i => <Sk key={i} h={90} />) : (
                 <>
@@ -255,14 +335,13 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
                   </div>
                   <div className="rp-kpi rp-kpi--amber">
                     <p className="rp-kpi__label">Active BDAs</p>
-                    <p className="rp-kpi__value">{bda.filter(b => b.bda_name !== "Unassigned").length}</p>
+                    <p className="rp-kpi__value">{bdaTableData.length}</p>
                   </div>
                 </>
               )}
             </div>
 
             <div className="rp-charts-row">
-              {/* Monthly trend */}
               <div className="rp-card rp-card--wide">
                 <div className="rp-card__header">
                   <h3 className="rp-card__title">Monthly Lead Trend</h3>
@@ -284,7 +363,6 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
                 )}
               </div>
 
-              {/* Status pie */}
               <div className="rp-card">
                 <div className="rp-card__header">
                   <h3 className="rp-card__title">Leads by Status</h3>
@@ -310,7 +388,7 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
           </>
         )}
 
-        {/* ════════════ BDA PERFORMANCE ════════════ */}
+        {/* ════════════ BDA PERFORMANCE — no Unassigned ════════════ */}
         {activeSection === "bda" && (
           <div className="rp-card rp-card--full">
             <div className="rp-card__header">
@@ -325,8 +403,8 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
                     <XAxis dataKey="name" tick={{ fill:"#94a3b8", fontSize:11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill:"#94a3b8", fontSize:11 }} axisLine={false} tickLine={false} />
                     <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="total"     name="Total"     fill="#2563eb" radius={[4,4,0,0]} />
-                    <Bar dataKey="converted" name="Converted" fill="#10b981" radius={[4,4,0,0]} />
+                    <Bar dataKey="total"     name="Total"      fill="#2563eb" radius={[4,4,0,0]} />
+                    <Bar dataKey="converted" name="Converted"  fill="#10b981" radius={[4,4,0,0]} />
                     <Bar dataKey="followups" name="Follow-ups" fill="#f59e0b" radius={[4,4,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -335,17 +413,16 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
                   <table className="rp-table">
                     <thead>
                       <tr>
-                        <th>BDA Name</th>
-                        <th>Total Leads</th>
-                        <th>Converted</th>
-                        <th>Interested</th>
-                        <th>Follow-ups</th>
-                        <th>Junk</th>
-                        <th>Conv. Rate</th>
+                        <th>BDA Name</th><th>Total Leads</th><th>Converted</th>
+                        <th>Interested</th><th>Follow-ups</th><th>Junk</th><th>Conv. Rate</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {bda.map((b, i) => (
+                      {bdaTableData.length === 0 ? (
+                        <tr><td colSpan={7} style={{ textAlign:"center", color:"#94a3b8", padding:"32px 0" }}>
+                          No BDA data available
+                        </td></tr>
+                      ) : bdaTableData.map((b, i) => (
                         <tr key={i}>
                           <td className="rp-td-name">{b.bda_name}</td>
                           <td>{b.total_leads}</td>
@@ -370,7 +447,7 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
           </div>
         )}
 
-        {/* ════════════ SOURCE ANALYSIS ════════════ */}
+        {/* ════════════ SOURCE ANALYSIS — normalized casing ════════════ */}
         {activeSection === "sources" && (
           <div className="rp-card rp-card--full">
             <div className="rp-card__header">
@@ -380,13 +457,13 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
             {loading ? <Sk h={240} /> : (
               <>
                 <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={sources} margin={{ top:10, right:12, left:-20, bottom:0 }}>
+                  <BarChart data={normalizedSources} margin={{ top:10, right:12, left:-20, bottom:0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
                     <XAxis dataKey="source" tick={{ fill:"#94a3b8", fontSize:11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill:"#94a3b8", fontSize:11 }} axisLine={false} tickLine={false} />
                     <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="total"     name="Total"     radius={[4,4,0,0]}>
-                      {sources.map((_, i) => <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />)}
+                    <Bar dataKey="total" name="Total" radius={[4,4,0,0]}>
+                      {normalizedSources.map((_, i) => <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />)}
                     </Bar>
                     <Bar dataKey="converted" name="Converted" fill="#10b981" radius={[4,4,0,0]} />
                   </BarChart>
@@ -398,7 +475,7 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
                       <tr><th>Source</th><th>Total Leads</th><th>Converted</th><th>Conv. Rate</th></tr>
                     </thead>
                     <tbody>
-                      {sources.map((s, i) => (
+                      {normalizedSources.map((s, i) => (
                         <tr key={i}>
                           <td>
                             <span className="rp-source-dot" style={{ background: SOURCE_COLORS[i % SOURCE_COLORS.length] }} />
@@ -423,60 +500,7 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
           </div>
         )}
 
-        {/* ════════════ LEAD DETAILS ════════════ */}
-        {activeSection === "leads" && (
-          <div className="rp-card rp-card--full">
-            <div className="rp-card__header">
-              <h3 className="rp-card__title">Lead Details</h3>
-              <p className="rp-card__sub">{leads.length} leads matching filters</p>
-            </div>
-            {loading ? <Sk h={300} /> : (
-              <div className="rp-table-wrap">
-                <table className="rp-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th><th>Phone</th><th>Source</th>
-                      <th>Status</th><th>City</th><th>Assigned</th>
-                      <th>Follow-ups</th><th>Last Follow-up</th><th>Date Added</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leads.length === 0 ? (
-                      <tr><td colSpan={9} style={{ textAlign:"center", color:"#94a3b8", padding:"32px 0" }}>
-                        No leads match the selected filters
-                      </td></tr>
-                    ) : leads.map(l => (
-                      <tr key={l.id}>
-                        <td className="rp-td-name">{l.name}</td>
-                        <td style={{ fontSize:12, color:"#64748b" }}>{l.phone}</td>
-                        <td>
-                          <span className="rp-src-pill">{l.source || "—"}</span>
-                        </td>
-                        <td>
-                          <span className="rp-badge" style={{
-                            background: STATUS_COLORS[(l.status||"").toLowerCase()]+"22",
-                            color: STATUS_COLORS[(l.status||"").toLowerCase()] || "#475569",
-                          }}>{l.status || "—"}</span>
-                        </td>
-                        <td style={{ fontSize:12, color:"#64748b" }}>{l.city || "—"}</td>
-                        <td style={{ fontSize:12, color:"#64748b" }}>{l.assigned_to || "—"}</td>
-                        <td style={{ textAlign:"center" }}>{l.followup_count || 0}</td>
-                        <td style={{ fontSize:11, color:"#94a3b8" }}>
-                          {l.last_followup ? new Date(l.last_followup).toLocaleDateString("en-IN") : "—"}
-                        </td>
-                        <td style={{ fontSize:11, color:"#94a3b8" }}>
-                          {new Date(l.created_at).toLocaleDateString("en-IN",{ day:"2-digit", month:"short", year:"numeric" })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ════════════ MASK — shown for BDA, hidden for CEO ════════════ */}
+        {/* ════════════ MASK — BDA users see this, CEO does not ════════════ */}
         {!isCEO && (
           <div className="rp-mask">
             <div className="rp-mask__box">
@@ -491,8 +515,6 @@ const BDAReports = ({ role }) => {  {/* ← ACCEPTS role PROP */}
         )}
 
       </div>
-      {/* ── END MASKED CONTENT ── */}
-
     </div>
   );
 };
