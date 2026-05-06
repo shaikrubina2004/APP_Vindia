@@ -2,7 +2,7 @@ const pool = require("../config/db");
 const { insertNotification }    = require("./pcNotificationsController");
 const { insertMEPNotification } = require("./mepNotificationsController");
 const { insertNotification: insertQSNotification } = require("./qsNotificationController"); // ✅ correct import
-
+const createSENotification = require("../utils/createSENotification");
 /* ─── HELPERS ─────────────────────────────────────────────── */
 
 function calcDeadline(priority) {
@@ -96,6 +96,60 @@ async function notifyByRole(userId, type, title, description, link, severity, re
     console.error("notifyByRole error:", err.message);
   }
 }
+
+//SE
+async function notifyByRole(userId, type, title, description, link, severity, referenceId) {
+  if (!userId) return;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT r.name, r.code 
+       FROM users u 
+       JOIN roles r ON r.id = u.role_id 
+       WHERE u.id = $1`,
+      [userId],
+    );
+
+    const roleName = (rows[0]?.name ?? "").toLowerCase();
+    const roleCode = (rows[0]?.code ?? "").toLowerCase();
+
+    // 🎯 STRUCTURAL ENGINEER (MAIN FIX)
+    if (roleCode === "structural_engineer" || roleName.includes("structural")) {
+      await createSENotification({
+        type,
+        severity,
+        title,
+        description,
+      });
+
+      console.log("✅ SE Notification Sent");
+      return;
+    }
+
+    // QS
+    if (
+      roleName.includes("quantity") ||
+      roleName.includes("qs") ||
+      roleCode.includes("qs")
+    ) {
+      await safeQSNotify(userId, type, title, description, link, severity, referenceId);
+      return;
+    }
+
+    // MEP
+    if (roleCode === "mep_engineer" || roleName.includes("mep")) {
+      await insertMEPNotification(userId, type, title, description, severity, referenceId ?? null);
+      return;
+    }
+
+    // DEFAULT → PC
+    await safeNotify(userId, type, title, description, link, severity, referenceId);
+
+  } catch (err) {
+    console.error("notifyByRole error:", err.message);
+  }
+}
+
 
 /* ══════════════════════════════════════════════════════════════
    ROLES + USERS
