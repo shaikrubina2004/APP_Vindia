@@ -35,8 +35,8 @@ const signup = async (req, res) => {
       name: trimmedName,
       email: trimmedEmail,
       password: hashedPassword,
-      role_id: 1,
-      status: "active",
+      role_id: null,       // ✅ was: 1
+      status: "pending",   // ✅ was: "active" — admin should activate
     });
 
     res.status(201).json({ message: "Signup successful", user });

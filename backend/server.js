@@ -70,6 +70,7 @@ const qsNotifRoutes = require("./routes/qsNotificationRoutes"); // ← NEW
 /* ── BDA / Leads ───────────────────────────────────────── */
 const leadRoutes = require("./routes/leadRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const metaRoutes = require("./routes/metaRoutes");
 
 const app = express();
 
@@ -171,6 +172,7 @@ try {
   /* ── BDA / Leads ───────────────────────────────────────── */
   app.use("/api/leads", leadRoutes);
   app.use("/api/reports", reportRoutes);
+  app.use("/api/meta", metaRoutes);
 } catch (err) {
   console.error("❌ Route loading error:", err.message);
 }
