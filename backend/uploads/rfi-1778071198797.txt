@@ -1,0 +1,1378 @@
+Basics of modern and successful search engine optimization in this comprehensive SEO fundamentals course.
+1.Intro and Curriculum
+
+Hi and welcome to this introductory course about the fundamentals of search engine optimization.
+
+My name is Johannes Wolff, and in this course, I'll teach you a solid understanding of modern and
+
+practical search engine optimization.
+
+We'll begin by looking at the absolute basics what the search engine optimization even mean.
+
+What is a search engine and how do they work?
+
+Will then look at the three processes a search engine must complete to display websites on the search
+
+results page.
+
+Crawling, indexing and ranking for each of these steps will detail how they work and how we can do
+
+our best to support the search engine and be found by searches on the Web.
+
+Afterwards, we talk about the critical topic of keyword research.
+
+What does our target audience want?
+
+What are they looking for and how can we provide this content for them so that search engines will consider
+
+all of.
+
+On page, as you'll see next extensive section of the course where we will begin to get a bit more practical.
+
+How can we best offer our content, what elements we need to know, and how do we implement them correctly?
+
+We'll even get a bit more technical.
+
+You look at how websites actually work and how we can work together with developers and admins to make
+
+our website the absolute best.
+
+Finally, we talk about how we can get our content and our website out there with link building.
+
+This way we can make sure that all the effort we put into content structure and website optimizations
+
+pays off and we can reap the well-deserved reward for our work in the form of qualified organic traffic
+
+from search.
+
+We have a lot to talk about and I hope you are just as excited as me to get started.
+
+
+2. Brief intro Search Engine Optimization :
+
+As here is an abbreviation for search engine optimization.
+
+Search engine optimization focuses on ensuring that more qualified visitors come to our website through
+
+so-called organic search results.
+
+Organic in this case means just that they are not paid for.
+
+If you search for something on Google, for example, you usually get some sponsored results at the
+
+top of the search results, which are paid ads.
+
+These can be recognized by this small label at right next to them.
+
+The normal search results are done displayed below through ACL.
+
+We try to position our page for relevant search queries as best as possible.
+
+Ideally, we appear among the first results to attract as many interested people as possible to our
+
+website, even though we are talking about search engine optimization.
+
+It is important to understand right at the beginning that our efforts should focus more on the people
+
+searching than on the search engines themselves.
+
+We want to understand exactly what people are searching for on the Internet, what answers they expect,
+
+how these searches are formulated, and what content we can provide.
+
+To meet these searches, we go into more detail about why optimizing for search engines is increasingly
+
+turned into optimization for humans.
+
+Later on in this course, of course, we have to make sure that the search engines are able to read
+
+and understand all content correctly.
+
+And we cannot always assume that everything a human being can recognize and understand can be interpreted
+
+by a bot in the same way.
+
+At the end of the SEO fundamentals course, we will therefore have looked at both sites and learned
+
+how to set ourselves up and optimize all content correctly for both humans and search engines and dashboards.
+
+
+3. What is Search  Engine ?
+
+A search engine determines which website is the best on a particular topic.
+
+Search engines are made to find answers to queries.
+
+They answer engines, so to speak.
+
+The queries do not always have to be questions, though they can also be individual words or short sentences.
+
+In this case, the search engine simply needs to find relevant content on the given topic.
+
+A search engine obviously cannot start looking for answers only at the very moment this query is made.
+
+The Internet contains a vast amount of content and would take forever to search and sort through it
+
+on the fly.
+
+Users, after all, expect a direct answer from search engines.
+
+That's why they use a three step process.
+
+First, they find content on websites, which is what we call crawling.
+
+They then store this content in a huge database called an index.
+
+This step is called indexing.
+
+And last but not least, the search engine forms a so-called ranking by organizing the content.
+
+The order is based on how relevant and good the content is for certain search queries and is identical
+
+to the way in which the organic results are displayed to us in the search results.
+
+But what does organic mean?
+
+We call search results organic.
+
+When they are displayed in the search without having been paid for the work we do.
+
+And search engine optimization is to make sure that our content can get a high position within these
+
+organic results.
+
+In addition to these results, there's also content on the search results pages that appear set as a
+
+result of being paid for.
+
+For example, we are paid at these results are however marked with the about at and are usually displayed
+
+above organic results in the first couple of years.
+
+When search engines were first developed, the results were easily identifiable.
+
+Organic results were simply represented as a list of ten blue links, and later a few clearly labeled
+
+ads were added.
+
+But nowadays, there's more information and content on a search results page, which can further distract
+
+users from the actual organic results.
+
+The search results page is often referred to as SERP, which stands for Search Engine Result Page.
+
+The new formats on this page are therefore called search features and they are quite a lot of them.
+
+For example, there can be answer boxes that contain a direct answer to a specific question, but also
+
+similar questions or carousels with images or videos are now displayed relatively high up for certain
+
+search queries.
+
+Some of these new search features can be achieved organically through optimizations to our website,
+
+so there's no need to pay extra for them.
+
+These include, for example, the answer boxes that provide a short answer to a specific question.
+
+Some of these features cannot be achieved with a normal website at all because Google gets the information
+
+from proprietary data sources like Wikipedia.
+
+4. Why is SEO important ?
+
+There are many different ways to bring traffic to a website.
+
+It can be through social media, can be through paid advertising or sponsored content that brings people
+
+to us.
+
+However, the majority of all online traffic is generated by search engines, and when it comes to search
+
+engines, organic results are significantly more popular with users because they are ultimately more
+
+credible.
+
+Nobody has paid for the fact that their own website is suggested.
+
+A study in USA, for example, showed that only about 2.8% of users click on paid ads in their search
+
+results page.
+
+This means that organic ranked pages with zeal have about 20 times the potential of pay per click ads.
+
+And this applies to both desktop search and mobile.
+
+Another, if not the biggest advantage of search engine optimization compared to other digital marketing
+
+efforts is that genuinely long term and long lasting improvements can be made.
+
+How does it work?
+
+Just one good piece of content on a website through targeted placement and optimizations for SEO can
+
+unleash a kind of snowball effect that brings qualified visitors to your website on a permanent basis.
+
+PPC or pay per click advertising, on the other hand, requires continuous funding to get more visitors.
+
+If you stop paying for your assets, you will immediately stop getting new traffic.
+
+In order to use this immense advantage for us.
+
+We have to make sure that not only good and relevant content is available on our website.
+
+It is also important that we optimize it in such a way that it can be easily recognized by search engines
+
+and indexed accordingly.
+
+So can I do as your myself or do I need an agency or consultant?
+
+Well, this brings up the question do you prefer to pay in money or time?
+
+Naturally, this always depends somewhat on the individual situation.
+
+Above all, you have to consider whether you would rather invest time and your own willingness to learn,
+
+or whether you would rather invest some money.
+
+In the case of smaller and less complex websites, especially those of companies that perhaps only do
+
+business locally or regionally, some things can certainly be done without a great deal of prior knowledge.
+
+If it is a company that operates nationally or even internationally with multiple locations, complex
+
+website structure and individual solutions are needed, then it may be worthwhile to look into the possibility
+
+of getting professional help for search engine optimization.
+
+Either way, both approaches are better than neglecting the topic and thus possibly not using one of
+
+the most important digital marketing channels out there.
+
+What do you try as you or your self or looking for a partner?
+
+It's important to work professionally or find reputable agencies because when it comes to search engine
+
+optimization, there's always a chance of making mistakes.
+
+And these mistakes can ultimately do more harm to a company than good.
+
+5.  White Hat and Black Hat SEO - The right and wrong way to optimize a Website  :
+
+When it comes to us here, there's a right and a wrong way to do it.
+
+Oftentimes also known as white hat and black hat as you the terms white hat and black hat originate
+
+from Western movies.
+
+In Westerns, the good guys often wore white hats and the bad guys wore black hats the same way the
+
+terms are applied to the topic of Sue by Whitehead Seale.
+
+We refer to all the techniques and actions that adhere to the rules of search engines and simply strive
+
+to make the experience better for all users.
+
+Black Hat SEO, on the other hand, refers to techniques and measures that are primarily intended to
+
+deceive or cheat the search engines in order to get a better ranking.
+
+This involves trickery and the use of shady processes.
+
+Even though this might still work in individual cases.
+
+The search engines are very eager to detect and punish these tactics so that truly good and relevant
+
+results can be displayed in search.
+
+By using black it as your tactics.
+
+Whether you do it yourself or an agency does.
+
+You can do a lot of damage to your own company, or rather your own website.
+
+For starters, how do search engines themselves feel about as you the major search engines pursue similar
+
+goals as SEO industry?
+
+Ultimately, it is always about showing the searchers the best possible results.
+
+Since search engines have become very good at searching how good or bad, how relevant or appropriate
+
+a piece of content is.
+
+CEOs are usually out to create this excellent content and thereby have the search engines with their
+
+goal.
+
+Google itself offers a guide starter guide to search engine optimization, which can definitely be used.
+
+Additionally to discover.
+
+Furthermore, many Google employees actively participate in discussions on the topic of Assume.
+
+For example, on Twitter.
+
+They also regularly attend large SEO conferences in order to gain and offer insights to strengthen the
+
+Common Core.
+
+Besides, all major search engines actually publish guidelines that specify which measures are acceptable
+
+and which are not.
+
+Strictly speaking, the basic essence or underlying principle is the same for all of those guidelines.
+
+You shouldn't try to trick or deceive the search engine.
+
+Instead, the focus should be on providing a great online experience for users.
+
+6. Is SEO relevant outside of Google? Are there other Search Engines?
+
+This is a difficult question to answer.
+
+If you look at it in a completely neutral way based on only numbers, the simple answer is probably
+
+not.
+
+Google has by far the largest market share, and although there are about 30 major search engines on
+
+the web, numerically, there's none that is even remotely as dominant as Google and Google image search
+
+maps and YouTube, which is also a Google product.
+
+And over 90% of all Web searches take place on Google now.
+
+This already sounds like a lot, but to put it in more perspective, that's about 20 times as many searches
+
+as your closest competitor, Bing and Yahoo!
+
+Combined.
+
+You can say whatever you want about Google's virtual monopoly.
+
+If you want to generate a lot of traffic through SEO, you probably won't be able to get past the big
+
+G for now.
+
+There are, of course, special cases in which a focus on Google does not necessarily make sense.
+
+In this beginner's guide, however, we will relate the majority of things to Google specifically for
+
+the simple reason of the absolute numbers at hand.
+
+All starting with the guidelines.
+
+Webmaster Guidelines from Google.
+
+Google publishes and updates guidelines for webmasters that summarize some basic principles.
+
+The full guidelines are linked with this video.
+
+But let's briefly summarize the essence.
+
+Basic principles that should be followed are websites should be created for users and not for search
+
+engines.
+
+Neither users nor search engines should be deceived.
+
+More tricks or cheating to manipulate the ranking.
+
+Think about what makes your website unique and valuable.
+
+Now some things that we should avoid at all costs.
+
+Content that is automatically generated buying and or exchanging links creating pages without original
+
+content so stolen or duplicated content and showing search engines different content than we show users.
+
+Understanding and fulfilling user intentions.
+
+It is actually much easier to create our own website and content in such a way that we are in the best
+
+possible position for search engine optimization.
+
+We shouldn't waste too many thoughts on paying attention to this or that or avoiding to solve that.
+
+At the very core, we should create our content with the goal of understanding our target audiences
+
+intentions and desires and helping them fulfill them.
+
+When someone searches for something using a search engine, they have a specific result in mind a goal
+
+we call the disclose user intent, and we have to fulfill it with our website.
+
+There are several categories of this the most common ones being informative.
+
+A user is looking for specific information.
+
+For example, this can be a search query such as which smartphone has the best camera.
+
+Internet navigation users looking for a specific website, for example, Wikipedia.
+
+Transaction.
+
+A user wants to buy something and searches for it.
+
+Example would be Black Friday deals on laptops.
+
+You can always get a good idea of what the user intent is for specific queries by taking a look at the
+
+current results on the search results page.
+
+Search engines have become really good at displaying the right relevant content.
+
+So if a lot of images or videos are shown for a particular search, then that usually reflects what
+
+the users want.
+
+And we should also focus on visual content when it comes to this topic.
+
+Looking at the search engine result page for the very best gaming console, it seems like users are
+
+expecting some sort of top list with different consoles listed, including their strengths and weaknesses.
+
+So if we publish relevant and high quality content on our website, then we build trust, increase our
+
+credibility and reliability, and at the same time, we can actually improve our performance in search.
+
+But before we blindly jump into the topic of SEO, we should briefly think about what we actually want
+
+to achieve with it.
+
+7. . How to define good goals for SEO ?
+
+Not only the goal of the search engine and the wishes of our target group are important.
+
+We also need to know what our own goal is in terms of SEO.
+
+Websites exist for a wide variety of reasons.
+
+Some are for entertainment.
+
+Others are closely tied to actual companies and aim to strengthen their business.
+
+To define goals that we can support with SEO, it is important to first start with overall business
+
+goals and then see how search engine optimization can help support them.
+
+To this end, we find important KPIs, key performance indicators that we can use to measure how well
+
+our search engine optimization is performing.
+
+Simply put, what numbers do we want to monitor to determine if our efforts are really paying off?
+
+A few commonly used tips would be downloads, newsletter, email, sign ups, sales calls, audits.
+
+Not this list may be missing two things that you would actually expect.
+
+There is no mention of ranking anywhere, meaning where our website is positioned in the search engine
+
+results.
+
+On top of that, we haven't even mentioned the number of visits to our website.
+
+Some of you may be thinking, I want to learn more about SEO, but ranking and visits aren't important
+
+at all.
+
+That's obviously not true, but our search rankings and resulting website traffic are really just a
+
+means to an end.
+
+Of course, we want to bring as many qualified prospects to our website as possible, and as he always
+
+grateful, that emphasis is on qualified though.
+
+After all, these people should be business relevant to our company.
+
+Let's say we run an online store.
+
+Now, which scenario would be a greater success for us?
+
+10,000 monthly visitors and 100 sales in our store, or a thousand monthly visitors.
+
+But over 500 says it is obvious which variant makes more sense from a business point of view.
+
+So before we start optimizing our website for search engines, the sensible thing to do is think about
+
+what we want to achieve.
+
+Then we can use as a tool to achieve those goals and not the other way around.
+
+As Here is an incredibly important part of a successful online marketing mix.
+
+If we work diligently and consistently, we can strengthen our position in the long run and drive prospects
+
+to a website on a permanent basis.
+
+And of course, we will present all the important and relevant parts of successful and modern search
+
+engine optimization.
+
+And we hope to be able to give us many people as possible a first insight to this interesting topic.
+
+
+8. How do Search Engines work?
+
+We have already learnt that a search engine is basically nothing more than a machine that answers questions
+
+or at least tries to.
+
+In order for a search engine through its job as well as possible, it must of course have a good answer
+
+already for an extremely large number of different questions on a wide variety of topics.
+
+The search engine itself is not an omniscient oracle and cannot simply answer the questions itself.
+
+Instead, it searches all of the Internet, all of the websites, and all of the content for information
+
+in order to show the person searching the most relevant possible selection of available sources on the
+
+topic in question.
+
+To accomplish this task.
+
+Search engines worked using three main operations crawling here, the entire Internet, every freely
+
+accessible website and URL is scanned for content.
+
+Indexing.
+
+The discovered content from crawling is stored in what is called the index of the search engine and
+
+can then be displayed in the search from this index.
+
+And finally, ranking the ranking of the search engine tries to determine through various factors.
+
+Which content offers the best possible answers to any given search query so that the most relevant results
+
+can be displayed at all times.
+
+So let's begin with crawling.
+
+The term crawling refers to the process in which a search engine sends out bots or so-called spiders
+
+to find new and updated content on the internet.
+
+Crawling comes from the nickname of the bots.
+
+Like I said, spiders as they crawl.
+
+The content that the bots search for can be anything from an entire website to images, videos, PDFs,
+
+everything that is available online.
+
+No matter what format the content has, one fact stays the same.
+
+This content is found through the links.
+
+Google bot starts by visiting some web pages and then follows the various links on these web pages.
+
+In this way, the bot discovers more and more new pages and content that may provide answers or information
+
+to specific search queries.
+
+This content is then added to the Search Engines Index.
+
+What is a search engine index?
+
+Search engines processed, the information they get from bots and crawlers and stored a content they
+
+consider good enough in what is called an index.
+
+This index is actually nothing more than a huge database of all the content the search engine has found
+
+and deemed relevant.
+
+Now, what does ranking mean in terms of search engines?
+
+When a person searches for something using a search engine, this search engine obviously doesn't just
+
+display all the content from its index that might fit the topic in some arbitrary order.
+
+Instead, it tries to rank the results by relevance so that the content that best fits the search intent
+
+is displayed first.
+
+And this is called ranking.
+
+In general terms, we can say that the higher the position of a particular page in the search results,
+
+the more relevant it is classified by the search engine for that specific search query.
+
+In the section, we will take a closer look at these three phases and steps that the search engine must
+
+complete.
+
+In doing so, we will learn what we should do to ensure that our own website is as well prepared as
+
+possible, and that a search engine has no problems finding, crawling and indexing the page.
+
+Because even though search engine optimization nowadays has a lot to do with optimization for the actual
+
+users or humans, we still have to make sure that search engines have no problems with our website.
+
+9. Can Search Engines find my Website?
+
+We already learned that the requirement for a website to appear in the search results is that the crawlers
+
+and bots of the search engine are able to find a website on the Internet, able to visit it and added
+
+to the index.
+
+So if you already have a website now, it's exactly the right time to check whether this website is
+
+already indexed and can be found by Google Search.
+
+To do this, we have basically two different possibilities.
+
+We could simply use the Google search directly and use a special search operator.
+
+We can just enter site call on my domain dot com.
+
+So in my case, I could, for example, search for side colon digitalis, Hoffa's body, which is one
+
+of our websites for the search operator.
+
+We can tell Google, I only want to see results from this domain, meaning from this particular website.
+
+If we don't specify any other search terms after that, Google will simply show us all pages indexed
+
+from this website.
+
+It is important to mention here that to display a number of results which this about this number of
+
+results right below the search bar should not be interpreted as a reliable statement about exactly how
+
+many pages are indexed from this domain.
+
+The number can, however, give a rough overview of how many URLs are indexed.
+
+If you want more accurate numbers and more information, key figures and analytical reports about your
+
+own website and indexed and in Google Search, you can create a free Google Search console account.
+
+Using this tool, we can directly submit site maps for our website and ask the search engine to indexed
+
+URLs and their content.
+
+We will then also get information directly in the dashboard, whether this happens or if something didn't
+
+work out.
+
+So before we continue, let's take a quick look at how we can create a search console account and link
+
+it to our website.
+
+In order to create a search console account.
+
+You will have to go to search dot Google dot com slash search console and will probably see a screen
+
+that looks a little something like this.
+
+If you want to, you can read up on all the information about the search console on this page.
+
+But let's skip to the point and click on the big start and all.
+
+But now, since I'm already locked in with my Google account, this will bring me personally to my search
+
+console and will have my last selected property shown here.
+
+If you do not have a search console account, you will be prompted to log in with your Google account.
+
+Could be a gmail or Google business account and then you will be prompted to create and your property.
+
+And this is exactly what we are doing now.
+
+So in my case, since I already have properties here, I have to click on this dropdown and select add
+
+property down here.
+
+If I do that, I can choose between two different property types.
+
+Domain or you are a prefix.
+
+The URL prefix is the old model.
+
+So for any new domain, I would encourage you to choose a domain since this will include all subdomains.
+
+So m dot org w w w thought it will work regardless of protocols or etps or htp, but it does require
+
+DNS verification.
+
+If you don't know how to do this yourself, you can easily contact your hosting or domain provider or
+
+your webmaster or developers if you have them.
+
+But let's start and I would begin by entering my domain here, which is content creator school.
+
+Dot com.
+
+As soon as I've done that, make sure that down or type was in your domain.
+
+I can click continue.
+
+This is verifying my property and it already tells me what the next steps are to verify it.
+
+It has automatically recognized where my domain is located, which is GoDaddy dot com for me and I can
+
+now continue with the verification process.
+
+So for me, this is correct.
+
+I don't have to select anything else here and I can start verification.
+
+This will bring me to GoDaddy page and will prompt me to log in.
+
+Where do you get this exact same process?
+
+Depends on where your domain is located.
+
+And this might be just as straightforward as it is here for me, or it might be more complex.
+
+But you can always get support from your domain host or your developers or webmasters if you need to.
+
+So let me log in here real quick and then we'll continue.
+
+I am now logged in and all I have to do is pretty much confirm that I would like to authorize Google
+
+to verify my domain content creators.
+
+Google dot com.
+
+So let's click on Connect.
+
+We are going back to our search console.
+
+And should see this ownership verified that now this happens almost in real time.
+
+So you might initially when going back see a pop up that the verification has failed.
+
+But don't worry, just reload the page a minute or two later and it should work again.
+
+If you have any trouble verifying your domain, you should contact your domain provider or your developers
+
+or webmasters to have them manually set the appropriate DNS records.
+
+Now that this has worked for us, I can say that I go to property which were in the Google search console
+
+back end bring up mine you property.
+
+I can see it here content creator school.
+
+And in the beginning this is of course empty because Google will only now start collecting data on the
+
+search performance for our website.
+
+If your website doesn't show up on here, it's not necessarily a cause for concern yet.
+
+This can be due to several reasons.
+
+The most common ones being the website is still very new and has not yet been found by the crawler.
+
+The website is not linked to any other websites.
+
+The navigation structure of the website is difficult for crawlers to understand, and therefore the
+
+content cannot be crawled effectively.
+
+The website itself blocks the search engine bots by giving certain crawler instructions.
+
+The website has been penalized by the search engine for a policy violation.
+
+If you use search console audit site called on my website dot com operator and search, you may notice
+
+that important pages are missing from the index.
+
+On the other hand, there may be rather unimportant pages of your website indexed that don't actually
+
+need to appear in search.
+
+This is not a bad thing because we have ways to have the bots and crawlers off the search engine to
+
+search and find the content that is important for us and to direct our focus to the right pages or directly
+
+exclude unimportant pages.
+
+People often worry about Google not finding important sub pictures on the website.
+
+However, we tend to overlook the fact that there are actually some pages on every website that are
+
+completely irrelevant for search and that we do not have to have indexed.
+
+These can be special landing pages for limited time offers or pages, imprint or tests, as opposed
+
+to trying to index certain pages, which can be difficult.
+
+It is actually quite easy to exclude unimportant pages from indexing.
+
+The easiest way to do this is to use a simple text file called Robots.txt Text.
+
+10 . The important robots.txt File  :
+
+The Robot store text file is a very basic text file that is placed in the root director of a website.
+
+This means simply that the file can be accessed at the URL.
+
+My website dot com slash robot store text in the file.
+
+We can use plain text instructions to specify how Google or other search engines or bots should or should
+
+not crawl our website.
+
+Now.
+
+How is this robots text treated by Google?
+
+If Google does not find any robots or text file on the website, then the entire website can be crawled.
+
+If Google does find a robot text file in the root directory, then the instructions to report content
+
+are usually taken into account.
+
+If Google finds an error when trying to read the robot's text file and cannot definitely determine whether
+
+the file exists or not, then the entire website will not be crossed.
+
+What is your budget and do I need to worry about it?
+
+The term for a budget comes up again and again in search engine optimization and often causes uncertainty
+
+and also fear, especially among beginners, as to whether their own site can actually be created in
+
+its entirety for much.
+
+It simply means the average number of pages that the Google bot cross before it leaves the website again.
+
+Therefore, by excluding irrelevant pages, we can ensure that the scribe budget is used as efficiently
+
+as possible and is not wasted on these irrelevant pages.
+
+At this point, however, we must definitely mention that Croy budget and the corresponding optimizations
+
+actually only start to play a real role for very large websites with thousands or tens of thousands
+
+of sub pages.
+
+A small website with a few hundreds of pages will definitely be crawled completely by Google, but you
+
+don't need to worry at all here.
+
+Nevertheless, it's hardly ever a bad idea to exclude pages that really don't need to show up in search.
+
+To all but respect this robot's text file.
+
+And how can I best protect more sensitive areas of my website?
+
+Many newbies who hear about this robot text file for the first time try to directly at everything.
+
+They don't want to be searched by bots to it.
+
+However, it's important to note that the instructions in this robot's file are only a hint.
+
+Crawlers, such as the Google bot and other search engine bots usually respect these instructions.
+
+However, there are other bots on the internet that automatically try websites.
+
+Their aim is often not to find content and index pages, but to steal data and obtain sensitive information.
+
+Therefore, it's not advisable to block really sensitive areas and pages of a website.
+
+Indy robot still text file after.
+
+Right.
+
+The fact that this file is publicly viewable means that malicious bots can directly detect which pages
+
+you do not want to be searched and can target these pages specifically and searching for information.
+
+A better approach to protecting these sensitive pages is to use the no index tech and protect the pages
+
+with passwords so that no unauthorized person can access them.
+
+If you don't know anything about the new index tech or the concept of meta attacks in general, don't
+
+worry.
+
+We'll also go into more detail about them later on in this course.
+
+The important takeaway his data and content that should not be found by bots no matter if harmless or
+
+malicious, must be protected by passwords.
+
+So, for example, are looking to really be absolutely safe.
+
+11 . How to check if your Website is accessible for bots and crawlers ?
+We've already talked about how to avoid that Googlebot finds and cross relevant pages and index system.
+
+Now it's time to ask ourselves what we can do to make sure that the board finds all the important content
+
+and pages and adds them to research index.
+
+We need to ensure that crawlers can find and access the content bearable.
+
+They want to check if we can find everything.
+
+We should ask ourselves the following questions Is content on our site protected by logins?
+
+We have talked about the fact that logins or passwords are the safest way to protect content from bots,
+
+especially malicious ones.
+
+Therefore, if a login questionnaire or any other form needs to be filled out in order to view the content,
+
+Googlebot will not be able to see it because crawlers will never log in.
+
+Search forms required to view content but can use searches.
+
+Many newbies assume that if people can find anything on a website using the search, then bots and crawlers
+
+can too.
+
+But that's not the case because bots do not use search.
+
+After all, they don't know what to search for in the first place.
+
+There are parts of the text not displayed as actual text on all website.
+
+What we mean by this somewhat complicated question is the following parts of the pages textual content
+
+embedded as an image, gif or video, for example, but can only interpret to him.
+
+I called off the website and read the text that has been included in it.
+
+Text that is on top of an image will not be understood by the bot and would therefore possibly be ignored.
+
+Of course, parts are getting smarter here too, and Google in particular is working a lot on automatic
+
+image recognition.
+
+But we cannot currently assume the texts on an image would be correctly recognized and taking into account.
+
+Can the bot follow all website navigation the same way that the bot came to our website?
+
+Yeah.
+
+An external link.
+
+It needs other links that can lead to other pages on our website.
+
+The internal links that connect individual pages represent the path that a bot can follow on our website.
+
+Therefore, we have to make sure that all the pages we want indexed are accessible through these links.
+
+For example, from our menu or through links into content on our sub purchase.
+
+If a certain page of our website is not linked to from anywhere, then it's virtually impossible for
+
+a crawler to find it and it will not be indexed.
+
+Common errors that can cause spots to have trouble following the navigation are the following.
+
+The website has different navigations with different links.
+
+For mobile devices and desktop devices.
+
+The navigation does not consist of extreme elements, but is generated by JavaScript, for example.
+
+Search engines, especially Google, are getting better and better at recognising these navigation structures
+
+as well.
+
+But the best choice is still a standard implementation using HMO code, excessive personalization and
+
+navigation so that different links are displayed for different visitors.
+
+This approach may even look like cloaking to a search engine and might cause a guideline violation which
+
+would cause the website not to be indexed.
+
+The absence of links to important pages of the website.
+
+In the main, navigation links are the path for bots and therefore this should be made as effortless
+
+as possible, especially when it comes to the most important pages.
+
+It is incredibly important that our website has a sensible, comprehensible navigation as well as logical
+
+structures, so that crawlers are able to find all the content we want them to find.
+
+12 .  Why proper Information Architecture matters ?
+Do we have good and simple information architecture?
+
+Information architecture is the term we use to describe the structure or the way we sort categorize
+
+and display our content with a good information architecture.
+
+We make sure that no one has to search for anything on our website for a long time.
+
+Instead, navigation is intuitive, and visitors and bots alike find their way to the next page and
+
+the content they want to see without much thought.
+
+Do we use site maps?
+
+A site map is really nothing more than a list of URLs to all the pages on our website.
+
+A crawler can use this list to find and index relevant pages.
+
+The easiest way to make sure that Google finds all the pages that are most important to us is to create
+
+such a sitemap and submit it to the Google search console.
+
+It is important to know that submitting the sitemap is not a substitute for good page navigation or
+
+information architecture, especially since these are immensely important for actual users and human
+
+visitors.
+
+However, the sitemap can definitely have crawlers find and index pages that may be linked to less frequently
+
+on our page.
+
+Let's take a brief look at a site map and how we can submit it in the Google search console.
+
+We are currently looking at the automatically generated sitemap for the content creator school dot com
+
+website, which is still just a template, but we can see that we do have some duress listed here.
+
+This particular sitemap was auto generated by a block and we are using on this WordPress side called
+
+the ACL framework, but there are many ways in which a site can be generated.
+
+I can also take a look at the usual exam l layout of the sitemap by just right clicking here and selecting
+
+view page source.
+
+And this is how a site map would usually look.
+
+We can see that we have a lot of as you.
+
+So one of these blocks represents a URL.
+
+Then we have the location parameter, which is your anti last mod parameter which specifies when this
+
+page was last modified.
+
+And then we just have this list that goes on and on and on and we can see that the location of our sitemap
+
+is this your.
+
+So content creator school dot com slash sitemap dot and this is what we're going to need in the search
+
+console.
+
+So I'll just copy it and let's jump back over to our search console account where we are now just logged
+
+in and have our content creator school dot com properties selected in the left column.
+
+Under the section index I can find site maps and if I click on this, I can see that there are no site
+
+maps currently submitted.
+
+I can now add to my site, my PUA, which is what we've just copied.
+
+So content creator school dot com slash site map thought examiner.
+
+Make sure that there are no typos and here and then submit the site by clicking the button.
+
+After short loading time, we should get this message that this site was submitted successfully.
+
+Click on got it.
+
+And we can see that we have now listed one submitted site map here, the date when we submitted it when
+
+it was last read by Google and the status so we can see success.
+
+Everything worked out.
+
+12th URLs were discovered.
+
+If we come back to you for a second, those are exactly that way.
+
+If you are URLs listed in our site map here.
+
+So everything worked and we can now assume that Google knows about this URLs and that they might be
+
+crawled in future visits of the crawler to our website.
+
+Make sure to only list those you are as in the site for Google that should be indexed so that the crawler
+
+gets clear instructions.
+
+It makes no sense to exclude certain pages via the Robert's text file or matter text, only to list
+
+them again in the sitemap.
+
+The same applies if there are duplicate pages on a website.
+
+In this case, only the preferred you are should be included in the site map and other URLs that point
+
+to the same page.
+
+I'll just admit the site map can be especially helpful if there are no other websites linking to your
+
+website yet.
+
+Perhaps because it is still very new or just not well known.
+
+Submitting the site map is not a guarantee that Google will actually crawl the URLs, but it's definitely
+
+worth a try.
+
+Do Crawlers encounter errors when accessing our website?
+
+While a bottle crawler is on our Web site.
+
+It may happen that arasaka if we go to the index section in our Google search console account, we can
+
+see these errors.
+
+This is where we can find server errors and not found errors should they occur.
+
+Alternatively, we can also look at these errors and plenty of other information from server log files.
+
+However, these files and analysis are a very advanced topic, so we will not cover them in this beginner's
+
+course for own purposes.
+
+The listing in the search console is sufficient because we can see exactly on which pages the errors
+
+occur.
+
+But before we talk about what conclusions we can draw from this report, it's important to briefly look
+
+at the different errors and what they mean.
+
+13 . Different Error Types :
+400 records.
+
+A roller coaster start with a fall also called client errors.
+
+This means that, for example, due to a typo in the URL deleted page or something similar, a request
+
+is made to the server that it cannot fulfill.
+
+The most common and probably best known error in this category is the code for oh form, which means
+
+not font.
+
+In other words, the requested page cannot be found and therefore the user what gets an error message
+
+instead of the expected result for of errors are especially frustrating for human visitors and often
+
+cause them to leave the site.
+
+500 records while a record starting with a four hour client side are also starting with a five, also
+
+called server errors.
+
+In this case, the problem is that the server cannot answer the requests made to it properly or within
+
+a reasonable time.
+
+For example, a timeout occurs and a Google bot or any other bot abandons the request without being
+
+able to search for content.
+
+In many cases, server errors are triggered by the server receiving too many requests in a short period
+
+of time and not having enough processing power to answer them or properly.
+
+Errors of any kind are not only a problem for search engine bots, they are also a nuisance for the
+
+actual visitors and users of the website and they can easily to frustration and people leave the website
+
+and search for needed information elsewhere.
+
+Obviously we should avoid this at all cost.
+
+There are two ways how we can better deal with any kind of errors, create custom error pages and set
+
+up redirects to prevent fault or for errors happening on our site.
+
+Let's start with customer error pages.
+
+The default behavior when an error occurs is for the processor to display a rather unhelpful and unappealing
+
+error page to the users, which might look something like this.
+
+In this case, a visitor may be able to tell whether there appears to be an error or perhaps even recognize
+
+the cause of it.
+
+But still, it's not a good user experience because all that can be done at this point is to go back
+
+or enter a new are in the browser.
+
+This is precisely what frequently causes users to leave a website, and it's something we want to prevent
+
+under all circumstances.
+
+Instead of the standard error page, we can create a separate page to be shown in case of an error.
+
+On this page, we can try to explain as best as possible what went wrong and at the same time help users
+
+in taking sensible action.
+
+One example for a44 arrow would be to notify the user that we are sorry, but the requested page does
+
+not seem to exist.
+
+In addition, we provide links to the homepage and our most important pages so that users can continue
+
+browsing right away.
+
+Another good element for such an error page is a search function.
+
+A visitor can enter the information they are looking for and hopefully find the content they need on
+
+our website.
+
+Of course, this doesn't fix the error itself, but we do our best to make the experience as pleasant
+
+as possible for our users.
+
+14 . Redirects :
+
+Other than typos, which a user makes in the euro themselves, the most common cause of a fall for error
+
+or not found is moving or deleting content by the side owner themselves.
+
+It can occur, for example, when we remove outdated content from our website that is nevertheless linked
+
+to from other sites or from search.
+
+If the page no longer exists because we deleted it, we naturally get this error.
+
+Many times we simply change the URL off a page as part of optimizing our information architecture.
+
+For example, let's say we created a website and initially worked with very confusing structures.
+
+Since we didn't really know anything about the subject matter.
+
+This has led to the fact that a simple article on SEO now appears under the euro content creator school
+
+dot com slash block slash articles slash topic.
+
+SEO slash.
+
+Create a google search console account.
+
+Meanwhile, we know that having an organized structure and clear information architecture is tremendously
+
+important for a website.
+
+So we would like to adjust the euro for this article.
+
+Our new one would be content creator school dot com slash as the own slash create a google search console
+
+account so the content still exists on our website.
+
+But now if someone goes through the audio URL or click on the link, that's two points to the URL.
+
+They will get a A-4 for a Roswell.
+
+Fortunately, we have a simple way of making this change easy for search engines as well as for users
+
+and visitors.
+
+So-called redirects.
+
+We distinguish between mainly two different types of redirect.
+
+Decode.
+
+301 indicates a permanent redirect and a code 302 is a temporary redirection.
+
+By setting up such a redirect, the request of the auditor will no longer generate an error.
+
+Instead, users of bots will be redirected automatically to the new era and get exactly the content
+
+they were looking for.
+
+Temporary redirects do not play a huge role in search engine optimization.
+
+You can imagine them a bit like a rort that has to be repaired.
+
+It will be closed for a short time, but after the work is done, it will be back to normal just like
+
+before.
+
+More interesting for us is 301 redirect, which makes sense when we want to make the same content permanently
+
+accessible under a different aura as an example.
+
+Let's take a quick look at the effects in different areas.
+
+If we format A, you are accordingly.
+
+And what happens if we don't use it?
+
+Experience?
+
+We've already mentioned it with a proper 301 redirect.
+
+Even users who go to the audio arena won't get to the content they want and not really notice anything
+
+except maybe a short delay.
+
+And did you want a change without the redirect?
+
+Users will probably get a440 and get frustrated and leave our website because they can't seem to find
+
+the content they want.
+
+Indexing.
+
+By redirecting, we signal to the crawler that this content can now be found at this new you are.
+
+The search engine can therefore update the entry in the index and displayed in new.
+
+You are in the search results without a redirect, the crawler gets the same error as our user.
+
+This does not technically harm the status of our website.
+
+At first, however, a search engine with sooner or later remove already indexed content that results
+
+in an error and we will lose valuable search traffic and visitors who could have come to our website
+
+from the search engine.
+
+Change redirects should be avoided.
+
+It can be difficult for both users and search engine crawlers if a page is reached only after multiple
+
+redirects.
+
+This phenomenon is also known as a redirect train or change redirect.
+
+As such, we should try to avoid it as much as possible.
+
+Let's look at an example.
+
+We use a redirect to change example dot com slash shop two example dot com slash offers.
+
+Now we want to change the URL again and instead of example dot com slash offers send users to example
+
+dot com slash select.
+
+Instead of having to go through tool redirect.
+
+We can simply redirect both.
+
+Example dot com slash shop and example dot com slash offers directly to example dot com slash select.
+
+Perhaps you can see the whole thing a bit more clearly in this chart.
+
+We have now done everything we can to ensure that our website is easily accessible and that search engines
+
+and the crawlers and bots can find and access all the content.
+
+The next step, naturally, is that we want the content found to be indexed as well so that it can actually
+
+show up in searches.
+
+15 .

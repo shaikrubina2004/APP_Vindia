@@ -1,7 +1,14 @@
+
 const express = require("express");
 const router = express.Router();
+
 const pool = require("../config/db");
 
+const {
+  getUsersByRole,
+} = require("../controllers/userController");
+/* GET USERS BY ROLE */
+router.get("/by-role/:role", getUsersByRole);
 /* GET USERS */
 router.get("/", async (req, res) => {
   try {

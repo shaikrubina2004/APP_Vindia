@@ -1,5 +1,40 @@
 const User = require("../models/User");
+const pool = require("../config/db");
 
+/* GET USERS BY ROLE */
+exports.getUsersByRole = async (req, res) => {
+  try {
+    const { role } = req.params;
+
+    const result = await pool.query(
+      `
+      SELECT
+        u.id,
+        u.name,
+        u.email,
+        r.name AS role
+      FROM users u
+      LEFT JOIN roles r
+        ON r.id = u.role_id
+      WHERE LOWER(r.name) = LOWER($1)
+      ORDER BY u.name ASC
+      `,
+      [role]
+    );
+
+    res.json(result.rows);
+
+  } catch (err) {
+    console.error(
+      "GET USERS BY ROLE ERROR:",
+      err
+    );
+
+    res.status(500).json({
+      error: "Failed to fetch users",
+    });
+  }
+};
 // GET ALL USERS
 exports.getUsers = async (req, res) => {
   try {
