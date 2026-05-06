@@ -84,9 +84,6 @@ import ArchitectLayout from "../layouts/ArchitectLayout";
 
 /* BDA */
 import BDALayout from "../layouts/BDALayout";
-{
-  /* ← ADDED */
-}
 import BDALeads from "../pages/business-development/business-development-analyst/BDALeads";
 import BDAAddLead from "../pages/business-development/business-development-analyst/BDAAddLead";
 import BDAReportsWithRole from "../pages/business-development/business-development-analyst/BDAReportsWithRole";
@@ -164,7 +161,7 @@ const AppRoutes = () => {
         <Route
           path="/pm/team"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
               <ProjectManagerLayout>
                 <TeamManagement />
               </ProjectManagerLayout>
@@ -174,7 +171,9 @@ const AppRoutes = () => {
         <Route
           path="/pm/incidents"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.MEP_ENGINEER]}>
+            <ProtectedRoute
+              allowedRoles={[ROLES.CEO, ROLES.MEP_ENGINEER, ROLES.PROJECT_MANAGER]}
+            >
               <ProjectManagerLayout>
                 <AppShell key="pm-incidents" />
               </ProjectManagerLayout>
@@ -184,7 +183,7 @@ const AppRoutes = () => {
         <Route
           path="/pm/daily-updates"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
               <ProjectManagerLayout>
                 <DailyUpdates />
               </ProjectManagerLayout>
@@ -194,7 +193,7 @@ const AppRoutes = () => {
         <Route
           path="/pm/reports"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
               <ProjectManagerLayout>
                 <Reports />
               </ProjectManagerLayout>
@@ -359,14 +358,7 @@ const AppRoutes = () => {
             </SiteEngineerLayout>
           }
         />
-        {/*<Route
-  path="/site-engineer/designs"
-  element={
-    <ProjectCoordinatorLayout>
-      <ArchitectDesigns />
-    </ProjectCoordinatorLayout>
-  }
-/>*/}
+
         {/* QUANTITY SURVEYOR */}
         <Route
           path="/quantity-surveyor/dashboard"
@@ -622,7 +614,6 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/bda/follow-up"
           element={

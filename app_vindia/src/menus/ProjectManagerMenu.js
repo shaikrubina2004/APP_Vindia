@@ -1,5 +1,5 @@
 export const ProjectManagerMenu = [
-  { name: "Dashboard", path: "/projects", icon: "home" },
+  { name: "Dashboard", path: "/project-manager/dashboard", icon: "home" },
 
   { name: "Incidents", path: "/pm/incidents", icon: "alert-triangle" },
 
