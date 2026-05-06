@@ -1,14 +1,16 @@
 const pool = require("../config/db");
-const { insertNotification }    = require("./pcNotificationsController");
+const { insertNotification } = require("./pcNotificationsController");
 const { insertMEPNotification } = require("./mepNotificationsController");
-const { insertNotification: insertQSNotification } = require("./qsNotificationController"); // ✅ correct import
-const createSENotification = require("../utils/createSENotification");
+const {
+  insertNotification: insertQSNotification,
+} = require("./qsNotificationController"); // ✅ correct import
+
 /* ─── HELPERS ─────────────────────────────────────────────── */
 
 function calcDeadline(priority) {
-  const now  = Date.now();
+  const now = Date.now();
   const HOUR = 3600000;
-  const DAY  = 86400000;
+  const DAY = 86400000;
   const offsets = { P1: 8 * HOUR, P2: 2 * DAY, P3: 7 * DAY };
   return new Date(now + (offsets[priority] ?? 2 * DAY));
 }
@@ -31,31 +33,70 @@ async function getCoordinatorId(projectId) {
   if (!projectId) return null;
   try {
     const { rows } = await pool.query(
-      `SELECT coordinator_id FROM projects WHERE id = $1`, [projectId],
+      `SELECT coordinator_id FROM projects WHERE id = $1`,
+      [projectId],
     );
     return rows[0]?.coordinator_id ?? null;
-  } catch (_) { return null; }
+  } catch (_) {
+    return null;
+  }
 }
 
 /* ─── NOTIFICATION HELPERS ────────────────────────────────── */
 
 /* PC notification — never crashes */
-async function safeNotify(userId, type, title, description, link, severity, referenceId) {
+async function safeNotify(
+  userId,
+  type,
+  title,
+  description,
+  link,
+  severity,
+  referenceId,
+) {
   if (!userId) return;
   try {
-    await insertNotification(userId, type, title, description, link, severity, referenceId ?? null);
-    console.log(`✅ PC Notification → user:${userId} type:${type} title:${title}`);
+    await insertNotification(
+      userId,
+      type,
+      title,
+      description,
+      link,
+      severity,
+      referenceId ?? null,
+    );
+    console.log(
+      `✅ PC Notification → user:${userId} type:${type} title:${title}`,
+    );
   } catch (err) {
     console.error("PC Notification error:", err.message);
   }
 }
 
 /* QS notification — never crashes */
-async function safeQSNotify(userId, type, title, description, link, severity, referenceId) {
+async function safeQSNotify(
+  userId,
+  type,
+  title,
+  description,
+  link,
+  severity,
+  referenceId,
+) {
   if (!userId) return;
   try {
-    await insertQSNotification(userId, type, title, description, link, severity, referenceId ?? null);
-    console.log(`✅ QS Notification → user:${userId} type:${type} title:${title}`);
+    await insertQSNotification(
+      userId,
+      type,
+      title,
+      description,
+      link,
+      severity,
+      referenceId ?? null,
+    );
+    console.log(
+      `✅ QS Notification → user:${userId} type:${type} title:${title}`,
+    );
   } catch (err) {
     console.error("QS Notification error:", err.message);
   }
@@ -70,7 +111,15 @@ async function safeQSNotify(userId, type, title, description, link, severity, re
  *
  * Use this for EVERY incident / task notification so no role is missed.
  */
-async function notifyByRole(userId, type, title, description, link, severity, referenceId) {
+async function notifyByRole(
+  userId,
+  type,
+  title,
+  description,
+  link,
+  severity,
+  referenceId,
+) {
   if (!userId) return;
   try {
     const { rows } = await pool.query(
@@ -80,76 +129,50 @@ async function notifyByRole(userId, type, title, description, link, severity, re
     const roleName = (rows[0]?.name ?? "").toLowerCase();
     const roleCode = (rows[0]?.code ?? "").toLowerCase();
 
-    if (roleName.includes("quantity") || roleName.includes("qs") || roleCode.includes("qs") || roleCode === "quantity_surveyor") {
-      await safeQSNotify(userId, type, title, description, link, severity, referenceId);
+    if (
+      roleName.includes("quantity") ||
+      roleName.includes("qs") ||
+      roleCode.includes("qs") ||
+      roleCode === "quantity_surveyor"
+    ) {
+      await safeQSNotify(
+        userId,
+        type,
+        title,
+        description,
+        link,
+        severity,
+        referenceId,
+      );
     } else if (roleCode === "mep_engineer" || roleName.includes("mep")) {
       try {
-        await insertMEPNotification(userId, type, title, description, severity, referenceId ?? null);
+        await insertMEPNotification(
+          userId,
+          type,
+          title,
+          description,
+          severity,
+          referenceId ?? null,
+        );
         console.log(`✅ MEP Notification → user:${userId} type:${type}`);
       } catch (err) {
         console.error("MEP Notification error:", err.message);
       }
     } else {
-      await safeNotify(userId, type, title, description, link, severity, referenceId);
-    }
-  } catch (err) {
-    console.error("notifyByRole error:", err.message);
-  }
-}
-
-//SE
-async function notifyByRole(userId, type, title, description, link, severity, referenceId) {
-  if (!userId) return;
-
-  try {
-    const { rows } = await pool.query(
-      `SELECT r.name, r.code 
-       FROM users u 
-       JOIN roles r ON r.id = u.role_id 
-       WHERE u.id = $1`,
-      [userId],
-    );
-
-    const roleName = (rows[0]?.name ?? "").toLowerCase();
-    const roleCode = (rows[0]?.code ?? "").toLowerCase();
-
-    // 🎯 STRUCTURAL ENGINEER (MAIN FIX)
-    if (roleCode === "structural_engineer" || roleName.includes("structural")) {
-      await createSENotification({
+      await safeNotify(
+        userId,
         type,
-        severity,
         title,
         description,
-      });
-
-      console.log("✅ SE Notification Sent");
-      return;
+        link,
+        severity,
+        referenceId,
+      );
     }
-
-    // QS
-    if (
-      roleName.includes("quantity") ||
-      roleName.includes("qs") ||
-      roleCode.includes("qs")
-    ) {
-      await safeQSNotify(userId, type, title, description, link, severity, referenceId);
-      return;
-    }
-
-    // MEP
-    if (roleCode === "mep_engineer" || roleName.includes("mep")) {
-      await insertMEPNotification(userId, type, title, description, severity, referenceId ?? null);
-      return;
-    }
-
-    // DEFAULT → PC
-    await safeNotify(userId, type, title, description, link, severity, referenceId);
-
   } catch (err) {
     console.error("notifyByRole error:", err.message);
   }
 }
-
 
 /* ══════════════════════════════════════════════════════════════
    ROLES + USERS
@@ -185,7 +208,9 @@ exports.getUsersByRole = async (req, res) => {
     res.json({ success: true, data: rows });
   } catch (err) {
     console.error("getUsersByRole:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch users for role" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch users for role" });
   }
 };
 
@@ -198,16 +223,25 @@ exports.getAllIncidents = async (req, res) => {
     const { status, priority, search } = req.query;
     const userId = req.user?.id ?? null;
 
-    let conditions = [], params = [];
+    let conditions = [],
+      params = [];
     let idx = 1;
 
     if (userId !== null) {
-      conditions.push(`(created_by_id = $${idx} OR assigned_to_id = $${idx + 1})`);
+      conditions.push(
+        `(created_by_id = $${idx} OR assigned_to_id = $${idx + 1})`,
+      );
       params.push(userId, userId);
       idx += 2;
     }
-    if (status)   { conditions.push(`status = $${idx++}`);   params.push(status); }
-    if (priority) { conditions.push(`priority = $${idx++}`); params.push(priority); }
+    if (status) {
+      conditions.push(`status = $${idx++}`);
+      params.push(status);
+    }
+    if (priority) {
+      conditions.push(`priority = $${idx++}`);
+      params.push(priority);
+    }
     if (search) {
       conditions.push(`(title ILIKE $${idx} OR incident_no ILIKE $${idx + 1})`);
       params.push(`%${search}%`, `%${search}%`);
@@ -216,24 +250,30 @@ exports.getAllIncidents = async (req, res) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const { rows } = await pool.query(
-      `SELECT * FROM v_incident_overview ${where} ORDER BY created_at DESC`, params,
+      `SELECT * FROM v_incident_overview ${where} ORDER BY created_at DESC`,
+      params,
     );
     res.json({ success: true, data: rows });
   } catch (err) {
     console.error("getAllIncidents:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch incidents" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch incidents" });
   }
 };
 
 exports.getIncidentById = async (req, res) => {
-  const { id }  = req.params;
-  const client  = await pool.connect();
+  const { id } = req.params;
+  const client = await pool.connect();
   try {
     const { rows: incRows } = await client.query(
-      `SELECT * FROM v_incident_overview WHERE id = $1`, [id],
+      `SELECT * FROM v_incident_overview WHERE id = $1`,
+      [id],
     );
     if (!incRows.length)
-      return res.status(404).json({ success: false, message: "Incident not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Incident not found" });
 
     const { rows: comments } = await client.query(
       `SELECT ic.id, ic.body, ic.created_at, ic.updated_at,
@@ -264,7 +304,8 @@ exports.getIncidentById = async (req, res) => {
     );
 
     const taskIds = tasks.map((t) => t.id);
-    let taskComments = [], taskPhotos = [];
+    let taskComments = [],
+      taskPhotos = [];
 
     if (taskIds.length) {
       const { rows: tcRows } = await client.query(
@@ -291,7 +332,7 @@ exports.getIncidentById = async (req, res) => {
     const tasksWithComments = tasks.map((t) => ({
       ...t,
       comments: taskComments.filter((c) => c.task_id === t.id),
-      photos:   taskPhotos.filter((p)   => p.task_id === t.id),
+      photos: taskPhotos.filter((p) => p.task_id === t.id),
     }));
 
     res.json({
@@ -300,7 +341,9 @@ exports.getIncidentById = async (req, res) => {
     });
   } catch (err) {
     console.error("getIncidentById:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch incident" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch incident" });
   } finally {
     client.release();
   }
@@ -310,27 +353,52 @@ exports.createIncident = async (req, res) => {
   const { title, description, priority = "P2", assigned_to_user_id } = req.body;
   const created_by = req.user?.id ?? null;
 
-  console.log("🔔 createIncident payload:", { title, assigned_to_user_id, created_by });
+  console.log("🔔 createIncident payload:", {
+    title,
+    assigned_to_user_id,
+    created_by,
+  });
 
   if (!title?.trim())
-    return res.status(400).json({ success: false, message: "Title is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Title is required" });
 
   try {
     const deadline_at = calcDeadline(priority);
 
-    let assignee_name = null, role_name = null;
+    let assignee_name = null,
+      role_name = null;
     if (assigned_to_user_id) {
       const { rows } = await pool.query(
         `SELECT u.name, r.name AS role_name
          FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = $1`,
         [assigned_to_user_id],
       );
-      if (rows.length) { assignee_name = rows[0].name; role_name = rows[0].role_name; }
+      if (rows.length) {
+        assignee_name = rows[0].name;
+        role_name = rows[0].role_name;
+      }
     }
 
-    const cols = ["title", "description", "priority", "assigned_to", "deadline_at"];
-    const vals = [title.trim(), description ?? null, priority, assigned_to_user_id ?? null, deadline_at];
-    if (created_by !== null) { cols.push("created_by"); vals.push(created_by); }
+    const cols = [
+      "title",
+      "description",
+      "priority",
+      "assigned_to",
+      "deadline_at",
+    ];
+    const vals = [
+      title.trim(),
+      description ?? null,
+      priority,
+      assigned_to_user_id ?? null,
+      deadline_at,
+    ];
+    if (created_by !== null) {
+      cols.push("created_by");
+      vals.push(created_by);
+    }
 
     const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
     const { rows } = await pool.query(
@@ -339,12 +407,17 @@ exports.createIncident = async (req, res) => {
     );
 
     const newIncident = rows[0];
-    const severity    = priority === "P1" ? "critical" : "warn";
+    const severity = priority === "P1" ? "critical" : "warn";
 
-    console.log("✅ Incident inserted:", newIncident.id, "assigned_to:", newIncident.assigned_to);
+    console.log(
+      "✅ Incident inserted:",
+      newIncident.id,
+      "assigned_to:",
+      newIncident.assigned_to,
+    );
 
     const assigneeId = parseInt(assigned_to_user_id, 10);
-    const creatorId  = created_by ? parseInt(created_by, 10) : null;
+    const creatorId = created_by ? parseInt(created_by, 10) : null;
 
     // ✅ notifyByRole handles QS / MEP / PC automatically
     if (assigneeId && assigneeId !== creatorId) {
@@ -365,18 +438,34 @@ exports.createIncident = async (req, res) => {
     });
   } catch (err) {
     console.error("createIncident ERROR:", err.message);
-    res.status(500).json({ success: false, message: "Failed to create incident", detail: err.message });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to create incident",
+        detail: err.message,
+      });
   }
 };
 
 exports.createStandaloneTask = async (req, res) => {
-  const { title, note, priority = "P2", assigned_to_user_id, project_id } = req.body;
+  const {
+    title,
+    note,
+    priority = "P2",
+    assigned_to_user_id,
+    project_id,
+  } = req.body;
   const created_by = req.user?.id ?? null;
 
   if (!title?.trim())
-    return res.status(400).json({ success: false, message: "Title is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Title is required" });
   if (!assigned_to_user_id)
-    return res.status(400).json({ success: false, message: "Assignee is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Assignee is required" });
 
   const client = await pool.connect();
   try {
@@ -390,10 +479,13 @@ exports.createStandaloneTask = async (req, res) => {
 
     await client.query("COMMIT");
 
-    console.log("✅ Standalone task created, notifying assignee:", assigned_to_user_id);
+    console.log(
+      "✅ Standalone task created, notifying assignee:",
+      assigned_to_user_id,
+    );
 
     const assigneeId = parseInt(assigned_to_user_id, 10);
-    const creatorId  = created_by ? parseInt(created_by, 10) : null;
+    const creatorId = created_by ? parseInt(created_by, 10) : null;
 
     // ✅ notifyByRole handles QS / MEP / PC automatically
     if (assigneeId && assigneeId !== creatorId) {
@@ -412,7 +504,13 @@ exports.createStandaloneTask = async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("createStandaloneTask:", err);
-    res.status(500).json({ success: false, message: "Failed to create task", detail: err.message });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to create task",
+        detail: err.message,
+      });
   } finally {
     client.release();
   }
@@ -422,16 +520,31 @@ exports.updateIncident = async (req, res) => {
   const { id } = req.params;
   const { title, description, priority, assigned_to_user_id } = req.body;
 
-  const fields = [], params = [];
+  const fields = [],
+    params = [];
   let idx = 1;
 
-  if (title !== undefined)               { fields.push(`title = $${idx++}`);        params.push(title); }
-  if (description !== undefined)         { fields.push(`description = $${idx++}`);  params.push(description); }
-  if (priority !== undefined)            { fields.push(`priority = $${idx++}`);     params.push(priority); }
-  if (assigned_to_user_id !== undefined) { fields.push(`assigned_to = $${idx++}`);  params.push(assigned_to_user_id); }
+  if (title !== undefined) {
+    fields.push(`title = $${idx++}`);
+    params.push(title);
+  }
+  if (description !== undefined) {
+    fields.push(`description = $${idx++}`);
+    params.push(description);
+  }
+  if (priority !== undefined) {
+    fields.push(`priority = $${idx++}`);
+    params.push(priority);
+  }
+  if (assigned_to_user_id !== undefined) {
+    fields.push(`assigned_to = $${idx++}`);
+    params.push(assigned_to_user_id);
+  }
 
   if (!fields.length)
-    return res.status(400).json({ success: false, message: "No fields to update" });
+    return res
+      .status(400)
+      .json({ success: false, message: "No fields to update" });
 
   params.push(id);
   try {
@@ -440,7 +553,9 @@ exports.updateIncident = async (req, res) => {
       params,
     );
     if (!rows.length)
-      return res.status(404).json({ success: false, message: "Incident not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Incident not found" });
 
     // ✅ notifyByRole handles QS / MEP / PC automatically
     if (assigned_to_user_id) {
@@ -458,16 +573,24 @@ exports.updateIncident = async (req, res) => {
     res.json({ success: true, data: rows[0] });
   } catch (err) {
     console.error("updateIncident:", err);
-    res.status(500).json({ success: false, message: "Failed to update incident" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update incident" });
   }
 };
 
 exports.updateIncidentStatus = async (req, res) => {
-  const { id }     = req.params;
+  const { id } = req.params;
   const { status } = req.body;
-  const userId     = req.user?.id ?? null;
+  const userId = req.user?.id ?? null;
 
-  const validStatuses = ["Created", "Assigned", "In Progress", "Resolved", "Closed"];
+  const validStatuses = [
+    "Created",
+    "Assigned",
+    "In Progress",
+    "Resolved",
+    "Closed",
+  ];
   if (!validStatuses.includes(status))
     return res.status(400).json({ success: false, message: "Invalid status" });
 
@@ -476,11 +599,14 @@ exports.updateIncidentStatus = async (req, res) => {
     await client.query("BEGIN");
 
     const { rows: existing } = await client.query(
-      `SELECT * FROM incidents WHERE id = $1 AND is_deleted = FALSE`, [id],
+      `SELECT * FROM incidents WHERE id = $1 AND is_deleted = FALSE`,
+      [id],
     );
     if (!existing.length) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ success: false, message: "Incident not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Incident not found" });
     }
     const row = existing[0];
 
@@ -490,8 +616,15 @@ exports.updateIncidentStatus = async (req, res) => {
     );
 
     if (userId) {
-      try { await patchHistoryUser(client, "incident_status_history", "incident_id", id, userId); }
-      catch (_) {}
+      try {
+        await patchHistoryUser(
+          client,
+          "incident_status_history",
+          "incident_id",
+          id,
+          userId,
+        );
+      } catch (_) {}
     }
 
     await client.query("COMMIT");
@@ -513,7 +646,9 @@ exports.updateIncidentStatus = async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("updateIncidentStatus:", err);
-    res.status(500).json({ success: false, message: "Failed to update status" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update status" });
   } finally {
     client.release();
   }
@@ -527,11 +662,15 @@ exports.deleteIncident = async (req, res) => {
       [id],
     );
     if (!rows.length)
-      return res.status(404).json({ success: false, message: "Incident not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Incident not found" });
     res.json({ success: true, message: "Incident deleted" });
   } catch (err) {
     console.error("deleteIncident:", err);
-    res.status(500).json({ success: false, message: "Failed to delete incident" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to delete incident" });
   }
 };
 
@@ -545,7 +684,9 @@ exports.addIncidentComment = async (req, res) => {
   const author_id = req.user?.id ?? null;
 
   if (!body?.trim())
-    return res.status(400).json({ success: false, message: "Comment body is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Comment body is required" });
 
   try {
     const { rows } = await pool.query(
@@ -565,27 +706,31 @@ exports.addIncidentComment = async (req, res) => {
 ══════════════════════════════════════════════════════════════ */
 
 exports.addIncidentPhoto = async (req, res) => {
-  const { id }      = req.params;
+  const { id } = req.params;
   const uploaded_by = req.user?.id ?? null;
 
   if (!req.body.url?.trim())
-    return res.status(400).json({ success: false, message: "Photo data is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Photo data is required" });
 
   try {
-    const supabase   = require("../config/supabase");
+    const supabase = require("../config/supabase");
     const base64Data = req.body.url.replace(/^data:image\/\w+;base64,/, "");
-    const buffer     = Buffer.from(base64Data, "base64");
-    const mimeMatch  = req.body.url.match(/^data:(image\/\w+);base64,/);
-    const mimeType   = mimeMatch ? mimeMatch[1] : "image/jpeg";
-    const ext        = mimeType.split("/")[1];
-    const fileName   = `incidents/${id}/${Date.now()}.${ext}`;
+    const buffer = Buffer.from(base64Data, "base64");
+    const mimeMatch = req.body.url.match(/^data:(image\/\w+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const ext = mimeType.split("/")[1];
+    const fileName = `incidents/${id}/${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from("incident-photos")
       .upload(fileName, buffer, { contentType: mimeType, upsert: false });
     if (uploadError) throw uploadError;
 
-    const { data: urlData } = supabase.storage.from("incident-photos").getPublicUrl(fileName);
+    const { data: urlData } = supabase.storage
+      .from("incident-photos")
+      .getPublicUrl(fileName);
 
     const { rows } = await pool.query(
       `INSERT INTO incident_photos (incident_id, url, uploaded_by)
@@ -608,7 +753,8 @@ exports.getAllTasks = async (req, res) => {
     const { role, status, priority, search } = req.query;
     const userId = req.user?.id ?? null;
 
-    let conditions = [], params = [];
+    let conditions = [],
+      params = [];
     let idx = 1;
 
     if (userId !== null) {
@@ -616,22 +762,35 @@ exports.getAllTasks = async (req, res) => {
       params.push(userId, userId);
       idx += 2;
     }
-    if (role)     { conditions.push(`role_name = $${idx++}`);  params.push(role); }
-    if (status)   { conditions.push(`status = $${idx++}`);     params.push(status); }
-    if (priority) { conditions.push(`priority = $${idx++}`);   params.push(priority); }
+    if (role) {
+      conditions.push(`role_name = $${idx++}`);
+      params.push(role);
+    }
+    if (status) {
+      conditions.push(`status = $${idx++}`);
+      params.push(status);
+    }
+    if (priority) {
+      conditions.push(`priority = $${idx++}`);
+      params.push(priority);
+    }
     if (search) {
-      conditions.push(`(title ILIKE $${idx} OR assignee_name ILIKE $${idx + 1})`);
+      conditions.push(
+        `(title ILIKE $${idx} OR assignee_name ILIKE $${idx + 1})`,
+      );
       params.push(`%${search}%`, `%${search}%`);
       idx += 2;
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const { rows } = await pool.query(
-      `SELECT * FROM v_task_queue ${where} ORDER BY created_at DESC`, params,
+      `SELECT * FROM v_task_queue ${where} ORDER BY created_at DESC`,
+      params,
     );
 
     const taskIds = rows.map((t) => t.id);
-    let comments = [], photos = [];
+    let comments = [],
+      photos = [];
 
     if (taskIds.length) {
       const { rows: cRows } = await pool.query(
@@ -658,7 +817,7 @@ exports.getAllTasks = async (req, res) => {
     const data = rows.map((t) => ({
       ...t,
       comments: comments.filter((c) => c.task_id === t.id),
-      photos:   photos.filter((p)   => p.task_id === t.id),
+      photos: photos.filter((p) => p.task_id === t.id),
     }));
 
     res.json({ success: true, data });
@@ -690,42 +849,60 @@ exports.getTasksByIncident = async (req, res) => {
 };
 
 exports.createTasks = async (req, res) => {
-  const { id }     = req.params;
-  const { tasks }  = req.body;
+  const { id } = req.params;
+  const { tasks } = req.body;
   const created_by = req.user?.id ?? null;
 
   if (!Array.isArray(tasks) || !tasks.length)
-    return res.status(400).json({ success: false, message: "tasks array is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "tasks array is required" });
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
     const { rows: incRows } = await client.query(
-      `SELECT id FROM incidents WHERE id = $1 AND is_deleted = FALSE`, [id],
+      `SELECT id FROM incidents WHERE id = $1 AND is_deleted = FALSE`,
+      [id],
     );
     if (!incRows.length) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ success: false, message: "Incident not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Incident not found" });
     }
 
     const created = [];
     for (const task of tasks) {
       if (!task.title?.trim()) continue;
 
-      let assignee_name = null, role_name = null;
+      let assignee_name = null,
+        role_name = null;
       if (task.assigned_to_user_id) {
         const { rows: userRows } = await client.query(
           `SELECT u.name, r.name AS role_name FROM users u
            LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = $1`,
           [task.assigned_to_user_id],
         );
-        if (userRows.length) { assignee_name = userRows[0].name; role_name = userRows[0].role_name; }
+        if (userRows.length) {
+          assignee_name = userRows[0].name;
+          role_name = userRows[0].role_name;
+        }
       }
 
       const tCols = ["incident_id", "title", "note", "priority", "assigned_to"];
-      const tVals = [id, task.title.trim(), task.note ?? null, task.priority ?? "P2", task.assigned_to_user_id ?? null];
-      if (created_by !== null) { tCols.push("created_by"); tVals.push(created_by); }
+      const tVals = [
+        id,
+        task.title.trim(),
+        task.note ?? null,
+        task.priority ?? "P2",
+        task.assigned_to_user_id ?? null,
+      ];
+      if (created_by !== null) {
+        tCols.push("created_by");
+        tVals.push(created_by);
+      }
 
       const tPlaceholders = tVals.map((_, i) => `$${i + 1}`).join(", ");
       const { rows } = await client.query(
@@ -753,33 +930,47 @@ exports.createTasks = async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("createTasks:", err);
-    res.status(500).json({ success: false, message: "Failed to create tasks", detail: err.message });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to create tasks",
+        detail: err.message,
+      });
   } finally {
     client.release();
   }
 };
 
 exports.updateTaskStatus = async (req, res) => {
-  const { taskId }  = req.params;
+  const { taskId } = req.params;
   const { status, blocked_reason } = req.body;
-  const userId      = req.user?.id ?? null;
+  const userId = req.user?.id ?? null;
 
   const validStatuses = ["Pending", "In Progress", "Done", "Blocked"];
   if (!validStatuses.includes(status))
     return res.status(400).json({ success: false, message: "Invalid status" });
   if (status === "Blocked" && !blocked_reason?.trim())
-    return res.status(400).json({ success: false, message: "blocked_reason is required when marking Blocked" });
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "blocked_reason is required when marking Blocked",
+      });
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
     const { rows: existing } = await client.query(
-      `SELECT * FROM tasks WHERE id = $1 AND is_deleted = FALSE`, [taskId],
+      `SELECT * FROM tasks WHERE id = $1 AND is_deleted = FALSE`,
+      [taskId],
     );
     if (!existing.length) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ success: false, message: "Task not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Task not found" });
     }
     const row = existing[0];
 
@@ -789,8 +980,15 @@ exports.updateTaskStatus = async (req, res) => {
     );
 
     if (userId) {
-      try { await patchHistoryUser(client, "task_status_history", "task_id", taskId, userId); }
-      catch (_) {}
+      try {
+        await patchHistoryUser(
+          client,
+          "task_status_history",
+          "task_id",
+          taskId,
+          userId,
+        );
+      } catch (_) {}
     }
 
     if (status === "Blocked") {
@@ -823,7 +1021,9 @@ exports.updateTaskStatus = async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("updateTaskStatus:", err);
-    res.status(500).json({ success: false, message: "Failed to update task status" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update task status" });
   } finally {
     client.release();
   }
@@ -837,7 +1037,9 @@ exports.deleteTask = async (req, res) => {
       [taskId],
     );
     if (!rows.length)
-      return res.status(404).json({ success: false, message: "Task not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Task not found" });
     res.json({ success: true, message: "Task deleted" });
   } catch (err) {
     console.error("deleteTask:", err);
@@ -851,11 +1053,13 @@ exports.deleteTask = async (req, res) => {
 
 exports.addTaskComment = async (req, res) => {
   const { taskId } = req.params;
-  const { body }   = req.body;
-  const author_id  = req.user?.id ?? null;
+  const { body } = req.body;
+  const author_id = req.user?.id ?? null;
 
   if (!body?.trim())
-    return res.status(400).json({ success: false, message: "Comment body is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Comment body is required" });
 
   try {
     const { rows } = await pool.query(
@@ -872,27 +1076,31 @@ exports.addTaskComment = async (req, res) => {
 };
 
 exports.addTaskPhoto = async (req, res) => {
-  const { taskId }  = req.params;
+  const { taskId } = req.params;
   const uploaded_by = req.user?.id ?? null;
 
   if (!req.body.url?.trim())
-    return res.status(400).json({ success: false, message: "Photo data is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Photo data is required" });
 
   try {
-    const supabase   = require("../config/supabase");
+    const supabase = require("../config/supabase");
     const base64Data = req.body.url.replace(/^data:image\/\w+;base64,/, "");
-    const buffer     = Buffer.from(base64Data, "base64");
-    const mimeMatch  = req.body.url.match(/^data:(image\/\w+);base64,/);
-    const mimeType   = mimeMatch ? mimeMatch[1] : "image/jpeg";
-    const ext        = mimeType.split("/")[1];
-    const fileName   = `tasks/${taskId}/${Date.now()}.${ext}`;
+    const buffer = Buffer.from(base64Data, "base64");
+    const mimeMatch = req.body.url.match(/^data:(image\/\w+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const ext = mimeType.split("/")[1];
+    const fileName = `tasks/${taskId}/${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from("incident-photos")
       .upload(fileName, buffer, { contentType: mimeType, upsert: false });
     if (uploadError) throw uploadError;
 
-    const { data: urlData } = supabase.storage.from("incident-photos").getPublicUrl(fileName);
+    const { data: urlData } = supabase.storage
+      .from("incident-photos")
+      .getPublicUrl(fileName);
 
     const { rows } = await pool.query(
       `INSERT INTO task_photos (task_id, url, uploaded_by)
@@ -933,7 +1141,10 @@ exports.getStats = async (req, res) => {
       FROM tasks WHERE is_deleted = FALSE
     `);
 
-    res.json({ success: true, data: { incidents: rows[0], tasks: taskRows[0] } });
+    res.json({
+      success: true,
+      data: { incidents: rows[0], tasks: taskRows[0] },
+    });
   } catch (err) {
     console.error("getStats:", err);
     res.status(500).json({ success: false, message: "Failed to fetch stats" });
