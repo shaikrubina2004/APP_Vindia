@@ -15,7 +15,7 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export default function CreateRFIModal({ myRole, onClose, onCreated }) {
+export default function CreateRFIModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     subject: "",
     description: "",
@@ -72,7 +72,7 @@ export default function CreateRFIModal({ myRole, onClose, onCreated }) {
 
     loadUsers();
   }, [form.assigned_to_role]);
-  const assignableRoles = ROLE_OPTIONS.filter((r) => r.value !== myRole);
+  const assignableRoles = ROLE_OPTIONS;
   const handle = (e) =>
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
@@ -156,18 +156,6 @@ export default function CreateRFIModal({ myRole, onClose, onCreated }) {
               </select>
             )}
           </div>
-          <select
-            name="assigned_to_role"
-            value={form.assigned_to_role}
-            onChange={handle}
-          >
-            <option value="">— Select role —</option>
-            {assignableRoles.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
 
           <div className="rfi-modal-row">
             <div>

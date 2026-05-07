@@ -8,37 +8,38 @@ const {
   getUsersByRole,
 } = require("../controllers/userController");
 /* GET USERS BY ROLE */
-router.get("/by-role/:role", getUsersByRole);
-/* GET USERS */
-router.get("/", async (req, res) => {
+router.get("/by-role/:role", async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT
-        u.id, u.name, u.email, u.status, u.role_id,
-        r.name AS role,
-        d.id AS department_id,
-        d.name AS department
-      FROM users u
-      LEFT JOIN roles r ON r.id = u.role_id
-      LEFT JOIN departments d ON d.id = r.department_id
-      ORDER BY u.id
-    `);
+    const { role } = req.params;
 
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/* GET DEPARTMENTS */
-router.get("/departments", async (req, res) => {
-  try {
     const result = await pool.query(
-      "SELECT id, name FROM departments ORDER BY name"
+      `
+      SELECT
+        u.id,
+        u.name,
+        u.email,
+        r.name AS role,
+        r.code AS role_code
+      FROM users u
+      JOIN roles r
+        ON r.id = u.role_id
+      WHERE LOWER(r.code) = LOWER($1)
+      ORDER BY u.name ASC
+      `,
+      [role]
     );
+
     res.json(result.rows);
+
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(
+      "GET USERS BY ROLE ERROR:",
+      err.message
+    );
+
+    res.status(500).json({
+      error: "Failed to fetch users",
+    });
   }
 });
 
