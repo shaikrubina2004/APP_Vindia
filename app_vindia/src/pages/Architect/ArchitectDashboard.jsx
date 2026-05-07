@@ -1,267 +1,445 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { getArchitectProjects } from "../../services/architectprojectService";
+import { getDailyLog } from "../../services/architectDailyLogService";
+import { API } from "../../services/authService";
+import { getDrawings } from "../../services/architectDesignService";
 import "./ArchitectDashboard.css";
 
-/* ══════════════════════════════════════════════════════
-   DATA
-══════════════════════════════════════════════════════ */
-const projectsData = [
-  {
-    id: 1,
-    name: "Skyward Residency",
-    version: "v4.2.1-RELEASE",
-    phase: "Phase 1",
-    accuracy: 98.4,
-    incidents: [
-      { id: 1, issue: "Beam clash with HVAC (Grid B-12)",      priority: "HIGH",   status: "Coordination Required", discipline: "MEP/Struct", age: "2d" },
-      { id: 2, issue: "Column offset Basement B2",             priority: "MEDIUM", status: "Awaiting Architect",    discipline: "Structural", age: "4d" },
-      { id: 3, issue: "Skylight structural load conflict",     priority: "HIGH",   status: "In Progress",           discipline: "MEP/Struct", age: "4d" },
-      { id: 4, issue: "Lobby flooring material query",         priority: "LOW",    status: "Pending Review",        discipline: "Client",     age: "9d" },
-    ],
-    signoffItems: [
-      { id: 1, title: "Level 3 Floor Plan — Block A",  version: "v2.4", sentDaysAgo: 3, status: "OVERDUE"  },
-      { id: 2, title: "Facade Elevation — South Wing", version: "v1.7", sentDaysAgo: 5, status: "OVERDUE"  },
-      { id: 3, title: "Structural Interface Drawing",  version: "v3.0", sentDaysAgo: 1, status: "Awaiting" },
-      { id: 4, title: "MEP Coordination Sheet",        version: "v2.1", sentDaysAgo: 0, status: "APPROVED" },
-    ],
-    tasks: [
-      { id: 1, name: "Upload stair section drawings",          assignee: "P. Rao",   initials: "PR", due: "Done",  done: true  },
-      { id: 2, name: "Revise facade panel schedule",           assignee: "S. Mehta", initials: "SM", due: "Today", done: false },
-      { id: 3, name: "Coordinate with MEP on duct routing",   assignee: "T. Kumar", initials: "TK", due: "Fri",   done: false },
-      { id: 4, name: "Update room data sheets — L4",          assignee: "A. Jain",  initials: "AJ", due: "Mon",   done: false },
-      { id: 5, name: "Prepare sign-off pack for Block B",     assignee: "P. Rao",   initials: "PR", due: "Mon",   done: false },
-    ],
-    versions: [
-      { ver: "v3.0", name: "Structural Interface",    date: "Today",      author: "AK", status: "Current"  },
-      { ver: "v2.4", name: "L3 Floor Plan — Block A", date: "2 days ago", author: "AK", status: "Pending"  },
-      { ver: "v1.7", name: "Facade Elevation S. Wing",date: "5 days ago", author: "SM", status: "Pending"  },
-      { ver: "v2.1", name: "MEP Coordination Sheet",  date: "1 week ago", author: "TK", status: "Approved" },
-    ],
-    structural: [
-      { title: "Confirm shear wall spec at Grid F",   by: "Eng. Patel",  age: "3 days ago", status: "Awaiting"  },
-      { title: "Column cap plate drawing shared",     by: "Eng. Sharma", age: "Today",      status: "Received"  },
-      { title: "Slab recess for MEP penetration",    by: "AK",          age: "1 week ago", status: "Resolved"  },
-    ],
-    mep: [
-      { title: "HVAC duct routing — Level 5 clash",  by: "MEP Lead",    age: "2 days ago", status: "Urgent"    },
-      { title: "Electrical riser shaft dimension",   by: "T. Kumar",    age: "Yesterday",  status: "Pending"   },
-      { title: "Plumbing chase location confirmed",  by: "AK",          age: "3 days ago", status: "Resolved"  },
-    ],
-  },
-  {
-    id: 2,
-    name: "Green Valley Towers",
-    version: "v2.3.0-DRAFT",
-    phase: "Phase 2",
-    accuracy: 92.1,
-    incidents: [
-      { id: 1, issue: "Pipe routing conflict Level 3", priority: "MEDIUM", status: "Pending Review", discipline: "MEP", age: "1d" },
-    ],
-    signoffItems: [
-      { id: 1, title: "Site Plan — Block C", version: "v1.2", sentDaysAgo: 1, status: "Awaiting" },
-    ],
-    tasks: [
-      { id: 1, name: "Review site drainage layout",   assignee: "A. Jain",  initials: "AJ", due: "Thu", done: false },
-      { id: 2, name: "Submit MEP interface sheet",    assignee: "T. Kumar", initials: "TK", due: "Fri", done: false },
-    ],
-    versions: [
-      { ver: "v1.2", name: "Site Plan — Block C", date: "Yesterday", author: "AK", status: "Pending" },
-    ],
-    structural: [
-      { title: "Foundation detail clarification", by: "Eng. Roy",  age: "2 days ago", status: "Awaiting" },
-    ],
-    mep: [
-      { title: "Pipe routing conflict Level 3",   by: "MEP Lead",  age: "1 day ago",  status: "Urgent"  },
-    ],
-  },
-];
+// ─── UTILITY ─────────────────────────────────────────────────────────────────
+const todayISO = () => new Date().toISOString().slice(0, 10);
 
-/* ══════════════════════════════════════════════════════
-   COMPONENT
-══════════════════════════════════════════════════════ */
-function ArchitectDashboard() {
-  const navigate = useNavigate();
+const longDate = () =>
+  new Date().toLocaleDateString("en-GB", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
 
-  const [projects]           = useState(projectsData);
-  const [selectedProjectId, setSelectedProjectId] = useState(projects[0].id);
-  const [taskStates,         setTaskStates]        = useState({});
-  const [filterDiscipline,   setFilterDiscipline]  = useState("All Disciplines");
-  const [clock,              setClock]             = useState("");
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+} 
 
-  const selectedProject = projects.find((p) => p.id === selectedProjectId);
-
-  /* Live clock */
-  useEffect(() => {
-    const tick = () =>
-      setClock(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  /* Helpers */
-  const toggleTask = (projId, taskId) => {
-    const key = `${projId}-${taskId}`;
-    setTaskStates((prev) => ({ ...prev, [key]: !prev[key] }));
+function normaliseTask(t) {
+  return {
+    id: t.id,
+    title: t.title,
+    priority: t.priority,
+    incidentPriority: t.incident_priority ?? t.incidentPriority ?? "P2",
+    status: t.status,
+    assignedName: t.assignee_name ?? t.assignedName ?? "",
+    updatedAt: new Date(t.updated_at ?? t.updatedAt),
   };
+}
 
-  const isTaskDone = (projId, taskId) => {
-    const key = `${projId}-${taskId}`;
-    return key in taskStates
-      ? taskStates[key]
-      : selectedProject.tasks.find((t) => t.id === taskId)?.done;
+function normaliseIncident(inc) {
+  return {
+    id: inc.id,
+    incidentNo: inc.incident_no,
+    title: inc.title,
+    priority: inc.priority,
+    status: inc.status,
+    assignedName: inc.assigned_to_name ?? "",
+    createdAt: new Date(inc.created_at),
+    updatedAt: new Date(inc.updated_at),
+    deadlineAt: inc.deadline_at ? new Date(inc.deadline_at) : null,
+    taskCount: Number(inc.task_count ?? 0),
+    tasks: (inc.tasks ?? []).map(normaliseTask),
   };
+}
 
-  /* Derived values */
-  const filteredIncidents =
-    filterDiscipline === "All Disciplines"
-      ? selectedProject.incidents
-      : selectedProject.incidents.filter((i) => i.discipline.includes(filterDiscipline));
+// ─── STATUS BADGE ─────────────────────────────────────────────────────────────
+function StatusBadge({ status }) {
+  const s = (status || "").toLowerCase().replace(/\s/g, "-");
+  return <span className={`acd-status-badge acd-status-${s}`}>{status}</span>;
+}
 
-  const pendingSignoffs = selectedProject.signoffItems.filter((s) => s.status !== "APPROVED").length;
-  const activeTasks     = selectedProject.tasks.filter((t) => !isTaskDone(selectedProject.id, t.id)).length;
-
-  const prioClass = (p) =>
-    p === "HIGH" ? "p-high" : p === "MEDIUM" ? "p-med" : "p-low";
-
-  /* ════════════════════════════════════════════════════
-     RENDER
-  ════════════════════════════════════════════════════ */
+// ─── HERO CARD ────────────────────────────────────────────────────────────────
+function HeroCard({ userName }) {
   return (
-    <div className="main">
-
-      {/* ── TOPBAR ── */}
-      <div className="topbar">
-        <div>
-          <div className="page-title">Good morning, Arjun.</div>
-          <div className="page-sub">Friday — your daily log is due before EOD.</div>
-        </div>
-        <div className="date-chip">{new Date().toDateString()}</div>
+    <div className="acd-hero-card">
+      <div className="acd-hero-circle acd-hero-circle-1" aria-hidden="true" />
+      <div className="acd-hero-circle acd-hero-circle-2" aria-hidden="true" />
+      <div className="acd-hero-circle acd-hero-circle-3" aria-hidden="true" />
+      <div className="acd-hero-body">
+        <p className="acd-hero-greeting">{getGreeting()},</p>
+        <h1 className="acd-hero-name">{userName}</h1>
+        <p className="acd-hero-date">{longDate()}</p>
       </div>
-
-      {/* ── ALERT ── */}
-      {pendingSignoffs > 0 && (
-        <div className="alert-banner">
-          <div className="alert-text">
-            {pendingSignoffs} client sign-off{pendingSignoffs > 1 ? "s" : ""} are overdue — action required.
-          </div>
-          <button
-            className="btn-submit"
-            onClick={() => navigate("/architect/sign-off")}
-          >
-            Review now
-          </button>
-        </div>
-      )}
-
-      {/* ── KPI GRID ── */}
-      <div className="kpi-grid">
-        <div className="kpi-card">
-          <div className="kpi-label">Daily Log</div>
-          <div className="kpi-val">Pending</div>
-          <div className="kpi-meta">Due by 6:00 PM</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Open Incidents</div>
-          <div className="kpi-val">{filteredIncidents.length}</div>
-          <div className="kpi-meta">2 high priority</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Pending Sign-offs</div>
-          <div className="kpi-val">{pendingSignoffs}</div>
-          <div className="kpi-meta">Overdue &gt; 48 hrs</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Tasks Assigned</div>
-          <div className="kpi-val">{activeTasks}</div>
-          <div className="kpi-meta">In progress</div>
-        </div>
-      </div>
-
-      {/* ── ROW 1: Daily Log + Incidents ── */}
-      <div className="two-col">
-
-        <div className="panel">
-          <div className="panel-head">
-            <div className="panel-title">
-              Task Assignments
-              <span className="panel-badge pb-success">{activeTasks} active</span>
-            </div>
-            <button
-              className="log-tag"
-              onClick={() => navigate("/architect/tasks")}
-            >
-              + Assign
-            </button>
-          </div>
- 
-          {selectedProject.tasks.map((task) => {
-            const done = isTaskDone(selectedProject.id, task.id);
-            return (
-              <div key={task.id} className="task-row">
-                <div
-                  className={`task-check${done ? " done" : ""}`}
-                  onClick={() => toggleTask(selectedProject.id, task.id)}
-                />
-                <div className="task-info">
-                  <div className={`task-name${done ? " done" : ""}`}>{task.name}</div>
-                  <div className="task-assignee">
-                    <div className="avatar-xs">{task.initials}</div>
-                    {task.assignee}
-                  </div>
-                </div>
-                <span className="task-due">{done ? "Done" : task.due}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* INCIDENT QUEUE */}
-        <div className="panel">
-          <div className="panel-head">
-            <div className="panel-title">
-              Incident Queue
-              <span className="panel-badge pb-danger">{filteredIncidents.length} open</span>
-            </div>
-            <button
-              className="log-tag"
-              onClick={() => navigate("/architect/incidents")}
-            >
-              + New
-            </button>
-          </div>
-
-          {filteredIncidents.map((inc) => (
-            <div key={inc.id} className="inc-row">
-              <div className={`inc-prio ${prioClass(inc.priority)}`} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="inc-title">{inc.issue}</div>
-                <div className="inc-sub">{inc.discipline} · INC-00{inc.id}</div>
-              </div>
-              <span className="inc-status">{inc.status}</span>
-              <span className="inc-age">{inc.age}</span>
-            </div>
-          ))}
-        </div>
-
-      </div>
-
-      
-
-        
-
-       
-
-    
-
-    
-
-          
-
-      
-
     </div>
   );
 }
 
-export default ArchitectDashboard;
+// ─── P1 INCIDENTS COUNT CARD ──────────────────────────────────────────────────
+function P1Card({ p1Count, totalCount, loading, onClick }) {
+  return (
+    <div className="acd-p1-card" onClick={onClick} role="button" tabIndex={0}>
+      <div className="acd-p1-label"> Critical Incidents</div>
+      {loading ? (
+        <div className="acd-skeleton" style={{ height: 44, width: 80, marginTop: 8 }} />
+      ) : (
+        <>
+          <div className="acd-p1-number">{p1Count}</div>
+          <div className={`acd-p1-sub${p1Count === 0 ? " acd-p1-clear" : ""}`}>
+            {p1Count > 0 ? "Needs immediate attention" : "All clear — no critical issues"}
+          </div>
+          {p1Count > 0 && <span className="acd-p1-badge">{p1Count} critical open</span>}
+        </>
+      )}
+      <div className="acd-p1-total">Total incidents: {totalCount}</div>
+    </div>
+  );
+}
+
+// ─── P1 TASKS COUNT CARD (NEW) ────────────────────────────────────────────────
+function P1TasksCard({ p1TaskCount, totalTaskCount, pendingCount, loading, onClick }) {
+  return (
+    <div className="acd-p1tasks-card" onClick={onClick} role="button" tabIndex={0}>
+      <div className="acd-p1-label">Critical Tasks</div>
+      {loading ? (
+        <div className="acd-skeleton" style={{ height: 44, width: 80, marginTop: 8 }} />
+      ) : (
+        <>
+          <div className="acd-p1tasks-number">{p1TaskCount}</div>
+          <div className={`acd-p1-sub${p1TaskCount === 0 ? " acd-p1-clear" : ""}`}>
+            {p1TaskCount > 0 ? `${pendingCount} pending · needs action` : "No P1 tasks assigned"}
+          </div>
+          {p1TaskCount > 0 && (
+            <span className="acd-p1tasks-badge">{pendingCount} not done</span>
+          )}
+        </>
+      )}
+      <div className="acd-p1-total">Total tasks: {totalTaskCount}</div>
+    </div>
+  );
+}
+
+// ─── ACTION CHIPS ─────────────────────────────────────────────────────────────
+function ActionChips({
+  logStatus, loadingLog,
+  drawingCount, loadingDrawings,
+  projectCount, loadingProjects,
+  incidentCount, loadingIncidents,
+  onLogClick, onDrawingClick, onProjectClick, onIncidentClick,
+}) {
+  const submitted = logStatus === "Submitted";
+
+  const chips = [
+    {
+      color: submitted ? "green" : "amber",
+      icon: submitted ? "✓" : "○",
+      label: "Log Status",
+      value: loadingLog ? "…" : submitted ? "Submitted" : "Pending",
+      onClick: onLogClick,
+    },
+    {
+      color: "blue",
+      icon: "⬜",
+      label: "Drawings",
+      value: loadingDrawings ? "…" : `${drawingCount ?? 0} total`,
+      onClick: onDrawingClick,
+    },
+    {
+      color: "navy",
+      icon: "📁",
+      label: "Projects",
+      value: loadingProjects ? "…" : `${projectCount} assigned`,
+      onClick: onProjectClick,
+    },
+    {
+      color: "teal",
+      icon: "⚠",
+      label: "Incidents",
+      value: loadingIncidents ? "…" : `${incidentCount} total`,
+      onClick: onIncidentClick,
+    },
+  ];
+
+  return (
+    <div className="acd-chips-row">
+      {chips.map((c) => (
+        <button key={c.label} className="acd-chip" onClick={c.onClick}>
+          <span className={`acd-chip-icon acd-chip-icon-${c.color}`}>{c.icon}</span>
+          <span className="acd-chip-text">
+            <span className="acd-chip-label">{c.label}</span>
+            <span className="acd-chip-val">{c.value}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── P1 INCIDENT ROW ─────────────────────────────────────────────────────────
+const AVATAR_BG = ["#BDD8E9", "#7BBDE8", "#6EA2B3", "#4E8EA2", "#49769F"];
+
+function IncidentRow({ inc, index }) {
+  const dateLabel = (inc.deadlineAt ?? inc.updatedAt).toLocaleDateString("en-GB", {
+    day: "2-digit", month: "short",
+  });
+  const words = (inc.assignedName || inc.title || "?").trim().split(/\s+/);
+  const abbr = words.length >= 2
+    ? (words[0][0] + words[words.length - 1][0]).toUpperCase()
+    : words[0].slice(0, 2).toUpperCase();
+
+  return (
+    <div className="acd-inc-row">
+      <div className="acd-avatar" style={{ background: AVATAR_BG[index % AVATAR_BG.length], color: "#001D39" }}>
+        {abbr}
+      </div>
+      <div className="acd-inc-info">
+        <div className="acd-inc-title">{inc.title}</div>
+        <div className="acd-inc-meta">
+          #{inc.incidentNo}
+          {inc.assignedName ? ` · ${inc.assignedName}` : ""}
+          {inc.taskCount > 0 ? ` · ${inc.taskCount} tasks` : ""}
+        </div>
+      </div>
+      <div className="acd-inc-right">
+        <div className="acd-inc-date">{dateLabel}</div>
+        <span className="acd-p1-chip">P1</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── TASK DONUT ───────────────────────────────────────────────────────────────
+function TaskDonut({ tasks }) {
+  const counts = { Done: 0, "In Progress": 0, "To Do": 0 };
+  tasks.forEach((t) => {
+    if (t.status === "Done") counts.Done++;
+    else if (t.status === "In Progress") counts["In Progress"]++;
+    else counts["To Do"]++;
+  });
+
+  const total = tasks.length || 1;
+  const colors = { Done: "#0A4174", "In Progress": "#4E8EA2", "To Do": "#BDD8E9" };
+
+  const R = 38, cx = 50, cy = 50;
+  const circ = 2 * Math.PI * R;
+  let offset = 0;
+  const slices = Object.entries(counts).map(([label, count]) => {
+    const dash = (count / total) * circ;
+    const s = { label, count, dash, offset, color: colors[label] };
+    offset += dash;
+    return s;
+  });
+
+  const donePct = Math.round((counts.Done / total) * 100);
+
+  return (
+    <div className="acd-donut-wrap">
+      <svg width="100" height="100" viewBox="0 0 100 100" role="img" aria-label={`${donePct}% tasks done`}>
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke="#e2ecf4" strokeWidth="11" />
+        {slices.map((s) => (
+          <circle key={s.label} cx={cx} cy={cy} r={R}
+            fill="none" stroke={s.color} strokeWidth="11"
+            strokeDasharray={`${s.dash} ${circ - s.dash}`}
+            strokeDashoffset={-s.offset}
+            transform={`rotate(-90 ${cx} ${cy})`}
+          />
+        ))}
+        <text x={cx} y={cy - 6} textAnchor="middle" fontSize="15" fontWeight="700" fill="#001D39">{donePct}%</text>
+        <text x={cx} y={cy + 10} textAnchor="middle" fontSize="10" fill="#49769F">Done</text>
+      </svg>
+      <div className="acd-donut-legend">
+        {slices.map((s) => (
+          <div key={s.label} className="acd-leg-row">
+            <span className="acd-leg-dot" style={{ background: s.color }} />
+            <span className="acd-leg-label">{s.label}</span>
+            <span className="acd-leg-count">{s.count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
+export default function ArchitectDashboard() {
+  const navigate = useNavigate();
+  const [user] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}"); }
+    catch { return {}; }
+  });
+
+  const [projects,  setProjects]  = useState([]);
+  const [incidents, setIncidents] = useState([]);
+  const [myTasks,   setMyTasks]   = useState([]);
+  const [logStatus, setLogStatus] = useState(null);
+  const [drawings,  setDrawings]  = useState([]);
+  const [loading, setLoading] = useState({
+    projects: true, incidents: true, tasks: true, log: true, drawings: true,
+  });
+  const setLoad = (k, v) => setLoading((p) => ({ ...p, [k]: v }));
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        const res = await getArchitectProjects(user.id);
+        const list = res?.data || res || [];
+        setProjects(list.map((p) => ({
+          id: p.project_id || p.id,
+          name: p.project_name || p.name || "Unnamed",
+          status: p.status || "Active",
+        })));
+      } catch (e) { console.error(e); } finally { setLoad("projects", false); }
+    })();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        const res = await getArchitectProjects(user.id);
+        const list = res?.data || res || [];
+        if (!list.length) { setLogStatus("Draft"); return; }
+        const pid = String(list[0].project_id || list[0].id);
+        const logRes = await getDailyLog(user.id, pid, todayISO());
+        setLogStatus(logRes?.data ? "Submitted" : "Draft");
+      } catch { setLogStatus("Draft"); } finally { setLoad("log", false); }
+    })();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        const res = await getDrawings(user.id, "architect");
+        setDrawings(res?.data || res || []);
+      } catch (e) { console.error(e); } finally { setLoad("drawings", false); }
+    })();
+  }, [user?.id]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await API.get("/incidents");
+        setIncidents((res.data.data || []).map(normaliseIncident));
+      } catch (e) { console.error(e); } finally { setLoad("incidents", false); }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await API.get("/incidents/tasks");
+        setMyTasks((res.data.data || []).map(normaliseTask));
+      } catch (e) { console.error(e); } finally { setLoad("tasks", false); }
+    })();
+  }, []);
+
+  const p1Incidents = incidents.filter((i) => i.priority === "P1");
+
+  // P1 tasks — use the task's own priority first, fall back to incidentPriority
+  const p1Tasks = myTasks.filter(
+    (t) => (t.priority || t.incidentPriority) === "P1"
+  );
+  const pendingP1Tasks = p1Tasks.filter((t) => t.status !== "Done");
+
+  return (
+    <div className="acd-dashboard">
+
+      {/* ── ROW 1: Hero + P1 Incidents + P1 Tasks ── */}
+      <div className="acd-row-hero">
+        <HeroCard userName={user.name || "Architect"} />
+        <P1Card
+          p1Count={p1Incidents.length}
+          totalCount={incidents.length}
+          loading={loading.incidents}
+          onClick={() => navigate("/architect/incidents")}
+        />
+        <P1TasksCard
+          p1TaskCount={p1Tasks.length}
+          totalTaskCount={myTasks.length}
+          pendingCount={pendingP1Tasks.length}
+          loading={loading.tasks}
+          onClick={() => navigate("/architect/incidents?page=tasks")}
+        />
+      </div>
+
+      {/* ── ROW 2: Action chips ── */}
+      <ActionChips
+        logStatus={logStatus}          loadingLog={loading.log}
+        drawingCount={drawings.length} loadingDrawings={loading.drawings}
+        projectCount={projects.length} loadingProjects={loading.projects}
+        incidentCount={incidents.length} loadingIncidents={loading.incidents}
+        onLogClick={() => navigate("/architect/logs")}
+        onDrawingClick={() => navigate("/architect/designs")}
+        onProjectClick={() => navigate("/architect/projects")}
+        onIncidentClick={() => navigate("/architect/incidents")}
+      />
+
+      {/* ── ROW 3: Narrower incidents list + wider analytics ── */}
+      <div className="acd-row-main">
+
+        <div className="acd-card acd-card-incidents">
+          <div className="acd-section-head">
+            <div className="acd-section-title"> Critical Incidents</div>
+            <button className="acd-section-link" onClick={() => navigate("/architect/incidents")}>
+              View all →
+            </button>
+          </div>
+          {loading.incidents ? (
+            <div className="acd-skeleton-list">
+              {[1, 2, 3].map((i) => <div key={i} className="acd-skeleton-row" />)}
+            </div>
+          ) : p1Incidents.length === 0 ? (
+            <div className="acd-empty-state">
+              <span className="acd-empty-icon">✓</span>
+              <div>No P1 incidents — all clear</div>
+            </div>
+          ) : (
+            <div className="acd-inc-list">
+              {p1Incidents.slice(0, 6).map((inc, idx) => (
+                <IncidentRow key={inc.id} inc={inc} index={idx} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Wider analytics panel */}
+        <div className="acd-card acd-card-analytics">
+          <div className="acd-analytics-section">
+            <div className="acd-section-title">Task completion</div>
+            {loading.tasks ? (
+              <div className="acd-skeleton" style={{ height: 120 }} />
+            ) : (
+              <TaskDonut tasks={myTasks} />
+            )}
+          </div>
+
+          <div className="acd-card-divider" />
+
+          <div className="acd-analytics-section">
+            <div className="acd-section-title">Projects</div>
+            {loading.projects ? (
+              <div className="acd-skeleton" style={{ height: 80 }} />
+            ) : (
+              <div className="acd-projects-summary">
+                {projects.slice(0, 5).map((p) => (
+                  <div key={p.id} className="acd-project-mini-row">
+                    <span className="acd-project-mini-name">{p.name}</span>
+                    <StatusBadge status={p.status} />
+                  </div>
+                ))}
+                {projects.length > 5 && (
+                  <button
+                    className="acd-section-link"
+                    onClick={() => navigate("/architect/projects")}
+                    style={{ marginTop: 8 }}
+                  >
+                    +{projects.length - 5} more →
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}

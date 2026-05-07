@@ -1,10 +1,46 @@
 const pool = require("../config/db");
 
 /* ─────────────────────────────────────────────
+   DB HELPER — wraps pool.query with timeout
+   and consistent error handling
+───────────────────────────────────────────── */
+const DB_TIMEOUT_MS = 10_000;
+
+function isConnectionError(err) {
+  return (
+    err.code === "EAI_AGAIN" ||
+    err.code === "ECONNREFUSED" ||
+    err.code === "ETIMEDOUT" ||
+    err.code === "ENOTFOUND" ||
+    err.message?.includes("getaddrinfo")
+  );
+}
+
+async function withDb(res, fn) {
+  const timer = setTimeout(() => {}, DB_TIMEOUT_MS); // keeps process alive briefly
+  try {
+    await fn();
+  } catch (err) {
+    clearTimeout(timer);
+    console.error("[DB Error]", err.code, err.message);
+
+    if (isConnectionError(err)) {
+      return res.status(503).json({
+        error: "Database unavailable. Please try again in a moment.",
+        code: "DB_UNREACHABLE",
+      });
+    }
+  
+    return res.status(500).json({ error: err.message });
+  }
+  clearTimeout(timer);
+}
+
+/* ─────────────────────────────────────────────
    CREATE DRAWING
 ───────────────────────────────────────────── */
 exports.createDrawing = async (req, res) => {
-  try {
+  await withDb(res, async () => {
     const { id, project_id, name, drawing_type, revision, file_url, file_name, user_id } = req.body;
 
     await pool.query(
@@ -22,23 +58,19 @@ exports.createDrawing = async (req, res) => {
     );
 
     res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  });
 };
 
 /* ─────────────────────────────────────────────
    GET DRAWINGS (ROLE BASED)
 ───────────────────────────────────────────── */
 exports.getDrawings = async (req, res) => {
-  try {
+  await withDb(res, async () => {
     const { userId, role } = req.query;
 
     let result;
 
     if (role === "architect") {
-      // Architect sees ALL drawings
       result = await pool.query(`
         SELECT
           d.*,
@@ -68,9 +100,8 @@ exports.getDrawings = async (req, res) => {
       `);
 
     } else if (role === "quantity_surveyor" || role === "project_coordinator") {
-      // Role-wide recipients: match by role name only (user_id is NULL for these)
-      // Map backend role code → the DMS display role stored in the recipients table
-      const roleLabel = role === "quantity_surveyor" ? "Quantity Surveyor" : "Program Coordinator";
+      const roleLabel =
+        role === "quantity_surveyor" ? "Quantity Surveyor" : "Program Coordinator";
 
       result = await pool.query(`
         SELECT
@@ -95,17 +126,14 @@ exports.getDrawings = async (req, res) => {
           WHERE drawing_id = d.id
           ORDER BY created_at DESC LIMIT 1
         ) r ON true
-        -- join once to qualify (drawing was sent to this role)
         JOIN architect_drawing_recipients rq
           ON rq.drawing_id = d.id AND rq.role = $1
-        -- join again to get ALL recipients for the sentTo badges
         LEFT JOIN architect_drawing_recipients rec ON rec.drawing_id = d.id
         GROUP BY d.id, p.name, r.file_url, r.file_name
         ORDER BY d.created_at DESC
       `, [roleLabel]);
 
     } else {
-      // Site Engineer / Client: matched by their specific user_id
       result = await pool.query(`
         SELECT
           d.*,
@@ -129,10 +157,8 @@ exports.getDrawings = async (req, res) => {
           WHERE drawing_id = d.id
           ORDER BY created_at DESC LIMIT 1
         ) r ON true
-        -- qualify: drawing was sent to this specific user
         JOIN architect_drawing_recipients rq
           ON rq.drawing_id = d.id AND rq.user_id = $1
-        -- get ALL recipients for sentTo display
         LEFT JOIN architect_drawing_recipients rec ON rec.drawing_id = d.id
         GROUP BY d.id, p.name, r.file_url, r.file_name
         ORDER BY d.created_at DESC
@@ -140,23 +166,17 @@ exports.getDrawings = async (req, res) => {
     }
 
     res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  });
 };
 
 /* ─────────────────────────────────────────────
    SEND DRAWING
-   user_id is NULL for role-wide recipients (QS, PC).
-   user_id is set for project-scoped roles (Site Engineer, Client).
 ───────────────────────────────────────────── */
 exports.sendDrawing = async (req, res) => {
-  try {
+  await withDb(res, async () => {
     const { drawingId } = req.params;
     const { user_id, role, sent_by } = req.body;
 
-    // Prevent duplicate sends to the same role (or same user for scoped roles)
     const existing = await pool.query(
       `SELECT id FROM architect_drawing_recipients
        WHERE drawing_id = $1 AND role = $2
@@ -168,7 +188,6 @@ exports.sendDrawing = async (req, res) => {
       return res.status(409).json({ error: "Drawing already sent to this recipient." });
     }
 
-    // Insert — user_id is NULL for QS/PC, set for SE/Client
     await pool.query(
       `INSERT INTO architect_drawing_recipients (drawing_id, user_id, role)
        VALUES ($1, $2, $3)`,
@@ -182,17 +201,14 @@ exports.sendDrawing = async (req, res) => {
     );
 
     res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  });
 };
 
 /* ─────────────────────────────────────────────
    REQUEST DRAWING
 ───────────────────────────────────────────── */
 exports.requestDrawing = async (req, res) => {
-  try {
+  await withDb(res, async () => {
     const { project_id, requested_by, role, description, due_date } = req.body;
 
     await pool.query(
@@ -203,17 +219,14 @@ exports.requestDrawing = async (req, res) => {
     );
 
     res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  });
 };
 
 /* ─────────────────────────────────────────────
-   GET REQUESTS (with project name)
+   GET REQUESTS
 ───────────────────────────────────────────── */
 exports.getRequests = async (_req, res) => {
-  try {
+  await withDb(res, async () => {
     const result = await pool.query(`
       SELECT 
         req.*,
@@ -226,8 +239,5 @@ exports.getRequests = async (_req, res) => {
       ORDER BY req.created_at DESC
     `);
     res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  });
 };

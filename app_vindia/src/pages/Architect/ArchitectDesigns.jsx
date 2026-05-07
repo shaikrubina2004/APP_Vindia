@@ -10,7 +10,7 @@ import {
   getRequests,
 } from "../../services/architectDesignService";
 
-// ─── Role mapping: localStorage user.role → DMS role ─────────────────────────
+// ─── Role mapping ──────────────────────────────────────────────────────────────
 const ROLE_MAP = {
   architect:           "Architect",
   draftsman:           "Architect",
@@ -31,8 +31,7 @@ const WORKING_DRAWING_SEQUENCE = [
   "Client",
 ];
 
-// Role code used when talking to the backend
-const DMS_ROLE_TO_CODE = {
+const DMS_ROLE_TO_CODE = {   
   "Architect":           "architect",
   "Program Coordinator": "project_coordinator",
   "Quantity Surveyor":   "quantity_surveyor",
@@ -41,8 +40,6 @@ const DMS_ROLE_TO_CODE = {
 };
 
 const PROJECT_SCOPED_ROLES = new Set(["Site Engineer", "Client"]);
-
-// ✅ ONLY Site Engineer and Client can request detailed drawings
 const CAN_REQUEST_ROLES = new Set(["Site Engineer", "Client"]);
 
 const DEFAULT_REQUEST_NOTE =
@@ -77,7 +74,6 @@ function resolveActiveRole(user) {
   return ROLE_MAP[code] || null;
 }
 
-// ─── Normalise a drawing row from the DB into the shape the UI expects ────────
 function normaliseDrawing(row) {
   return {
     id:          row.id,
@@ -100,7 +96,6 @@ function normaliseDrawing(row) {
   };
 }
 
-// ─── Normalise a request row from the DB ──────────────────────────────────────
 function normaliseRequest(row) {
   return {
     id:          row.id,
@@ -114,7 +109,10 @@ function normaliseRequest(row) {
   };
 }
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// PURE SUB-COMPONENTS (defined OUTSIDE main component to prevent remount bug)
+// ═══════════════════════════════════════════════════════════════════════════════
+
 function Toast({ toast, onClose }) {
   useEffect(() => {
     if (!toast) return;
@@ -132,18 +130,20 @@ function Toast({ toast, onClose }) {
   );
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
 function Modal({ title, wide, onClose, children, footer }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
   return ReactDOM.createPortal(
-    <div className="dms-backdrop">
-      <div
-        className={`dms-modal${wide ? " dms-modal-wide" : ""}`}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+    <div className="dms-backdrop" onMouseDown={handleBackdropClick}>
+      <div className={`dms-modal${wide ? " dms-modal-wide" : ""}`}
+        onMouseDown={(e) => e.stopPropagation()}>
         <div className="dms-modal-head">
           <h3 className="dms-modal-title">{title}</h3>
           <button className="dms-modal-close" onClick={onClose}>✕</button>
@@ -156,7 +156,6 @@ function Modal({ title, wide, onClose, children, footer }) {
   );
 }
 
-// ─── WorkflowTracker ──────────────────────────────────────────────────────────
 function WorkflowTracker({ sentTo }) {
   return (
     <div className="dms-workflow-row">
@@ -182,31 +181,17 @@ function WorkflowTracker({ sentTo }) {
   );
 }
 
-// ─── Role pill ────────────────────────────────────────────────────────────────
 function RolePill({ role }) {
-  const colors = {
-    Architect:             { bg: "#1e3a5f", color: "#90caf9" },
-    "Program Coordinator": { bg: "#1b3a2d", color: "#81c995" },
-    "Quantity Surveyor":   { bg: "#3b2a00", color: "#ffd54f" },
-    "Site Engineer":       { bg: "#2d1b3a", color: "#ce93d8" },
-    Client:                { bg: "#1a2a3a", color: "#80deea" },
-  };
-  const s = colors[role] || { bg: "#222", color: "#fff" };
   return (
-    <span style={{
-      background: s.bg, color: s.color, borderRadius: 6,
-      padding: "3px 12px", fontSize: 12, fontWeight: 700, letterSpacing: 0.5,
-    }}>
+    <span className="dms-role-pill" data-role={role.toLowerCase().replace(/\s+/g, "-")}>
       {role}
     </span>
   );
 }
 
-// ─── File preview ─────────────────────────────────────────────────────────────
 function FilePreview({ d, fileBlobs, maxHeight = 380 }) {
   const blobUrl = fileBlobs[d.blobKey];
   const src = blobUrl || d.fileUrl || null;
-
   const nameToCheck = d.fileName || d.fileUrl || "";
   const isImg = /\.(png|jpg|jpeg|gif|bmp|webp|svg)$/i.test(nameToCheck);
   const isPDF = /\.pdf$/i.test(nameToCheck);
@@ -223,8 +208,7 @@ function FilePreview({ d, fileBlobs, maxHeight = 380 }) {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Download failed:", err);
+    } catch {
       window.open(src, "_blank");
     }
   };
@@ -244,8 +228,7 @@ function FilePreview({ d, fileBlobs, maxHeight = 380 }) {
           <div style={{ textAlign: "center", padding: 24, color: "var(--ink-muted)" }}>
             <div className="dms-file-icon">📄</div>
             <div style={{ fontWeight: 700, color: "var(--ink)", marginBottom: 16 }}>{d.fileName}</div>
-            <button onClick={handleDownload}
-              className="dms-btn dms-btn-success dms-download-link-inline">
+            <button onClick={handleDownload} className="dms-btn dms-btn-success">
               ↓ Download File
             </button>
           </div>
@@ -255,12 +238,326 @@ function FilePreview({ d, fileBlobs, maxHeight = 380 }) {
         )}
       </div>
       {src && (isImg || isPDF) && (
-        <button onClick={handleDownload}
-          className="dms-btn dms-btn-success dms-download-link">
+        <button onClick={handleDownload} className="dms-btn dms-btn-success dms-download-link">
           ↓ Download {d.fileName}
         </button>
       )}
     </>
+  );
+}
+
+// ─── Upload Modal ──────────────────────────────────────────────────────────────
+function UploadModal({ uf, setUf, projects, fileRef, handleFileChange, handleUpload, onClose }) {
+  return (
+    <Modal
+      title="Upload Drawing"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="dms-btn dms-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="dms-btn dms-btn-primary" onClick={handleUpload}>Upload Drawing</button>
+        </>
+      }
+    >
+      <div className="dms-form-field">
+        <label className="dms-label">Project *</label>
+        <select className="dms-input" value={uf.projectId}
+          onChange={(e) => setUf((p) => ({ ...p, projectId: e.target.value }))}>
+          <option value="">Select a project…</option>
+          {projects.map((p) => (
+            <option key={p.id} value={String(p.id)}>{p.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="dms-form-field">
+        <label className="dms-label">Drawing Name *</label>
+        <input className="dms-input" value={uf.drawingName} placeholder="e.g. Ground Floor Plan"
+          onChange={(e) => setUf((p) => ({ ...p, drawingName: e.target.value }))} />
+      </div>
+      <div className="dms-grid-2">
+        <div className="dms-form-field">
+          <label className="dms-label">Drawing Type *</label>
+          <select className="dms-input" value={uf.drawingType}
+            onChange={(e) => setUf((p) => ({ ...p, drawingType: e.target.value }))}>
+            {DRAWING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="dms-form-field">
+          <label className="dms-label">Revision *</label>
+          <input className="dms-input" value={uf.revision} placeholder="e.g. R1"
+            onChange={(e) => setUf((p) => ({ ...p, revision: e.target.value }))} />
+        </div>
+      </div>
+      <div className="dms-form-field">
+        <label className="dms-label">File *</label>
+        <input ref={fileRef} type="file" accept="*/*" style={{ display: "none" }}
+          onChange={handleFileChange} />
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button className="dms-btn dms-btn-ghost" onClick={() => fileRef.current?.click()}>
+            Choose File
+          </button>
+          {uf.fileName && (
+            <span style={{ fontSize: 12, color: "var(--ink-muted)" }}>{uf.fileName}</span>
+          )}
+        </div>
+      </div>
+      {uf.drawingType === "Working Drawing" && (
+        <div className="dms-info-box dms-info-box-gold">
+          ⚡ Working drawings follow a fixed sequence:<br />
+          <strong>QS → Site Engineer → Program Coordinator → Client</strong>
+        </div>
+      )}
+      {uf.drawingType === "Detailed Drawing" && (
+        <div className="dms-info-box dms-info-box-blue">
+          📤 Detailed drawings can be sent to any recipient in any order.
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ─── Request Modal ─────────────────────────────────────────────────────────────
+function RequestModal({ rf, setRf, projects, sendRequest, onClose }) {
+  return (
+    <Modal
+      title="Request Detailed Drawing"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="dms-btn dms-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="dms-btn dms-btn-primary" onClick={sendRequest}>Send Request</button>
+        </>
+      }
+    >
+      <p style={{ fontSize: 13, color: "var(--ink-muted)", marginBottom: 20 }}>
+        This request will be sent to the Architect for a detailed drawing.
+      </p>
+      <div className="dms-form-field">
+        <label className="dms-label">Project *</label>
+        <select className="dms-input" value={rf.projectId}
+          onChange={(e) => setRf((p) => ({ ...p, projectId: e.target.value }))}>
+          <option value="">Select a project…</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="dms-form-field">
+        <label className="dms-label">Note (optional)</label>
+        <textarea className="dms-input"
+          style={{ minHeight: 120, resize: "vertical", lineHeight: 1.6 }}
+          value={rf.note}
+          onChange={(e) => setRf((p) => ({ ...p, note: e.target.value }))} />
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Request Detail Modal ──────────────────────────────────────────────────────
+function RequestDetailModal({ req, setRequests, onClose }) {
+  if (!req) return null;
+  return (
+    <Modal
+      title="Drawing Request Details"
+      onClose={onClose}
+      footer={
+        <div className="dms-modal-foot-spread">
+          {!req.seen && (
+            <button className="dms-btn dms-btn-success" onClick={() => {
+              setRequests((prev) =>
+                prev.map((r) => r.id === req.id ? { ...r, seen: true } : r)
+              );
+              onClose();
+            }}>Mark Seen</button>
+          )}
+          <button className="dms-btn dms-btn-ghost" style={{ marginLeft: "auto" }} onClick={onClose}>
+            Close
+          </button>
+        </div>
+      }
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="dms-detail-info-card">
+          <div className="dms-grid-2" style={{ gap: "12px 24px" }}>
+            <div>
+              <div className="dms-label">Requested By</div>
+              <div style={{ fontWeight: 700, color: "var(--blue-mid)", fontSize: 14 }}>{req.from}</div>
+              <div style={{ fontSize: 11, color: "var(--ink-muted)", marginTop: 2 }}>{req.fromRole}</div>
+            </div>
+            <div>
+              <div className="dms-label">Sent At</div>
+              <div style={{ fontSize: 13, color: "var(--ink-3)" }}>{fmt(req.sentAt)}</div>
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <div className="dms-label">Project</div>
+              <div style={{
+                fontWeight: 700, color: "var(--amber)", fontSize: 15,
+                padding: "6px 10px", background: "var(--surface-2)",
+                borderRadius: 6, marginTop: 4,
+              }}>
+                {req.projectName || "—"}
+              </div>
+            </div>
+            <div>
+              <div className="dms-label">Status</div>
+              <span className={badgeClass(req.seen ? "Approved" : "Pending")}>
+                {req.seen ? "Seen" : "Unseen"}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div className="dms-label" style={{ marginBottom: 6 }}>What They Need</div>
+          {req.note ? (
+            <pre className="dms-note-pre">{req.note}</pre>
+          ) : (
+            <div className="dms-info-box dms-info-box-gold">No description provided.</div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Drawing Detail Modal ──────────────────────────────────────────────────────
+function DrawingDetailModal({ d, fileBlobs, sendTo, onClose }) {
+  if (!d) return null;
+
+  const getNextStage = (drawing) => {
+    const sent = drawing.sentTo.map((s) => s.role);
+    return WORKING_DRAWING_SEQUENCE.find((r) => !sent.includes(r)) || null;
+  };
+
+  const next = d.drawingType === "Working Drawing" ? getNextStage(d) : null;
+
+  return (
+    <Modal title={d.drawingName} wide onClose={onClose}>
+      <div className="dms-detail-grid">
+        <div>
+          <div className="dms-form-field">
+            <div className="dms-label">Project</div>
+            <div style={{ color: "var(--ink)", fontSize: 14, fontWeight: 600 }}>{d.projectName}</div>
+          </div>
+          <div className="dms-grid-2">
+            <div className="dms-form-field">
+              <div className="dms-label">Type</div>
+              <span className={`dms-tag ${d.drawingType === "Working Drawing" ? "dms-tag-gold" : "dms-tag-blue"}`}>
+                {d.drawingType}
+              </span>
+            </div>
+            <div className="dms-form-field">
+              <div className="dms-label">Revision</div>
+              <span className="dms-revision-lg">{d.revision}</span>
+            </div>
+            <div className="dms-form-field">
+              <div className="dms-label">Uploaded</div>
+              <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{fmt(d.uploadedAt)}</div>
+            </div>
+            <div className="dms-form-field">
+              <div className="dms-label">File</div>
+              <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{d.fileName}</div>
+            </div>
+          </div>
+
+          {d.drawingType === "Working Drawing" && (
+            <>
+              <div className="dms-label" style={{ marginBottom: 8 }}>Workflow Progress</div>
+              <WorkflowTracker sentTo={d.sentTo} />
+              {next ? (
+                <button
+                  className="dms-btn dms-btn-info"
+                  style={{ width: "100%", marginTop: 4 }}
+                  onClick={() => sendTo(d.id, next)}
+                >
+                  → Send to {next}
+                </button>
+              ) : (
+                <div className="dms-info-box dms-info-box-gold">✓ Sent to all stages in sequence.</div>
+              )}
+            </>
+          )}
+
+          {d.drawingType === "Detailed Drawing" && (
+            <>
+              <div className="dms-label" style={{ marginBottom: 8 }}>Send To</div>
+              <div className="dms-send-buttons">
+                {WORKING_DRAWING_SEQUENCE.map((role) => {
+                  const done = d.sentTo.some((s) => s.role === role);
+                  return (
+                    <button
+                      key={role}
+                      className={`dms-btn ${done ? "dms-btn-muted" : "dms-btn-primary"}`}
+                      disabled={done}
+                      onClick={() => sendTo(d.id, role)}
+                    >
+                      {done ? `✓ ${role}` : `→ ${role}`}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {d.sentTo.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div className="dms-label">Delivery Log</div>
+              {d.sentTo.map((s) => (
+                <div key={s.role} className="dms-delivery-row">
+                  <span style={{ color: "var(--ink-2)" }}>{s.role}</span>
+                  <span style={{ color: "var(--ink-muted)" }}>{fmt(s.sentAt)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div>
+          <div className="dms-label">File Preview</div>
+          <FilePreview d={d} fileBlobs={fileBlobs} maxHeight={380} />
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Recipient Detail Modal ────────────────────────────────────────────────────
+function RecipientDetailModal({ d, role, fileBlobs, onClose }) {
+  if (!d) return null;
+  const sentInfo = d.sentTo.find((s) => s.role === role);
+  return (
+    <Modal title={d.drawingName} wide onClose={onClose}>
+      <div className="dms-detail-grid">
+        <div>
+          <div className="dms-form-field">
+            <div className="dms-label">Project</div>
+            <div style={{ color: "var(--ink)", fontWeight: 600 }}>{d.projectName}</div>
+          </div>
+          <div className="dms-grid-2">
+            <div className="dms-form-field">
+              <div className="dms-label">Type</div>
+              <span className={`dms-tag ${d.drawingType === "Working Drawing" ? "dms-tag-gold" : "dms-tag-blue"}`}>
+                {d.drawingType}
+              </span>
+            </div>
+            <div className="dms-form-field">
+              <div className="dms-label">Revision</div>
+              <span className="dms-revision-lg">{d.revision}</span>
+            </div>
+            <div className="dms-form-field">
+              <div className="dms-label">File</div>
+              <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{d.fileName}</div>
+            </div>
+            <div className="dms-form-field">
+              <div className="dms-label">Received</div>
+              <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{fmt(sentInfo?.sentAt)}</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div className="dms-label">File Preview</div>
+          <FilePreview d={d} fileBlobs={fileBlobs} maxHeight={360} />
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -293,14 +590,16 @@ export default function DrawingManagementSystem() {
   });
   const [rf, setRf] = useState({ projectId: "", note: DEFAULT_REQUEST_NOTE });
 
-  // Architect-only: which role tab is active for preview
   const [architectViewAs, setArchitectViewAs] = useState("Architect");
 
   const viewRole = activeRole === "Architect" ? architectViewAs : activeRole;
   const isArchitectPreview = activeRole === "Architect";
 
-  const showToast = (type, message) => setToast({ type, message });
-  const closeModal = () => { setModal(null); setSelectedRequest(null); };
+  const showToast = useCallback((type, message) => setToast({ type, message }), []);
+  const closeModal = useCallback(() => {
+    setModal(null);
+    setSelectedRequest(null);
+  }, []);
 
   // ── Load projects ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -309,10 +608,8 @@ export default function DrawingManagementSystem() {
       try {
         let res;
         if (activeRole === "Architect") {
-          // Architect sees their own projects filtered by architect_id
           res = await getArchitectProjects(currentUser.id);
         } else {
-          // ✅ All other roles see ALL projects from the general endpoint
           res = await fetch("/api/projects").then((r) => r.json());
         }
         const list = res?.data || res || [];
@@ -331,28 +628,26 @@ export default function DrawingManagementSystem() {
     })();
   }, [currentUser?.id, activeRole]);
 
-  // ── Load drawings FROM DB ──────────────────────────────────────────────────
+  // ── Load drawings ──────────────────────────────────────────────────────────
   const loadDrawings = useCallback(async (silent = false) => {
-  if (!currentUser?.id || !activeRole) return;
-  if (!silent) setLoading(true);   // ← only show spinner on first load
-  try {
-    const roleCode = DMS_ROLE_TO_CODE[activeRole] || activeRole.toLowerCase();
-    const res = await getDrawings(currentUser.id, roleCode);
-    const rows = res?.data || res || [];
-    setDrawings(rows.map(normaliseDrawing));
-  } catch (err) {
-    console.error("Failed to load drawings:", err);
-    showToast("error", "Could not load drawings from server.");
-  } finally {
-    if (!silent) setLoading(false); // ← only clear spinner on first load
-  }
-}, [currentUser?.id, activeRole]);
+    if (!currentUser?.id || !activeRole) return;
+    if (!silent) setLoading(true);
+    try {
+      const roleCode = DMS_ROLE_TO_CODE[activeRole] || activeRole.toLowerCase();
+      const res = await getDrawings(currentUser.id, roleCode);
+      const rows = res?.data || res || [];
+      setDrawings(rows.map(normaliseDrawing));
+    } catch (err) {
+      console.error("Failed to load drawings:", err);
+      showToast("error", "Could not load drawings from server.");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [currentUser?.id, activeRole, showToast]);
 
-  useEffect(() => {
-    loadDrawings();
-  }, [loadDrawings]);
+  useEffect(() => { loadDrawings(); }, [loadDrawings]);
 
-  // ── Load requests FROM DB (Architect only) ─────────────────────────────────
+  // ── Load requests ──────────────────────────────────────────────────────────
   const loadRequests = useCallback(async () => {
     if (activeRole !== "Architect") return;
     try {
@@ -364,9 +659,7 @@ export default function DrawingManagementSystem() {
     }
   }, [activeRole]);
 
-  useEffect(() => {
-    loadRequests();
-  }, [loadRequests]);
+  useEffect(() => { loadRequests(); }, [loadRequests]);
 
   // ── File pick ──────────────────────────────────────────────────────────────
   const handleFileChange = (e) => {
@@ -395,13 +688,11 @@ export default function DrawingManagementSystem() {
       const formData = new FormData();
       formData.append("file", uf.file);
       const uploadRes = await fetch("/api/architect-drawings/upload", {
-        method: "POST",
-        body: formData,
+        method: "POST", body: formData,
       });
       const uploadData = await uploadRes.json();
       fileUrl = uploadData.url || uploadData.file_url || uploadData.path || "";
-    } catch (err) {
-      console.warn("File upload failed, storing placeholder:", err);
+    } catch {
       fileUrl = `uploads/${uf.fileName}`;
     }
 
@@ -422,60 +713,54 @@ export default function DrawingManagementSystem() {
       setUf({ projectId: "", drawingName: "", drawingType: "Working Drawing",
                revision: "R1", file: null, fileName: "", blobKey: null });
       closeModal();
-      await loadDrawings(true); 
+      await loadDrawings(true);
     } catch (err) {
       console.error(err);
       showToast("error", "Failed to save drawing. Please try again.");
     }
   };
 
-  // ── Send drawing to a role ─────────────────────────────────────────────────
- // REPLACE the entire sendTo function with this:
-const sendTo = async (drawingId, role) => {
-  const drawing = drawings.find((d) => String(d.id) === String(drawingId));
-  const project = projects.find((p) => String(p.id) === String(drawing?.projectId));
+  // ── Send drawing ───────────────────────────────────────────────────────────
+  const sendTo = useCallback(async (drawingId, role) => {
+    const drawing = drawings.find((d) => String(d.id) === String(drawingId));
+    const project = projects.find((p) => String(p.id) === String(drawing?.projectId));
 
-  let recipientUserId = null;
-  if (role === "Client")        recipientUserId = project?.clientUserId ?? null;
-  if (role === "Site Engineer") recipientUserId = project?.siteEngineerId ?? null;
+    let recipientUserId = null;
+    if (role === "Client")        recipientUserId = project?.clientUserId ?? null;
+    if (role === "Site Engineer") recipientUserId = project?.siteEngineerId ?? null;
 
-  try {
-    await sendDrawing(drawingId, {
-      user_id: recipientUserId,
-      role:    role,
-      sent_by: currentUser.id,
-    });
-    showToast("success", `Sent to ${role}.`);
+    try {
+      await sendDrawing(drawingId, {
+        user_id: recipientUserId,
+        role:    role,
+        sent_by: currentUser.id,
+      });
+      showToast("success", `Sent to ${role}.`);
 
-    // ✅ Update drawings list in-place — NO loadDrawings(), NO re-render flicker
-    const newEntry = { role, sentAt: new Date().toISOString(), assignedUserId: recipientUserId };
+      const newEntry = {
+        role,
+        sentAt:         new Date().toISOString(),
+        assignedUserId: recipientUserId,
+      };
 
-    setDrawings((prev) =>
-      prev.map((d) => {
-        if (String(d.id) !== String(drawingId)) return d;
-        return { ...d, sentTo: [...d.sentTo, newEntry] };
-      })
-    );
+      setDrawings((prev) =>
+        prev.map((d) =>
+          String(d.id) !== String(drawingId)
+            ? d
+            : { ...d, sentTo: [...d.sentTo, newEntry] }
+        )
+      );
 
-    // ✅ Update selectedDrawing in-place so modal stays open and reflects new state
-    setSelectedDrawing((prev) => {
-      if (!prev || String(prev.id) !== String(drawingId)) return prev;
-      return { ...prev, sentTo: [...prev.sentTo, newEntry] };
-    });
+      setSelectedDrawing((prev) => {
+        if (!prev || String(prev.id) !== String(drawingId)) return prev;
+        return { ...prev, sentTo: [...prev.sentTo, newEntry] };
+      });
 
-  } catch (err) {
-    console.error(err);
-    showToast("error", `Failed to send to ${role}.`);
-  }
-};
-
-  // Re-sync selectedDrawing after loadDrawings
-
-
-  const getNextStage = (d) => {
-    const sent = d.sentTo.map((s) => s.role);
-    return WORKING_DRAWING_SEQUENCE.find((r) => !sent.includes(r)) || null;
-  };
+    } catch (err) {
+      console.error(err);
+      showToast("error", `Failed to send to ${role}.`);
+    }
+  }, [drawings, projects, currentUser.id, showToast]);
 
   // ── Send request ───────────────────────────────────────────────────────────
   const sendRequest = async () => {
@@ -527,7 +812,10 @@ const sendTo = async (drawingId, role) => {
         </div>
 
         {loading ? (
-          <div className="dms-card dms-empty-box">Loading drawings…</div>
+          <div className="dms-card dms-empty-box">
+            <div className="dms-spinner" />
+            Loading drawings…
+          </div>
         ) : drawings.length === 0 ? (
           <div className="dms-card dms-empty-box">
             No drawings yet — click "+ Upload Drawing" to begin.
@@ -537,7 +825,7 @@ const sendTo = async (drawingId, role) => {
             <table className="dms-table">
               <thead>
                 <tr>
-                  {["Drawing Name","Project","Type","Rev","Uploaded","Sent To","Actions"].map((h) => (
+                  {["Drawing Name", "Project", "Type", "Rev", "Uploaded", "Sent To", "Actions"].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -550,15 +838,21 @@ const sendTo = async (drawingId, role) => {
                     onMouseEnter={() => setHoveredRow(d.id)}
                     onMouseLeave={() => setHoveredRow(null)}
                   >
-                    <td><strong style={{ color: "var(--ink)" }}>{d.drawingName}</strong></td>
-                    <td><span style={{ color: "var(--ink-3)", fontSize: 12 }}>{d.projectName}</span></td>
+                    <td>
+                      <strong style={{ color: "var(--ink)" }}>{d.drawingName}</strong>
+                    </td>
+                    <td>
+                      <span style={{ color: "var(--ink-3)", fontSize: 12 }}>{d.projectName}</span>
+                    </td>
                     <td>
                       <span className={`dms-tag ${d.drawingType === "Working Drawing" ? "dms-tag-gold" : "dms-tag-blue"}`}>
                         {d.drawingType === "Working Drawing" ? "Working" : "Detailed"}
                       </span>
                     </td>
                     <td><span className="dms-revision">{d.revision}</span></td>
-                    <td><span style={{ fontSize: 11, color: "var(--ink-muted)" }}>{fmt(d.uploadedAt)}</span></td>
+                    <td>
+                      <span style={{ fontSize: 11, color: "var(--ink-muted)" }}>{fmt(d.uploadedAt)}</span>
+                    </td>
                     <td>
                       {d.sentTo.length === 0 ? (
                         <span style={{ color: "var(--ink-faint)", fontSize: 11 }}>None</span>
@@ -573,8 +867,10 @@ const sendTo = async (drawingId, role) => {
                       )}
                     </td>
                     <td>
-                      <button className="dms-btn dms-btn-ghost"
-                        onClick={() => { setSelectedDrawing(d); setModal("detail"); }}>
+                      <button
+                        className="dms-btn dms-btn-ghost"
+                        onClick={() => { setSelectedDrawing(d); setModal("detail"); }}
+                      >
                         View
                       </button>
                     </td>
@@ -587,13 +883,13 @@ const sendTo = async (drawingId, role) => {
 
         {requests.length > 0 && (
           <>
-            <div className="dms-section-title" style={{ marginTop: 28 }}>
+            <div className="dms-section-title" style={{ marginTop: 32 }}>
               Incoming Requests
               {unseenRequests.length > 0 && (
                 <span className="dms-notif-badge">{unseenRequests.length}</span>
               )}
             </div>
-            <div className="dms-card dms-card-padded">
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
               {requests.map((req) => (
                 <div
                   key={req.id}
@@ -623,21 +919,31 @@ const sendTo = async (drawingId, role) => {
                         "{req.note.slice(0, 80)}{req.note.length > 80 ? "…" : ""}"
                       </div>
                     )}
-                    <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 4 }}>{fmt(req.sentAt)}</div>
+                    <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 4 }}>
+                      {fmt(req.sentAt)}
+                    </div>
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-                    <button className="dms-btn dms-btn-info"
-                      onClick={(e) => { e.stopPropagation(); setSelectedRequest(req); setModal("requestDetail"); }}>
+                    <button
+                      className="dms-btn dms-btn-info"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRequest(req);
+                        setModal("requestDetail");
+                      }}
+                    >
                       View
                     </button>
                     {!req.seen && (
-                      <button className="dms-btn dms-btn-success"
+                      <button
+                        className="dms-btn dms-btn-success"
                         onClick={(e) => {
                           e.stopPropagation();
                           setRequests((prev) =>
-                            prev.map((r) => (r.id === req.id ? { ...r, seen: true } : r))
+                            prev.map((r) => r.id === req.id ? { ...r, seen: true } : r)
                           );
-                        }}>
+                        }}
+                      >
                         Mark Seen
                       </button>
                     )}
@@ -652,7 +958,6 @@ const sendTo = async (drawingId, role) => {
   };
 
   const RecipientView = ({ role }) => {
-    // ✅ ONLY Site Engineer and Client can request detailed drawings
     const canRequest = CAN_REQUEST_ROLES.has(role);
     const mine = filterDrawingsForRole(role);
 
@@ -664,10 +969,14 @@ const sendTo = async (drawingId, role) => {
               ? `All drawings sent to ${role} (${mine.length})`
               : `Drawings Sent to Me (${mine.length})`}
           </div>
-          {/* ✅ Button only shows for Site Engineer and Client, and not in architect preview */}
           {canRequest && !isArchitectPreview && (
-            <button className="dms-btn dms-btn-ghost"
-              onClick={() => { setRf({ projectId: "", note: DEFAULT_REQUEST_NOTE }); setModal("request"); }}>
+            <button
+              className="dms-btn dms-btn-ghost"
+              onClick={() => {
+                setRf({ projectId: "", note: DEFAULT_REQUEST_NOTE });
+                setModal("request");
+              }}
+            >
               + Request Detailed Drawing
             </button>
           )}
@@ -686,7 +995,7 @@ const sendTo = async (drawingId, role) => {
             <table className="dms-table">
               <thead>
                 <tr>
-                  {["Drawing Name","Project","Type","Revision","Received","Actions"].map((h) => (
+                  {["Drawing Name", "Project", "Type", "Revision", "Received", "Actions"].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -720,8 +1029,10 @@ const sendTo = async (drawingId, role) => {
                         </span>
                       </td>
                       <td>
-                        <button className="dms-btn dms-btn-ghost"
-                          onClick={() => { setSelectedDrawing(d); setModal("recipientDetail"); }}>
+                        <button
+                          className="dms-btn dms-btn-ghost"
+                          onClick={() => { setSelectedDrawing(d); setModal("recipientDetail"); }}
+                        >
                           View
                         </button>
                       </td>
@@ -737,8 +1048,8 @@ const sendTo = async (drawingId, role) => {
   };
 
   const NoAccessView = () => (
-    <div className="dms-card dms-empty-box" style={{ textAlign: "center", padding: 48 }}>
-      <div style={{ fontSize: 40, marginBottom: 16 }}>🔒</div>
+    <div className="dms-card dms-empty-box" style={{ textAlign: "center", padding: 64 }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
       <div style={{ fontWeight: 700, fontSize: 16, color: "var(--ink)", marginBottom: 8 }}>
         Access Restricted
       </div>
@@ -747,303 +1058,6 @@ const sendTo = async (drawingId, role) => {
       </div>
     </div>
   );
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // MODALS
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const UploadModal = () => (
-    <Modal title="Upload Drawing" onClose={closeModal}
-      footer={
-        <>
-          <button className="dms-btn dms-btn-ghost" onClick={closeModal}>Cancel</button>
-          <button className="dms-btn dms-btn-primary" onClick={handleUpload}>Upload Drawing</button>
-        </>
-      }
-    >
-      <div className="dms-form-field">
-        <label className="dms-label">Project *</label>
-        <select className="dms-input" value={uf.projectId}
-          onChange={(e) => setUf((p) => ({ ...p, projectId: e.target.value }))}>
-          <option value="">Select a project…</option>
-          {projects.map((p) => (
-            <option key={p.id} value={String(p.id)}>{p.name}</option>
-          ))}
-        </select>
-      </div>
-      <div className="dms-form-field">
-        <label className="dms-label">Drawing Name *</label>
-        <input className="dms-input" value={uf.drawingName} placeholder="e.g. Ground Floor Plan"
-          onChange={(e) => setUf((p) => ({ ...p, drawingName: e.target.value }))} />
-      </div>
-      <div className="dms-grid-2">
-        <div className="dms-form-field">
-          <label className="dms-label">Drawing Type *</label>
-          <select className="dms-input" value={uf.drawingType}
-            onChange={(e) => setUf((p) => ({ ...p, drawingType: e.target.value }))}>
-            {DRAWING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
-        <div className="dms-form-field">
-          <label className="dms-label">Revision *</label>
-          <input className="dms-input" value={uf.revision} placeholder="e.g. R1"
-            onChange={(e) => setUf((p) => ({ ...p, revision: e.target.value }))} />
-        </div>
-      </div>
-      <div className="dms-form-field">
-        <label className="dms-label">File *</label>
-        <input ref={fileRef} type="file" accept="*/*" style={{ display: "none" }} onChange={handleFileChange} />
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button className="dms-btn dms-btn-ghost" onClick={() => fileRef.current?.click()}>
-            Choose File
-          </button>
-          {uf.fileName && <span style={{ fontSize: 12, color: "var(--ink-muted)" }}>{uf.fileName}</span>}
-        </div>
-      </div>
-      {uf.drawingType === "Working Drawing" && (
-        <div className="dms-info-box dms-info-box-gold">
-          ⚡ Working drawings follow a fixed sequence:<br />
-          <strong>QS → Site Engineer → Program Coordinator → Client</strong>
-        </div>
-      )}
-      {uf.drawingType === "Detailed Drawing" && (
-        <div className="dms-info-box dms-info-box-blue">
-          📤 Detailed drawings can be sent to any recipient in any order.
-        </div>
-      )}
-    </Modal>
-  );
-
-  // ✅ Request modal — shows ALL projects in dropdown
-  const RequestModal = () => (
-    <Modal title="Request Detailed Drawing" onClose={closeModal}
-      footer={
-        <>
-          <button className="dms-btn dms-btn-ghost" onClick={closeModal}>Cancel</button>
-          <button className="dms-btn dms-btn-primary" onClick={sendRequest}>Send Request</button>
-        </>
-      }
-    >
-      <p style={{ fontSize: 13, color: "var(--ink-muted)", marginBottom: 20 }}>
-        This request will be sent to the Architect for a detailed drawing.
-      </p>
-      <div className="dms-form-field">
-        <label className="dms-label">Project *</label>
-        <select className="dms-input" value={rf.projectId}
-          onChange={(e) => setRf((p) => ({ ...p, projectId: e.target.value }))}>
-          <option value="">Select a project…</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-      </div>
-      <div className="dms-form-field">
-        <label className="dms-label">Note (optional)</label>
-        <textarea className="dms-input"
-          style={{ minHeight: 120, resize: "vertical", lineHeight: 1.6 }}
-          value={rf.note}
-          onChange={(e) => setRf((p) => ({ ...p, note: e.target.value }))} />
-      </div>
-    </Modal>
-  );
-
-  const RequestDetailModal = () => {
-    if (!selectedRequest) return null;
-    const req = selectedRequest;
-    return (
-      <Modal title="Drawing Request Details" onClose={closeModal}
-        footer={
-          <div className="dms-modal-foot-spread">
-            {!req.seen && (
-              <button className="dms-btn dms-btn-success" onClick={() => {
-                setRequests((prev) =>
-                  prev.map((r) => r.id === req.id ? { ...r, seen: true } : r)
-                );
-                closeModal();
-              }}>Mark Seen</button>
-            )}
-            <button className="dms-btn dms-btn-ghost"
-              style={{ marginLeft: "auto" }} onClick={closeModal}>
-              Close
-            </button>
-          </div>
-        }
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="dms-detail-info-card">
-            <div className="dms-grid-2" style={{ gap: "12px 24px" }}>
-              <div>
-                <div className="dms-label">Requested By</div>
-                <div style={{ fontWeight: 700, color: "var(--blue-mid)", fontSize: 14 }}>
-                  {req.from}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--ink-muted)", marginTop: 2 }}>
-                  {req.fromRole}
-                </div>
-              </div>
-              <div>
-                <div className="dms-label">Sent At</div>
-                <div style={{ fontSize: 13, color: "var(--ink-3)" }}>{fmt(req.sentAt)}</div>
-              </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <div className="dms-label">Project</div>
-                <div style={{
-                  fontWeight: 700, color: "var(--amber)", fontSize: 15,
-                  padding: "6px 10px", background: "var(--surface-2)",
-                  borderRadius: 6, marginTop: 4,
-                }}>
-                  {req.projectName || "—"}
-                </div>
-              </div>
-              <div>
-                <div className="dms-label">Status</div>
-                <span className={badgeClass(req.seen ? "Approved" : "Pending")}>
-                  {req.seen ? "Seen" : "Unseen"}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div className="dms-label" style={{ marginBottom: 6 }}>What They Need</div>
-            {req.note ? (
-              <pre className="dms-note-pre">{req.note}</pre>
-            ) : (
-              <div className="dms-info-box dms-info-box-gold">No description provided.</div>
-            )}
-          </div>
-        </div>
-      </Modal>
-    );
-  };
-
-  const DrawingDetailModal = () => {
-    if (!selectedDrawing) return null;
-    const d = selectedDrawing;
-    const next = d.drawingType === "Working Drawing" ? getNextStage(d) : null;
-    return (
-      <Modal title={d.drawingName} wide onClose={closeModal}>
-        <div className="dms-detail-grid">
-          <div>
-            <div className="dms-form-field">
-              <div className="dms-label">Project</div>
-              <div style={{ color: "var(--ink)", fontSize: 14, fontWeight: 600 }}>{d.projectName}</div>
-            </div>
-            <div className="dms-grid-2">
-              <div className="dms-form-field">
-                <div className="dms-label">Type</div>
-                <span className={`dms-tag ${d.drawingType === "Working Drawing" ? "dms-tag-gold" : "dms-tag-blue"}`}>
-                  {d.drawingType}
-                </span>
-              </div>
-              <div className="dms-form-field">
-                <div className="dms-label">Revision</div>
-                <span className="dms-revision-lg">{d.revision}</span>
-              </div>
-              <div className="dms-form-field">
-                <div className="dms-label">Uploaded</div>
-                <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{fmt(d.uploadedAt)}</div>
-              </div>
-              <div className="dms-form-field">
-                <div className="dms-label">File</div>
-                <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{d.fileName}</div>
-              </div>
-            </div>
-
-            {d.drawingType === "Working Drawing" && (
-              <>
-                <div className="dms-label" style={{ marginBottom: 8 }}>Workflow Progress</div>
-                <WorkflowTracker sentTo={d.sentTo} />
-                {next ? (
-                  <button className="dms-btn dms-btn-info" style={{ width: "100%", marginTop: 4 }}
-                    onClick={() => sendTo(d.id, next)}>
-                    → Send to {next}
-                  </button>
-                ) : (
-                  <div className="dms-info-box dms-info-box-gold">✓ Sent to all stages in sequence.</div>
-                )}
-              </>
-            )}
-
-            {d.drawingType === "Detailed Drawing" && (
-              <>
-                <div className="dms-label" style={{ marginBottom: 8 }}>Send To</div>
-                <div className="dms-send-buttons">
-                  {WORKING_DRAWING_SEQUENCE.map((role) => {
-                    const done = d.sentTo.some((s) => s.role === role);
-                    return (
-                      <button key={role}
-                        className={`dms-btn ${done ? "dms-btn-muted" : "dms-btn-primary"}`}
-                        disabled={done} onClick={() => sendTo(d.id, role)}>
-                        {done ? `✓ ${role}` : `→ ${role}`}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-
-            {d.sentTo.length > 0 && (
-              <div style={{ marginTop: 20 }}>
-                <div className="dms-label">Delivery Log</div>
-                {d.sentTo.map((s) => (
-                  <div key={s.role} className="dms-delivery-row">
-                    <span style={{ color: "var(--ink-2)" }}>{s.role}</span>
-                    <span style={{ color: "var(--ink-muted)" }}>{fmt(s.sentAt)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <div className="dms-label">File Preview</div>
-            <FilePreview d={d} fileBlobs={fileBlobs} maxHeight={380} />
-          </div>
-        </div>
-      </Modal>
-    );
-  };
-
-  const RecipientDetailModal = ({ role }) => {
-    if (!selectedDrawing) return null;
-    const d = selectedDrawing;
-    const sentInfo = d.sentTo.find((s) => s.role === role);
-    return (
-      <Modal title={d.drawingName} wide onClose={closeModal}>
-        <div className="dms-detail-grid">
-          <div>
-            <div className="dms-form-field">
-              <div className="dms-label">Project</div>
-              <div style={{ color: "var(--ink)", fontWeight: 600 }}>{d.projectName}</div>
-            </div>
-            <div className="dms-grid-2">
-              <div className="dms-form-field">
-                <div className="dms-label">Type</div>
-                <span className={`dms-tag ${d.drawingType === "Working Drawing" ? "dms-tag-gold" : "dms-tag-blue"}`}>
-                  {d.drawingType}
-                </span>
-              </div>
-              <div className="dms-form-field">
-                <div className="dms-label">Revision</div>
-                <span className="dms-revision-lg">{d.revision}</span>
-              </div>
-              <div className="dms-form-field">
-                <div className="dms-label">File</div>
-                <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{d.fileName}</div>
-              </div>
-              <div className="dms-form-field">
-                <div className="dms-label">Received</div>
-                <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>{fmt(sentInfo?.sentAt)}</div>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div className="dms-label">File Preview</div>
-            <FilePreview d={d} fileBlobs={fileBlobs} maxHeight={360} />
-          </div>
-        </div>
-      </Modal>
-    );
-  };
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -1058,14 +1072,16 @@ const sendTo = async (drawingId, role) => {
         <h1 className="dms-header-title">Drawing Management System</h1>
         {activeRole && (
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 13, color: "var(--ink-muted)" }}>{currentUser.name}</span>
+            <span style={{ fontSize: 13, color: "var(--mist)", opacity: 0.7 }}>
+              {currentUser.name}
+            </span>
             <RolePill role={activeRole} />
           </div>
         )}
       </header>
 
       {activeRole === "Architect" && (
-        <div className="dms-role-bar" style={{ padding: "10px 24px 0" }}>
+        <div className="dms-role-bar">
           {ALL_VIEWS.map((role) => (
             <button
               key={role}
@@ -1089,14 +1105,52 @@ const sendTo = async (drawingId, role) => {
         {viewRole === "Quantity Surveyor"   && <RecipientView role="Quantity Surveyor" />}
         {viewRole === "Site Engineer"       && <RecipientView role="Site Engineer" />}
         {viewRole === "Program Coordinator" && <RecipientView role="Program Coordinator" />}
-        {viewRole === "Client"              && <RecipientView role="Client" />}
+        {viewRole === "Client"             && <RecipientView role="Client" />}
       </div>
 
-      {modal === "upload"          && <UploadModal />}
-      {modal === "request"         && <RequestModal />}
-      {modal === "requestDetail"   && selectedRequest && <RequestDetailModal />}
-      {modal === "detail"          && selectedDrawing && <DrawingDetailModal />}
-      {modal === "recipientDetail" && selectedDrawing && <RecipientDetailModal role={viewRole} />}
+      {modal === "upload" && (
+        <UploadModal
+          uf={uf}
+          setUf={setUf}
+          projects={projects}
+          fileRef={fileRef}
+          handleFileChange={handleFileChange}
+          handleUpload={handleUpload}
+          onClose={closeModal}
+        />
+      )}
+      {modal === "request" && (
+        <RequestModal
+          rf={rf}
+          setRf={setRf}
+          projects={projects}
+          sendRequest={sendRequest}
+          onClose={closeModal}
+        />
+      )}
+      {modal === "requestDetail" && selectedRequest && (
+        <RequestDetailModal
+          req={selectedRequest}
+          setRequests={setRequests}
+          onClose={closeModal}
+        />
+      )}
+      {modal === "detail" && selectedDrawing && (
+        <DrawingDetailModal
+          d={selectedDrawing}
+          fileBlobs={fileBlobs}
+          sendTo={sendTo}
+          onClose={closeModal}
+        />
+      )}
+      {modal === "recipientDetail" && selectedDrawing && (
+        <RecipientDetailModal
+          d={selectedDrawing}
+          role={viewRole}
+          fileBlobs={fileBlobs}
+          onClose={closeModal}
+        />
+      )}
     </div>
   );
 }

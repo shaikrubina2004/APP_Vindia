@@ -1,68 +1,67 @@
 const db = require("../config/db");
 
+// ─── helper: get a client with timeout protection ────────────────────────────
+// Wraps db.connect() so a hanging DB connection never crashes the server.
+const getClient = async () => {
+  const connectPromise = db.connect();
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("DB connection timeout")), 5000)
+  );
+  return Promise.race([connectPromise, timeoutPromise]);
+};
+
+// ─── helper: safe JSON response on DB errors ─────────────────────────────────
+const dbError = (res, err) => {
+  console.error("DB Error:", err.message);
+  if (err.message.includes("timeout") || err.code === "ETIMEDOUT") {
+    return res.status(503).json({
+      success: false,
+      message: "Database is currently unreachable. Please try again shortly.",
+    });
+  }
+  return res.status(500).json({ success: false, message: err.message });
+};
+
 // -----------------------------
 // GET DAILY LOG
-// /api/architect-daily-log?architect_id=&project_id=&date=
+// GET /api/architect-daily-log?architect_id=&project_id=&date=
 // -----------------------------
 const getDailyLog = async (req, res) => {
-  const client = await db.connect();
-
+  let client;
   try {
     const { architect_id, project_id, date } = req.query;
-
+  
     if (!architect_id || !project_id || !date) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing query params",
-      });
+      return res.status(400).json({ success: false, message: "Missing query params" });
     }
 
+    client = await getClient();
+
     const logResult = await client.query(
-      `
-      SELECT * FROM architect_daily_logs
-      WHERE architect_id = $1
-      AND project_id = $2
-      AND date = $3
-      LIMIT 1
-      `,
+      `SELECT * FROM architect_daily_logs
+       WHERE architect_id = $1 AND project_id = $2 AND date = $3
+       LIMIT 1`,
       [architect_id, project_id, date]
     );
 
     const log = logResult.rows[0];
+    if (!log) return res.json({ success: true, data: null });
 
-    if (!log) {
-      return res.json({ success: true, data: null });
-    }
-
-    const tasks = await client.query(
-      `SELECT * FROM architect_daily_log_tasks WHERE log_id = $1`,
-      [log.id]
+    const tasks  = await client.query(
+      `SELECT * FROM architect_daily_log_tasks WHERE log_id = $1`, [log.id]
     );
-
     const issues = await client.query(
-      `SELECT * FROM architect_daily_log_issues WHERE log_id = $1`,
-      [log.id]
+      `SELECT * FROM architect_daily_log_issues WHERE log_id = $1`, [log.id]
     );
-
-    
 
     return res.json({
       success: true,
-      data: {
-        ...log,
-        tasks: tasks.rows,
-        issues: issues.rows,
-        
-      },
+      data: { ...log, tasks: tasks.rows, issues: issues.rows },
     });
   } catch (err) {
-    console.error("GET Daily Log Error:", err);
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    return dbError(res, err);
   } finally {
-    client.release();
+    if (client) client.release();
   }
 };
 
@@ -72,134 +71,116 @@ const getDailyLog = async (req, res) => {
 // -----------------------------
 const submitDailyLog = async (req, res) => {
   let client;
-
   try {
-    client = await db.connect();
+    client = await getClient();
     await client.query("BEGIN");
 
     const {
-      id,
       date,
       project_id,
       architect_id,
-      role,
       status,
       approval_status,
       work_done,
-      tasks = [],
+      tasks  = [],
       issues = [],
-     
     } = req.body;
 
     if (!date || !project_id || !architect_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields",
-      });
+      return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
-    // -----------------------------
     // 1. UPSERT MAIN LOG
-    // -----------------------------
-const logResult = await client.query(
-  `
-  INSERT INTO architect_daily_logs
-  (date, project_id, architect_id, status, approval_status, work_done)
-  VALUES ($1,$2,$3,$4,$5,$6)
-
-  ON CONFLICT (architect_id, project_id, date)
-  DO UPDATE SET
-    status = EXCLUDED.status,
-    approval_status = EXCLUDED.approval_status,
-    work_done = EXCLUDED.work_done,
-    updated_at = NOW()
-
-  RETURNING id
-  `,
-  [
-    date,
-    project_id,
-    architect_id,
-    status || "Submitted",
-    approval_status || "Pending",
-    work_done,
-  ]
-);
+    const logResult = await client.query(
+      `INSERT INTO architect_daily_logs
+         (date, project_id, architect_id, status, approval_status, work_done)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (architect_id, project_id, date)
+       DO UPDATE SET
+         status          = EXCLUDED.status,
+         approval_status = EXCLUDED.approval_status,
+         work_done       = EXCLUDED.work_done,
+         updated_at      = NOW()
+       RETURNING id`,
+      [date, project_id, architect_id, status || "Submitted", approval_status || "Pending", work_done]
+    );
 
     const log_id = logResult.rows[0].id;
 
-    // -----------------------------
-    // 2. CLEAN OLD CHILD DATA (IMPORTANT)
-    // -----------------------------
-    await client.query(
-      `DELETE FROM architect_daily_log_tasks WHERE log_id = $1`,
-      [log_id]
-    );
+    // 2. CLEAN OLD CHILD DATA
+    await client.query(`DELETE FROM architect_daily_log_tasks  WHERE log_id = $1`, [log_id]);
+    await client.query(`DELETE FROM architect_daily_log_issues WHERE log_id = $1`, [log_id]);
 
-    await client.query(
-      `DELETE FROM architect_daily_log_issues WHERE log_id = $1`,
-      [log_id]
-    );
-
-    
-
-    // -----------------------------
     // 3. INSERT TASKS
-    // -----------------------------
-    for (let t of tasks) {
+    for (const t of tasks) {
       await client.query(
-        `
-        INSERT INTO architect_daily_log_tasks
-        (log_id, task_name, status)
-        VALUES ($1,$2,$3)
-        `,
+        `INSERT INTO architect_daily_log_tasks (log_id, task_name, status) VALUES ($1,$2,$3)`,
         [log_id, t.task_name, t.status]
       );
     }
 
-    // -----------------------------
     // 4. INSERT ISSUES
-    // -----------------------------
- for (let i of issues) {
-  await client.query(
-    `
-    INSERT INTO architect_daily_log_issues
-    (log_id, title, type, severity, description)
-    VALUES ($1,$2,$3,$4,$5)
-    `,
-    [
-      log_id,
-      i.title,
-      i.type,
-      i.severity,
-      i.description,
-    ]
-  );
-}
+    for (const i of issues) {
+      await client.query(
+        `INSERT INTO architect_daily_log_issues (log_id, title, type, severity, description)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [log_id, i.title, i.type, i.severity, i.description]
+      );
+    }
 
-  
     await client.query("COMMIT");
 
-    return res.json({
-      success: true,
-      message: "Daily log saved successfully",
-      log_id,
-    });
+    return res.json({ success: true, message: "Daily log saved successfully", log_id });
   } catch (err) {
-    if (client) await client.query("ROLLBACK");
-
-    console.error("POST Daily Log Error:", err);
-
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    if (client) {
+      try { await client.query("ROLLBACK"); } catch (_) {}
+    }
+    return dbError(res, err);
   } finally {
     if (client) client.release();
   }
 };
 
-module.exports = {
-  getDailyLog,
-  submitDailyLog,
+// -----------------------------
+// GET ALL LOGS FOR A PROJECT
+// GET /api/architect-daily-log/history?architect_id=&project_id=
+// -----------------------------
+const getProjectLogs = async (req, res) => {
+  let client;
+  try {
+    const { architect_id, project_id } = req.query;
+
+    if (!architect_id || !project_id) {
+      return res.status(400).json({ success: false, message: "Missing query params" });
+    }
+
+    client = await getClient();
+
+    const logResult = await client.query(
+      `SELECT * FROM architect_daily_logs
+       WHERE architect_id = $1 AND project_id = $2
+       ORDER BY date DESC`,
+      [architect_id, project_id]
+    );
+
+    const logs = await Promise.all(
+      logResult.rows.map(async (log) => {
+        const tasks  = await client.query(
+          `SELECT * FROM architect_daily_log_tasks  WHERE log_id = $1`, [log.id]
+        );
+        const issues = await client.query(
+          `SELECT * FROM architect_daily_log_issues WHERE log_id = $1`, [log.id]
+        );
+        return { ...log, tasks: tasks.rows, issues: issues.rows };
+      })
+    );
+
+    return res.json({ success: true, data: logs });
+  } catch (err) {
+    return dbError(res, err);
+  } finally {
+    if (client) client.release();
+  }
 };
+
+module.exports = { getDailyLog, submitDailyLog, getProjectLogs };

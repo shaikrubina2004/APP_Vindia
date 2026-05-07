@@ -518,6 +518,26 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/architect/rfi"
+          element={
+         <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+           <ArchitectLayout>
+             <RFIPage />
+           </ArchitectLayout>
+         </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/architect/rfi/:id"
+          element={
+         <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+           <ArchitectLayout>
+            <RFIDetailPage />
+           </ArchitectLayout>
+         </ProtectedRoute>
+         }
+        />
 
         {/* PROJECT COORDINATOR */}
         <Route

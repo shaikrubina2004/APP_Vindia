@@ -1,11 +1,14 @@
 import AppLayout from "./AppLayout";
 import { ArchitectMenu } from "../menus/ArchitectMenu";
+import { ProjectProvider } from "../context/ProjectContext";  // ← ADD THIS
 
 function ArchitectLayout({ children }) {
   return (
-    <AppLayout menuItems={ArchitectMenu}>
-      {children}
-    </AppLayout>
+    <ProjectProvider>
+      <AppLayout menuItems={ArchitectMenu}>
+        {children}
+      </AppLayout>
+    </ProjectProvider>
   );
 }
 

@@ -40,6 +40,10 @@ export const ArchitectMenu = [
     name: "Projects",
     path: "/architect/projects",
     icon: "grid"
-  }
-  /*{ name: "Drawings", path: "/site-engineer/designs", icon: "file" },*/
+  },
+  {
+    name: "RFI",
+    path: "/architect/rfi",
+    icon: "help-circle",  
+  },
 ];

@@ -41,3 +41,14 @@ export const submitDailyLog = async (payload) => {
     throw error;
   }
 };
+export const getProjectLogs = async (architectId, projectId) => {
+  try {
+    const res = await API.get("/architect-daily-log/history", {
+      params: { architect_id: architectId, project_id: projectId },
+    });
+    return res.data;
+  } catch (error) {
+    console.error("getProjectLogs error:", error);
+    throw error;
+  }
+};   
