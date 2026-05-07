@@ -3,8 +3,8 @@ const axios = require("axios");
 
 const VERIFY_TOKEN = "vindia_meta_verify";
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
+const { notifyNewLead } = require("./bdaNotificationsController");
 
-// ✅ Facebook calls this to verify your webhook
 exports.verifyWebhook = (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -17,22 +17,34 @@ exports.verifyWebhook = (req, res) => {
   return res.status(403).send("Verification failed");
 };
 
-// ✅ Facebook sends lead data here
 exports.receiveLeads = async (req, res) => {
   try {
     console.log("📥 Meta lead received:", JSON.stringify(req.body, null, 2));
+
+    // ✅ Handle Meta's test ping
+    if (req.body.object === undefined || req.body.entry === undefined) {
+      console.log("📌 Test ping received from Meta");
+      return res.status(200).json({ success: true });
+    }
 
     const entry = req.body.entry?.[0];
     const change = entry?.changes?.[0];
     const value = change?.value;
 
     if (!value || !value.leadgen_id) {
+      console.log("⚠️ No leadgen_id found");
       return res.status(200).json({ success: true });
     }
 
     const leadgen_id = value.leadgen_id;
+    console.log("🔍 Fetching lead ID:", leadgen_id);
 
-    // ✅ Fetch real lead details from Meta Graph API
+    // ✅ Skip fake test IDs
+    if (leadgen_id === "444444444444" || leadgen_id.startsWith("4444")) {
+      console.log("🧪 Test lead detected - skipping Graph API call");
+      return res.status(200).json({ success: true });
+    }
+
     const metaRes = await axios.get(
       `https://graph.facebook.com/v19.0/${leadgen_id}`,
       {
@@ -44,9 +56,8 @@ exports.receiveLeads = async (req, res) => {
     );
 
     const fieldData = metaRes.data.field_data;
-    console.log("📋 Field data:", fieldData);
+    console.log("📋 Field data:", JSON.stringify(fieldData, null, 2));
 
-    // ✅ Helper to extract field values
     const getValue = (name) => {
       const field = fieldData.find(
         (f) => f.name.toLowerCase().includes(name.toLowerCase())
@@ -56,19 +67,28 @@ exports.receiveLeads = async (req, res) => {
 
     const firstName = getValue("first_name") || "";
     const lastName  = getValue("last_name") || "";
-    const fullName  = getValue("full_name") || `${firstName} ${lastName}`.trim() || "Meta Lead";
+    const fullName  = getValue("full_name") ||
+                      `${firstName} ${lastName}`.trim() ||
+                      "Meta Lead";
     const phone     = getValue("phone") || getValue("phone_number") || "";
     const email     = getValue("email") || "";
     const city      = getValue("city") || "";
 
-    // ✅ Insert into your leads table (PostgreSQL)
-    await pool.query(
-      `INSERT INTO leads (name, phone, email, source, status, assigned_to, city, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-      [fullName, phone, email, "Meta Ads", "New", "Unassigned", city]
-    );
+    const result = await pool.query(
+  `INSERT INTO leads (name, phone, email, source, status, assigned_to, city, created_at)
+   VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+   RETURNING id`,
+  [fullName, phone, email, "Meta Ads", "New", "Unassigned", city]
+);
 
-    console.log("✅ Lead saved:", fullName, phone, email);
+notifyNewLead({
+  leadId: result.rows[0].id,
+  name:   fullName,
+  source: "Meta Ads",
+  phone:  phone,
+}).catch(console.error);
+
+    console.log("✅ Real lead saved:", fullName, phone, email);
     return res.status(200).json({ success: true });
 
   } catch (error) {

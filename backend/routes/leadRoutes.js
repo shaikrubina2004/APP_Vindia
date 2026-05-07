@@ -3,6 +3,8 @@ const router  = express.Router();
 const multer  = require("multer");
 const path    = require("path");
 const lead    = require("../controllers/leadController");
+const { logTimeSpent } = require("../controllers/timeTrackingController");
+
 
 /* ── File upload setup ── */
 const storage = multer.diskStorage({
@@ -49,6 +51,9 @@ router.put("/:id", lead.updateLead);
 /* ── FOLLOW UPS per lead ── */
 router.post("/:leadId/followups", lead.addFollowUp);
 router.get("/:leadId/followups",  lead.getFollowUps);
+
+/* ── TIME TRACKING ── */
+router.post("/:leadId/track-time", logTimeSpent);
 
 /* ── JUNK / ADMIN ── */
 router.put("/:id/request-junk",     lead.requestJunk);

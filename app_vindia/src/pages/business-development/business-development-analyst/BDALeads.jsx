@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./BDALeads.css";
@@ -45,24 +45,81 @@ function statusStyle(s) {
 
 const ALL_STATUSES = ["New","Interested","Follow Up","Converted","Not Interested","Contacted","Junk"];
 const ALL_SOURCES  = ["JustDial","Facebook/Meta","Manual","Website","Walk-in","Referral"];
+const MAX_TRACK_SEC = 300; // 5 minutes cap
 
 const Sk = ({ h=16, r=6 }) => (
   <div className="bda-lsk" style={{ height:h, borderRadius:r }} />
 );
 
 /* ════════════════════════════════════════
+   TIME TRACKER HOOK
+   Starts a timer, returns elapsed seconds.
+   On unmount or manual stop, fires callback
+   with capped duration.
+════════════════════════════════════════ */
+function useTimeTracker(active, onStop) {
+  const startRef    = useRef(null);
+  const intervalRef = useRef(null);
+  const [elapsed, setElapsed] = useState(0);
+  const onStopRef = useRef(onStop);
+  onStopRef.current = onStop;
+
+  useEffect(() => {
+    if (active) {
+      startRef.current = Date.now();
+      setElapsed(0);
+      intervalRef.current = setInterval(() => {
+        const secs = Math.floor((Date.now() - startRef.current) / 1000);
+        setElapsed(Math.min(secs, MAX_TRACK_SEC));
+      }, 1000);
+    } else {
+      if (startRef.current) {
+        const secs = Math.min(
+          Math.floor((Date.now() - startRef.current) / 1000),
+          MAX_TRACK_SEC
+        );
+        clearInterval(intervalRef.current);
+        if (secs > 0) onStopRef.current(secs);
+        startRef.current = null;
+        setElapsed(0);
+      }
+    }
+    return () => clearInterval(intervalRef.current);
+  }, [active]);
+
+  return elapsed;
+}
+
+/* ════════════════════════════════════════
    LEAD ROW — expanded / collapsed
 ════════════════════════════════════════ */
-const LeadRow = ({ lead, onEdit, onJunk }) => {
+const LeadRow = ({ lead, onEdit, onJunk, bdaEmail, bdaName }) => {
   const [open, setOpen] = useState(false);
   const src  = srcStyle(lead.source);
   const stat = statusStyle(lead.status);
+
+  // Track time while expanded (view session)
+  const handleViewStop = async (secs) => {
+    if (!bdaEmail || secs <= 0) return;
+    try {
+      await axios.post(`${API}/leads/${lead.id}/track-time`, {
+        bda_email:    bdaEmail,
+        bda_name:     bdaName || bdaEmail,
+        session_type: "view",
+        duration_sec: secs,
+      });
+    } catch (_) { /* silent fail — don't interrupt UX */ }
+  };
+
+  const elapsed = useTimeTracker(open, handleViewStop);
+
+  const handleToggle = () => setOpen(o => !o);
 
   return (
     <>
       <tr
         className={`blr ${open ? "blr--open" : ""}`}
-        onClick={() => setOpen(o => !o)}
+        onClick={handleToggle}
       >
         <td>
           <div className="blr__name">{lead.name}</div>
@@ -95,6 +152,11 @@ const LeadRow = ({ lead, onEdit, onJunk }) => {
         <tr className="blr__detail-row">
           <td colSpan={8}>
             <div className="blr__detail">
+              {/* Live timer badge */}
+              <div className="blr__timer-badge">
+                <span className="blr__timer-dot" />
+                Viewing · {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2,"0")} / 5:00
+              </div>
               <div className="blr__detail-grid">
                 <DetailItem label="WhatsApp"      value={lead.whatsapp} />
                 <DetailItem label="Building Type" value={lead.building_type} />
@@ -122,13 +184,28 @@ const DetailItem = ({ label, value, wide }) => (
 );
 
 /* ════════════════════════════════════════
-   EDIT MODAL
+   EDIT MODAL — with time tracking
 ════════════════════════════════════════ */
-const EditModal = ({ lead, onClose, onSave }) => {
+const EditModal = ({ lead, onClose, onSave, bdaEmail, bdaName }) => {
   const [form, setForm] = useState({ ...lead });
   const [saving, setSaving] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Track time while modal is open (edit session)
+  const handleEditStop = async (secs) => {
+    if (!bdaEmail || secs <= 0) return;
+    try {
+      await axios.post(`${API}/leads/${lead.id}/track-time`, {
+        bda_email:    bdaEmail,
+        bda_name:     bdaName || bdaEmail,
+        session_type: "edit",
+        duration_sec: secs,
+      });
+    } catch (_) { /* silent fail */ }
+  };
+
+  const elapsed = useTimeTracker(true, handleEditStop);
 
   const handleSave = async () => {
     setSaving(true);
@@ -147,7 +224,14 @@ const EditModal = ({ lead, onClose, onSave }) => {
       <div className="bda-modal" onClick={e => e.stopPropagation()}>
         <div className="bda-modal__header">
           <h2 className="bda-modal__title">Edit Lead — {lead.name}</h2>
-          <button className="bda-modal__close" onClick={onClose}>✕</button>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            {/* Live timer in modal header */}
+            <div className="bda-modal__timer">
+              <span className="blr__timer-dot" />
+              {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2,"0")} / 5:00
+            </div>
+            <button className="bda-modal__close" onClick={onClose}>✕</button>
+          </div>
         </div>
         <div className="bda-modal__body">
           <div className="bda-modal__grid">
@@ -195,8 +279,11 @@ const FieldSelect = ({ label, value, onChange, options }) => (
 
 /* ════════════════════════════════════════
    MAIN PAGE
+   Pass bdaEmail + bdaName as props from your
+   auth context / parent component.
+   Example: <BDALeads bdaEmail="user@co.in" bdaName="Ravi Kumar" />
 ════════════════════════════════════════ */
-const BDALeads = () => {
+const BDALeads = ({ bdaEmail, bdaName }) => {
   const navigate = useNavigate();
   const [leads,    setLeads]    = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -432,6 +519,8 @@ const BDALeads = () => {
                     lead={lead}
                     onEdit={setEditLead}
                     onJunk={handleJunk}
+                    bdaEmail={bdaEmail}
+                    bdaName={bdaName}
                   />
                 ))}
               </tbody>
@@ -476,7 +565,13 @@ const BDALeads = () => {
 
       {/* ── EDIT MODAL ── */}
       {editLead && (
-        <EditModal lead={editLead} onClose={() => setEditLead(null)} onSave={handleSaved} />
+        <EditModal
+          lead={editLead}
+          onClose={() => setEditLead(null)}
+          onSave={handleSaved}
+          bdaEmail={bdaEmail}
+          bdaName={bdaName}
+        />
       )}
     </div>
   );

@@ -346,6 +346,51 @@
   color: #1a2a4a;
 }
 
+/* ── LIVE TIMER BADGE (expanded row) ── */
+.blr__timer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #c2410c;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.blr__timer-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f97316;
+  display: inline-block;
+  animation: timerPulse 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .5; transform: scale(.75); }
+}
+
+/* ── MODAL TIMER ── */
+.bda-modal__timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #c2410c;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
 /* ── PILLS ── */
 .bda-pill {
   display: inline-flex;

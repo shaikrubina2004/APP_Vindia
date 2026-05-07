@@ -2,6 +2,7 @@ const pool = require("../config/db");
 const XLSX = require("xlsx");
 const path = require("path");
 const fs   = require("fs");
+const { notifyNewLead, notifyFollowUp } = require("./bdaNotificationsController");
 
 /* ══════════════════════════════════════
    DASHBOARD SUMMARY
@@ -100,7 +101,17 @@ exports.createLead = async (req, res) => {
         parseInt(designs_sent) || 0,
       ]
     );
-    res.json({ success: true, leadId: rows[0].id });
+
+    const newLeadId = rows[0].id;
+
+    notifyNewLead({
+      leadId: newLeadId,
+      name,
+      source: source || "Manual",
+      phone,
+    }).catch(err => console.error("Notify new lead error:", err.message));
+
+    res.json({ success: true, leadId: newLeadId });
   } catch (err) {
     console.error("Create lead error:", err.message);
     res.status(500).json({ success: false, message: "Failed to create lead" });
@@ -139,11 +150,7 @@ exports.updateLead = async (req, res) => {
 };
 
 /* ══════════════════════════════════════
-   FOLLOW UPS
-   
-   KEY FIX: When a nextFollowUp date is provided,
-   we also write it to leads.snooze_until so the
-   frontend Today/Upcoming tabs pick it up correctly.
+   ADD FOLLOW UP
 ══════════════════════════════════════ */
 exports.addFollowUp = async (req, res) => {
   const { leadId } = req.params;
@@ -151,16 +158,11 @@ exports.addFollowUp = async (req, res) => {
   if (!note) return res.status(400).json({ error: "Note required" });
 
   try {
-    // 1. Insert follow-up record
     await pool.query(
       "INSERT INTO followups (lead_id, note, status, next_followup) VALUES ($1, $2, $3, $4)",
       [leadId, note, status || null, nextFollowUp || null]
     );
 
-    // 2. Build the UPDATE for the leads table
-    //    - Always update status if provided
-    //    - Always update snooze_until with the next follow-up date
-    //      (set to NULL if no date given, so it falls out of Today/Overdue/Upcoming)
     const updateFields = [];
     const updateVals   = [];
     let n = 1;
@@ -170,7 +172,6 @@ exports.addFollowUp = async (req, res) => {
       updateVals.push(status);
     }
 
-    // Write snooze_until regardless — this is what drives Today/Upcoming/Overdue
     updateFields.push(`snooze_until = $${n++}`);
     updateVals.push(nextFollowUp || null);
 
@@ -182,13 +183,42 @@ exports.addFollowUp = async (req, res) => {
       );
     }
 
+    if (nextFollowUp) {
+      const { rows } = await pool.query(
+        "SELECT name, phone, assigned_to FROM leads WHERE id = $1",
+        [leadId]
+      );
+      if (rows.length) {
+        // ✅ Look up email from users table using assigned_to name
+        // To this:
+const userRes = await pool.query(
+  `SELECT email FROM users 
+   WHERE REGEXP_REPLACE(LOWER(TRIM(name)), '\\s+', ' ', 'g') = 
+         REGEXP_REPLACE(LOWER(TRIM($1)), '\\s+', ' ', 'g') 
+   LIMIT 1`,
+  [rows[0].assigned_to]
+);
+        const assignedEmail = userRes.rows[0]?.email || null;
+
+        notifyFollowUp({
+          leadId,
+          name:        rows[0].name,
+          phone:       rows[0].phone,
+          nextFollowUp,
+          assignedTo:  assignedEmail, // ✅ email not name
+        }).catch(err => console.error("Notify followup error:", err.message));
+      }
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error("Add followup error:", err.message);
     res.status(500).json({ error: err.message });
   }
 };
-
+/* ══════════════════════════════════════
+   GET FOLLOW UPS
+══════════════════════════════════════ */
 exports.getFollowUps = async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -262,7 +292,6 @@ exports.importJustDialPDF = async (req, res) => {
   const fileExt = path.extname(req.file.originalname).toLowerCase();
 
   try {
-    /* ── XLSX ── */
     if (fileExt === ".xlsx" || fileExt === ".xls") {
       const workbook = XLSX.readFile(req.file.path);
       const sheet    = workbook.Sheets[workbook.SheetNames[0]];
@@ -310,7 +339,6 @@ exports.importJustDialPDF = async (req, res) => {
       return res.json({ success: true, affectedRows: inserted });
     }
 
-    /* ── PDF ── */
     else if (fileExt === ".pdf") {
       const pdfParse   = require("pdf-parse");
       const dataBuffer = fs.readFileSync(req.file.path);

@@ -72,6 +72,7 @@ const qsNotifRoutes = require("./routes/qsNotificationRoutes");
 const leadRoutes = require("./routes/leadRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const metaRoutes = require("./routes/metaRoutes");
+const bdaNotifRoutes = require("./routes/bdaNotificationRoutes");
 
 const app = express();
 
@@ -164,6 +165,16 @@ app.use("/api/drawings", drawingUploadRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/meta", metaRoutes);
+app.use("/api/bda-notifications", bdaNotifRoutes);
+
+/* ── BDA Notifications Cron ─────────────────────────────── */
+const cron = require("node-cron");
+const { generateFollowUpNotifications } = require("./controllers/bdaNotificationsController");
+
+// Run every day at 8:00 AM
+cron.schedule("0 8 * * *", () => {
+  generateFollowUpNotifications();
+});
 
 /* ═══════════════════════════════════════════════════════════
    404 + GLOBAL ERROR HANDLER
