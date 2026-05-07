@@ -1,4 +1,7 @@
 const pool = require("../config/db");
+const createSENotification = require(
+  "../utils/createSENotification"
+);
 
 exports.createRFI = async (req, res) => {
   try {
@@ -21,6 +24,15 @@ exports.createRFI = async (req, res) => {
     );
 
     res.status(201).json(result.rows[0]);
+
+    // Create SE notification
+    await createSENotification({
+      message: `New RFI created: ${title}`,
+      type: "rfi",
+      severity: "info",
+      description: description,
+      link: "/structural-engineer/rfi",
+    });
   } catch (err) {
     console.error("RFI Create Error:", err.message);
     res.status(500).json({ error: err.message });

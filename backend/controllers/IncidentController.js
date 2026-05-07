@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const createSENotification = require("../utils/createSENotification");
 const { insertNotification } = require("./pcNotificationsController");
 const { insertMEPNotification } = require("./mepNotificationsController");
 const {
@@ -365,7 +366,13 @@ exports.createIncident = async (req, res) => {
     project_id,
   } = req.body;
   const created_by = req.user?.id ?? null;
-
+  await createSENotification({
+    message: `New Incident Assigned`,
+    description: title,
+    type: "incident",
+    severity: priority === "P1" ? "critical" : "warn",
+    link: "/structural-engineer/incidents",
+  });
   console.log("🔔 createIncident payload:", {
     title,
     assigned_to_user_id,
@@ -498,7 +505,13 @@ exports.createStandaloneTask = async (req, res) => {
     );
 
     await client.query("COMMIT");
-
+    await createSENotification({
+      message: `New Task Assigned`,
+      description: title,
+      type: "task",
+      severity: "info",
+      link: "/structural-engineer/incidents?page=tasks",
+    });
     console.log(
       "✅ Standalone task created, notifying assignee:",
       assigned_to_user_id,
@@ -646,7 +659,13 @@ exports.updateIncidentStatus = async (req, res) => {
     }
 
     await client.query("COMMIT");
-
+    await createSENotification({
+      message: `Incident Status Updated`,
+      description: `${row.title} → ${status}`,
+      type: "incident",
+      severity: "info",
+      link: "/structural-engineer/incidents",
+    });
     // ✅ notifyByRole handles QS / MEP / PC automatically
     if (row.assigned_to) {
       await notifyByRole(

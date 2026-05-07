@@ -1,5 +1,7 @@
 const pool = require("../config/db");
-
+const createSENotification = require(
+  "../utils/createSENotification"
+);
 // 🎯 CREATE TASK
 exports.createTask = async (req, res) => {
   try {
@@ -111,17 +113,14 @@ exports.updateTaskStatus = async (req, res) => {
     const updatedTask = result.rows[0];
 
     // 🔔 Notification for status update
-    await pool.query(
-      `INSERT INTO notifications (message, type, role, severity)
-       VALUES ($1, $2, $3, $4)`,
-      [
-        `Task Updated: ${updatedTask.title} → ${finalStatus}`,
-        "task",
-        "structural_engineer",
-        "info"
-      ]
-    );
-
+    await createSENotification({
+  message: `New Task Assigned`,
+  description: createdTask.title,
+  type: "task",
+  severity: "info",
+  link:
+    "/structural-engineer/incidents?page=tasks",
+});
     res.json(updatedTask);
 
   } catch (err) {

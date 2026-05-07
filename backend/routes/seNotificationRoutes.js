@@ -22,6 +22,12 @@ const TYPE_LINK = {
   analysis: "/structural-engineer/daily-updates",
 };
 
+// ── Safe role checker ───────────────────────────────────────
+function isStructuralEngineer(user) {
+  const role = user?.role?.toLowerCase?.() || "";
+
+  return role.includes("structural");
+}
 // ── Helper: shape a DB row into the frontend-expected object ─────────────────
 function shapeRow(n) {
   return {
@@ -32,21 +38,24 @@ function shapeRow(n) {
     description: n.description || n.message,
     created_at: n.created_at,
     is_read: n.is_read,
-    link: TYPE_LINK[n.type] || "/structural-engineer/dashboard",
-  };
+link:
+  n.link ||
+  TYPE_LINK[n.type] ||
+  "/structural-engineer/dashboard",  };
 }
 
 // ── GET /  – unread notifications for the logged-in SE ───────────────────────
 router.get("/", protect, async (req, res) => {
   try {
-    if (req.user?.role !== "structural_engineer") {
+    if (!isStructuralEngineer(req.user)) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
     const result = await pool.query(
-      `SELECT id, message, description, type, severity, is_read, created_at
+      `SELECT id, message, description, type, severity, is_read, created_at,link
    FROM notifications
-   WHERE role = 'structural_engineer'
+WHERE role = 'structural_engineer'
+AND is_read = false
    ORDER BY created_at DESC
    LIMIT 50`,
     );
@@ -64,7 +73,7 @@ router.get("/", protect, async (req, res) => {
 // ── GET /count  – unread badge count ─────────────────────────────────────────
 router.get("/count", protect, async (req, res) => {
   try {
-    if (req.user?.role !== "structural_engineer") {
+    if (!isStructuralEngineer(req.user)) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
