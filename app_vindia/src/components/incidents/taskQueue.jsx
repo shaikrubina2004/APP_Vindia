@@ -102,6 +102,7 @@ function BlockedReasonModal({ task, onConfirm, onCancel }) {
 export default function TaskQueue({
   incidents,
   setIncidents,
+  standaloneTasks = [],
   users,
   onNavigateBack,
   refreshAllTasks,
@@ -120,14 +121,22 @@ export default function TaskQueue({
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const taskFileRef = useRef(null);
 
-  const allTasks = incidents.flatMap((inc) =>
-    (inc.tasks ?? []).map((t) => ({
+  const allTasks = [
+    ...incidents.flatMap((inc) =>
+      (inc.tasks ?? []).map((t) => ({
+        ...t,
+        incidentTitle: t.incidentTitle ?? inc.title,
+        incidentPriority: t.incidentPriority ?? inc.priority,
+        incidentStatus: inc.status,
+      })),
+    ),
+    ...standaloneTasks.map((t) => ({
       ...t,
-      incidentTitle: t.incidentTitle ?? inc.title,
-      incidentPriority: t.incidentPriority ?? inc.priority,
-      incidentStatus: inc.status,
+      incidentTitle: "Standalone Task",
+      incidentPriority: t.incidentPriority || t.priority,
+      incidentStatus: "—",
     })),
-  );
+  ];
 
   const p1AutoTasks = allTasks.filter(
     (t) => t.incidentPriority === "P1" && t.status === "Pending",

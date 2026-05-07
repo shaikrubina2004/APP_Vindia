@@ -807,7 +807,7 @@ exports.getAllTasks = async (req, res) => {
       idx += 2;
     }
     if (open_only === "true") {
-      conditions.push(`(incident_id IS NULL AND project_id IS NULL)`);
+      conditions.push(`(incident_project_id IS NULL AND project_id IS NULL)`);
     }
     if (role) {
       conditions.push(`role_name = $${idx++}`);

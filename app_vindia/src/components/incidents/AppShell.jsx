@@ -78,6 +78,7 @@ export default function AppShell() {
     searchParams.get("page") === "tasks" ? "taskqueue" : "incidents",
   );
   const [incidents, setIncidents] = useState([]);
+  const [standaloneTasks, setStandaloneTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -229,6 +230,7 @@ export default function AppShell() {
 
         const taskRes = await API.get(taskUrl);
         const tasks = taskRes.data.data.map(normaliseTask);
+        setStandaloneTasks(tasks.filter((t) => !t.incidentId));
 
         setIncidents((prev) => {
           const merged = prev.map((inc) => ({
@@ -364,6 +366,7 @@ export default function AppShell() {
         <TaskQueue
           incidents={incidents}
           setIncidents={setIncidents}
+          standaloneTasks={standaloneTasks}
           users={users}
           refreshIncident={refreshIncident}
           onNavigateBack={navigateToIncidents}
