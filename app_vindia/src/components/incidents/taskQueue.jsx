@@ -608,10 +608,25 @@ export default function TaskQueue({
                       <span className="inc-assignee">
                         📤 {task.createdByName || "—"}
                       </span>
+                      <span
+                        className={`inc-deadline ${task.deadlineAt && Date.now() > new Date(task.deadlineAt).getTime() ? "overdue" : ""}`}
+                      >
+                        {task.deadlineAt
+                          ? Date.now() > new Date(task.deadlineAt).getTime()
+                            ? `Overdue by ${Math.floor((Date.now() - new Date(task.deadlineAt).getTime()) / 3600000)}h`
+                            : `Due in ${Math.floor((new Date(task.deadlineAt).getTime() - Date.now()) / 3600000)}h`
+                          : ""}
+                      </span>
                       <span className="inc-time">
                         {timeAgo(task.createdAt)}
                       </span>
                     </div>
+                    {task.deadlineAt &&
+                      Date.now() > new Date(task.deadlineAt).getTime() && (
+                        <div className="inc-overdue-bar">
+                          ⏰ Reminder: This task is overdue!
+                        </div>
+                      )}
                   </div>
                 );
               })}

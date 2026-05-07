@@ -57,6 +57,7 @@ function normaliseTask(t) {
     assignedId: t.assignee_id ?? t.assignedId ?? null,
     createdAt: new Date(t.created_at ?? t.createdAt),
     updatedAt: new Date(t.updated_at ?? t.updatedAt),
+    deadlineAt: t.deadline_at ? new Date(t.deadline_at) : null,
     comments: (t.comments ?? []).map((c) => ({
       author: c.author_name ?? c.author,
       text: c.body ?? c.text,

@@ -492,8 +492,8 @@ exports.createStandaloneTask = async (req, res) => {
     await client.query("BEGIN");
 
     const { rows } = await client.query(
-      `INSERT INTO tasks (title, note, priority, assigned_to, created_by, project_id)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      `INSERT INTO tasks (title, note, priority, assigned_to, created_by, project_id, deadline_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [
         title.trim(),
         note ?? null,
@@ -501,6 +501,7 @@ exports.createStandaloneTask = async (req, res) => {
         assigned_to_user_id,
         created_by,
         project_id ?? null,
+        calcDeadline(priority),
       ],
     );
 
@@ -938,13 +939,21 @@ exports.createTasks = async (req, res) => {
         }
       }
 
-      const tCols = ["incident_id", "title", "note", "priority", "assigned_to"];
+      const tCols = [
+        "incident_id",
+        "title",
+        "note",
+        "priority",
+        "assigned_to",
+        "deadline_at",
+      ];
       const tVals = [
         id,
         task.title.trim(),
         task.note ?? null,
         task.priority ?? "P2",
         task.assigned_to_user_id ?? null,
+        calcDeadline(task.priority ?? "P2"),
       ];
       if (created_by !== null) {
         tCols.push("created_by");

@@ -462,17 +462,25 @@ exports.flagClash = async (req, res) => {
     const name1 = drawingNames.rows[0]?.name1 || "Drawing 1";
     const name2 = drawingNames.rows[0]?.name2 || "Drawing 2";
 
+    // Get project_id from the drawing
+    const drawingProject = await client.query(
+      `SELECT project_id FROM drawings WHERE id = $1`,
+      [drawing_id_1],
+    );
+    const clash_project_id = drawingProject.rows[0]?.project_id ?? null;
+
     const incidentResult = await client.query(
       `INSERT INTO incidents
         (title, description, priority, status,
-         created_by, assigned_to)
-       VALUES ($1, $2, 'P2', 'Created', $3, $4)
+         created_by, assigned_to, project_id)
+       VALUES ($1, $2, 'P2', 'Created', $3, $4, $5)
        RETURNING id`,
       [
         `Clash: ${name1} vs ${name2}`,
         `${clash_type} — ${description}. Clash flagged on drawing "${name1}" conflicting with "${name2}".`,
         raised_by_id,
         assigned_to,
+        clash_project_id,
       ],
     );
 
