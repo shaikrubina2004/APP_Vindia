@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useProject } from "../../context/ProjectContext";
 import "./NotificationBell.css";
 
 const TYPE_CFG = {
@@ -21,6 +22,7 @@ const FILTERS = ["all", "incident", "clash", "drawing", "approval", "task"];
 
 export default function MEPNotificationBell({ userId }) {
   const navigate = useNavigate();
+  const { PROJECTS, setActiveProject } = useProject();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("all");
   const [notifs, setNotifs] = useState([]);
@@ -85,6 +87,23 @@ export default function MEPNotificationBell({ userId }) {
     e.stopPropagation();
     markRead(n.id);
     setOpen(false);
+
+    // Auto switch project if notification has project_id
+    if (n.project_id) {
+      const project = PROJECTS.find(
+        (p) => String(p.id) === String(n.project_id),
+      );
+      if (project) {
+        setActiveProject(project);
+      }
+    } else {
+      // No project_id means open incident/task
+      const openOption = PROJECTS.find((p) => p.id === null);
+      if (openOption && (n.type === "incident" || n.type === "task")) {
+        setActiveProject(openOption);
+      }
+    }
+
     const routes = {
       incident: "/mep/incidents",
       clash: "/mep/shared/drawings",

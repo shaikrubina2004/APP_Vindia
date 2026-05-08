@@ -7,7 +7,7 @@ const {
 } = require("./qsNotificationController"); // ✅ correct import
 const {
   insertArchitectNotification,
-} = require("./architectNotificationsController")
+} = require("./architectNotificationsController");
 /* ─── HELPERS ─────────────────────────────────────────────── */
 
 function calcDeadline(priority) {
@@ -122,6 +122,7 @@ async function notifyByRole(
   link,
   severity,
   referenceId,
+  projectId = null,
 ) {
   if (!userId) return;
   try {
@@ -156,21 +157,37 @@ async function notifyByRole(
           description,
           severity,
           referenceId ?? null,
+          projectId,
         );
         console.log(`✅ MEP Notification → user:${userId} type:${type}`);
       } catch (err) {
         console.error("MEP Notification error:", err.message);
       }
-      
-   } else if (roleName.includes("architect") || roleCode === "architect") {
+    } else if (roleName.includes("architect") || roleCode === "architect") {
       try {
-        await insertArchitectNotification(userId, type, title, description, link, severity, referenceId ?? null);
+        await insertArchitectNotification(
+          userId,
+          type,
+          title,
+          description,
+          link,
+          severity,
+          referenceId ?? null,
+        );
         console.log(`✅ Architect Notification → user:${userId} type:${type}`);
       } catch (err) {
         console.error("Architect Notification error:", err.message);
       }
     } else {
-      await safeNotify(userId, type, title, description, link, severity, referenceId);
+      await safeNotify(
+        userId,
+        type,
+        title,
+        description,
+        link,
+        severity,
+        referenceId,
+      );
     }
   } catch (err) {
     console.error("notifyByRole error:", err.message);
@@ -453,6 +470,7 @@ exports.createIncident = async (req, res) => {
         "/quantity-surveyor/incident",
         severity,
         null,
+        project_id ?? null,
       );
     }
 
@@ -533,6 +551,7 @@ exports.createStandaloneTask = async (req, res) => {
         "/quantity-surveyor/incident?page=tasks",
         "info",
         null,
+        project_id ?? null,
       );
     }
 
@@ -971,6 +990,12 @@ exports.createTasks = async (req, res) => {
 
       // ✅ notifyByRole handles QS / MEP / PC automatically
       if (task.assigned_to_user_id) {
+        // get project_id from the incident
+        const { rows: incProjectRows } = await client.query(
+          `SELECT project_id FROM incidents WHERE id = $1`,
+          [id],
+        );
+        const incProjectId = incProjectRows[0]?.project_id ?? null;
         await notifyByRole(
           task.assigned_to_user_id,
           "task",
@@ -979,6 +1004,7 @@ exports.createTasks = async (req, res) => {
           "/quantity-surveyor/incident?page=tasks",
           "info",
           null,
+          incProjectId,
         );
       }
     }
