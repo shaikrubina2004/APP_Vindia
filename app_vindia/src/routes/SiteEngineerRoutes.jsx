@@ -34,6 +34,7 @@
 
     // ── Shared ─────────────────────────────────────────────────
     import AppShell from "../components/incidents/AppShell";
+import QSMeasurements from "../pages/siteEngineer/Qsmeasurements";
 
     // ── Allowed roles ──────────────────────────────────────────
     const SE_ROLES = [ROLES.SITE_ENGINEER, ROLES.PROJECT_MANAGER, ROLES.CEO];
@@ -170,6 +171,16 @@
         element={
         <ProtectedRoute allowedRoles={SE_ROLES}>
             <SiteEngineerLayout><SiteInstruction /></SiteEngineerLayout>
+        </ProtectedRoute>
+        }
+    />,
+
+    <Route
+        key="se-qs-measurements"
+        path="/site-engineer/qs-measurements"
+        element={
+        <ProtectedRoute allowedRoles={SE_ROLES}>
+            <SiteEngineerLayout><QSMeasurements /></SiteEngineerLayout>
         </ProtectedRoute>
         }
     />,

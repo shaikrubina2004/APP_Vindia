@@ -82,6 +82,11 @@ const siteEngineerMenu = [
     path: "/site-engineer/site-instructions",
     icon: "file-text",
   },
+   {
+    name: "QS Measurements",
+    path: "/site-engineer/qs-measurements",
+    icon: "circle",
+  },
 ];
 
 export default siteEngineerMenu;

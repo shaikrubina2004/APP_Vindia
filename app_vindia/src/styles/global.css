@@ -12,17 +12,16 @@
 }
 
 /* SCROLL FIX — must be here to override Tailwind base */
-html,
-body {
-  height: auto !important;
-  min-height: 100vh;
-  overflow: visible !important;
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow-x: hidden;   /* only prevent horizontal scroll */
 }
 
 #root {
-  height: auto !important;
   min-height: 100vh;
-  overflow: visible !important;
+  display: block;
+  flex-direction: column;
 }
 
 /* BODY */
@@ -32,11 +31,11 @@ body {
 }
 
 /* MAIN CONTENT */
-.main-content {
+/* .main-content {
   margin-left: 110px;
   margin-top: var(--navbar-height);
   padding: 20px;
-}
+} */
 
 /* MOBILE FIX */
 @media (max-width: 768px) {

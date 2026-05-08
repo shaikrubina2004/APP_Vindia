@@ -54,7 +54,7 @@ const PIP = {
 
 /* ── quick actions — all wired to real routes ────────────── */
 const QUICK_ACTIONS = [
-  { label: "Daily Diary",       icon: "📋", route: "/site-engineer/diary"             },
+  { label: "Daily Diary",       icon: "📋", route: "/site-engineer/daily-diary"       },
   { label: "Raise RFI",         icon: "❓", route: "/site-engineer/rfi"               },
   { label: "Log Progress",      icon: "📊", route: "/site-engineer/progress"          },
   { label: "Material Request",  icon: "📦", route: "/site-engineer/materials"         },
@@ -97,58 +97,81 @@ export default function SiteEngineerDashboard() {
 
   // ── data load ──────────────────────────────────────────────
   useEffect(() => {
-    if (loaded.current) return;
-    loaded.current = true;
+  if (loaded.current) return;
+  loaded.current = true;
 
-    const today = nowISO();
+  const today = nowISO();
 
-    Promise.allSettled([
-      api.get("/site-engineer/rfi"),
-      api.get("/ncr"),
-      api.get("/progress"),
-      api.get("/approvals"),
-      api.get("/snags"),
-      api.get("/site-instructions"),
-      api.get("/material-request"),
-      api.get("/diary"),
-    ]).then(([rfiRes, ncrRes, progRes, aprRes, snagRes, siRes, matRes, diaryRes]) => {
+  const loadData = async () => {
+    try {
+      // 🔹 Dashboard summary (fast KPIs)
+      const dashRes = await api.get("/dashboard");
+      console.log("Dashboard KPI:", dashRes.data);
+
+      // 🔹 Full module data (IMPORTANT)
+      const [
+        rfiRes,
+        ncrRes,
+        progRes,
+        aprRes,
+        snagRes,
+        siRes,
+        matRes,
+        diaryRes
+      ] = await Promise.allSettled([
+        api.get("/site-engineer/rfi"),
+        api.get("/ncr"),
+        api.get("/progress"),
+        api.get("/approvals"),
+        api.get("/snags"),
+        api.get("/site-instructions"),
+        api.get("/material-request"),
+        api.get("/diary"),
+      ]);
 
       if (rfiRes.status === "fulfilled")
-        setRFIs(dedupe(Array.isArray(rfiRes.value?.data) ? rfiRes.value.data : []));
+        setRFIs(Array.isArray(rfiRes.value?.data) ? rfiRes.value.data : []);
 
       if (ncrRes.status === "fulfilled")
-        setNCRs(dedupe(Array.isArray(ncrRes.value?.data) ? ncrRes.value.data : []));
+        setNCRs(Array.isArray(ncrRes.value?.data) ? ncrRes.value.data : []);
 
       if (progRes.status === "fulfilled")
         setProg(Array.isArray(progRes.value?.data) ? progRes.value.data : []);
 
       if (aprRes.status === "fulfilled") {
-        const all = Array.isArray(aprRes.value?.data) ? aprRes.value.data : [];
+        const all = aprRes.value?.data || [];
         setPendingApprovals(all.filter(a => !a.status || a.status === "pending"));
       }
 
       if (snagRes.status === "fulfilled") {
-        const all = Array.isArray(snagRes.value?.data) ? snagRes.value.data : [];
+        const all = snagRes.value?.data || [];
         setOpenSnags(all.filter(s => s.status !== "closed"));
       }
 
       if (siRes.status === "fulfilled") {
-        const all = Array.isArray(siRes.value?.data) ? siRes.value.data : [];
-        setPendingSIs(all.filter(s => s.status === "issued")); // needs acknowledgement
+        const all = siRes.value?.data || [];
+        setPendingSIs(all.filter(s => s.status === "issued"));
       }
 
       if (matRes.status === "fulfilled") {
-        const all = Array.isArray(matRes.value?.data) ? matRes.value.data : [];
+        const all = matRes.value?.data || [];
         setPendingMaterials(all.filter(m => m.status === "requested"));
       }
 
       if (diaryRes.status === "fulfilled") {
-        const all = Array.isArray(diaryRes.value?.data) ? diaryRes.value.data : [];
+        const all = diaryRes.value?.data || [];
         setDiaryToday(all.some(d => (d.date || "").slice(0, 10) === today));
       }
 
-    }).finally(() => setLoading(false));
-  }, []);
+    } catch (err) {
+      console.error("Dashboard error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadData();
+}, []);
 
   // ── derived ────────────────────────────────────────────────
   const openRFIs  = useMemo(() => rfis.filter(r => !r?.status || r.status === "open"), [rfis]);

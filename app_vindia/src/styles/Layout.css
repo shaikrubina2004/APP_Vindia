@@ -64,11 +64,9 @@ body, html {
   flex: 1;
   min-width: 0;
   width: auto;
-  display: flex;
-  flex-direction: column;
-  /* NO overflow-x here */
-}
 
+  display: block;   /* ✅ IMPORTANT FIX */
+}
 .page-content {
   margin-top: 70px;
   padding: 12px 20px;

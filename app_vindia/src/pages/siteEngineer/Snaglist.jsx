@@ -5,7 +5,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
 import { useNotifications } from "../../context/NotificationContext";
-import "../../styles/shared-pages.css";
+import "../../styles/Snaglist.css";
 
 const PAGE_SIZE = 10;
 
@@ -59,8 +59,13 @@ export default function SnagList() {
     } catch { /* ignore */ }
     return { role: "site_engineer", id: null, name: "Site Engineer" };
   }, []);
+  const path = window.location.pathname;
 
-  const userRole = currentUser?.role || "site_engineer";
+const userRole = path.includes("site-engineer")
+  ? "site_engineer"
+  : currentUser?.role || "site_engineer";
+
+//   const userRole = currentUser?.role || "site_engineer";
 
   function canTransition(nextStatus) {
     const allowed = ROLE_ALLOWED_TRANSITIONS[userRole] || ROLE_ALLOWED_TRANSITIONS.site_engineer;
@@ -90,16 +95,22 @@ export default function SnagList() {
   }, []);
 
   async function load() {
-    setLoading(true);
-    try {
-      const res = await api.get("/snags");
-      if (!alive.current) return;
-      const raw  = Array.isArray(res?.data) ? res.data.slice().reverse() : [];
-      const seen = new Set();
-      setSnags(raw.filter(it => { const k = stableKey(it); if (seen.has(k)) return false; seen.add(k); return true; }));
-    } catch { /* offline */ }
-    finally { if (alive.current) setLoading(false); }
+  setLoading(true);
+  try {
+    const res = await api.get("/snags");
+
+    const data = Array.isArray(res.data)
+      ? res.data
+      : res.data?.snags || [];
+
+    setSnags(data);
+
+  } catch (err) {
+    console.error("Error loading snags:", err);
+  } finally {
+    setLoading(false);
   }
+}
 
   // ── Status update ──────────────────────────────────────────
   const updateStatus = useCallback(async (snag, newStatus) => {
@@ -157,8 +168,10 @@ export default function SnagList() {
         body.closed_at = new Date().toISOString();
       }
 
-      await api.patch(`/snags/${snag.id}`, body);
-      setSnags(s => s.map(it => it.id === snag.id ? { ...it, ...body } : it));
+    // TEMP: simulate success
+await api.patch(`/api/snags/${snag.id}`, body);
+
+   setSnags(s => s.map(it => it.id === snag.id ? { ...it, ...body } : it));
       push(`Snag ${newStatus.replace("_", " ")}: "${snag.title || snag.snag_number}"`, "approval", { linked_ref: snag.snag_number });
 
     } catch {

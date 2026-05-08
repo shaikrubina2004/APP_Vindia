@@ -21,6 +21,7 @@ const DELAY_TYPES  = [
   { value: "other",           label: "Other" },
 ];
 
+
 const ls = {
   load: k => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch { return null; } },
   save: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
@@ -36,14 +37,18 @@ function enqueue(payload) {
 async function flushQueue() {
   const q = ls.load(QUEUE_KEY);
   if (!Array.isArray(q) || !q.length) return;
+
   const rem = [];
+
   for (const item of q) {
     try {
-      if (item.payload?._fd) { rem.push(item); continue; }
-      const res = await api.post("/diary", item.payload);
+      const res = await api.post("/se-daily-reports", item.payload);
       if (!res || (res.status && res.status >= 400)) throw new Error();
-    } catch { rem.push(item); }
+    } catch {
+      rem.push(item);
+    }
   }
+
   ls.save(QUEUE_KEY, rem);
 }
 
@@ -77,23 +82,26 @@ const BLANK = {
 };
 
 export default function DailyDiary() {
+const [projects, setProjects] = useState([]);
   const draft = ls.load(DRAFT_KEY);
   const [form, setForm]       = useState({ ...BLANK, date: nowISO(), ...draft, attachments: [] });
   const [errors, setErrors]   = useState({});
   const [status, setStatus]   = useState("");
   const [submitting, setSub]  = useState(false);
   const [diaries, setDiaries] = useState([]);
+  const [milestones, setMilestones] = useState([]);
+const [wbsList, setWbsList] = useState([]);
   const [viewIdx, setViewIdx] = useState(null);
   const [tab, setTab]         = useState("new");
   const autoSave = useRef(null);
   const alive    = useRef(true);
 
   useEffect(() => {
-    alive.current = true;
-    loadHistory();
-    flushQueue().catch(() => {});
-    return () => { alive.current = false; };
-  }, []);
+  alive.current = true;
+  loadHistory();
+  flushQueue().catch(() => {});
+  return () => { alive.current = false; };
+}, []);
 
   useEffect(() => {
     clearTimeout(autoSave.current);
@@ -104,11 +112,40 @@ export default function DailyDiary() {
 
   async function loadHistory() {
     try {
-      const res = await api.get("/diary");
+      const res = await api.get("/se-daily-reports");
       if (alive.current) setDiaries(Array.isArray(res?.data) ? res.data.slice().reverse() : []);
     } catch { /* empty list */ }
   }
+  useEffect(() => {
+  loadProjects();
+}, []);
 
+async function loadProjects() {
+  try {
+    const res = await api.get("/projects");
+    setProjects(res.data || []);
+  } catch (err) {
+    console.error("Failed to load projects");
+  }
+}
+  async function loadMilestones(projectId) {
+  try {
+    const res = await api.get(`/diary/milestones?project_id=${projectId}`);
+    setMilestones(res.data || []);
+  } catch (err) {
+    console.error("Failed to load milestones");
+  }
+}
+async function loadWbsByMilestone(milestoneId) {
+  try {
+    const res = await api.get(
+      `/diary/wbs?milestone_id=${milestoneId}&project_id=${form.project_id}`
+    );
+    setWbsList(res.data || []);
+  } catch (err) {
+    console.error("Failed to load WBS");
+  }
+}
   const setF = (k, v) => {
     setForm(f => ({ ...f, [k]: v }));
     setErrors(e => { const c = { ...e }; delete c[k]; return c; });
@@ -116,7 +153,8 @@ export default function DailyDiary() {
   };
   const setMat = (i, k, v) => setForm(f => { const m = [...f.materials]; m[i] = { ...m[i], [k]: v }; return { ...f, materials: m }; });
   const addMat  = () => setForm(f => ({ ...f, materials: [...f.materials, { name: "", qty: "", notes: "" }] }));
-  const handleFiles = e => { setForm(f => ({ ...f, attachments: [...f.attachments, ...Array.from(e.target.files || [])] })); e.target.value = null; };
+  const handleFiles = e => {   console.log("FILES 👉", e.target.files);
+setForm(f => ({ ...f, attachments: [...f.attachments, ...Array.from(e.target.files || [])] })); e.target.value = null; };
   const removeFile  = i => setForm(f => ({ ...f, attachments: f.attachments.filter((_, j) => j !== i) }));
 
   const totalLabour = ["labour_carpenters","labour_steel","labour_masons","labour_mep","labour_general","labour_supervisors"]
@@ -133,12 +171,12 @@ export default function DailyDiary() {
     setErrors(errs);
     if (Object.keys(errs).length) { setStatus("Fix errors above"); return; }
     setSub(true); setStatus("Saving…");
-    const payload = {
-      ...form,
-      labour_total: totalLabour,
-      labour_skilled: form.labour_carpenters + form.labour_steel + form.labour_masons + form.labour_mep,
-      labour_unskilled: form.labour_general,
-    };
+   const payload = {
+  ...form,
+  project_id: form.project_id, // ✅ dynamic
+  wbs_id: form.subtask_id,
+  milestone_id: form.milestone_id,
+};
     delete payload.attachments;
     try {
       let res;
@@ -146,9 +184,10 @@ export default function DailyDiary() {
         const fd = new FormData();
         Object.entries(payload).forEach(([k, v]) => fd.append(k, typeof v === "object" ? JSON.stringify(v) : String(v ?? "")));
         form.attachments.forEach(f => fd.append("attachments", f, f.name));
-        res = await api.post("/diary", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      } else {
-        res = await api.post("/diary", payload);
+res = await api.post("/se-daily-reports", fd, {
+  headers: { "Content-Type": "multipart/form-data" }
+});      } else {
+        res = await api.post("/se-daily-reports", payload);
       }
       if (!res || (res.status && res.status >= 400)) throw new Error();
       await loadHistory(); ls.del(DRAFT_KEY);
@@ -216,8 +255,71 @@ export default function DailyDiary() {
                         </select>
                       </div>
                       <div className="dd-field">
-                        <label className="dd-label">Site / Project</label>
-                        <input className="dd-input" value={form.site} onChange={e => setF("site", e.target.value)} placeholder="Block C · Phase 2" />
+  <label className="dd-label">Project</label>
+  <select
+    className="dd-select"
+    value={form.project_id || ""}
+    onChange={(e) => {
+      const projectId = e.target.value;
+      setF("project_id", projectId);
+
+      // reset dependent fields
+      setMilestones([]);
+      setWbsList([]);
+
+      if (projectId) {
+        loadMilestones(projectId);
+      }
+    }}
+  >
+    <option value="">Select Project</option>
+    {projects.map(p => (
+      <option key={p.id} value={p.id}>
+        {p.name}
+      </option>
+    ))}
+  </select>
+</div>
+                      <div className="dd-field">
+                      <label className="dd-label">Milestone</label>
+                      <select
+  className="dd-select"
+  value={form.milestone_id || ""}
+  onChange={(e) => {
+  const val = e.target.value;
+  setF("milestone_id", val);
+
+  if (val) {
+    loadWbsByMilestone(val); // ✅ clean call
+  } else {
+    setWbsList([]);
+  }
+}}
+>
+  <option value="">Select milestone</option>
+  {milestones.map(m => (
+  <option key={m.id} value={m.id}>
+    {m.name}
+  </option>
+))}
+</select>
+                    </div>
+
+                    <div className="dd-field">
+                      <label className="dd-label">Task (WBS)</label>
+                      <select
+  className="dd-select"
+  value={form.subtask_id || ""}
+  onChange={e => setF("subtask_id", e.target.value)}
+  disabled={!form.milestone_id} // 🔥 important
+>
+  <option value="">Select task</option>
+  {wbsList.map(w => (
+  <option key={w.id} value={w.id}>
+    {w.name}
+  </option>
+))}
+</select>
                       </div>
                       <div className="dd-field">
                         <label className="dd-label">Zone / Area</label>

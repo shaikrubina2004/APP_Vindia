@@ -240,6 +240,18 @@ export default function MaterialRequest() {
   const secTitle = { fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em", color: "var(--color-text-tertiary)", marginBottom: 12, paddingBottom: 6, borderBottom: "0.5px solid var(--color-border-tertiary)" };
   const grid2 = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 };
 
+  const markDelivered = async (id) => {
+  try {
+    await api.put(`/material-request/${id}`, {
+      status: "delivered",
+    });
+
+    loadList(); // refresh list
+  } catch (err) {
+    console.error(err);
+  }
+};
+
   return (
     <div style={{ padding: "0 0 40px" }}>
 
@@ -440,6 +452,23 @@ export default function MaterialRequest() {
                           </div>
                         </div>
                       </div>
+                      {r.status === "approved" && (
+  <button
+    onClick={() => markDelivered(r.id)}
+    style={{
+      marginTop: 8,
+      padding: "6px 12px",
+      fontSize: 12,
+      background: "#0A4174",
+      color: "#fff",
+      border: "none",
+      borderRadius: "6px",
+      cursor: "pointer"
+    }}
+  >
+    Mark as Delivered
+  </button>
+)}
                       {items.length > 0 && (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                           {items.filter(it => it.description).map((it, ii) => (
