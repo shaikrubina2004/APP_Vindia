@@ -92,7 +92,7 @@ function P1Card({ p1Count, totalCount, loading, onClick }) {
   );
 }
 
-// ─── P1 TASKS COUNT CARD (NEW) ────────────────────────────────────────────────
+// ─── P1 TASKS COUNT CARD ────────────────────────────────────────────────────
 function P1TasksCard({ p1TaskCount, totalTaskCount, pendingCount, loading, onClick }) {
   return (
     <div className="acd-p1tasks-card" onClick={onClick} role="button" tabIndex={0}>
@@ -121,7 +121,7 @@ function ActionChips({
   drawingCount, loadingDrawings,
   projectCount, loadingProjects,
   incidentCount, loadingIncidents,
-  onLogClick, onDrawingClick, onProjectClick, onIncidentClick,
+  onLogClick, onDrawingClick, onProjectClick, onIncidentClick, onSnagClick, // ← added onSnagClick
 }) {
   const submitted = logStatus === "Submitted";
 
@@ -153,6 +153,14 @@ function ActionChips({
       label: "Incidents",
       value: loadingIncidents ? "…" : `${incidentCount} total`,
       onClick: onIncidentClick,
+    },
+    // ── NEW: Snag List chip ──
+    {
+      color: "indigo",
+      icon: "📋",
+      label: "Snag List",
+      value: "View all",
+      onClick: onSnagClick,
     },
   ];
 
@@ -333,7 +341,6 @@ export default function ArchitectDashboard() {
 
   const p1Incidents = incidents.filter((i) => i.priority === "P1");
 
-  // P1 tasks — use the task's own priority first, fall back to incidentPriority
   const p1Tasks = myTasks.filter(
     (t) => (t.priority || t.incidentPriority) === "P1"
   );
@@ -370,6 +377,7 @@ export default function ArchitectDashboard() {
         onDrawingClick={() => navigate("/architect/designs")}
         onProjectClick={() => navigate("/architect/projects")}
         onIncidentClick={() => navigate("/architect/incidents")}
+        onSnagClick={() => navigate("/architect/snags")} 
       />
 
       {/* ── ROW 3: Narrower incidents list + wider analytics ── */}

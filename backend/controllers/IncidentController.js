@@ -5,7 +5,9 @@ const { insertMEPNotification } = require("./mepNotificationsController");
 const {
   insertNotification: insertQSNotification,
 } = require("./qsNotificationController"); // ✅ correct import
-
+const {
+  insertArchitectNotification,
+} = require("./architectNotificationsController")
 /* ─── HELPERS ─────────────────────────────────────────────── */
 
 function calcDeadline(priority) {
@@ -159,16 +161,16 @@ async function notifyByRole(
       } catch (err) {
         console.error("MEP Notification error:", err.message);
       }
+      
+   } else if (roleName.includes("architect") || roleCode === "architect") {
+      try {
+        await insertArchitectNotification(userId, type, title, description, link, severity, referenceId ?? null);
+        console.log(`✅ Architect Notification → user:${userId} type:${type}`);
+      } catch (err) {
+        console.error("Architect Notification error:", err.message);
+      }
     } else {
-      await safeNotify(
-        userId,
-        type,
-        title,
-        description,
-        link,
-        severity,
-        referenceId,
-      );
+      await safeNotify(userId, type, title, description, link, severity, referenceId);
     }
   } catch (err) {
     console.error("notifyByRole error:", err.message);

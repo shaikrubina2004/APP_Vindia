@@ -1,0 +1,162 @@
+/* ── Bell badge ── */
+.arch-notif-bell-btn { position: relative; }
+
+.arch-notif-bell-badge {
+  position: absolute;
+  top: -5px; right: -5px;
+  background: #dc2626; color: #fff;
+  font-size: 9px; font-weight: 800;
+  min-width: 17px; height: 17px;
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid #fff;
+  font-family: inherit;
+  pointer-events: none;
+}
+
+/* ── Overlay ── */
+.arch-notif-overlay {
+  position: fixed; inset: 0;
+  background: rgba(10,37,64,.20);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
+  display: flex; align-items: flex-start; justify-content: flex-end;
+  padding: 70px 24px 0 0;
+  animation: archNotifFadeIn .2s ease both;
+}
+@keyframes archNotifFadeIn { from { opacity:0 } to { opacity:1 } }
+
+/* ── Panel ── */
+.arch-notif-panel {
+  width: 420px;
+  max-height: calc(100vh - 100px);
+  background: #fff;
+  border: 1.5px solid #e2eaf4;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(37,99,235,.18);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: archNotifSlideIn .25s cubic-bezier(.4,0,.2,1) both;
+  font-family: 'Plus Jakarta Sans','Segoe UI',sans-serif;
+}
+@keyframes archNotifSlideIn {
+  from { opacity:0; transform:translateY(-16px) scale(.97) }
+  to   { opacity:1; transform:translateY(0) scale(1) }
+}
+
+/* ── Header ── */
+.arch-notif-panel__header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid #f0f6ff;
+  flex-shrink: 0;
+}
+.arch-notif-panel__title { font-size: 15px; font-weight: 800; color: #0a2540; }
+.arch-notif-panel__unread {
+  font-size: 10px; font-weight: 700; color: #0891b2;
+  background: #ecfeff; border: 1px solid #a5f3fc;
+  padding: 2px 8px; border-radius: 20px;
+  margin-top: 3px; display: inline-block;
+}
+.arch-notif-mark-all {
+  background: none; border: none; color: #0891b2;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  font-family: inherit; text-decoration: underline;
+}
+.arch-notif-mark-all:hover { opacity: .7; }
+.arch-notif-close {
+  background: none; border: none; color: #94a3b8;
+  font-size: 16px; cursor: pointer; padding: 0 4px; line-height: 1;
+}
+.arch-notif-close:hover { color: #0a2540; }
+
+/* ── Filters ── */
+.arch-notif-filters {
+  display: flex; gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f6ff;
+  overflow-x: auto; scrollbar-width: none;
+  flex-shrink: 0; flex-wrap: nowrap;
+}
+.arch-notif-filters::-webkit-scrollbar { display: none; }
+
+.arch-notif-filter-btn {
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; font-family: inherit;
+  border: 1px solid #e2eaf4; background: #fff;
+  color: #64748b; cursor: pointer; transition: all .2s;
+  white-space: nowrap; flex-shrink: 0;
+}
+.arch-notif-filter-btn:hover  { border-color: #a5f3fc; color: #0891b2; }
+.arch-notif-filter-btn.active { background: #ecfeff; border-color: #0891b2; color: #0891b2; }
+
+/* ── List scroll container ── */
+.arch-notif-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+.arch-notif-list::-webkit-scrollbar { width: 4px; }
+.arch-notif-list::-webkit-scrollbar-thumb { background: #a5f3fc; border-radius: 4px; }
+
+.arch-notif-empty {
+  text-align: center; padding: 32px 20px;
+  color: #94a3b8; font-size: 13px;
+}
+
+/* ── Notification card ── */
+.arch-notif-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 16px; cursor: pointer;
+  transition: background .15s;
+  border-bottom: 1px solid #f8fafc;
+}
+.arch-notif-item:last-child { border-bottom: none; }
+.arch-notif-item:hover { background: #f0fdfa; }
+
+.arch-notif-item.unread { background: #fafcff; }
+.arch-notif-item.read   { opacity: .5; background: #fff; }
+.arch-notif-item.read:hover { opacity: .75; background: #f0fdfa; }
+
+.arch-notif-item__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 5px;
+}
+.arch-notif-item__body  { flex: 1; min-width: 0; }
+.arch-notif-item__top   { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.arch-notif-type-chip   {
+  font-size: 9px; font-weight: 700;
+  padding: 2px 7px; border-radius: 20px;
+  letter-spacing: .04em; flex-shrink: 0;
+}
+.arch-notif-item__time  { font-size: 10px; color: #94a3b8; margin-left: auto; white-space: nowrap; }
+.arch-notif-unread-dot  { width: 6px; height: 6px; border-radius: 50%; background: #0891b2; flex-shrink: 0; }
+.arch-notif-item__title { font-size: 12px; font-weight: 700; color: #0a2540; margin-bottom: 2px; }
+.arch-notif-item__desc  { font-size: 11px; color: #64748b; line-height: 1.4; }
+
+/* ── Show/hide read toggle ── */
+.arch-notif-show-read-btn {
+  display: block; width: 100%;
+  padding: 9px 16px;
+  background: #f8fafc;
+  border: none;
+  border-top: 1px solid #e2eaf4;
+  border-bottom: 1px solid #e2eaf4;
+  color: #64748b;
+  font-size: 11px; font-weight: 600; font-family: inherit;
+  cursor: pointer; text-align: center;
+  transition: color .15s, background .15s;
+  flex-shrink: 0;
+}
+.arch-notif-show-read-btn:hover { color: #0891b2; background: #ecfeff; }
+
+/* ── Read section wrapper ── */
+.arch-notif-read-section { border-top: none; }
+
+/* ── Loading ── */
+.arch-notif-loading {
+  text-align: center; padding: 32px 20px;
+  color: #94a3b8; font-size: 13px;
+}
+
+/* ── Mobile ── */
+@media (max-width: 600px) {
+  .arch-notif-overlay { padding: 60px 8px 0; }
+  .arch-notif-panel   { width: 100%; max-height: calc(100vh - 80px); }
+}

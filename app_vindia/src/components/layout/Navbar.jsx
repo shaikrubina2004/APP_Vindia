@@ -7,6 +7,7 @@ import SENotificationBell from "../../components/notifications/SENotificationBel
 import QSNotificationBell from "../../components/notifications/QSNotificationBell";
 import MEPNotificationBell from "../notifications/MepNotificationBell";
 import BDANotificationBell from "../../components/notifications/BDANotificationBell";
+import ArchitectNotificationBell from "../../components/notifications/ArchitectNotificationBell";
 import "../../styles/layout/Navbar.css";
 import logo from "../../assets/logo.png.png";
 
@@ -31,6 +32,7 @@ const NOTIFICATION_COMPONENTS = {
   structural_engineer: SENotificationBell,
   quantity_surveyor: QSNotificationBell,
   mep_engineer: MEPNotificationBell,
+  architect:    ArchitectNotificationBell,
   bda:                           ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
   bda1:                          ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
   bda2:                          ({ userId }) => <BDANotificationBell bdaEmail={userId} />,

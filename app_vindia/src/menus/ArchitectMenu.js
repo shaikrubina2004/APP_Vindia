@@ -46,4 +46,10 @@ export const ArchitectMenu = [
     path: "/architect/rfi",
     icon: "help-circle",  
   },
+  {
+    name: "Snag",
+  path: "/architect/snag",
+  icon: "clipboard",
+  },
+
 ];
