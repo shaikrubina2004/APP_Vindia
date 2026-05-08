@@ -56,6 +56,15 @@ export const getDashboardRoute = (role) => {
     case ROLES.TESTER:
       return "/tester/dashboard";
 
+    case ROLES.DIGITAL_MARKETING:
+      return "/digital-marketing/dashboard";
+
+    case ROLES.THREE_D_VISUALIZER:
+      return "/3d-visualizer/dashboard";
+
+    case ROLES.FINANCE_MANAGER:
+      return "/finance-manager/dashboard";
+
     default:
       return "/";
   }
