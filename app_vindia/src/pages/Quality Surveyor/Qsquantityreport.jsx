@@ -10,6 +10,16 @@ const STATUS = {
   rejected:   { label: "Changes Requested",     color: "red",   icon: "↩️" },
 };
 
+// ── Safe array helper ──
+const safeArr = (val) => {
+  if (Array.isArray(val)) return val;
+  if (!val) return [];
+  if (typeof val === "string") {
+    try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch (_) { return []; }
+  }
+  return [];
+};
+
 export default function Qsquantityreport() {
   const [tab,            setTab]           = useState("list");
   const [toast,          setToast]         = useState(null);
@@ -23,10 +33,10 @@ export default function Qsquantityreport() {
     const d = new Date(); d.setDate(d.getDate() - 7);
     return d.toISOString().split("T")[0];
   });
-  const [filterTo,       setFilterTo]       = useState(() => new Date().toISOString().split("T")[0]);
-  const [viewingReport,  setViewingReport]  = useState(null);
-  const [rejectModal,    setRejectModal]    = useState(null); // { id } when open
-  const [rejectComment,  setRejectComment]  = useState("");
+  const [filterTo,      setFilterTo]      = useState(() => new Date().toISOString().split("T")[0]);
+  const [viewingReport, setViewingReport] = useState(null);
+  const [rejectModal,   setRejectModal]   = useState(null);
+  const [rejectComment, setRejectComment] = useState("");
 
   const notify = (msg, type = "success") => {
     setToast({ msg, type });
@@ -34,7 +44,10 @@ export default function Qsquantityreport() {
   };
 
   const totalQty = (items) =>
-    (items || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
+    safeArr(items).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
+
+  const totalWorkers = (labourItems) =>
+    safeArr(labourItems).reduce((s, i) => s + (parseInt(i.workers) || 0), 0);
 
   // ── Fetch projects ──
   useEffect(() => {
@@ -87,11 +100,7 @@ export default function Qsquantityreport() {
     } catch (err) { notify(err.message, "error"); }
   };
 
-  // ── SE Reject — opens comment modal ──
-  const openRejectModal = (id) => {
-    setRejectComment("");
-    setRejectModal({ id });
-  };
+  const openRejectModal = (id) => { setRejectComment(""); setRejectModal({ id }); };
 
   const submitReject = async () => {
     if (!rejectModal) return;
@@ -104,8 +113,7 @@ export default function Qsquantityreport() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       notify("Changes requested ↩️ — BOQ rejected, QS must edit and resubmit");
-      setRejectModal(null);
-      setRejectComment("");
+      setRejectModal(null); setRejectComment("");
       fetchReports();
       if (viewingReport?.id === id) {
         const r = await fetch(`${QR_API}/${id}`);
@@ -114,45 +122,53 @@ export default function Qsquantityreport() {
     } catch (err) { notify(err.message, "error"); }
   };
 
-  // ── Open detail ──
   const openDetail = async (report) => {
     setTab("detail");
+    setViewingReport(report);
     try {
       const res  = await fetch(`${QR_API}/${report.id}`);
       const data = await res.json();
-      setViewingReport(res.ok ? data : report);
-    } catch (_) { setViewingReport(report); }
+      if (res.ok) setViewingReport(data);
+    } catch (_) {}
   };
 
-  // ── Export CSV ──
+  // ── Export CSV — includes labour rows ──
   const exportCSV = (report) => {
-    const lines = [
+    const labourItems = safeArr(report.labourItems);
+    const matLines = [
       `Quantity Report — ${report.projectName} · ${report.milestoneName}`,
       `Generated: ${new Date().toLocaleDateString("en-IN")} | BOQ Ref: #${report.boqId}`,
       "",
+      "--- MATERIALS ---",
       ["#", "Material / Item", "Unit", "Quantity"].join(","),
-      ...(report.items || []).map((item, i) =>
+      ...safeArr(report.items).map((item, i) =>
         [i + 1, item.material, item.unit, item.quantity].join(",")
       ),
-      `,,Total Items,${report.items?.length || 0}`,
+      `,,Total Items,${safeArr(report.items).length}`,
+      "",
     ];
+    const labLines = labourItems.length > 0 ? [
+      "--- LABOUR ---",
+      ["#", "Labour Type", "Workers", "Working Days"].join(","),
+      ...labourItems.map((item, i) =>
+        [i + 1, item.labourType, item.workers, item.workingDays].join(",")
+      ),
+      `,,Total Labour Types,${labourItems.length}`,
+    ] : [];
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+    a.href = URL.createObjectURL(
+      new Blob([[...matLines, ...labLines].join("\n")], { type: "text/csv" })
+    );
     a.download = `QuantityReport_${report.projectName?.replace(/ /g, "_")}_${report.milestoneName}.csv`;
     a.click();
   };
 
-
-  // ── Safe date parser — handles "02 May 2026" format ──
   const parseDate = (dateStr) => {
     if (!dateStr) return null;
-    // Handle "DD MMM YYYY" format e.g. "02 May 2026"
     const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-    const parts = dateStr.split(" ");
-    if (parts.length === 3 && months[parts[1]] !== undefined) {
+    const parts  = String(dateStr).split(" ");
+    if (parts.length === 3 && months[parts[1]] !== undefined)
       return new Date(parseInt(parts[2]), months[parts[1]], parseInt(parts[0]));
-    }
-    // Fallback: ISO string
     const d = new Date(dateStr);
     return isNaN(d) ? null : d;
   };
@@ -163,20 +179,15 @@ export default function Qsquantityreport() {
     setFilterFrom(from.toISOString().split("T")[0]);
     setFilterTo(to.toISOString().split("T")[0]);
   };
+
   const filtered = reports.filter((r) => {
     if (filterProject && String(r.projectId) !== String(filterProject)) return false;
     if (filterStatus  && r.status !== filterStatus)                      return false;
     if (filterFrom || filterTo) {
       const d = parseDate(r.createdDate);
       if (d) {
-        if (filterFrom) {
-          const [fy,fm,fd] = filterFrom.split("-").map(Number);
-          if (d < new Date(fy, fm-1, fd, 0,0,0,0)) return false;
-        }
-        if (filterTo) {
-          const [ty,tm,td] = filterTo.split("-").map(Number);
-          if (d > new Date(ty, tm-1, td, 23,59,59,999)) return false;
-        }
+        if (filterFrom) { const [fy,fm,fd] = filterFrom.split("-").map(Number); if (d < new Date(fy,fm-1,fd)) return false; }
+        if (filterTo)   { const [ty,tm,td] = filterTo.split("-").map(Number);   if (d > new Date(ty,tm-1,td,23,59,59,999)) return false; }
       }
     }
     return true;
@@ -230,7 +241,6 @@ export default function Qsquantityreport() {
         )}
       </div>
 
-      {/* ── Info bar ── */}
       <div className="qr__info-bar">
         <span>ℹ️</span>
         <span>
@@ -249,6 +259,7 @@ export default function Qsquantityreport() {
             <div className="qr__view-head">
               <h2 className="qr__view-h">All Quantity Reports</h2>
             </div>
+
             <div className="qr__filter-bar">
               <div className="qr__range-btns">
                 <span className="qr__range-label">📅 Show:</span>
@@ -290,7 +301,9 @@ export default function Qsquantityreport() {
             ) : (
               <div className="qr__cards-list">
                 {filtered.map((r) => {
-                  const st = STATUS[r.status] || STATUS.pending_se;
+                  const st          = STATUS[r.status] || STATUS.pending_se;
+                  const labourItems = safeArr(r.labourItems);
+                  const hasLabour   = labourItems.length > 0;
                   return (
                     <div key={r.id} className={`qr__card qr__card--${st.color}`}>
                       <div className="qr__card-top">
@@ -305,7 +318,8 @@ export default function Qsquantityreport() {
                         </div>
                         <div className="qr__card-right">
                           <div className="qr__card-items">
-                            {r.totalItems || r.items?.length || 0} items
+                            {safeArr(r.items).length} material items
+                            {hasLabour && <span className="qr__card-labour-pill">👷 {labourItems.length} labour</span>}
                           </div>
                           <span className={`qr__status-badge qr__status--${st.color}`}>
                             {st.icon} {st.label}
@@ -313,7 +327,6 @@ export default function Qsquantityreport() {
                         </div>
                       </div>
 
-                      {/* SE comment if rejected */}
                       {r.status === "rejected" && r.seComment && (
                         <div className="qr__card-comment">
                           <strong>💬 SE:</strong> {r.seComment}
@@ -321,24 +334,15 @@ export default function Qsquantityreport() {
                       )}
 
                       <div className="qr__card-actions">
-                        <button className="qr__view-btn" onClick={() => openDetail(r)}>
-                          👁 View Report
-                        </button>
+                        <button className="qr__view-btn" onClick={() => openDetail(r)}>👁 View Report</button>
                         {r.status === "pending_se" && (
                           <>
-                            <button className="qr__approve-btn" onClick={() => seApprove(r.id)}>
-                              ✔ SE Approve
-                            </button>
-                            <button className="qr__reject-btn"
-                              onClick={() => openRejectModal(r.id)}>
-                              ✘ SE Reject
-                            </button>
+                            <button className="qr__approve-btn" onClick={() => seApprove(r.id)}>✔ SE Approve</button>
+                            <button className="qr__reject-btn" onClick={() => openRejectModal(r.id)}>✘ SE Reject</button>
                           </>
                         )}
                         {r.status === "approved" && (
-                          <button className="qr__export-btn" onClick={() => exportCSV(r)}>
-                            ⬇ Export CSV
-                          </button>
+                          <button className="qr__export-btn" onClick={() => exportCSV(r)}>⬇ Export CSV</button>
                         )}
                       </div>
                     </div>
@@ -351,30 +355,52 @@ export default function Qsquantityreport() {
 
         {/* ══════ DETAIL TAB ══════ */}
         {tab === "detail" && viewingReport && (() => {
-          const r     = viewingReport;
-          const st    = STATUS[r.status] || STATUS.pending_se;
-          const total = totalQty(r.items);
+          const r           = viewingReport;
+          const st          = STATUS[r.status] || STATUS.pending_se;
+          const items       = safeArr(r.items);
+          const labourItems = safeArr(r.labourItems);
+          const hasLabour   = labourItems.length > 0;
+          const total       = totalQty(items);
 
           return (
             <div className="qr__detail">
 
               {/* Info bar */}
               <div className="qr__detail-infobar">
-                {[
-                  { label: "Project",   value: r.projectName },
-                  { label: "Milestone", value: `🏗️ ${r.milestoneName}` },
-                  { label: "BOQ Ref",   value: `#${r.boqId}` },
-                  { label: "Created",   value: r.createdDate },
-                  ...(r.updatedDate ? [{ label: "Updated", value: r.updatedDate }] : []),
-                  { label: "Status",    badge: true },
-                ].map((item, i) => (
-                  <div key={i} className="qr__detail-infoitem">
-                    <span className="qr__detail-infolbl">{item.label}</span>
-                    {item.badge
-                      ? <span className={`qr__status-badge qr__status--${st.color}`}>{st.icon} {st.label}</span>
-                      : <span className="qr__detail-infoval">{item.value}</span>}
+                <div className="qr__detail-infoitem">
+                  <span className="qr__detail-infolbl">Project</span>
+                  <span className="qr__detail-infoval">{r.projectName}</span>
+                </div>
+                <div className="qr__detail-infoitem">
+                  <span className="qr__detail-infolbl">Milestone</span>
+                  <span className="qr__detail-infoval">🏗️ {r.milestoneName}</span>
+                </div>
+                <div className="qr__detail-infoitem">
+                  <span className="qr__detail-infolbl">BOQ Ref</span>
+                  <span className="qr__detail-infoval">#{r.boqId}</span>
+                </div>
+                <div className="qr__detail-infoitem">
+                  <span className="qr__detail-infolbl">Created</span>
+                  <span className="qr__detail-infoval">{r.createdDate}</span>
+                </div>
+                {r.updatedDate && (
+                  <div className="qr__detail-infoitem">
+                    <span className="qr__detail-infolbl">Updated</span>
+                    <span className="qr__detail-infoval">{r.updatedDate}</span>
                   </div>
-                ))}
+                )}
+                <div className="qr__detail-infoitem">
+                  <span className="qr__detail-infolbl">Status</span>
+                  <span className={`qr__status-badge qr__status--${st.color}`}>{st.icon} {st.label}</span>
+                </div>
+                {hasLabour && (
+                  <div className="qr__detail-infoitem">
+                    <span className="qr__detail-infolbl">Labour Types</span>
+                    <span className="qr__detail-infoval" style={{color:"#1d4ed8"}}>
+                      👷 {labourItems.length} types · {totalWorkers(labourItems)} workers
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* No price notice */}
@@ -396,26 +422,21 @@ export default function Qsquantityreport() {
                   <span className="qr__approved-icon">✅</span>
                   <div>
                     <div className="qr__approved-title">Approved by Site Engineer</div>
-                    <div className="qr__approved-sub">
-                      BOQ is now finalised and sent to Site Engineer.
-                    </div>
+                    <div className="qr__approved-sub">BOQ is now finalised and sent to Site Engineer.</div>
                   </div>
-                  <button className="qr__export-btn qr__export-btn--lg"
-                    onClick={() => exportCSV(r)}>⬇ Export CSV</button>
+                  <button className="qr__export-btn qr__export-btn--lg" onClick={() => exportCSV(r)}>⬇ Export CSV</button>
                 </div>
               )}
 
               {/* Approval tracker */}
               <div className="qr__block">
-                <div className="qr__block-label">
-                  <span className="qr__num">📊</span> Approval Progress
-                </div>
+                <div className="qr__block-label"><span className="qr__num">📊</span> Approval Progress</div>
                 <div className="qr__approval-track">
                   {[
-                    { label: "Qty Report Created",  done: true },
-                    { label: "Sent to SE",           done: ["pending_se","approved","rejected"].includes(r.status), current: r.status === "pending_se" },
-                    { label: "SE Approved",          done: r.status === "approved", current: r.status === "pending_se" },
-                    { label: "BOQ Finalised",        done: r.status === "approved" },
+                    { label: "Qty Report Created", done: true },
+                    { label: "Sent to SE",          done: ["pending_se","approved","rejected"].includes(r.status), current: r.status === "pending_se" },
+                    { label: "SE Approved",         done: r.status === "approved", current: r.status === "pending_se" },
+                    { label: "BOQ Finalised",       done: r.status === "approved" },
                   ].map((step, i, arr) => (
                     <React.Fragment key={i}>
                       <div className={`qr__ap-step ${step.done ? "done" : step.current ? "active" : ""}`}>
@@ -432,20 +453,16 @@ export default function Qsquantityreport() {
               {r.status === "pending_se" && (
                 <div className="qr__se-actions">
                   <span className="qr__se-actions-label">[ SE Actions ]</span>
-                  <button className="qr__approve-btn qr__approve-btn--lg"
-                    onClick={() => seApprove(r.id)}>✔ Approve Quantity Report</button>
-                  <button className="qr__reject-btn qr__reject-btn--lg"
-                    onClick={() => openRejectModal(r.id)}>
-                    ✘ Request Changes
-                  </button>
+                  <button className="qr__approve-btn qr__approve-btn--lg" onClick={() => seApprove(r.id)}>✔ Approve Quantity Report</button>
+                  <button className="qr__reject-btn qr__reject-btn--lg" onClick={() => openRejectModal(r.id)}>✘ Request Changes</button>
                 </div>
               )}
 
-              {/* Quantity table — NO prices */}
+              {/* ── MATERIAL QUANTITY TABLE ── */}
               <div className="qr__block">
                 <div className="qr__block-label">
                   <span className="qr__num">📋</span>
-                  Quantity Breakdown
+                  Material Quantity Breakdown
                   <span className="qr__auto-tag">🔗 From BOQ #{r.boqId}</span>
                   <span className="qr__no-price-tag">No Prices</span>
                 </div>
@@ -463,7 +480,7 @@ export default function Qsquantityreport() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(r.items || []).map((item, i) => {
+                      {items.map((item, i) => {
                         const qty   = parseFloat(item.quantity) || 0;
                         const share = total ? ((qty / total) * 100).toFixed(1) : "0.0";
                         return (
@@ -487,7 +504,7 @@ export default function Qsquantityreport() {
                     <tfoot>
                       <tr>
                         <td colSpan={3} className="qr-tfoot-lbl">Total Line Items</td>
-                        <td className="qr-tfoot-val">{r.items?.length || 0} items</td>
+                        <td className="qr-tfoot-val">{items.length} items</td>
                         <td className="qr-tfoot-pct">100%</td>
                       </tr>
                     </tfoot>
@@ -495,18 +512,90 @@ export default function Qsquantityreport() {
                 </div>
               </div>
 
+              {/* ── LABOUR QUANTITY TABLE — only if labour exists ── */}
+              {hasLabour && (
+                <div className="qr__block">
+                  <div className="qr__block-label">
+                    <span className="qr__num qr__num--blue">👷</span>
+                    Labour Quantity Breakdown
+                    <span className="qr__auto-tag qr__auto-tag--blue">🔗 From BOQ #{r.boqId}</span>
+                    <span className="qr__no-price-tag">No Wages</span>
+                  </div>
+                  <div className="qr__table-scroll">
+                    <table className="qr__table">
+                      <colgroup>
+                        <col style={{width:"50px"}} /><col />
+                        <col style={{width:"120px"}} /><col style={{width:"140px"}} />
+                        <col style={{width:"80px"}} />
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th>#</th><th>Labour Type</th>
+                          <th>Workers</th><th>Working Days</th>
+                          <th>% Share</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {labourItems.map((item, i) => {
+                          const workers    = parseInt(item.workers || 0);
+                          const totalW     = totalWorkers(labourItems);
+                          const share      = totalW ? ((workers / totalW) * 100).toFixed(1) : "0.0";
+                          return (
+                            <tr key={i}>
+                              <td className="qr-num">{i + 1}</td>
+                              <td className="qr-material"><strong>{item.labourType}</strong></td>
+                              <td className="qr-qty">{workers.toLocaleString("en-IN")}</td>
+                              <td className="qr-center">{parseInt(item.workingDays || 0).toLocaleString("en-IN")} days</td>
+                              <td className="qr-pct">
+                                <div className="qr-pct-wrap">
+                                  <span>{share}%</span>
+                                  <div className="qr-pct-bar">
+                                    <div className="qr-pct-fill qr-pct-fill--blue" style={{width:`${share}%`}} />
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colSpan={2} className="qr-tfoot-lbl">Total Labour</td>
+                          <td className="qr-tfoot-val">{totalWorkers(labourItems)} workers</td>
+                          <td className="qr-tfoot-val" colSpan={2}>
+                            {labourItems.length} type{labourItems.length !== 1 ? "s" : ""}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Summary cards */}
               <div className="qr__detail-summary">
                 <div className="qr__sum-card">
-                  <span className="qr__sum-lbl">Line Items</span>
-                  <span className="qr__sum-val">{r.items?.length || 0}</span>
+                  <span className="qr__sum-lbl">Material Items</span>
+                  <span className="qr__sum-val">{items.length}</span>
                 </div>
+                {hasLabour && (
+                  <div className="qr__sum-card qr__sum-card--blue">
+                    <span className="qr__sum-lbl">Labour Types</span>
+                    <span className="qr__sum-val qr__sum-val--blue">{labourItems.length}</span>
+                  </div>
+                )}
                 <div className="qr__sum-card qr__sum-card--highlight">
                   <span className="qr__sum-lbl">Total Quantity</span>
                   <span className="qr__sum-val qr__sum-val--big">
-                    {totalQty(r.items).toLocaleString("en-IN")}
+                    {totalQty(items).toLocaleString("en-IN")}
                   </span>
                 </div>
+                {hasLabour && (
+                  <div className="qr__sum-card">
+                    <span className="qr__sum-lbl">Total Workers</span>
+                    <span className="qr__sum-val">👷 {totalWorkers(labourItems).toLocaleString("en-IN")}</span>
+                  </div>
+                )}
                 <div className="qr__sum-card qr__sum-card--locked">
                   <span className="qr__sum-lbl">Pricing</span>
                   <span className="qr__sum-val">🔒 Hidden from SE</span>
@@ -523,37 +612,33 @@ export default function Qsquantityreport() {
           );
         })()}
       </div>
-    {/* ── REJECT COMMENT MODAL ── */}
-    {rejectModal && (
-      <div className="qr__modal-overlay">
-        <div className="qr__modal">
-          <div className="qr__modal-header">
-            <span className="qr__modal-icon">↩️</span>
-            <div>
-              <div className="qr__modal-title">Request Changes</div>
-              <div className="qr__modal-sub">Add a suggestion for the Quantity Surveyor</div>
+
+      {/* ── REJECT MODAL ── */}
+      {rejectModal && (
+        <div className="qr__modal-overlay">
+          <div className="qr__modal">
+            <div className="qr__modal-header">
+              <span className="qr__modal-icon">↩️</span>
+              <div>
+                <div className="qr__modal-title">Request Changes</div>
+                <div className="qr__modal-sub">Add a suggestion for the Quantity Surveyor</div>
+              </div>
+            </div>
+            <textarea className="qr__modal-textarea"
+              placeholder="e.g. Please check the quantities for concrete and steel bars…"
+              value={rejectComment}
+              onChange={(e) => setRejectComment(e.target.value)}
+              rows={4} autoFocus />
+            <div className="qr__modal-actions">
+              <button className="qr__modal-cancel"
+                onClick={() => { setRejectModal(null); setRejectComment(""); }}>Cancel</button>
+              <button className="qr__modal-submit" onClick={submitReject}>
+                ✘ Send Rejection &amp; Suggestion
+              </button>
             </div>
           </div>
-          <textarea
-            className="qr__modal-textarea"
-            placeholder="e.g. Please check the quantities for concrete and steel bars…"
-            value={rejectComment}
-            onChange={(e) => setRejectComment(e.target.value)}
-            rows={4}
-            autoFocus
-          />
-          <div className="qr__modal-actions">
-            <button className="qr__modal-cancel"
-              onClick={() => { setRejectModal(null); setRejectComment(""); }}>
-              Cancel
-            </button>
-            <button className="qr__modal-submit" onClick={submitReject}>
-              ✘ Send Rejection &amp; Suggestion
-            </button>
-          </div>
         </div>
-      </div>
-    )}
+      )}
     </div>
   );
 }

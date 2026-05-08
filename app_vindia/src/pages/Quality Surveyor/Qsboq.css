@@ -979,3 +979,69 @@
   font-size: 12px; font-weight: 600; color: var(--c-green); white-space: nowrap;
 }
 .boq__card-sent-sub   { display: none; }
+/* ══ LABOUR SECTION ══ */
+.boq__num--blue {
+  background: #1d4ed8;
+}
+.boq__add-btn--blue {
+  background: #dbeafe; border-color: #93c5fd; color: #1d4ed8;
+}
+.boq__add-btn--blue:hover { background: #bfdbfe; }
+
+.boq__labour-hint {
+  font-size: 12px; color: var(--c-muted); font-family: var(--font-mono);
+  margin-bottom: 12px; padding: 7px 12px;
+  background: var(--c-blue-lt); border-radius: 6px;
+  border: 1px solid #93c5fd; color: var(--c-blue);
+}
+.td-labour-total {
+  font-family: var(--font-mono); font-weight: 500; color: #1d4ed8;
+}
+
+/* ══ GRAND TOTAL BREAKDOWN ══ */
+.boq__grand-breakdown {
+  display: flex; flex-direction: column; gap: 5px;
+}
+.boq__grand-line {
+  display: flex; align-items: baseline; gap: 14px;
+}
+.boq__grand-lbl { font-size: 13px; font-weight: 500; color: var(--c-muted); min-width: 80px; }
+.boq__grand-lbl--main { font-size: 14px; font-weight: 700; color: var(--c-text); }
+.boq__grand-amt { font-family: var(--font-mono); font-size: 22px; font-weight: 600; color: var(--c-teal); }
+.boq__grand-amt--mat { font-size: 16px; color: var(--c-teal); }
+.boq__grand-amt--lab { font-size: 16px; color: #1d4ed8; }
+.boq__grand-divider { height: 1px; background: var(--c-border); margin: 4px 0; }
+
+/* ══ COST SPLIT PILLS IN CARD ══ */
+.boq__card-cost-split { display: flex; gap: 6px; flex-wrap: wrap; }
+.boq__cost-pill {
+  font-size: 11px; font-weight: 600; padding: 2px 8px;
+  border-radius: 20px; white-space: nowrap;
+}
+.boq__cost-pill--mat { background: var(--c-teal-lt); color: var(--c-teal); border: 1px solid #a7d4d5; }
+.boq__cost-pill--lab { background: var(--c-blue-lt);  color: var(--c-blue);  border: 1px solid #93c5fd; }
+
+/* ══ GRAND TOTAL SUMMARY BLOCK ══ */
+.boq__grand-summary {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+}
+.boq__grand-summary-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 20px; border-bottom: 1px solid var(--c-border);
+  font-size: 14px; color: var(--c-text);
+}
+.boq__grand-summary-mat { font-family: var(--font-mono); font-weight: 600; color: var(--c-teal); }
+.boq__grand-summary-lab { font-family: var(--font-mono); font-weight: 600; color: #1d4ed8; }
+.boq__grand-summary-total {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 20px; background: var(--c-teal);
+  font-family: var(--font-head); font-size: 15px; font-weight: 700; color: #fff;
+}
+/* ── Pre-fill banner from Measurement ── */
+.boq__prefill-banner {
+  background: #eff6ff; border: 1.5px solid #93c5fd;
+  border-radius: 8px; padding: 12px 18px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13.5px; color: #1d4ed8; font-weight: 500;
+}

@@ -686,3 +686,69 @@
   background: var(--cr-bg); cursor: pointer; transition: border-color .18s;
 }
 .cr__date-input:focus { outline: none; border-color: var(--cr-teal); }
+
+/* ══ LABOUR TABLE ══ */
+.cr__num--blue {
+  background: #1d4ed8;
+}
+.cr__auto-tag--blue {
+  background: #dbeafe; color: #1d4ed8; border-color: #93c5fd;
+}
+.cr-labour-total {
+  font-family: var(--font-mono); font-weight: 600; color: #1d4ed8;
+}
+.cr-pct-fill--blue {
+  background: #1d4ed8;
+}
+
+/* ══ COST SPLIT PILLS IN CARD ══ */
+.cr__card-cost-split {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.cr__cost-pill {
+  font-size: 11px; font-weight: 600; padding: 2px 8px;
+  border-radius: 20px; white-space: nowrap;
+}
+.cr__cost-pill--mat {
+  background: var(--cr-teal-lt); color: var(--cr-teal); border: 1px solid #a7d4d5;
+}
+.cr__cost-pill--lab {
+  background: var(--cr-blue-lt); color: var(--cr-blue); border: 1px solid #93c5fd;
+}
+
+/* ══ COST SUMMARY BLOCK ══ */
+.cr__cost-summary {
+  background: var(--cr-surface); border: 1px solid var(--cr-border);
+  border-radius: var(--cr-radius); box-shadow: var(--cr-shadow); overflow: hidden;
+}
+.cr__cost-summary-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 11px 20px; border-bottom: 1px solid var(--cr-border);
+  font-size: 14px; color: var(--cr-text);
+}
+.cr__cost-summary-mat {
+  font-family: var(--font-mono); font-weight: 600; color: var(--cr-teal);
+}
+.cr__cost-summary-lab {
+  font-family: var(--font-mono); font-weight: 600; color: #1d4ed8;
+}
+.cr__cost-summary-total {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 20px; background: var(--cr-teal);
+  font-family: var(--font-head); font-size: 15px; font-weight: 700; color: #fff;
+}
+
+/* ══ SUMMARY CARD — BLUE VARIANT ══ */
+.cr__sum-card--blue {
+  background: var(--cr-blue-lt); border-color: #93c5fd;
+}
+.cr__sum-card--blue .cr__sum-lbl { color: #1d4ed8; }
+.cr__sum-val--blue {
+  font-family: var(--font-mono); font-size: 20px; color: #1d4ed8;
+}
+
+/* ══ MISSING BLUE VAR (add if not already present) ══ */
+:root {
+  --cr-blue:    #1d4ed8;
+  --cr-blue-lt: #dbeafe;
+}

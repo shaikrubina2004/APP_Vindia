@@ -1,10 +1,10 @@
 // ══════════════════════════════════════════════════════════════════════════════
-//  costReportController.js
+//  costReportController.js  — with Labour Items support
 // ══════════════════════════════════════════════════════════════════════════════
 const pool = require("../config/db");
 const { createNotificationDirect } = require("./qsNotificationController");
 
-// ── Auto-create table ─────────────────────────────────────────────────────────
+// ── Auto-create / migrate table ───────────────────────────────────────────────
 (async () => {
   try {
     await pool.query(`
@@ -16,6 +16,9 @@ const { createNotificationDirect } = require("./qsNotificationController");
         milestone_name  VARCHAR(255)  NOT NULL,
         boq_id          INTEGER       NOT NULL,
         items           JSONB         NOT NULL DEFAULT '[]',
+        labour_items    JSONB         NOT NULL DEFAULT '[]',
+        material_total  NUMERIC(15,2) NOT NULL DEFAULT 0,
+        labour_total    NUMERIC(15,2) NOT NULL DEFAULT 0,
         total_cost      NUMERIC(15,2) NOT NULL DEFAULT 0,
         status          VARCHAR(50)   NOT NULL DEFAULT 'pending_pm',
         pm_comment      TEXT          DEFAULT '',
@@ -24,19 +27,62 @@ const { createNotificationDirect } = require("./qsNotificationController");
         created_at      TIMESTAMP     DEFAULT NOW(),
         updated_at      TIMESTAMP     DEFAULT NOW()
       );
+
+      -- Safe migrations — add columns if they don't exist yet
+      ALTER TABLE cost_reports ADD COLUMN IF NOT EXISTS labour_items   JSONB         NOT NULL DEFAULT '[]';
+      ALTER TABLE cost_reports ADD COLUMN IF NOT EXISTS material_total NUMERIC(15,2) NOT NULL DEFAULT 0;
+      ALTER TABLE cost_reports ADD COLUMN IF NOT EXISTS labour_total   NUMERIC(15,2) NOT NULL DEFAULT 0;
+
       CREATE INDEX IF NOT EXISTS idx_cr_project_id   ON cost_reports (project_id);
       CREATE INDEX IF NOT EXISTS idx_cr_milestone_id ON cost_reports (milestone_id);
       CREATE INDEX IF NOT EXISTS idx_cr_boq_id       ON cost_reports (boq_id);
       CREATE INDEX IF NOT EXISTS idx_cr_status       ON cost_reports (status);
     `);
+
+    // ── Backfill existing cost_reports missing labour data from the BOQ ──
+    await pool.query(`
+      UPDATE cost_reports cr
+      SET
+        labour_items   = b.labour_rows,
+        labour_total   = b.labour_total,
+        material_total = b.material_total,
+        total_cost     = b.grand_total
+      FROM boqs b
+      WHERE cr.boq_id = b.id
+        AND (cr.labour_items = '[]'::jsonb OR cr.labour_items IS NULL)
+        AND b.labour_total > 0
+    `);
+
     console.log("✅ cost_reports table ready");
   } catch (err) {
     console.error("❌ cost_reports table setup failed:", err.message);
   }
 })();
 
+// ── Safe JSON parse helper ────────────────────────────────────────────────────
+function safeJson(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    try { return JSON.parse(val); } catch (_) { return []; }
+  }
+  if (typeof val === "object") return val;
+  return [];
+}
+
 // ── Format helper ─────────────────────────────────────────────────────────────
 function formatReport(r) {
+  const items       = safeJson(r.items);
+  const labourItems = safeJson(r.labour_items);
+
+  // Recalculate from item arrays if DB columns are still 0 (old rows)
+  const calcMat = items.reduce((s, i) => s + parseFloat(i.total || 0), 0);
+  const calcLab = labourItems.reduce((s, i) => s + parseFloat(i.total || 0), 0);
+
+  const materialTotal = parseFloat(r.material_total) || calcMat;
+  const labourTotal   = parseFloat(r.labour_total)   || calcLab;
+  const totalCost     = parseFloat(r.total_cost)     || (materialTotal + labourTotal);
+
   return {
     id:            r.id,
     projectId:     r.project_id,
@@ -44,8 +90,11 @@ function formatReport(r) {
     milestoneId:   r.milestone_id,
     milestoneName: r.milestone_name,
     boqId:         r.boq_id,
-    items:         r.items || [],
-    totalCost:     parseFloat(r.total_cost) || 0,
+    items,
+    labourItems,    // ← always returned
+    materialTotal,  // ← always returned
+    labourTotal,    // ← always returned
+    totalCost,
     status:        r.status,
     pmComment:     r.pm_comment || "",
     createdDate:   r.created_date
@@ -74,7 +123,7 @@ exports.getAllReports = async (req, res) => {
     if (status)    { values.push(status);    conditions.push(`status = $${values.length}`);     }
     if (boqId)     { values.push(boqId);     conditions.push(`boq_id = $${values.length}`);    }
 
-    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const where  = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const result = await pool.query(
       `SELECT * FROM cost_reports ${where} ORDER BY created_at DESC`, values
     );
@@ -108,7 +157,11 @@ exports.getReportById = async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.createReport = async (req, res) => {
   try {
-    const { projectId, projectName, milestoneId, milestoneName, boqId, items, totalCost } = req.body;
+    const {
+      projectId, projectName, milestoneId, milestoneName,
+      boqId, items, labourItems,
+      materialTotal, labourTotal, totalCost,
+    } = req.body;
 
     if (!projectId || !milestoneId || !boqId) {
       return res.status(400).json({ error: "projectId, milestoneId and boqId are required" });
@@ -131,15 +184,36 @@ exports.createReport = async (req, res) => {
       "SELECT id FROM cost_reports WHERE boq_id = $1 AND status != 'rejected'", [boqId]
     );
     if (existing.rows.length > 0) {
-      return res.status(409).json({ error: "A cost report already exists for this BOQ. Edit it instead." });
+      return res.status(409).json({
+        error: "A cost report already exists for this BOQ.",
+        id:    existing.rows[0].id,
+      });
     }
+
+    // Always safe-default labour fields
+    const safeLabourItems = Array.isArray(labourItems) ? labourItems : [];
+    const calcMat         = items.reduce((s, i) => s + parseFloat(i.total || 0), 0);
+    const calcLab         = safeLabourItems.reduce((s, i) => s + parseFloat(i.total || 0), 0);
+    const finalMatTotal   = parseFloat(materialTotal) || calcMat;
+    const finalLabTotal   = parseFloat(labourTotal)   || calcLab;
+    const finalTotal      = parseFloat(totalCost)     || (finalMatTotal + finalLabTotal);
 
     const result = await pool.query(
       `INSERT INTO cost_reports
-         (project_id, project_name, milestone_id, milestone_name, boq_id, items, total_cost, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending_pm')
+         (project_id, project_name, milestone_id, milestone_name,
+          boq_id, items, labour_items,
+          material_total, labour_total, total_cost, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending_pm')
        RETURNING id`,
-      [projectId, projectName, milestoneId, milestoneName, boqId, JSON.stringify(items), totalCost || 0]
+      [
+        projectId, projectName, milestoneId, milestoneName,
+        boqId,
+        JSON.stringify(items),
+        JSON.stringify(safeLabourItems),
+        finalMatTotal,
+        finalLabTotal,
+        finalTotal,
+      ]
     );
 
     res.status(201).json({
@@ -159,7 +233,11 @@ exports.createReport = async (req, res) => {
 exports.updateReport = async (req, res) => {
   try {
     const { id } = req.params;
-    const { projectId, projectName, milestoneId, milestoneName, boqId, items, totalCost } = req.body;
+    const {
+      projectId, projectName, milestoneId, milestoneName,
+      boqId, items, labourItems,
+      materialTotal, labourTotal, totalCost,
+    } = req.body;
 
     const check = await pool.query("SELECT status FROM cost_reports WHERE id = $1", [id]);
     if (!check.rows.length) return res.status(404).json({ error: "Cost report not found" });
@@ -167,23 +245,35 @@ exports.updateReport = async (req, res) => {
       return res.status(403).json({ error: "Cannot edit an approved cost report" });
     }
 
+    const safeLabourItems = Array.isArray(labourItems) ? labourItems : [];
+
     const result = await pool.query(
       `UPDATE cost_reports
-       SET project_id     = COALESCE($1, project_id),
-           project_name   = COALESCE($2, project_name),
-           milestone_id   = COALESCE($3, milestone_id),
-           milestone_name = COALESCE($4, milestone_name),
-           boq_id         = COALESCE($5, boq_id),
-           items          = COALESCE($6, items),
-           total_cost     = COALESCE($7, total_cost),
+       SET project_id     = COALESCE($1,  project_id),
+           project_name   = COALESCE($2,  project_name),
+           milestone_id   = COALESCE($3,  milestone_id),
+           milestone_name = COALESCE($4,  milestone_name),
+           boq_id         = COALESCE($5,  boq_id),
+           items          = COALESCE($6,  items),
+           labour_items   = COALESCE($7,  labour_items),
+           material_total = COALESCE($8,  material_total),
+           labour_total   = COALESCE($9,  labour_total),
+           total_cost     = COALESCE($10, total_cost),
            status         = 'pending_pm',
            pm_comment     = '',
            updated_date   = CURRENT_DATE,
            updated_at     = NOW()
-       WHERE id = $8
+       WHERE id = $11
        RETURNING id, status`,
-      [projectId, projectName, milestoneId, milestoneName, boqId,
-       items ? JSON.stringify(items) : null, totalCost, id]
+      [
+        projectId, projectName, milestoneId, milestoneName, boqId,
+        items       ? JSON.stringify(items)             : null,
+        labourItems ? JSON.stringify(safeLabourItems)   : null,
+        materialTotal || null,
+        labourTotal   || null,
+        totalCost     || null,
+        id,
+      ]
     );
 
     res.json({
@@ -221,7 +311,6 @@ exports.approveReport = async (req, res) => {
       [boq_id]
     );
 
-    // ── QS Notification ──────────────────────────────────────
     await createNotificationDirect({
       type:         "Cost",
       project_name: project_name,
@@ -270,7 +359,6 @@ exports.rejectReport = async (req, res) => {
       [note, boq_id]
     );
 
-    // ── QS Notification ──────────────────────────────────────
     await createNotificationDirect({
       type:         "Cost",
       project_name: project_name,

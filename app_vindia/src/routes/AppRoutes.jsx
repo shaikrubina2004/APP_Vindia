@@ -44,7 +44,7 @@ import Qsdailyupdates  from "../pages/Quality Surveyor/Qsdailyupdates";
 import Qsboq           from "../pages/Quality Surveyor/Qsboq";
 import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
 import Qscostreport    from "../pages/Quality Surveyor/Qscostreport";
-
+import Qsmeasurement from "../pages/Quality Surveyor/Qsmeasurement";
 /* ── MEP ─────────────────────────────────────────────────── */
 import MEPRoutes      from "./MepRoutes";
 import MEPCoordination from "../pages/MEP Engineer/MEPCoordination";
@@ -212,7 +212,14 @@ const AppRoutes = () => {
         <Route path="/quantity-surveyor/boq"             element={<QuantitySurveyorLayout><Qsboq /></QuantitySurveyorLayout>} />
         <Route path="/quantity-surveyor/coordination"    element={<QuantitySurveyorLayout><MEPCoordination /></QuantitySurveyorLayout>} />
         <Route path="/quantity-surveyor/incident"        element={<QuantitySurveyorLayout><AppShell key="qs-incidents" /></QuantitySurveyorLayout>} />
-
+   <Route
+  path="/quantity-surveyor/measurement"
+  element={
+    <QuantitySurveyorLayout>
+      <Qsmeasurement />
+    </QuantitySurveyorLayout>
+  }
+/>
         {/* ══ MEP ═══════════════════════════════════════════ */}
         <Route path="/mep/*" element={<MEPRoutes />} />
 

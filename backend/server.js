@@ -77,6 +77,7 @@ const boqRoutes            = require("./routes/boqRoutes");
 const costReportRoutes     = require("./routes/costReportRoutes");
 const quantityReportRoutes = require("./routes/Quantityreportroutes.js");
 const qsNotifRoutes        = require("./routes/qsNotificationRoutes");
+const measurementRoutes = require("./routes/measurementRoutes");
 
 /* ── MEP ──────────────────────────────────────────────────── */
 const mepNotifRoutes = require("./routes/mepNotificationsRoutes");
@@ -143,7 +144,7 @@ app.use("/api/qs",               qsRoutes);
 app.use("/api/boq",              boqRoutes);
 app.use("/api/cost-report",      costReportRoutes);
 app.use("/api/quantity-report",  quantityReportRoutes);
-
+app.use("/api/measurement", measurementRoutes);
 /* ── Other Core ───────────────────────────────────────────── */
 app.use("/api/timesheets",       timesheetRoutes);
 app.use("/api/daily-reports",    dailyRoutes);
