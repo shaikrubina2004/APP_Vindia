@@ -26,11 +26,11 @@
     import ActivityLog           from "../pages/siteEngineer/ActivityLog";
 
     // ── New pages ──────────────────────────────────────────────
-    import SnagList         from "../pages/siteEngineer/SnagList";
-    import ApprovalWorkflow from "../pages/siteEngineer/ApprovalWorkflow";
-    import PhotoGallery     from "../pages/siteEngineer/PhotoGallery";
-    import SiteInstruction  from "../pages/siteEngineer/SiteInstruction";
-    import MaterialRequest  from "../pages/siteEngineer/MaterialRequest";
+    import SnagList         from "../pages/siteEngineer/Snaglist";
+    import ApprovalWorkflow from "../pages/siteEngineer/Approvalworkflow";
+    import PhotoGallery     from "../pages/siteEngineer/Photogallery";
+    import SiteInstruction  from "../pages/siteEngineer/Siteinstruction";
+    import MaterialRequest  from "../pages/siteEngineer/Materialrequest";
 
     // ── Shared ─────────────────────────────────────────────────
     import AppShell from "../components/incidents/AppShell";

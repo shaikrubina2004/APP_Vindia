@@ -1,8 +1,8 @@
 // src/pages/siteEngineer/ApprovalWorkflow.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
-import { useNotifications } from "../../context/NotificationContext";
-import "../../styles/ApprovalWorkflow.css";
+import { useNotifications } from "../../context/Notificationcontext";
+import "../../styles/Approvalworkflow.css";
 
 const QUEUE_KEY = "approvals:queue:v1";
 const PAGE_SIZE = 8;

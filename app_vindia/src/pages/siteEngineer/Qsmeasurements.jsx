@@ -5,7 +5,7 @@ import React, {
 } from "react";
 import api from "../../services/api";
 import "../../styles/shared-pages.css";
-import "../../styles/QSMeasurements.css";
+import "../../styles/Qsmeasurements.css";
 
 /* ── constants ───────────────────────────────────────────── */
 const PAGE_SIZE = 8;

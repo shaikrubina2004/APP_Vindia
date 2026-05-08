@@ -85,7 +85,7 @@ import BDAReportsWithRole from "../pages/business-development/business-developme
 import Timesheet      from "../pages/timesheet/Timesheet";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES }      from "../roles";
-import { NotificationProvider } from "../context/NotificationContext";
+import { NotificationProvider } from "../context/Notificationcontext";
 
 /* ── LAYOUTS ─────────────────────────────────────────────── */
 import CEOLayout               from "../layouts/CEOLayout";
