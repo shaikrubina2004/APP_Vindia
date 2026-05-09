@@ -93,7 +93,7 @@ export default function MEPDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!activeProject) return;
+    if (!activeProject || !activeProject.id) return;
     setLoading(true);
 
     Promise.all([

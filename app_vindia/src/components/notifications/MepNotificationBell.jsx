@@ -88,22 +88,6 @@ export default function MEPNotificationBell({ userId }) {
     markRead(n.id);
     setOpen(false);
 
-    // Auto switch project if notification has project_id
-    if (n.project_id) {
-      const project = PROJECTS.find(
-        (p) => String(p.id) === String(n.project_id),
-      );
-      if (project) {
-        setActiveProject(project);
-      }
-    } else {
-      // No project_id means open incident/task
-      const openOption = PROJECTS.find((p) => p.id === null);
-      if (openOption && (n.type === "incident" || n.type === "task")) {
-        setActiveProject(openOption);
-      }
-    }
-
     const routes = {
       incident: "/mep/incidents",
       clash: "/mep/shared/drawings",
@@ -111,7 +95,32 @@ export default function MEPNotificationBell({ userId }) {
       approval: "/mep/shared/drawings",
       task: "/mep/incidents?page=tasks",
     };
-    navigate(routes[n.type] ?? "/mep/dashboard");
+    const targetRoute = routes[n.type] ?? "/mep/dashboard";
+
+    if (n.project_id) {
+      console.log("notification project_id:", n.project_id);
+      console.log("PROJECTS list:", PROJECTS);
+      const project = PROJECTS.find(
+        (p) => String(p.id) === String(n.project_id),
+      );
+      console.log("found project:", project);
+      if (project) {
+        setActiveProject(project);
+        setTimeout(() => navigate(targetRoute), 100);
+        return;
+      }
+    } else if (n.type === "incident" || n.type === "task") {
+      console.log("no project_id on notification, type:", n.type);
+      console.log("PROJECTS list:", PROJECTS);
+      const openOption = PROJECTS.find((p) => p.id === null);
+      if (openOption) {
+        setActiveProject(openOption);
+        setTimeout(() => navigate(targetRoute), 100);
+        return;
+      }
+    }
+
+    navigate(targetRoute);
   };
 
   const formatTime = (ts) => {

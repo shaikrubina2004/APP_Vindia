@@ -52,6 +52,8 @@ import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
 import Qsmeasurement from "../pages/Quality Surveyor/Qsmeasurement";
 /* ── MEP ─────────────────────────────────────────────────── */
 import MEPRoutes from "./MepRoutes";
+import ClientRoutes from "./MepRoutes";
+
 import MEPCoordination from "../pages/MEP Engineer/MEPCoordination";
 
 /* ── OTHER ROLES ─────────────────────────────────────────── */
@@ -372,6 +374,8 @@ const AppRoutes = () => {
         />
         {/* ══ MEP ═══════════════════════════════════════════ */}
         <Route path="/mep/*" element={<MEPRoutes />} />
+        <Route path="/client/*" element={<ClientRoutes />} />
+
         {/* ══ PLANNING / QC / SAFETY ════════════════════════ */}
         <Route
           path="/planning-engineer/dashboard"
@@ -410,7 +414,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-        
+
         <Route
           path="/3d-visualizer/dashboard"
           element={
@@ -636,15 +640,15 @@ const AppRoutes = () => {
         />
         {/* ══ DIGITAL MARKETING══════════════════════════════════════ */}
         <Route
-        path="/digital-marketing/dashboard"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.DIGITAL_MARKETING, ROLES.CEO]}>
-            <DigitalMarketingLayout>  
-              <DigitalMarketing />
-            </DigitalMarketingLayout>
-          </ProtectedRoute>
-        }
-      />
+          path="/digital-marketing/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.DIGITAL_MARKETING, ROLES.CEO]}>
+              <DigitalMarketingLayout>
+                <DigitalMarketing />
+              </DigitalMarketingLayout>
+            </ProtectedRoute>
+          }
+        />
         {/* ══ FALLBACK ══════════════════════════════════════ */}
         <Route
           path="*"

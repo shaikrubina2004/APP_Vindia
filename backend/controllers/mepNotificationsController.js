@@ -10,7 +10,9 @@ exports.insertMEPNotification = async (
   projectId = null,
 ) => {
   if (!userId) return;
-  console.log(`🔔 MEP NOTIFY → user:${userId} type:${type} title:${title}`);
+  console.log(
+    `🔔 MEP NOTIFY → user:${userId} type:${type} title:${title} projectId:${projectId}`,
+  );
   try {
     await pool.query(
       `INSERT INTO mep_notifications (user_id, type, title, description, severity, reference_id, project_id)
