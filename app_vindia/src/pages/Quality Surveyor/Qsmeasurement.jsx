@@ -231,28 +231,13 @@ export default function Qsmeasurement() {
     setPushModal(true);
   };
 
-  const handlePush = async () => {
-    if (!viewingSheet) return;
-    setPushLoading(true);
-    try {
-      const res  = await fetch(`${API}/${viewingSheet.id}/push-to-boq`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetBoqId: pushTarget === "new" ? null : pushTarget }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to push");
-      notify(
-        pushTarget === "new"
-          ? "Pushed to BOQ ✓ — go to BOQ page to complete and submit"
-          : "Added to existing BOQ ✓"
-      );
-      setPushModal(false);
-    } catch (err) {
-      notify(err.message, "error");
-    } finally {
-      setPushLoading(false);
-    }
-  };
+ const handlePush = () => {
+  if (!viewingSheet) return;
+
+  const url = `/quantity-surveyor/boq?projectId=${viewingSheet.projectId}&milestoneId=${viewingSheet.milestoneId}&material=${encodeURIComponent(viewingSheet.sheetTitle)}&qty=${viewingSheet.netQty}&unit=${viewingSheet.unit}&measurementId=${viewingSheet.id}`;
+
+  window.location.href = url;
+};
 
   // ── Export CSV ──
   const exportCSV = (sheet) => {

@@ -21,7 +21,7 @@ const LABOUR_TYPES = [
 ];
 
 const uid         = () => Math.random().toString(36).substr(2, 9);
-const blank       = () => ({ id: uid(), material: "", unit: "m²", quantity: "", unitPrice: "" });
+const blank       = () => ({ id: uid(), material: "", unit: "m²", quantity: "", unitPrice: "", fromMeasurement: false });
 const blankLabour = () => ({ id: uid(), labourType: "", workers: "", workingDays: "", dailyWage: "" });
 const fmtN        = (n) => parseFloat(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
@@ -79,24 +79,27 @@ export default function Qsboq() {
 
   // ── Read pre-fill params from Measurement "Push to BOQ" ──
   useEffect(() => {
-    const params      = new URLSearchParams(location.search);
-    const preProject  = params.get("projectId");
+    const params       = new URLSearchParams(location.search);
+    const preMeasurementId = params.get("measurementId");
+    const preProject   = params.get("projectId");
     const preMilestone = params.get("milestoneId");
-    const preMaterial = params.get("material");
-    const preQty      = params.get("qty");
-    const preUnit     = params.get("unit");
+    const preMaterial  = params.get("material");
+    const preQty       = params.get("qty");
+    const preUnit      = params.get("unit");
 
     if (preProject && preMaterial) {
       setProject(preProject);
       setTab("create");
       if (preQty && preUnit) {
         setRows([{
-          id:        uid(),
-          material:  decodeURIComponent(preMaterial),
-          unit:      decodeURIComponent(preUnit),
-          quantity:  preQty,
-          unitPrice: "",
-        }, blank()]);
+  id: uid(),
+  material: decodeURIComponent(preMaterial),
+  unit: decodeURIComponent(preUnit),
+  quantity: preQty,
+  unitPrice: "",
+  fromMeasurement: true,
+  measurementId: preMeasurementId   // 🔥 ADD THIS
+}, blank()]);
       }
       if (preMilestone) {
         sessionStorage.setItem("boq_prefill_milestone", preMilestone);
@@ -239,11 +242,12 @@ export default function Qsboq() {
       milestoneId:   milestoneObj.id,
       milestoneName: milestoneObj.name,
       rows: rows.map((r) => ({
-        ...r,
-        total:     rowTotal(r),
-        quantity:  parseFloat(r.quantity),
-        unitPrice: parseFloat(r.unitPrice),
-      })),
+  ...r,
+  measurementId: r.measurementId || null,
+  total: rowTotal(r),
+  quantity: parseFloat(r.quantity),
+  unitPrice: parseFloat(r.unitPrice),
+})),
       labourRows: filledLabour.map((r) => ({
         ...r,
         workers:     parseInt(r.workers),
@@ -433,7 +437,9 @@ export default function Qsboq() {
     } catch (_) {}
   };
 
-  const closeDetail = () => { setViewingBoq(null); setCrStatus(null); setQrStatus(null); setTab("list"); };
+  const closeDetail = () => {
+    setViewingBoq(null); setCrStatus(null); setQrStatus(null); setTab("list");
+  };
 
   // ═══════════════════════════════════════════════════════════════
   //  EXPORT CSV
@@ -576,6 +582,8 @@ export default function Qsboq() {
     );
   };
 
+  const isPrefilled = !!new URLSearchParams(location.search).get("material");
+
   // ═══════════════════════════════════════════════════════════════
   //  RENDER
   // ═══════════════════════════════════════════════════════════════
@@ -639,11 +647,15 @@ export default function Qsboq() {
               </div>
             )}
 
-            {/* Pre-fill banner from Measurement */}
-            {new URLSearchParams(location.search).get("material") && !editingId && (
+            {/* ── Pre-fill banner from Measurement ── */}
+            {isPrefilled && !editingId && (
               <div className="boq__prefill-banner">
-                <span>📐</span>
-                <span>Pre-filled from Measurement Sheet — add unit price to complete the BOQ row.</span>
+                <span className="boq__prefill-icon">📐</span>
+                <div className="boq__prefill-text">
+                  <strong>Pre-filled from Measurement Sheet</strong>
+                  <span>Row 1 has been filled with the net quantity. Just add the unit price to complete.</span>
+                </div>
+                <span className="boq__prefill-tag">From Measurement</span>
               </div>
             )}
 
@@ -707,11 +719,20 @@ export default function Qsboq() {
                   </thead>
                   <tbody>
                     {rows.map((row, i) => (
-                      <tr key={row.id}>
-                        <td className="td-num">{i + 1}</td>
+                      <tr key={row.id} className={row.fromMeasurement ? "boq__row--prefilled" : ""}>
+                        <td className="td-num">
+                          {row.fromMeasurement
+                            ? <span className="boq__ms-badge" title="From Measurement Sheet">📐</span>
+                            : i + 1}
+                        </td>
                         <td>
-                          <input className="boq__inp" placeholder="e.g. M25 Concrete, Steel Bar…"
-                            value={row.material} onChange={(e) => change(row.id, "material", e.target.value)} />
+                          <div style={{display:"flex", alignItems:"center", gap:"6px"}}>
+                            <input className="boq__inp" placeholder="e.g. M25 Concrete, Steel Bar…"
+                              value={row.material} onChange={(e) => change(row.id, "material", e.target.value)} />
+                            {row.fromMeasurement && (
+                              <span className="boq__ms-tag">📐 Measurement</span>
+                            )}
+                          </div>
                         </td>
                         <td>
                           <select className="boq__inp boq__inp--sel" value={row.unit}
@@ -720,13 +741,21 @@ export default function Qsboq() {
                           </select>
                         </td>
                         <td>
-                          <input className="boq__inp boq__inp--n" type="number" min="0"
-                            placeholder="0" value={row.quantity}
-                            onChange={(e) => change(row.id, "quantity", e.target.value)} />
+                          <input 
+  className="boq__inp boq__inp--n"
+  type="number"
+  min="0"
+  placeholder="0"
+  value={row.quantity}
+  disabled={row.fromMeasurement}   // ✅ correct
+/>
                         </td>
                         <td>
-                          <input className="boq__inp boq__inp--n" type="number" min="0"
-                            placeholder="0.00" value={row.unitPrice}
+                          <input
+                            className={`boq__inp boq__inp--n ${row.fromMeasurement && !row.unitPrice ? "boq__inp--highlight" : ""}`}
+                            type="number" min="0"
+                            placeholder={row.fromMeasurement ? "← Enter price here" : "0.00"}
+                            value={row.unitPrice}
                             onChange={(e) => change(row.id, "unitPrice", e.target.value)} />
                         </td>
                         <td className="td-total">₹ {fmtN(rowTotal(row))}</td>
@@ -1052,9 +1081,16 @@ export default function Qsboq() {
                         <thead><tr><th>#</th><th>Material</th><th>Unit</th><th>Quantity</th><th>Unit Price (₹)</th><th>Total (₹)</th></tr></thead>
                         <tbody>
                           {safeArr(boq.rows).map((r, i) => (
-                            <tr key={r.id || i}>
-                              <td className="td-num">{i + 1}</td>
-                              <td><strong>{r.material}</strong></td>
+                            <tr key={r.id || i} className={r.fromMeasurement ? "boq__row--prefilled" : ""}>
+                              <td className="td-num">
+                                {r.fromMeasurement
+                                  ? <span className="boq__ms-badge" title="From Measurement Sheet">📐</span>
+                                  : i + 1}
+                              </td>
+                              <td>
+                                <strong>{r.material}</strong>
+                                {r.fromMeasurement && <span className="boq__ms-tag">📐 Measurement</span>}
+                              </td>
                               <td>{r.unit}</td>
                               <td className="td-num">{parseFloat(r.quantity).toLocaleString("en-IN")}</td>
                               <td className="td-num">₹ {parseFloat(r.unitPrice).toLocaleString("en-IN")}</td>
@@ -1096,9 +1132,17 @@ export default function Qsboq() {
                         <thead><tr><th>#</th><th>Material</th><th>Unit</th><th>Quantity</th><th>Unit Price (₹)</th><th>Total (₹)</th></tr></thead>
                         <tbody>
                           {safeArr(boq.rows).map((r, i) => (
-                            <tr key={r.id || i}>
-                              <td className="td-num">{i + 1}</td>
-                              <td>{r.material}</td><td>{r.unit}</td>
+                            <tr key={r.id || i} className={r.fromMeasurement ? "boq__row--prefilled" : ""}>
+                              <td className="td-num">
+                                {r.fromMeasurement
+                                  ? <span className="boq__ms-badge" title="From Measurement Sheet">📐</span>
+                                  : i + 1}
+                              </td>
+                              <td>
+                                {r.material}
+                                {r.fromMeasurement && <span className="boq__ms-tag">📐 Measurement</span>}
+                              </td>
+                              <td>{r.unit}</td>
                               <td className="td-num">{parseFloat(r.quantity).toLocaleString("en-IN")}</td>
                               <td className="td-num">₹ {parseFloat(r.unitPrice).toLocaleString("en-IN")}</td>
                               <td className="td-total">₹ {fmtN(r.total || 0)}</td>

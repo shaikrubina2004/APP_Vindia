@@ -1045,3 +1045,50 @@
   display: flex; align-items: center; gap: 10px;
   font-size: 13.5px; color: #1d4ed8; font-weight: 500;
 }
+/* ══ MEASUREMENT PRE-FILL ROW ══ */
+.boq__row--prefilled td {
+  background: #eff6ff !important;
+}
+.boq__row--prefilled:hover td {
+  background: #dbeafe !important;
+}
+.boq__ms-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px;
+  background: #1d4ed8; color: #fff; font-size: 11px;
+  cursor: help;
+}
+.boq__ms-tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-weight: 600; padding: 2px 7px;
+  background: #dbeafe; color: #1d4ed8;
+  border: 1px solid #93c5fd; border-radius: 20px;
+  margin-left: 8px; white-space: nowrap;
+}
+.boq__inp--highlight {
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 0 0 3px rgba(29,78,216,.15) !important;
+  background: #eff6ff !important;
+}
+
+/* ══ PRE-FILL BANNER ══ */
+.boq__prefill-banner {
+  background: #eff6ff; border: 1.5px solid #93c5fd;
+  border-radius: 8px; padding: 14px 18px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.boq__prefill-icon { font-size: 22px; flex-shrink: 0; }
+.boq__prefill-text {
+  display: flex; flex-direction: column; gap: 2px; flex: 1;
+}
+.boq__prefill-text strong {
+  font-size: 13.5px; font-weight: 700; color: #1d4ed8;
+}
+.boq__prefill-text span {
+  font-size: 12.5px; color: #1e40af;
+}
+.boq__prefill-tag {
+  font-size: 12px; font-weight: 600; padding: 4px 12px;
+  background: #1d4ed8; color: #fff;
+  border-radius: 20px; white-space: nowrap; flex-shrink: 0;
+}
