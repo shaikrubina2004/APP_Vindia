@@ -9,7 +9,6 @@
   overflow-y: auto;
 }
 
-/* Header */
 .header h1 {
   color: #001D39;
   margin-bottom: 12px;
@@ -33,20 +32,17 @@
   overflow: hidden;
 }
 
-/* Top accent bar for search section only */
 .search-section::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 0; left: 0; right: 0;
   height: 4px;
   background: linear-gradient(90deg, #7BBDE8, #4E8EA2, #0A4174);
 }
 
 .search-grid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr 0.9fr;
+  grid-template-columns: 1.2fr 1fr 0.9fr;
   gap: 18px;
   align-items: center;
 }
@@ -62,6 +58,7 @@
   transition: all 0.3s ease;
   height: 48px;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .search-grid input:focus {
@@ -102,6 +99,7 @@
   overflow-x: hidden;
 }
 
+/* --- 4. EMPLOYEE CARD --- */
 .employee-card {
   margin-bottom: 12px;
   background: linear-gradient(135deg, rgba(123,189,232,0.08), rgba(189,216,233,0.16));
@@ -110,19 +108,42 @@
   border: 1px solid rgba(110,162,179,0.2);
 }
 
+/* Two-column employee info grid */
+.emp-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+
 .emp-row {
   display: flex;
   justify-content: space-between;
-  padding: 6px 0;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(78,142,162,0.07);
+  gap: 8px;
 }
+
+.emp-row:last-child { border-bottom: none; }
 
 .emp-label {
   font-weight: 700;
   color: #49769F;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
 }
 
-/* --- 4. ATTENDANCE STATS (CLEAN SOLID BLOCKS) --- */
+.emp-row span:last-child {
+  font-size: 0.82rem;
+  color: #001D39;
+  text-align: right;
+}
+
+.pf-no {
+  font-size: 0.7rem !important;
+  word-break: break-all;
+}
+
+/* --- 5. ATTENDANCE STATS --- */
 .attendance-stats {
   display: flex;
   flex-wrap: wrap;
@@ -147,42 +168,16 @@
   position: relative;
 }
 
-/* STRIPE REMOVAL: Ensures no side-lines appear on any card */
-.stat-card::before, 
-.stat-card::after,
+.stat-card::before, .stat-card::after,
+.employee-card::before { display: none !important; content: none !important; }
 
-.employee-card::before {
-  display: none !important;
-  content: none !important;
-}
+.stat-card.present { background: #001D39; color: white; }
+.stat-card.late    { background: #0A4174; color: white; }
+.stat-card.leave   { background: #7EBCE2; color: #001D39; }
+.stat-card.halfday { background: #49769F; color: white; }
+.stat-card.holiday { background: #FFFFFF !important; color: #4E8EA2 !important; border: 1.5px solid rgba(78,142,162,0.3) !important; }
 
-.stat-card.present { 
-  background: #001D39;  /* was halfday */
-  color: white; 
-}
-
-.stat-card.late { 
-  background: #0A4174;  /* was leave */
-  color: white; 
-}
-
-.stat-card.leave { 
-  background: #7EBCE2;  /* was present */
-  color: #001D39; 
-}
-
-.stat-card.halfday { 
-  background: #49769F;  /* was late */
-  color: white; 
-}
-
-.stat-card.holiday { 
-  background: #FFFFFF !important; 
-  color: #4E8EA2 !important; 
-  border: 1.5px solid rgba(78,142,162,0.3) !important; 
-}
-
-/* --- 5. CALENDAR SECTION --- */
+/* --- 6. CALENDAR --- */
 .calendar {
   margin-top: 12px;
   background: white;
@@ -217,57 +212,170 @@
   border: none !important;
 }
 
-.calendar-day.present { 
-  background: #001D39; 
-  color: white; 
+.calendar-day.present { background: #001D39; color: white; }
+.calendar-day.late    { background: #0A4174; color: white; }
+.calendar-day.leave   { background: #7BBDE8; color: #001D39; }
+.calendar-day.halfday { background: #49769F; color: white; }
+.calendar-day.holiday { background: #FFFFFF !important; color: #4E8EA2 !important; border: 1.5px solid #4E8EA2 !important; }
+
+/* --- 7. SECTION TITLE --- */
+.section-title {
+  color: #001D39;
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 14px 0 8px 0;
 }
 
-.calendar-day.late { 
-  background: #0A4174; 
-  color: white; 
+/* --- 8. PAYSLIP TITLE BAR --- */
+.payslip-title {
+  background: linear-gradient(135deg, #001D39, #0A4174);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 14px;
+  letter-spacing: 0.3px;
 }
 
-.calendar-day.leave { 
-  background: #7BBDE8; 
-  color: #001D39; 
+/* --- 9. EARNINGS & DEDUCTIONS SIDE-BY-SIDE --- */
+.earnings-deductions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 
-.calendar-day.halfday { 
-  background: #49769F; 
-  color: white; 
-}
-
-.calendar-day.holiday { 
-  background: #FFFFFF !important; 
-  color: #4E8EA2 !important; 
-  border: 1.5px solid #4E8EA2 !important; 
-}
-
-
-
-/* --- 7. PAYROLL BREAKDOWN --- */
-.payroll-breakdown {
-  margin-bottom: 16px;
+.ed-section {
   background: rgba(255,255,255,0.9);
-  padding: 16px 18px;
   border-radius: 12px;
   border: 1px solid rgba(78,142,162,0.12);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  overflow: hidden;
 }
 
-.payroll-breakdown div {
+.ed-header {
+  background: linear-gradient(135deg, rgba(123,189,232,0.2), rgba(78,142,162,0.15));
+  color: #001D39;
+  font-weight: 700;
+  font-size: 0.88rem;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(78,142,162,0.15);
+}
+
+.ed-table {
+  padding: 6px 10px;
+}
+
+.ed-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.95rem;
+  padding: 5px 0;
+  font-size: 0.83rem;
+  border-bottom: 1px solid rgba(78,142,162,0.06);
+  gap: 6px;
 }
 
-.amount { font-weight: 700; font-size: 1rem; }
-.amount.salary { color: #001D39; font-size: 1.1rem; }
-.amount.deduction { color: #49769F; }
+.ed-row:last-child { border-bottom: none; }
 
+.ed-amt {
+  font-weight: 600;
+  color: #001D39;
+  white-space: nowrap;
+}
+
+.deduction-amt { color: #49769F; }
+
+.ed-total {
+  border-top: 2px solid rgba(78,142,162,0.2) !important;
+  border-bottom: none !important;
+  margin-top: 4px;
+  padding-top: 8px !important;
+}
+
+.ed-total .amount { color: #001D39; font-size: 0.95rem; }
+.ed-total .amount.deduction { color: #49769F; }
+
+/* --- 10. NET SALARY BAR --- */
+.net-salary-bar {
+  background: linear-gradient(135deg, #001D39, #0A4174);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.net-amount {
+  font-size: 1.25rem;
+  color: #7BBDE8;
+}
+
+/* --- 11. CTC TABLE --- */
+.ctc-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(78,142,162,0.2);
+}
+
+.ctc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+}
+
+.ctc-table th, .ctc-table td {
+  padding: 7px 10px;
+  text-align: right;
+  border-bottom: 1px solid rgba(78,142,162,0.1);
+}
+
+.ctc-table th:first-child, .ctc-table td:first-child {
+  text-align: left;
+}
+
+.ctc-table thead tr:first-child th {
+  background: linear-gradient(135deg, #001D39, #0A4174);
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.ctc-main-val {
+  color: #7BBDE8 !important;
+  font-size: 1rem !important;
+}
+
+.ctc-subhead th {
+  background: linear-gradient(135deg, rgba(123,189,232,0.15), rgba(78,142,162,0.12));
+  color: #49769F;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.ctc-table tbody tr:nth-child(even) {
+  background: rgba(123,189,232,0.04);
+}
+
+.ctc-subtotal td {
+  background: rgba(78,142,162,0.08) !important;
+  border-top: 1px solid rgba(78,142,162,0.2);
+  border-bottom: 1px solid rgba(78,142,162,0.2);
+  color: #0A4174;
+}
+
+.ctc-total-row td {
+  background: linear-gradient(135deg, rgba(0,29,57,0.06), rgba(10,65,116,0.08)) !important;
+  border-top: 2px solid rgba(78,142,162,0.3);
+  color: #001D39;
+  font-size: 0.88rem;
+}
+
+/* --- 12. APPROVE BUTTON --- */
 .approve-btn {
   margin-top: 10px;
   padding: 14px;
@@ -278,49 +386,48 @@
   font-weight: 700;
   width: 100%;
   cursor: pointer;
+  font-size: 0.95rem;
+  transition: opacity 0.2s;
 }
 
-/* --- 8. MOBILE VIEW: ONE ROW, NO SCROLLING --- */
+.approve-btn:hover { opacity: 0.88; }
+
+/* --- 13. MOBILE --- */
 @media (max-width: 850px) {
-  
   .attendance-stats {
     display: flex !important;
-    flex-wrap: nowrap !important; 
-    justify-content: space-between !important; 
-    gap: 4px !important; 
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+    gap: 4px !important;
     padding: 8px !important;
-    overflow-x: hidden !important; 
+    overflow-x: hidden !important;
   }
 
   .stat-card {
-    flex: 1 1 0 !important; 
-    min-width: 0 !important; 
-    padding: 6px 2px !important; 
-    font-size: 0.65rem !important; 
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    padding: 6px 2px !important;
+    font-size: 0.65rem !important;
     border-radius: 6px !important;
     display: flex;
-    flex-direction: column; 
+    flex-direction: column;
     align-items: center;
     justify-content: center;
   }
 
-  /* Extra protection to keep stripes removed on mobile */
-  .stat-card::before, .stat-card::after {
-    display: none !important;
-  }
+  .stat-card::before, .stat-card::after { display: none !important; }
 
-  .search-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  
+  .search-grid { grid-template-columns: 1fr; gap: 12px; }
+
   .dashboard {
     grid-template-columns: 1fr;
     display: flex;
     flex-direction: column;
   }
 
-  .container {
-    padding: 10px;
-  }
+  .container { padding: 10px; }
+
+  .emp-grid-2col { grid-template-columns: 1fr; }
+
+  .earnings-deductions-grid { grid-template-columns: 1fr; }
 }

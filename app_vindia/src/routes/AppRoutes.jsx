@@ -65,7 +65,7 @@ import SafetyOfficerDashboard from "../pages/Safety Officer/SafetyOfficerDashboa
 import StructuralRoutes from "./StructuralRoutes";
 
 /* FINANCE */
-import FinanceRoutes    from "./FinanceRoutes";   
+
 
 /* ── ARCHITECT ───────────────────────────────────────────── */
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
@@ -407,7 +407,7 @@ const AppRoutes = () => {
         {/* ══ STRUCTURAL ════════════════════════════════════ */}
         <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
           {/* ══ FINANCE ═══════════════════════════════════════ */}
-        <Route path="/finance/*" element={<FinanceRoutes />} />
+       {/* <Route path="/finance/*" element={<FinanceRoutes />} /> */}
         {/* ══ ARCHITECT ═════════════════════════════════════ */}
         <Route
           path="/architect/dashboard"
