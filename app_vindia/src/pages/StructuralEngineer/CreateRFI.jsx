@@ -17,12 +17,18 @@ function authHeaders() {
 
 export default function CreateRFIModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
-    subject: "",
-    description: "",
-    priority: "medium",
-    assigned_to_role: "",
-    project_name: "",
-  });
+  subject: "",
+  description: "",
+  priority: "medium",
+  assigned_to_role: "",
+  project_name: "",
+
+  // ✅ NEW FIELDS
+  drawing_ref: "",
+  grid_ref: "",
+  zone: "",
+  response_required_by: "",
+});
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -195,8 +201,7 @@ export default function CreateRFIModal({ onClose, onCreated }) {
               )}
             </div>
           </div>
-
-          <label>Description</label>
+           <label>Description</label>
           <textarea
             name="description"
             value={form.description}
@@ -204,6 +209,39 @@ export default function CreateRFIModal({ onClose, onCreated }) {
             rows={4}
             placeholder="Provide full context, drawing refs, location, etc."
           />
+          <label>Drawing Reference</label>
+<input
+  name="drawing_ref"
+  value={form.drawing_ref}
+  onChange={handle}
+  placeholder="e.g. STR-FDN-001"
+/>
+
+<label>Grid / Zone Reference</label>
+<input
+  name="grid_ref"
+  value={form.grid_ref}
+  onChange={handle}
+  placeholder="e.g. Grid C3"
+/>
+
+<label>Zone / Location</label>
+<input
+  name="zone"
+  value={form.zone}
+  onChange={handle}
+  placeholder="e.g. Level 2"
+/>
+
+<label>Response Required By</label>
+<input
+  type="date"
+  name="response_required_by"
+  value={form.response_required_by}
+  onChange={handle}
+/>
+
+         
 
           <label>
             Attachment <span className="rfi-optional">(optional)</span>

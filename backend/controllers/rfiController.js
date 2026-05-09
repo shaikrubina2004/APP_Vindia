@@ -2,7 +2,6 @@ const pool = require("../config/db");
 const createSENotification = require(
   "../utils/createSENotification"
 );
-
 exports.createRFI = async (req, res) => {
   try {
     const raised_by = req.user?.id; // Extract from auth middleware
@@ -24,7 +23,6 @@ exports.createRFI = async (req, res) => {
     );
 
     res.status(201).json(result.rows[0]);
-
     // Create SE notification
     await createSENotification({
       message: `New RFI created: ${title}`,

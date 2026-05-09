@@ -82,10 +82,15 @@ const siteEngineerMenu = [
     path: "/site-engineer/site-instructions",
     icon: "file-text",
   },
-   {
-    name: "QS Measurements",
-    path: "/site-engineer/qs-measurements",
-    icon: "circle",
+  {
+   name: "QS Measurements",
+   path: "/site-engineer/qs-measurements",
+   icon: "circle",
+  },
+  {
+   name: "Architect Drawings",
+   path: "/site-engineer/ArchitectDrawings",
+   icon: "circle",
   },
 ];
 

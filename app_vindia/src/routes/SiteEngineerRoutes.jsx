@@ -20,7 +20,7 @@
     import SiteEngineerDashboard from "../pages/siteEngineer/SiteEngineerDashboard";
     import DailyDiary            from "../pages/siteEngineer/DailyDiary";
     import Progress              from "../pages/siteEngineer/Progress";
-    import RFI                   from "../pages/siteEngineer/RFI";
+    import RFI                   from "../pages/StructuralEngineer/RFI";
     import NCR                   from "../pages/siteEngineer/NCR";
     import Checklist             from "../pages/siteEngineer/Checklist";
     import ActivityLog           from "../pages/siteEngineer/ActivityLog";
@@ -35,6 +35,8 @@
     // ── Shared ─────────────────────────────────────────────────
     import AppShell from "../components/incidents/AppShell";
 import QSMeasurements from "../pages/siteEngineer/Qsmeasurements";
+import ArchitectDesigns     from "../pages/Architect/ArchitectDesigns";
+
 
     // ── Allowed roles ──────────────────────────────────────────
     const SE_ROLES = [ROLES.SITE_ENGINEER, ROLES.PROJECT_MANAGER, ROLES.CEO];
@@ -75,15 +77,15 @@ import QSMeasurements from "../pages/siteEngineer/Qsmeasurements";
         }
     />,
 
-    <Route
-        key="se-rfi"
-        path="/site-engineer/rfi"
-        element={
-        <ProtectedRoute allowedRoles={[...SE_ROLES, ROLES.ARCHITECT]}>
-            <SiteEngineerLayout><RFI /></SiteEngineerLayout>
-        </ProtectedRoute>
-        }
-    />,
+    // <Route
+    //     key="se-rfi"
+    //     path="/site-engineer/rfi"
+    //     element={
+    //     <ProtectedRoute allowedRoles={[...SE_ROLES, ROLES.ARCHITECT]}>
+    //         <SiteEngineerLayout><RFI /></SiteEngineerLayout>
+    //     </ProtectedRoute>
+    //     }
+    // />,
 
     <Route
         key="se-ncr"
@@ -105,6 +107,15 @@ import QSMeasurements from "../pages/siteEngineer/Qsmeasurements";
         }
     />,
 
+    <Route
+        key="se-checklist"
+        path="/site-engineer/ArchitectDrawings"
+        element={
+        <ProtectedRoute allowedRoles={SE_ROLES}>
+            <SiteEngineerLayout>< ArchitectDesigns/></SiteEngineerLayout>
+        </ProtectedRoute>
+        }
+    />,
     <Route
         key="se-activity"
         path="/site-engineer/activity"
@@ -184,6 +195,16 @@ import QSMeasurements from "../pages/siteEngineer/Qsmeasurements";
         </ProtectedRoute>
         }
     />,
+    <Route
+        key="se-rfi"
+        path="site-engineer/rfi"
+        element={
+        <ProtectedRoute allowedRoles={SE_ROLES}>
+            <SiteEngineerLayout><RFI/></SiteEngineerLayout>
+        </ProtectedRoute>
+        }
+    />,
+    
 
     ];
 
