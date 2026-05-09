@@ -9,10 +9,7 @@ import {
 } from "recharts";
 
 /* ── Helpers ── */
-const fmt = (n) =>
-  Number(n) >= 10000000 ? `₹${(Number(n) / 10000000).toFixed(1)}Cr`
-  : Number(n) >= 100000  ? `₹${(Number(n) / 100000).toFixed(1)}L`
-  : `₹${Number(n).toLocaleString("en-IN")}`;
+const fmt = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -218,10 +215,8 @@ function ProjectManagement() {
   const hiddenCount = filteredProjects.length - PROJECTS_INITIAL_COUNT;
 
   const costBreakdown = {
-    labour:    costSummary.reduce((s, w) => s + Number(w.labour_cost    || 0), 0),
-    material:  costSummary.reduce((s, w) => s + Number(w.material_cost  || 0), 0),
-    equipment: costSummary.reduce((s, w) => s + Number(w.equipment_cost || 0), 0),
-    misc:      costSummary.reduce((s, w) => s + Number(w.misc_cost      || 0), 0),
+    labour:   costSummary.reduce((s, w) => s + Number(w.labour_cost   || 0), 0),
+    material: costSummary.reduce((s, w) => s + Number(w.material_cost || 0), 0),
   };
 
   /* ── Selected project values ── */
