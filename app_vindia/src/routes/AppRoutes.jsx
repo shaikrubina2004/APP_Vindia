@@ -25,7 +25,8 @@ import Leaves from "../pages/hr/Leaves";
 import Payroll from "../pages/hr/Payroll";
 import Travel from "../pages/hr/Travel";
 
-import DigitalMarketing from "../pages/DigitalMarketing/DigitalMarketing";
+import DigitalMarketing from "../pages/business-development/digital-marketing/DigitalMarketing";
+import DigitalMarketingLayout from "../layouts/DigitalMarketingLayout";
 import ThreeDVisualizerDashboard from "../pages/3DVisualizer/ThreeDVisualizerDashboard";
 import FinanceManagerDashboard from "../pages/Finance/FinanceManagerDashboard";
 
@@ -409,16 +410,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/digital-marketing/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.DIGITAL_MARKETING, ROLES.CEO]}>
-              <ArchitectLayout>
-                <DigitalMarketing />
-              </ArchitectLayout>
-            </ProtectedRoute>
-          }
-        />
+        
         <Route
           path="/3d-visualizer/dashboard"
           element={
@@ -642,6 +634,17 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        {/* ══ DIGITAL MARKETING══════════════════════════════════════ */}
+        <Route
+        path="/digital-marketing/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.DIGITAL_MARKETING, ROLES.CEO]}>
+            <DigitalMarketingLayout>  
+              <DigitalMarketing />
+            </DigitalMarketingLayout>
+          </ProtectedRoute>
+        }
+      />
         {/* ══ FALLBACK ══════════════════════════════════════ */}
         <Route
           path="*"
