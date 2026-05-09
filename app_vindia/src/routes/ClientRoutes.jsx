@@ -1,24 +1,18 @@
 import { Routes, Route } from "react-router-dom";
-import MEPLayout from "../layouts/MEPLayout";
-import MEPDashboard from "../pages/MEP Engineer/MEPDashboard";
+import ClientLayout from "../layouts/ClientLayout";
+import ClientDashboard from "../pages/Client/ClientDashboard";
 import AppShell from "../components/incidents/AppShell";
 import RFIPage from "../pages/StructuralEngineer/RFI";
 import RFIDetailPage from "../pages/StructuralEngineer/RFIDetails";
 
-function MEPRoutes() {
+function ClientRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<MEPLayout />}>
+      <Route path="/" element={<ClientLayout />}>
         {" "}
         {/* ✅ layout wraps as parent */}
-        <Route path="dashboard" element={<MEPDashboard />} />
-        <Route path="daily-log" element={<MEPDailylog />} />
-        <Route path="drawings" element={<MEPDrawings />} />
-        <Route path="shared/drawings" element={<SharedDrawingPage />} />
-        <Route path="version-control" element={<MEPVerssionControll />} />
-        <Route path="incidents" element={<AppShell key="mep-incidents" />} />
-        <Route path="coordination" element={<MEPCoordination />} />
-        <Route path="upload" element={<MEPUploads />} />
+        <Route path="dashboard" element={<ClientDashboard />} />
+        <Route path="incidents" element={<AppShell />} />
         <Route path="rfi" element={<RFIPage />} />
         <Route path="rfi/:id" element={<RFIDetailPage />} />
       </Route>
@@ -26,4 +20,4 @@ function MEPRoutes() {
   );
 }
 
-export default MEPRoutes;
+export default ClientRoutes;

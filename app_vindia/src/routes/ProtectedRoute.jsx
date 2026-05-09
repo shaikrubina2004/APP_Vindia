@@ -49,6 +49,8 @@ const getRoleDashboard = (role) => {
     // NEW ROLES
     case "digital_marketing":
       return "/digital-marketing/dashboard";
+    case "client":
+      return "/client/dashboard";
 
     case "3d_visualizer":
       return "/3d-visualizer/dashboard";

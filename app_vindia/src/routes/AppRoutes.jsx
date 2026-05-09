@@ -52,7 +52,7 @@ import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
 import Qsmeasurement from "../pages/Quality Surveyor/Qsmeasurement";
 /* ── MEP ─────────────────────────────────────────────────── */
 import MEPRoutes from "./MepRoutes";
-import ClientRoutes from "./MepRoutes";
+import ClientRoutes from "./ClientRoutes";
 
 import MEPCoordination from "../pages/MEP Engineer/MEPCoordination";
 
