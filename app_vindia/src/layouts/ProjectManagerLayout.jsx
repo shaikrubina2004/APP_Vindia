@@ -1,8 +1,12 @@
 import AppLayout from "./AppLayout";
 import { ProjectManagerMenu } from "../menus/ProjectManagerMenu";
+import { ProjectProvider } from "../context/ProjectContext";
+
 
 function ProjectManagerLayout({ children }) {
-  return <AppLayout menuItems={ProjectManagerMenu}>{children}</AppLayout>;
+  return(    <ProjectProvider>
+  <AppLayout menuItems={ProjectManagerMenu}>{children}</AppLayout>    </ProjectProvider>
+  );
 }
 
 export default ProjectManagerLayout;
