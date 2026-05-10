@@ -24,7 +24,7 @@ const employeeRoutes   = require("./routes/employeeRoutes");
 /* ── HR ───────────────────────────────────────────────────── */
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const leaveRoutes      = require("./routes/leaveRoutes");
-
+const rolesRoutes = require("./routes/rolesRoutes");
 /* ── Project Module ───────────────────────────────────────── */
 const projectRoutes    = require("./routes/projectRoutes");
 const wbsRoutes        = require("./routes/wbsRoutes");
@@ -125,6 +125,7 @@ app.use("/api/employees", employeeRoutes);
 /* ── HR ───────────────────────────────────────────────────── */
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves",     leaveRoutes);
+app.use("/api/roles", rolesRoutes);
 
 /* ── Project ──────────────────────────────────────────────── */
 app.use("/api/projects",     projectRoutes);
