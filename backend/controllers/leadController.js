@@ -9,14 +9,19 @@ const { notifyNewLead, notifyFollowUp } = require("./bdaNotificationsController"
 ══════════════════════════════════════ */
 exports.getDashboardSummary = async (req, res) => {
   try {
-    const [total, todayNew, converted, interested, todayFU, pendingFU] = await Promise.all([
+    const [total, todayNew, converted, interested, todayFU, pendingFU, todayConverted] = await Promise.all([
       pool.query("SELECT COUNT(*) FROM leads WHERE deleted_by_admin = false"),
-      pool.query("SELECT COUNT(*) FROM leads WHERE DATE(created_at) = CURRENT_DATE AND deleted_by_admin = false"),
+      pool.query("SELECT COUNT(*) FROM leads WHERE DATE(created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AND deleted_by_admin = false"),
       pool.query("SELECT COUNT(*) FROM leads WHERE LOWER(status) = 'converted' AND deleted_by_admin = false"),
       pool.query("SELECT COUNT(*) FROM leads WHERE LOWER(status) = 'interested' AND deleted_by_admin = false"),
       pool.query("SELECT COUNT(*) FROM followups WHERE DATE(next_followup) = CURRENT_DATE"),
       pool.query("SELECT COUNT(*) FROM followups WHERE DATE(next_followup) < CURRENT_DATE"),
+      // ✅ NEW: count leads converted today using converted_at in IST
+      pool.query(
+        "SELECT COUNT(*) FROM leads WHERE converted_at IS NOT NULL AND DATE(converted_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AND deleted_by_admin = false"
+      ),
     ]);
+
     res.json({
       totalLeads:       parseInt(total.rows[0].count),
       todayLeads:       parseInt(todayNew.rows[0].count),
@@ -24,6 +29,7 @@ exports.getDashboardSummary = async (req, res) => {
       interested:       parseInt(interested.rows[0].count),
       todayFollowUps:   parseInt(todayFU.rows[0].count),
       pendingFollowUps: parseInt(pendingFU.rows[0].count),
+      todayConverted:   parseInt(todayConverted.rows[0].count), // ✅ NEW field
     });
   } catch (err) {
     console.error("Dashboard summary error:", err.message);
@@ -79,15 +85,20 @@ exports.createLead = async (req, res) => {
     return res.status(400).json({ success: false, message: "Name and phone are required" });
 
   try {
+    // If lead is created with status "Converted" directly, set converted_at too
+    const isConverted = (status || "").toLowerCase() === "converted";
+
     const { rows } = await pool.query(
       `INSERT INTO leads (
         name,phone,whatsapp,email,city,source,status,call_status,
         building_type,floors,measurement,sqft,budget,assigned_to,
         quotation_sent,project_start,snooze_until,description,
-        date_and_time,search_category,area,designs_sent,deleted_by_admin
+        date_and_time,search_category,area,designs_sent,
+        converted_at,deleted_by_admin
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
-        $13,$14,$15,$16,$17,$18,$19,$20,$21,$22,false
+        $13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
+        $23,false
       ) RETURNING id`,
       [
         name, phone, whatsapp || phone, email || null,
@@ -99,6 +110,7 @@ exports.createLead = async (req, res) => {
         description || null, date_and_time || null,
         search_category || null, area || null,
         parseInt(designs_sent) || 0,
+        isConverted ? new Date() : null, // ✅ set converted_at if created as converted
       ]
     );
 
@@ -120,28 +132,52 @@ exports.createLead = async (req, res) => {
 
 /* ══════════════════════════════════════
    UPDATE LEAD
+   ✅ Auto-sets converted_at when status
+      changes to "Converted", clears it
+      when status changes away.
 ══════════════════════════════════════ */
 exports.updateLead = async (req, res) => {
   const { id } = req.params;
+
   const fields = [
     "email","city","source","status","call_status","building_type",
     "floors","measurement","sqft","budget","assigned_to",
     "quotation_sent","project_start","snooze_until","description",
     "date_and_time","search_category","area","designs_sent",
   ];
+
   const setClauses = [];
-  const values = [];
+  const values     = [];
   let n = 1;
+
   fields.forEach(f => {
     if (req.body[f] !== undefined) {
       setClauses.push(`${f} = $${n++}`);
       values.push(req.body[f]);
     }
   });
+
+  // ✅ Handle converted_at automatically based on status change
+  if (req.body.status !== undefined) {
+    const isConverted = req.body.status.toLowerCase() === "converted";
+    if (isConverted) {
+      // Only set converted_at if not already set (first time converting)
+      setClauses.push(`converted_at = COALESCE(converted_at, NOW())`);
+    } else {
+      // Status changed away from Converted — clear converted_at
+      setClauses.push(`converted_at = NULL`);
+    }
+  }
+
   if (!setClauses.length) return res.status(400).json({ error: "No fields to update" });
+
   values.push(id);
+
   try {
-    await pool.query(`UPDATE leads SET ${setClauses.join(", ")} WHERE id = $${n}`, values);
+    await pool.query(
+      `UPDATE leads SET ${setClauses.join(", ")} WHERE id = $${n}`,
+      values
+    );
     res.json({ success: true });
   } catch (err) {
     console.error("Update lead error:", err.message);
@@ -170,6 +206,14 @@ exports.addFollowUp = async (req, res) => {
     if (status) {
       updateFields.push(`status = $${n++}`);
       updateVals.push(status);
+
+      // ✅ Also handle converted_at if status set via follow-up
+      const isConverted = status.toLowerCase() === "converted";
+      if (isConverted) {
+        updateFields.push(`converted_at = COALESCE(converted_at, NOW())`);
+      } else {
+        updateFields.push(`converted_at = NULL`);
+      }
     }
 
     updateFields.push(`snooze_until = $${n++}`);
@@ -189,15 +233,13 @@ exports.addFollowUp = async (req, res) => {
         [leadId]
       );
       if (rows.length) {
-        // ✅ Look up email from users table using assigned_to name
-        // To this:
-const userRes = await pool.query(
-  `SELECT email FROM users 
-   WHERE REGEXP_REPLACE(LOWER(TRIM(name)), '\\s+', ' ', 'g') = 
-         REGEXP_REPLACE(LOWER(TRIM($1)), '\\s+', ' ', 'g') 
-   LIMIT 1`,
-  [rows[0].assigned_to]
-);
+        const userRes = await pool.query(
+          `SELECT email FROM users
+           WHERE REGEXP_REPLACE(LOWER(TRIM(name)), '\\s+', ' ', 'g') =
+                 REGEXP_REPLACE(LOWER(TRIM($1)), '\\s+', ' ', 'g')
+           LIMIT 1`,
+          [rows[0].assigned_to]
+        );
         const assignedEmail = userRes.rows[0]?.email || null;
 
         notifyFollowUp({
@@ -205,7 +247,7 @@ const userRes = await pool.query(
           name:        rows[0].name,
           phone:       rows[0].phone,
           nextFollowUp,
-          assignedTo:  assignedEmail, // ✅ email not name
+          assignedTo:  assignedEmail,
         }).catch(err => console.error("Notify followup error:", err.message));
       }
     }
@@ -216,6 +258,7 @@ const userRes = await pool.query(
     res.status(500).json({ error: err.message });
   }
 };
+
 /* ══════════════════════════════════════
    GET FOLLOW UPS
 ══════════════════════════════════════ */
@@ -251,11 +294,14 @@ exports.importLeadsFromExcel = async (req, res) => {
       const phone = String(keys["phone"] || "").trim();
       if (!name || !phone) continue;
 
+      const isConverted = (keys["status"] || "").toLowerCase() === "converted";
+
       await pool.query(
         `INSERT INTO leads (name,phone,whatsapp,email,city,source,status,call_status,
           building_type,floors,measurement,sqft,budget,assigned_to,
-          quotation_sent,description,search_category,area,designs_sent,deleted_by_admin)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,false)
+          quotation_sent,description,search_category,area,designs_sent,
+          converted_at,deleted_by_admin)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,false)
          ON CONFLICT DO NOTHING`,
         [
           String(name).trim(), phone, phone,
@@ -270,6 +316,7 @@ exports.importLeadsFromExcel = async (req, res) => {
           keys["search_category"] || null,
           keys["area"] || null,
           parseInt(keys["designs_sent"]) || 0,
+          isConverted ? new Date() : null, // ✅
         ]
       );
       inserted++;

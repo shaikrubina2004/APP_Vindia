@@ -52,14 +52,10 @@ function formatTime(ts) {
 
 /* ── Route map based on notification type ── */
 function getRoute(notif) {
-  if (notif.type === "new_lead") {
-    return notif.lead_id
-      ? `/bda/leads`   // Could deep-link to specific lead if routing supports it
-      : "/bda/leads";
-  }
-  if (notif.type === "followup_today")    return "/bda/follow-ups";
-  if (notif.type === "followup_overdue")  return "/bda/follow-ups";
-  if (notif.type === "followup_upcoming") return "/bda/follow-ups";
+  if (notif.type === "new_lead")          return "/bda/leads";
+  if (notif.type === "followup_today")    return "/bda/follow-up";
+  if (notif.type === "followup_overdue")  return "/bda/follow-up";
+  if (notif.type === "followup_upcoming") return "/bda/follow-up";
   return "/bda/leads";
 }
 
