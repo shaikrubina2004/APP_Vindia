@@ -11,37 +11,95 @@ import ArchitectNotificationBell from "../../components/notifications/ArchitectN
 import "../../styles/layout/Navbar.css";
 import logo from "../../assets/logo.png.png";
 
-function Navbar() {
-  const navigate = useNavigate();
-  const { user, logout } = useAuth(); // ✅ only one destructure, removed duplicate
-
-  useEffect(() => {
-  console.log("======= USER OBJECT =======");
-  console.log(user);
-  console.log("role:", user?.role);
-  console.log("===========================");
-}, [user]);
-
-  const [isSearchActive, setIsSearchActive] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-
-  // ✅ Role-based notification mapping
-const NOTIFICATION_COMPONENTS = {
-  project_coordinator: NotificationBell,
-  structural_engineer: SENotificationBell,
-  quantity_surveyor: QSNotificationBell,
-  mep_engineer: MEPNotificationBell,
-  architect:    ArchitectNotificationBell,
-  bda:                           ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-  bda1:                          ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-  bda2:                          ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-  BDA:                           ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-  "business_development":        ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-  "business_development_analyst":({ userId }) => <BDANotificationBell bdaEmail={userId} />,
+// ✅ Role-based quick-add menu items
+const QUICK_ADD_ITEMS = {
+  project_coordinator: [
+    { label: "Add Milestone",    path: "/project-coordinator/milestone" },
+    { label: "View Incident",  path: "/project-coordinator/incidents" },
+    { label: "View Task",  path: "/project-coordinator/incidents?page=tasks" },
+  ],
+  structural_engineer: [
+    { label: "Create Project",  path: "/projects/create" },
+    { label: "Submit Expense",  path: "/expenses/submit" },
+  ],
+  quantity_surveyor: [
+    { label: "Create Project",  path: "/projects/create" },
+    { label: "Submit Expense",  path: "/expenses/submit" },
+  ],
+  mep_engineer: [
+    { label: "Create Project",  path: "/projects/create" },
+    { label: "Submit Expense",  path: "/expenses/submit" },
+  ],
+  architect: [
+    { label: "Create Project",  path: "/projects/create" },
+    { label: "Submit Expense",  path: "/expenses/submit" },
+  ],
+  // All BDA variants get only Add Lead + Add Follow-up
+  bda:                           [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
+  ],
+  bda1:                          [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
+  ],
+  bda2:                          [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
+  ],
+  BDA:                           [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
+  ],
+  business_development:          [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
+  ],
+  business_development_analyst:  [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
+  ],
 };
 
+// Fallback for unknown roles
+const DEFAULT_QUICK_ADD = [
+  { label: "Submit Expense", path: "/expenses/submit" },
+];
+
+function Navbar() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  useEffect(() => {
+    console.log("======= USER OBJECT =======");
+    console.log(user);
+    console.log("role:", user?.role);
+    console.log("===========================");
+  }, [user]);
+
+  const [isSearchActive, setIsSearchActive]   = useState(false);
+  const [isProfileOpen, setIsProfileOpen]     = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen]   = useState(false);
+
+  // ✅ Role-based notification mapping
+  const NOTIFICATION_COMPONENTS = {
+    project_coordinator: NotificationBell,
+    structural_engineer: SENotificationBell,
+    quantity_surveyor:   QSNotificationBell,
+    mep_engineer:        MEPNotificationBell,
+    architect:           ArchitectNotificationBell,
+    bda:                           ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
+    bda1:                          ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
+    bda2:                          ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
+    BDA:                           ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
+    "business_development":        ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
+    "business_development_analyst":({ userId }) => <BDANotificationBell bdaEmail={userId} />,
+  };
+
   const RoleNotification = NOTIFICATION_COMPONENTS[user?.role];
+
+  // ✅ Get quick-add items for current role
+  const quickAddItems = QUICK_ADD_ITEMS[user?.role] || DEFAULT_QUICK_ADD;
 
   const handleLogout = () => {
     setIsProfileOpen(false);
@@ -83,7 +141,12 @@ const NOTIFICATION_COMPONENTS = {
           <span>Timesheet</span>
         </button>
 
-        <div className="quick-add-wrapper" onMouseEnter={() => setIsQuickAddOpen(true)} onMouseLeave={() => setIsQuickAddOpen(false)}>
+        {/* ✅ Role-based Quick Add */}
+        <div
+          className="quick-add-wrapper"
+          onMouseEnter={() => setIsQuickAddOpen(true)}
+          onMouseLeave={() => setIsQuickAddOpen(false)}
+        >
           <button className="quick-add-btn">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -92,21 +155,33 @@ const NOTIFICATION_COMPONENTS = {
             Add
           </button>
           <div className={`quick-add-menu ${isQuickAddOpen ? "show" : ""}`}>
-            <button className="quick-add-item" onClick={() => navigate("/hr/add-employee")}>Add Employee</button>
-            <button className="quick-add-item">Create Project</button>
-            <button className="quick-add-item">Add Lead</button>
-            <button className="quick-add-item">Submit Expense</button>
+            {quickAddItems.map((item) => (
+              <button
+                key={item.label}
+                className="quick-add-item"
+                onClick={() => {
+                  setIsQuickAddOpen(false);
+                  navigate(item.path);
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* 🔥 Role-Based Notifications */}
-      {RoleNotification && (
-  ["bda", "bda1", "bda2", "BDA", "business_development", "business_development_analyst"].includes(user?.role)
-    ? <RoleNotification userId={user.email} />
-    : <RoleNotification userId={user.id} />
-)}
+        {RoleNotification && (
+          ["bda", "bda1", "bda2", "BDA", "business_development", "business_development_analyst"].includes(user?.role)
+            ? <RoleNotification userId={user.email} />
+            : <RoleNotification userId={user.id} />
+        )}
 
-        <div className="profile-dropdown-wrapper" onMouseEnter={() => setIsProfileOpen(true)} onMouseLeave={() => setIsProfileOpen(false)}>
+        <div
+          className="profile-dropdown-wrapper"
+          onMouseEnter={() => setIsProfileOpen(true)}
+          onMouseLeave={() => setIsProfileOpen(false)}
+        >
           <button className="profile-btn">
             <div className="avatar">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
