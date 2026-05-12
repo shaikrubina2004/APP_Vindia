@@ -65,6 +65,8 @@ export const getDashboardRoute = (role) => {
     case ROLES.FINANCE_MANAGER:
       return "/finance-manager/dashboard";
 
+      
+
     default:
       return "/";
   }

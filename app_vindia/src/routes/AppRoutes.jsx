@@ -64,8 +64,9 @@ import SafetyOfficerDashboard from "../pages/Safety Officer/SafetyOfficerDashboa
 /* ── STRUCTURAL ──────────────────────────────────────────── */
 import StructuralRoutes from "./StructuralRoutes";
 
-/* FINANCE */
-
+/* ── FINANCE ─────────────────────────────────────────────── */
+import FinanceRoutes from "./FinanceRoutes";
+import FinanceLayout from "../layouts/FinanceManagerLayout";
 
 /* ── ARCHITECT ───────────────────────────────────────────── */
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
@@ -109,7 +110,7 @@ import BDALayout from "../layouts/BDALayout";
 
 /* ═══════════════════════════════════════════════════════════
    APP ROUTES
-═══════════════════════════════════════════════════════════ */
+═════════════════════════════════════════════════════ */
 const AppRoutes = () => {
   const PROJECT_ROLES = [
     ROLES.PROJECT_MANAGER,
@@ -171,17 +172,17 @@ const AppRoutes = () => {
           }
         />
         {/* ══ PROJECT MANAGER ═══════════════════════════════ */}
-      <Route
-  path="/pm/team"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
-      <ProjectManagerLayout>
-        <TeamManagement />
-      </ProjectManagerLayout>
-    </ProtectedRoute>
-  }
-/>
-       
+        <Route
+          path="/pm/team"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
+              <ProjectManagerLayout>
+                <TeamManagement />
+              </ProjectManagerLayout>
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/pm/incidents"
           element={
@@ -407,8 +408,28 @@ const AppRoutes = () => {
         />
         {/* ══ STRUCTURAL ════════════════════════════════════ */}
         <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
-          {/* ══ FINANCE ═══════════════════════════════════════ */}
-       {/* <Route path="/finance/*" element={<FinanceRoutes />} /> */}
+        {/* ══ FINANCE ═══════════════════════════════════════ */}
+        <Route
+          path="/finance/*"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.FINANCE_MANAGER, ROLES.CEO]}>
+              <FinanceLayout>
+                <FinanceRoutes />
+              </FinanceLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/finance-manager/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.FINANCE_MANAGER, ROLES.CEO]}>
+              <FinanceLayout>
+                <FinanceManagerDashboard />
+              </FinanceLayout>
+            </ProtectedRoute>
+          }
+        />
         {/* ══ ARCHITECT ═════════════════════════════════════ */}
         <Route
           path="/architect/dashboard"
