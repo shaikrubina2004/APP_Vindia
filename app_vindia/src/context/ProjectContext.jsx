@@ -11,14 +11,6 @@ export function ProjectProvider({ children }) {
     fetch("http://localhost:5000/api/projects")
       .then((res) => res.json())
       .then((data) => {
-        /*
-          Map backend fields to what ProjectSwitcher expects:
-          id, code, name, location
-          Backend returns: id (INT), name, client, location, etc.
-          "code" doesn't exist in your projects table so we
-          generate it from the id — replace with your actual
-          code field if you add one to the projects table later.
-        */
         const openOption = {
           id: null,
           code: "OPEN",
@@ -33,8 +25,10 @@ export function ProjectProvider({ children }) {
         }));
         const allOptions = [openOption, ...mapped];
         setProjects(allOptions);
+
         const savedId = localStorage.getItem("activeProjectId");
         const saved = allOptions.find((p) => String(p.id) === savedId);
+        // ✅ restore saved project, fallback to openOption only if nothing saved
         setActiveProject(saved ?? openOption);
       })
       .catch((err) => console.error("Failed to load projects:", err))
@@ -43,8 +37,11 @@ export function ProjectProvider({ children }) {
 
   const handleSetActiveProject = (project) => {
     setActiveProject(project);
-    if (project) {
-      localStorage.setItem("activeProjectId", project.id);
+    // ✅ only persist real projects, not "Open Incidents"
+    if (project?.id !== null && project?.id !== undefined) {
+      localStorage.setItem("activeProjectId", String(project.id));
+    } else {
+      localStorage.removeItem("activeProjectId");
     }
   };
 

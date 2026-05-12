@@ -30,7 +30,7 @@ const projectRoutes    = require("./routes/projectRoutes");
 const wbsRoutes        = require("./routes/wbsRoutes");
 const costRoutes       = require("./routes/costRoutes");
 const dashboardRoutes  = require("./routes/dashboardRoutes");
-
+const teamRoutes = require("./routes/teamRoutes");
 /* ── Other Core Modules ───────────────────────────────────── */
 const timesheetRoutes  = require("./routes/timesheetRoutes");
 const dailyRoutes      = require("./routes/dailyUpdatesRoutes");
@@ -132,7 +132,7 @@ app.use("/api/projects",     projectRoutes);
 app.use("/api/wbs",          wbsRoutes);
 app.use("/api/cost-summary", costRoutes);
 app.use("/api/dashboard",    dashboardRoutes);
-
+app.use("/api/team", teamRoutes);
 /* ── Structural Engineer ──────────────────────────────────── */
 app.use("/api/structural",       structuralRoutes);
 app.use("/api/se-daily-reports", seDailyRoutes);

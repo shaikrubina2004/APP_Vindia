@@ -171,16 +171,17 @@ const AppRoutes = () => {
           }
         />
         {/* ══ PROJECT MANAGER ═══════════════════════════════ */}
-        <Route
-          path="/pm/team"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
-              <ProjectManagerLayout>
-                <TeamManagement />
-              </ProjectManagerLayout>
-            </ProtectedRoute>
-          }
-        />
+      <Route
+  path="/pm/team"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
+      <ProjectManagerLayout>
+        <TeamManagement />
+      </ProjectManagerLayout>
+    </ProtectedRoute>
+  }
+/>
+       
         <Route
           path="/pm/incidents"
           element={

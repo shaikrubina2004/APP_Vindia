@@ -106,6 +106,24 @@ router.post("/", async (req, res) => {
 });
 
 /* =========================================================
+   GET ALL UPDATES — ALL PROJECTS (for Project Manager)
+========================================================= */
+router.get("/project/all", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.*, p.name AS project_name
+       FROM pc_daily_updates u
+       LEFT JOIN projects p ON u.project_id = p.id
+       ORDER BY u.date DESC, u.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("FETCH ALL ERROR:", err);
+    res.status(500).json({ message: "Error fetching all updates" });
+  }
+});
+
+/* =========================================================
    GET ALL UPDATES FOR A PROJECT
 ========================================================= */
 router.get("/project/:project_id", async (req, res) => {

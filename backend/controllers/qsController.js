@@ -98,6 +98,8 @@ exports.getProjects = async (req, res) => {
 // GET ALL
 exports.getDailyUpdates = async (req, res) => {
   try {
+    // Ensure approved column exists
+    await pool.query(`ALTER TABLE qs_daily_updates ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT FALSE`).catch(()=>{});
     const { rows } = await pool.query(`
       SELECT d.*, p.name AS project_name
       FROM qs_daily_updates d

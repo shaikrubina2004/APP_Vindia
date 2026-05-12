@@ -113,6 +113,27 @@ router.get("/floors/:project_id", getFloorsByProject);
 // ── Daily Logs ────────────────────────
 router.post("/daily-logs", upsertDailyLog);
 router.get("/daily-logs/check", checkTodayLog);
+router.get("/daily-logs/all", async (req, res) => {
+  /* PM-only: fetch all MEP daily logs across all projects */
+  try {
+    const pool = require("../config/db");
+    const result = await pool.query(
+      `SELECT dl.*, pf.name AS floor_name,
+              u.name AS submitted_by_name,
+              p.name AS project_name
+       FROM daily_logs dl
+       LEFT JOIN project_floors pf ON pf.id = dl.floor_id
+       LEFT JOIN users u ON u.id = dl.submitted_by
+       LEFT JOIN projects p ON p.id = dl.project_id
+       ORDER BY dl.log_date DESC, dl.created_at DESC
+       LIMIT 200`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("MEP daily-logs/all error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 router.get("/daily-logs/:project_id", getDailyLogsByProject);
 
 // ── Coordination Threads ──────────────

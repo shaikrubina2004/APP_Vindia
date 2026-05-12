@@ -183,4 +183,38 @@ const getProjectLogs = async (req, res) => {
   }
 };
 
-module.exports = { getDailyLog, submitDailyLog, getProjectLogs };
+module.exports = { getDailyLog, submitDailyLog, getProjectLogs, getAllLogs };
+
+// GET /api/architect-daily-log/all  — PM only, no params needed
+async function getAllLogs(req, res) {
+  let client;
+  try {
+    client = await getClient();
+    const logResult = await client.query(
+      `SELECT adl.*,
+              u.name  AS architect_name,
+              p.name  AS project_name
+       FROM architect_daily_logs adl
+       LEFT JOIN users    u ON u.id = adl.architect_id
+       LEFT JOIN projects p ON p.id = adl.project_id
+       ORDER BY adl.date DESC, adl.created_at DESC
+       LIMIT 300`
+    );
+    const logs = await Promise.all(
+      logResult.rows.map(async (log) => {
+        const tasks  = await client.query(
+          `SELECT * FROM architect_daily_log_tasks  WHERE log_id = $1`, [log.id]
+        );
+        const issues = await client.query(
+          `SELECT * FROM architect_daily_log_issues WHERE log_id = $1`, [log.id]
+        );
+        return { ...log, tasks: tasks.rows, issues: issues.rows };
+      })
+    );
+    return res.json({ success: true, data: logs });
+  } catch (err) {
+    return dbError(res, err);
+  } finally {
+    if (client) client.release();
+  }
+}
