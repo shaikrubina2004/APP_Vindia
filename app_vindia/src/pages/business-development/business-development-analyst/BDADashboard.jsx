@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -24,11 +24,9 @@ function normalizeSource(raw) {
 
 /* ─────────────────────────────────────────
    TIMEZONE-SAFE DATE HELPERS
-   Compares in local IST time, not UTC,
-   to avoid date shift bugs.
 ───────────────────────────────────────── */
 function toLocalDateStr(date) {
-  return date.toLocaleDateString("en-CA"); // "YYYY-MM-DD" in local timezone
+  return date.toLocaleDateString("en-CA");
 }
 function getTodayStr() {
   return toLocalDateStr(new Date());
@@ -63,21 +61,16 @@ const STATUS_FUNNEL = [
 ];
 
 /* ─────────────────────────────────────────
-   DATE FILTER — timezone-safe
+   DATE FILTER
 ───────────────────────────────────────── */
 function filterByTab(leads, tab) {
   if (tab === "all") return leads;
-
   const now      = new Date();
   const todayStr = getTodayStr();
-
   return leads.filter(l => {
     if (!l.created_at) return false;
     const d = new Date(l.created_at);
-
-    if (tab === "today") {
-      return toLocalDateStr(d) === todayStr;
-    }
+    if (tab === "today") return toLocalDateStr(d) === todayStr;
     if (tab === "week") {
       const weekAgo = new Date(now);
       weekAgo.setDate(now.getDate() - 7);
@@ -91,6 +84,16 @@ function filterByTab(leads, tab) {
     return true;
   });
 }
+
+/* ─────────────────────────────────────────
+   TIME FORMATTER
+───────────────────────────────────────── */
+const fmtTime = (t) => {
+  if (!t) return "—";
+  const [h, m] = t.split(":");
+  const hh = parseInt(h, 10);
+  return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
+};
 
 /* ─────────────────────────────────────────
    SUB-COMPONENTS
@@ -159,6 +162,192 @@ const StatusPill = ({ status }) => {
   );
 };
 
+/* ══════════════════════════════════════════════════════════
+   CHECK-IN / CHECK-OUT BUTTON
+   (reused from ProjectCoordinatorDashboard — same logic)
+══════════════════════════════════════════════════════════ */
+const CheckInButton = ({ employeeId }) => {
+  const [attendance, setAttendance] = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [busy, setBusy]             = useState(false);
+  const [elapsed, setElapsed]       = useState("");
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    fetchTodayAttendance();
+    return () => clearInterval(timerRef.current);
+  }, []);
+
+  useEffect(() => {
+    clearInterval(timerRef.current);
+    if (attendance?.check_in && !attendance?.check_out) {
+      const tick = () => {
+        const [h, m, s] = attendance.check_in.split(":").map(Number);
+        const inMs  = (h * 3600 + m * 60 + s) * 1000;
+        const nowMs = new Date() - new Date().setHours(0, 0, 0, 0);
+        const diff  = Math.max(0, nowMs - inMs);
+        const th = String(Math.floor(diff / 3600000)).padStart(2, "0");
+        const tm = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
+        const ts = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
+        setElapsed(`${th}:${tm}:${ts}`);
+      };
+      tick();
+      timerRef.current = setInterval(tick, 1000);
+    } else {
+      setElapsed("");
+    }
+  }, [attendance]);
+
+  const fetchTodayAttendance = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(
+        `${API}/attendance/today?employee_id=${employeeId}`
+      );
+      setAttendance(res.data || null);
+    } catch (err) {
+      if (err.response?.status !== 404) console.error(err);
+      setAttendance(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    setBusy(true);
+    try {
+      const now       = new Date();
+      const timeStr   = now.toTimeString().slice(0, 8);
+      const dateStr   = now.toISOString().slice(0, 10);
+      const shiftStart = new Date();
+      shiftStart.setHours(9, 0, 0, 0);
+      const lateMinutes = Math.floor(Math.max(0, now - shiftStart) / 60000);
+
+      const res = await axios.post(`${API}/attendance`, {
+        employee_id:  employeeId,
+        date:         dateStr,
+        check_in:     timeStr,
+        status:       "Present",
+        shift:        "morning",
+        late_minutes: lateMinutes,
+        remarks:      lateMinutes > 0 ? `Late by ${lateMinutes} min` : "",
+      });
+      setAttendance(res.data);
+    } catch (err) {
+      console.error(err);
+      alert("Check-in failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCheckOut = async () => {
+    if (!attendance?.id) return;
+    setBusy(true);
+    try {
+      const timeStr = new Date().toTimeString().slice(0, 8);
+      const res = await axios.put(`${API}/attendance/${attendance.id}`, {
+        check_out: timeStr,
+      });
+      setAttendance(res.data);
+      clearInterval(timerRef.current);
+    } catch (err) {
+      console.error(err);
+      alert("Check-out failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const isCheckedIn  = attendance?.check_in && !attendance?.check_out;
+  const isCheckedOut = attendance?.check_in && attendance?.check_out;
+
+  /* Loading */
+  if (loading) {
+    return (
+      <button disabled style={{
+        padding: "8px 18px", borderRadius: 10, border: "1.5px solid #e2e8f0",
+        background: "#f8fafc", color: "#94a3b8", fontSize: 13, fontWeight: 600,
+        cursor: "not-allowed", display: "flex", alignItems: "center", gap: 6,
+      }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#cbd5e1", display: "inline-block" }} />
+        Loading…
+      </button>
+    );
+  }
+
+  /* Done for today */
+  if (isCheckedOut) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+        <button disabled style={{
+          padding: "8px 18px", borderRadius: 10, border: "1.5px solid #86efac",
+          background: "#f0fdf4", color: "#16a34a", fontSize: 13, fontWeight: 700,
+          cursor: "not-allowed", display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+          ✓ Done for Today
+        </button>
+        <span style={{ fontSize: 10, color: "#64748b" }}>
+          {fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}
+        </span>
+      </div>
+    );
+  }
+
+  /* Checked in — show Check Out */
+  if (isCheckedIn) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+        <button
+          onClick={handleCheckOut}
+          disabled={busy}
+          style={{
+            padding: "8px 18px", borderRadius: 10, border: "none",
+            background: busy ? "#fca5a5" : "#dc2626",
+            color: "#fff", fontSize: 13, fontWeight: 700,
+            cursor: busy ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", gap: 6,
+            transition: "all .2s",
+            boxShadow: "0 2px 8px rgba(220,38,38,0.3)",
+          }}
+        >
+          <span style={{
+            width: 8, height: 8, borderRadius: "50%", background: "#fff",
+            display: "inline-block",
+            animation: "bda-pulse 1.2s ease-in-out infinite",
+          }} />
+          {busy ? "Saving…" : "Check Out"}
+        </button>
+        <span style={{ fontSize: 10, color: "#64748b", fontVariantNumeric: "tabular-nums" }}>
+          In: {fmtTime(attendance.check_in)}
+          {elapsed && <> &nbsp;·&nbsp; <strong style={{ color: "#2563eb" }}>{elapsed}</strong></>}
+        </span>
+      </div>
+    );
+  }
+
+  /* Not yet checked in */
+  return (
+    <button
+      onClick={handleCheckIn}
+      disabled={busy}
+      style={{
+        padding: "8px 18px", borderRadius: 10, border: "none",
+        background: busy ? "#86efac" : "#16a34a",
+        color: "#fff", fontSize: 13, fontWeight: 700,
+        cursor: busy ? "not-allowed" : "pointer",
+        display: "flex", alignItems: "center", gap: 6,
+        transition: "all .2s",
+        boxShadow: "0 2px 8px rgba(22,163,74,0.3)",
+      }}
+    >
+      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff", display: "inline-block" }} />
+      {busy ? "Saving…" : "Check In"}
+    </button>
+  );
+};
+
 /* ═══════════════════════════════════════════
    MAIN DASHBOARD
 ═══════════════════════════════════════════ */
@@ -168,15 +357,10 @@ const BDADashboard = () => {
   const [loading,   setLoading]   = useState(true);
   const [allLeads,  setAllLeads]  = useState([]);
   const [activeTab, setActiveTab] = useState("all");
-
-  /*
-   * dbSummary — from /api/leads/dashboard-summary
-   * Used for:
-   *   todayFollowUps / pendingFollowUps → from followups table
-   *   todayConverted                    → uses converted_at AT TIME ZONE IST (DB-side)
-   * Everything else computed client-side from allLeads.
-   */
   const [dbSummary, setDbSummary] = useState(null);
+
+  // ── Get logged-in user id from localStorage ──
+  const employeeId = JSON.parse(localStorage.getItem("user") || "{}")?.id || null;
 
   useEffect(() => { loadAll(); }, []);
 
@@ -196,47 +380,26 @@ const BDADashboard = () => {
     }
   };
 
-  /* ── Leads filtered by active tab (by created_at) ── */
   const leads = useMemo(() => filterByTab(allLeads, activeTab), [allLeads, activeTab]);
 
-  /*
-   * ── Summary ──
-   *
-   * totalLeads       → tab-filtered by created_at        (client-side)
-   * todayLeads       → created today, timezone-safe       (client-side)
-   * converted        → depends on tab:
-   *                    "today"  → dbSummary.todayConverted (uses converted_at IST in DB ✅)
-   *                    others   → tab-filtered leads with status=converted (client-side)
-   * todayFollowUps   → backend followups table            (DB)
-   * pendingFollowUps → backend followups table            (DB)
-   */
   const summary = useMemo(() => {
     const todayStr = getTodayStr();
-
-    // For "today" tab: use DB's todayConverted (converted_at AT TIME ZONE 'Asia/Kolkata')
-    // For all other tabs: count converted from tab-filtered leads
     const converted = activeTab === "today"
       ? (dbSummary?.todayConverted ?? 0)
       : leads.filter(l => (l.status || "").toLowerCase() === "converted").length;
 
     return {
       totalLeads: leads.length,
-
-      // Always count today's new leads regardless of tab
       todayLeads: allLeads.filter(l => {
         if (!l.created_at) return false;
         return toLocalDateStr(new Date(l.created_at)) === todayStr;
       }).length,
-
       converted,
-
-      // From backend — queries followups table
       todayFollowUps:   dbSummary?.todayFollowUps   ?? 0,
       pendingFollowUps: dbSummary?.pendingFollowUps ?? 0,
     };
   }, [leads, allLeads, activeTab, dbSummary]);
 
-  /* ── Source donut (tab-filtered) ── */
   const sourceData = useMemo(() => {
     const counts = {};
     leads.forEach(l => {
@@ -248,7 +411,6 @@ const BDADashboard = () => {
       .map(([name, value]) => ({ name, value }));
   }, [leads]);
 
-  /* ── Trend: last 6 months, always all leads ── */
   const trendData = useMemo(() => {
     const now = new Date();
     const buckets = {};
@@ -259,7 +421,7 @@ const BDADashboard = () => {
     }
     allLeads.forEach(l => {
       if (!l.created_at) return;
-      const m = MONTHS[new Date(l.created_at).getMonth()];
+      const m    = MONTHS[new Date(l.created_at).getMonth()];
       if (!buckets[m]) return;
       const norm = normalizeSource(l.source);
       if (norm === "JustDial")           buckets[m].JustDial++;
@@ -269,7 +431,6 @@ const BDADashboard = () => {
     return Object.values(buckets);
   }, [allLeads]);
 
-  /* ── Funnel (tab-filtered) ── */
   const funnelData = useMemo(() => {
     const KNOWN = [
       "new","interested","intrested","follow up",
@@ -279,9 +440,7 @@ const BDADashboard = () => {
       if (s.key === "__other__") {
         return {
           ...s,
-          count: leads.filter(l =>
-            !KNOWN.includes((l.status || "").toLowerCase())
-          ).length,
+          count: leads.filter(l => !KNOWN.includes((l.status || "").toLowerCase())).length,
         };
       }
       return {
@@ -297,15 +456,10 @@ const BDADashboard = () => {
   const maxFunnel   = Math.max(...funnelData.map(f => f.count), 1);
   const recentLeads = leads.slice(0, 6);
 
-  // Conversion rate:
-  // "today" tab → todayConverted / todayLeads
-  // other tabs  → converted / totalLeads
   const convRate = (() => {
     if (activeTab === "today") {
       const base = summary.todayLeads || 0;
-      return base > 0
-        ? ((summary.converted / base) * 100).toFixed(1)
-        : "0.0";
+      return base > 0 ? ((summary.converted / base) * 100).toFixed(1) : "0.0";
     }
     return summary.totalLeads > 0
       ? ((summary.converted / summary.totalLeads) * 100).toFixed(1)
@@ -325,6 +479,10 @@ const BDADashboard = () => {
           <h1 className="bda-title">Business Development Analyst</h1>
         </div>
         <div className="bda-header-actions">
+
+          {/* ── CHECK IN / OUT ── */}
+          {employeeId && <CheckInButton employeeId={employeeId} />}
+
           <button className="bda-btn-outline" onClick={() => navigate("/bda/reports")}>Export Report</button>
           <button className="bda-btn-primary" onClick={() => navigate("/bda/add-lead")}>+ Add Lead</button>
         </div>

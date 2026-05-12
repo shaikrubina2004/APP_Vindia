@@ -601,6 +601,22 @@ const AppRoutes = () => {
             </ProjectCoordinatorLayout>
           }
         />
+        <Route
+          path="/project-coordinator/rfi"
+          element={
+            <ProjectCoordinatorLayout>
+              <RFIPage />
+            </ProjectCoordinatorLayout>
+          }
+        />
+        <Route
+          path="/project-coordinator/rfi/:id"
+          element={
+            <ProjectCoordinatorLayout>
+              <RFIDetailPage />
+            </ProjectCoordinatorLayout>
+          }
+        />
         {/* ══ TIMESHEET ═════════════════════════════════════ */}
         <Route
           path="/timesheet"

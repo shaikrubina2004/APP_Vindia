@@ -1,6 +1,6 @@
 // src/pages/Project Coordinator/ProjectCoordinatorDashboard.jsx
 import { getProjects } from "../../services/projectService";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Coordinator.css";
 import {
@@ -18,6 +18,13 @@ const fmt = (n) =>
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
+const fmtTime = (t) => {
+  if (!t) return "—";
+  const [h, m] = t.split(":");
+  const hh = parseInt(h, 10);
+  return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
+};
+
 const buildTimeline = (proj) => {
   if (!proj) return [];
   const p = proj.progress || 0;
@@ -32,7 +39,7 @@ const buildTimeline = (proj) => {
   });
 };
 
-/* ── Modal styles (defined at top — not after export) ────── */
+/* ── Modal styles ────────────────────────────────────────── */
 const overlayStyle = {
   position: "fixed",
   top: 0, left: 0, right: 0, bottom: 0,
@@ -211,7 +218,7 @@ const CoordProjectCard = ({ proj, isActive, isLoading, onClick }) => (
    MATERIAL REQUEST MODAL
 ══════════════════════════════════════════════════════════ */
 const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
-  const [view, setView] = useState("list"); // "list" | request object
+  const [view, setView] = useState("list");
   const [updating, setUpdating] = useState(false);
 
   const handleUpdate = async (id, status) => {
@@ -231,14 +238,12 @@ const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={e => e.stopPropagation()}>
-
         {view === "list" ? (
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Material Requests</h3>
               <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748b" }}>✕</button>
             </div>
-
             {requests.length === 0 ? (
               <p style={{ color: "#94a3b8", fontSize: 13, textAlign: "center", padding: "24px 0" }}>No material requests yet</p>
             ) : (
@@ -280,7 +285,6 @@ const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Review Request</h3>
               <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748b", marginLeft: "auto" }}>✕</button>
             </div>
-
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
               {[
                 ["Project",  view.project],
@@ -295,8 +299,6 @@ const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
                 </div>
               ))}
             </div>
-
-            {/* Items */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "#94a3b8", marginBottom: 8 }}>Items</div>
               {(() => {
@@ -314,13 +316,11 @@ const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
                 }
               })()}
             </div>
-
             {view.notes && (
               <div style={{ marginBottom: 16, padding: "10px 14px", background: "#f8fafc", borderRadius: 8, fontSize: 12, color: "#64748b" }}>
                 <strong>Notes:</strong> {view.notes}
               </div>
             )}
-
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 onClick={() => handleUpdate(view.id, "approved")}
@@ -345,6 +345,208 @@ const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
 };
 
 /* ══════════════════════════════════════════════════════════
+   CHECK-IN / CHECK-OUT BUTTON
+══════════════════════════════════════════════════════════ */
+const CheckInButton = ({ employeeId }) => {
+  // attendance state: null | { id, check_in, check_out, status }
+  const [attendance, setAttendance] = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [busy, setBusy]             = useState(false);
+  const [elapsed, setElapsed]       = useState("");
+  const timerRef = useRef(null);
+
+  /* ── fetch today's record on mount ── */
+  useEffect(() => {
+    fetchTodayAttendance();
+    return () => clearInterval(timerRef.current);
+  }, []);
+
+  /* ── live elapsed timer while checked-in ── */
+  useEffect(() => {
+    clearInterval(timerRef.current);
+    if (attendance?.check_in && !attendance?.check_out) {
+      const tick = () => {
+        const [h, m, s] = attendance.check_in.split(":").map(Number);
+        const inMs = (h * 3600 + m * 60 + s) * 1000;
+        const nowMs = new Date() - new Date().setHours(0, 0, 0, 0);
+        const diff = Math.max(0, nowMs - inMs);
+        const th = String(Math.floor(diff / 3600000)).padStart(2, "0");
+        const tm = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
+        const ts = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
+        setElapsed(`${th}:${tm}:${ts}`);
+      };
+      tick();
+      timerRef.current = setInterval(tick, 1000);
+    } else {
+      setElapsed("");
+    }
+  }, [attendance]);
+
+  const fetchTodayAttendance = async () => {
+    setLoading(true);
+    try {
+      // GET /api/attendance/today?employee_id=<id>
+      const res = await api.get(`/attendance/today?employee_id=${employeeId}`);
+      setAttendance(res.data || null);
+    } catch (err) {
+      // 404 means no record yet today — that's fine
+      if (err.response?.status !== 404) console.error(err);
+      setAttendance(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    setBusy(true);
+    try {
+      const now = new Date();
+      const timeStr = now.toTimeString().slice(0, 8); // "HH:MM:SS"
+      const dateStr = now.toISOString().slice(0, 10);  // "YYYY-MM-DD"
+
+      // Calculate late_minutes (assume 9:00 AM shift start)
+      const shiftStart = new Date();
+      shiftStart.setHours(9, 0, 0, 0);
+      const lateMs = Math.max(0, now - shiftStart);
+      const lateMinutes = Math.floor(lateMs / 60000);
+
+      // POST /api/attendance
+      const res = await api.post("/attendance", {
+        employee_id: employeeId,
+        date: dateStr,
+        check_in: timeStr,
+        status: "Present",
+        shift: "morning",
+        late_minutes: lateMinutes,
+        remarks: lateMinutes > 0 ? `Late by ${lateMinutes} min` : "",
+      });
+      setAttendance(res.data);
+    } catch (err) {
+      console.error(err);
+      alert("Check-in failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCheckOut = async () => {
+    if (!attendance?.id) return;
+    setBusy(true);
+    try {
+      const now = new Date();
+      const timeStr = now.toTimeString().slice(0, 8);
+
+      // PUT /api/attendance/:id  — only update check_out
+      const res = await api.put(`/attendance/${attendance.id}`, {
+        check_out: timeStr,
+      });
+      setAttendance(res.data);
+      clearInterval(timerRef.current);
+    } catch (err) {
+      console.error(err);
+      alert("Check-out failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* ── states ── */
+  const isCheckedIn  = attendance?.check_in && !attendance?.check_out;
+  const isCheckedOut = attendance?.check_in && attendance?.check_out;
+
+  if (loading) {
+    return (
+      <button
+        disabled
+        style={{
+          padding: "8px 18px", borderRadius: 10, border: "1.5px solid #e2e8f0",
+          background: "#f8fafc", color: "#94a3b8", fontSize: 13, fontWeight: 600,
+          cursor: "not-allowed", display: "flex", alignItems: "center", gap: 6,
+        }}
+      >
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#cbd5e1", display: "inline-block" }} />
+        Loading…
+      </button>
+    );
+  }
+
+  /* Already checked out for the day */
+  if (isCheckedOut) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+        <button
+          disabled
+          style={{
+            padding: "8px 18px", borderRadius: 10, border: "1.5px solid #86efac",
+            background: "#f0fdf4", color: "#16a34a", fontSize: 13, fontWeight: 700,
+            cursor: "not-allowed", display: "flex", alignItems: "center", gap: 6,
+          }}
+        >
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+          ✓ Done for Today
+        </button>
+        <span style={{ fontSize: 10, color: "#64748b" }}>
+          {fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}
+        </span>
+      </div>
+    );
+  }
+
+  /* Checked in — show Check Out */
+  if (isCheckedIn) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+        <button
+          onClick={handleCheckOut}
+          disabled={busy}
+          style={{
+            padding: "8px 18px", borderRadius: 10, border: "none",
+            background: busy ? "#fca5a5" : "#dc2626",
+            color: "#fff", fontSize: 13, fontWeight: 700,
+            cursor: busy ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", gap: 6,
+            transition: "all .2s",
+            boxShadow: "0 2px 8px rgba(220,38,38,0.3)",
+          }}
+        >
+          {/* pulsing dot */}
+          <span style={{
+            width: 8, height: 8, borderRadius: "50%", background: "#fff",
+            display: "inline-block",
+            animation: "coord-pulse 1.2s ease-in-out infinite",
+          }} />
+          {busy ? "Saving…" : "Check Out"}
+        </button>
+        <span style={{ fontSize: 10, color: "#64748b", fontVariantNumeric: "tabular-nums" }}>
+          In: {fmtTime(attendance.check_in)}
+          {elapsed && <> &nbsp;·&nbsp; <strong style={{ color: "#2563eb" }}>{elapsed}</strong></>}
+        </span>
+      </div>
+    );
+  }
+
+  /* Not yet checked in */
+  return (
+    <button
+      onClick={handleCheckIn}
+      disabled={busy}
+      style={{
+        padding: "8px 18px", borderRadius: 10, border: "none",
+        background: busy ? "#86efac" : "#16a34a",
+        color: "#fff", fontSize: 13, fontWeight: 700,
+        cursor: busy ? "not-allowed" : "pointer",
+        display: "flex", alignItems: "center", gap: 6,
+        transition: "all .2s",
+        boxShadow: "0 2px 8px rgba(22,163,74,0.3)",
+      }}
+    >
+      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff", display: "inline-block" }} />
+      {busy ? "Saving…" : "Check In"}
+    </button>
+  );
+};
+
+/* ══════════════════════════════════════════════════════════
    MAIN DASHBOARD
 ══════════════════════════════════════════════════════════ */
 const ProjectCoordinatorDashboard = () => {
@@ -358,6 +560,14 @@ const ProjectCoordinatorDashboard = () => {
   const [showAll, setShowAll]             = useState(false);
   const [requests, setRequests]           = useState([]);
   const [showMatModal, setShowMatModal]   = useState(false);
+
+  // ── Get current employee id from localStorage / your auth context ──
+  // Adjust this to however you store the logged-in user's id.
+ const employeeId = JSON.parse(localStorage.getItem("user") || "{}")?.employee_id 
+  || JSON.parse(localStorage.getItem("user") || "{}")?.id 
+  || null;
+  console.log("FULL USER:", JSON.parse(localStorage.getItem("user")));
+  console.log("EMPLOYEE ID:", employeeId);
 
   /* ── Load projects ─────────────────────────────────────── */
   useEffect(() => {
@@ -436,6 +646,10 @@ const ProjectCoordinatorDashboard = () => {
           <h1 className="coord-title">Project Coordinator</h1>
         </div>
         <div className="coord-header-actions">
+
+          {/* ── CHECK IN / OUT ── */}
+          {employeeId && <CheckInButton employeeId={employeeId} />}
+
           <button className="coord-btn-outline" onClick={() => navigate("/project-coordinator/payments")}>
             Payments
           </button>
@@ -443,9 +657,9 @@ const ProjectCoordinatorDashboard = () => {
             Milestone
           </button>
           <button className="coord-btn-outline" onClick={() => {
-  fetchRequests();   // 🔥 THIS LINE FIXES EVERYTHING
-  setShowMatModal(true);
-}} style={{ position: "relative" }}>
+            fetchRequests();
+            setShowMatModal(true);
+          }} style={{ position: "relative" }}>
             Material Requests
             {pendingCount > 0 && (
               <span style={{
