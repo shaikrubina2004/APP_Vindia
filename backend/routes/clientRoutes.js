@@ -24,6 +24,8 @@ const {
   getClientBoq,
   // Payments
   getClientPayments,
+  // Shared files
+  getClientSharedFiles,
   // Incidents
   getClientIncidents,
   getClientIncidentById,
@@ -66,6 +68,11 @@ router.get("/boq", getClientBoq);
 // PAYMENTS
 // ═══════════════════════════════════════════════════════════════════════════
 router.get("/payments", getClientPayments);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SHARED FILES
+// ═══════════════════════════════════════════════════════════════════════════
+router.get("/shared-files", getClientSharedFiles);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INCIDENTS

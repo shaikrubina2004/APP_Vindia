@@ -71,6 +71,8 @@ const seDailyRoutes = require("./routes/seDailyupdatesRoutes");
 const rfiRoutes = require("./routes/rfiRoutes");
 const seNotificationRoutes = require("./routes/seNotificationRoutes");
 
+//const clientRoutes = require("./routes/clientRoutes");
+
 /* ── QS ───────────────────────────────────────────────────── */
 const qsRoutes = require("./routes/qsRoutes");
 const boqRoutes = require("./routes/boqRoutes");
@@ -167,6 +169,8 @@ app.use("/api/architect-designs", architectDesignRoutes);
 app.use("/api/architect-drawings", architectDrawingUploadRoutes);
 app.use("/api/architect-assign", architectAssignRoutes);
 app.use("/api/architect-notifications", architectNotifRoutes);
+
+//app.use("/api/client", clientRoutes);
 
 /* ── Site Engineer ────────────────────────────────────────── */
 app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes);

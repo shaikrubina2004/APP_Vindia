@@ -1,128 +1,138 @@
 import { useState } from "react";
+import {
+  useClientAPI,
+  PageLoader,
+  PageError,
+  fmtDate,
+} from "../../hooks/Useclientapi.jsx";
 import "../../styles/Client.css";
 
-const LOGS = [
-  {
-    id: 1,
-    engineer: "Ravi Kumar",
-    role: "Site Engineer",
-    date: "May 9, 2024",
-    time: "6:30 PM",
-    photos: 6,
-    weather: "Partly cloudy · 31°C",
-    crew: 24,
-    tag: "Structural frame",
-    summary:
-      "Column casting completed for F4 north side. Shuttering removed for F3 slab. Concrete pour scheduled for F4 south tomorrow 7 AM. Steel reinforcement for F5 columns procured and stacked on site.",
-  },
-  {
-    id: 2,
-    engineer: "Ravi Kumar",
-    role: "Site Engineer",
-    date: "May 8, 2024",
-    time: "6:15 PM",
-    photos: 4,
-    weather: "Clear · 33°C",
-    crew: 21,
-    tag: "MEP rough-in",
-    summary:
-      "Plumbing rough-in delayed — materials not delivered. Raised procurement request to PM. Electrical conduit work on F5 progressing well, estimated 80% complete. Coordination meeting with MEP team held at site.",
-  },
-  {
-    id: 3,
-    engineer: "Ravi Kumar",
-    role: "Site Engineer",
-    date: "May 7, 2024",
-    time: "5:45 PM",
-    photos: 3,
-    weather: "Hot · 35°C",
-    crew: 26,
-    tag: "Safety",
-    summary:
-      "Safety inspection completed by officer Suresh. All workers confirmed with helmets & harness. One near-miss reported at F4 scaffolding level — incident INC-039 filed. Toolbox talk conducted after incident.",
-  },
-  {
-    id: 4,
-    engineer: "Ravi Kumar",
-    role: "Site Engineer",
-    date: "May 6, 2024",
-    time: "6:00 PM",
-    photos: 5,
-    weather: "Overcast · 29°C",
-    crew: 23,
-    tag: "Structural frame",
-    summary:
-      "F4 north column formwork erected. Concrete mix design approved by QC. Ready for pour pending slab inspection sign-off. Backfilling on south side completed and compacted.",
-  },
-  {
-    id: 5,
-    engineer: "Ravi Kumar",
-    role: "Site Engineer",
-    date: "May 5, 2024",
-    time: "5:30 PM",
-    photos: 7,
-    weather: "Sunny · 34°C",
-    crew: 28,
-    tag: "Structural frame",
-    summary:
-      "Major milestone — F3 slab pour completed successfully. Total concrete poured: 42 cubic metres. No cold joints observed. Curing compound applied. Photos uploaded for QC records.",
-  },
-];
-
 function LogEntry({ log }) {
-  const [showPhotos, setShowPhotos] = useState(false);
-  const isSafety = log.tag === "Safety";
+  const [showDetail, setShowDetail] = useState(false);
+  const isSafety =
+    (log.milestone_name || "").toLowerCase().includes("safety") ||
+    (log.work_done || "").toLowerCase().includes("safety incident");
+  const initials = (log.submitted_by_name || "SE")
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2);
+
+  // Parse attachments if string
+  let attachments = [];
+  try {
+    attachments =
+      typeof log.attachments === "string"
+        ? JSON.parse(log.attachments)
+        : log.attachments || [];
+  } catch {
+    attachments = [];
+  }
+
   return (
     <div className={`dl-entry ${isSafety ? "dl-entry--safety" : ""}`}>
       <div className="dl-entry__header">
         <div className="dl-entry__who">
-          <div className="dl-avatar">
-            {log.engineer
-              .split(" ")
-              .map((n) => n[0])
-              .join("")}
-          </div>
+          <div className="dl-avatar">{initials}</div>
           <div>
-            <div className="dl-name">{log.engineer}</div>
-            <div className="dl-role">{log.role}</div>
+            <div className="dl-name">
+              {log.submitted_by_name || "Site Engineer"}
+            </div>
+            <div className="dl-role">Site Engineer</div>
           </div>
         </div>
         <div className="dl-entry__right">
           <span className="dl-date">
-            {log.date} · {log.time}
+            {fmtDate(log.report_date)}
+            {log.shift ? ` · ${log.shift} shift` : ""}
           </span>
-          <span className={`dl-tag ${isSafety ? "dl-tag--safety" : ""}`}>
-            {log.tag}
-          </span>
+          {log.milestone_name && (
+            <span className={`dl-tag ${isSafety ? "dl-tag--safety" : ""}`}>
+              {log.milestone_name}
+            </span>
+          )}
         </div>
       </div>
+
       <div className="dl-body">
-        <p className="dl-summary">{log.summary}</p>
+        <p className="dl-summary">{log.work_done || "—"}</p>
+
         <div className="dl-meta-row">
-          <span className="dl-meta-item">📷 {log.photos} photos</span>
-          <span className="dl-meta-item">👷 {log.crew} crew on site</span>
-          <span className="dl-meta-item">🌤 {log.weather}</span>
-          {log.photos > 0 && (
+          {log.labour_total != null && (
+            <span className="dl-meta-item">
+              👷 {log.labour_total} crew on site
+            </span>
+          )}
+          {log.weather_am && (
+            <span className="dl-meta-item">
+              🌤 {log.weather_am}
+              {log.weather_pm ? ` / ${log.weather_pm}` : ""}
+              {log.temp_c ? ` · ${log.temp_c}°C` : ""}
+            </span>
+          )}
+          {log.delay_type && (
+            <span className="dl-meta-item" style={{ color: "var(--amber)" }}>
+              ⚠ Delay: {log.delay_type}
+            </span>
+          )}
+          {(log.notes || log.delay_description) && (
             <button
               className="cl-btn cl-btn--ghost"
-              style={{
-                marginLeft: "auto",
-                padding: "4px 12px",
-                fontSize: "12px",
-              }}
-              onClick={() => setShowPhotos((v) => !v)}
+              style={{ marginLeft: "auto", padding: "4px 12px", fontSize: 12 }}
+              onClick={() => setShowDetail((v) => !v)}
             >
-              {showPhotos ? "Hide photos" : "View photos"}
+              {showDetail ? "Hide details" : "View details"}
             </button>
           )}
         </div>
-        {showPhotos && (
-          <div className="dl-photos-grid">
-            {Array.from({ length: log.photos }).map((_, i) => (
-              <div key={i} className="dl-photo-thumb">
-                📷
+
+        {showDetail && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "10px 14px",
+              background: "var(--bg-hover)",
+              borderRadius: "var(--radius-sm)",
+              fontSize: 12,
+              color: "var(--text-secondary)",
+              lineHeight: 1.7,
+            }}
+          >
+            {log.delay_description && (
+              <p>
+                <strong>Delay note:</strong> {log.delay_description}
+              </p>
+            )}
+            {log.notes && (
+              <p>
+                <strong>Notes:</strong> {log.notes}
+              </p>
+            )}
+            {log.next_day && (
+              <p>
+                <strong>Plan tomorrow:</strong> {log.next_day}
+              </p>
+            )}
+            {log.linked_incident && (
+              <p>
+                <strong>Linked incident:</strong> {log.linked_incident}
+              </p>
+            )}
+            {attachments.length > 0 && (
+              <div className="dl-photos-grid" style={{ marginTop: 8 }}>
+                {attachments.map((att, i) => (
+                  <a
+                    key={i}
+                    href={`${import.meta.env.VITE_API_BASE || "http://localhost:5000"}${att.url || att}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="dl-photo-thumb"
+                  >
+                    📷
+                  </a>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
@@ -134,13 +144,28 @@ export default function DailyLogs() {
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
 
-  const tags = ["all", ...new Set(LOGS.map((l) => l.tag))];
-  const filtered = LOGS.filter(
-    (l) =>
-      (tagFilter === "all" || l.tag === tagFilter) &&
-      (l.summary.toLowerCase().includes(search.toLowerCase()) ||
-        l.date.toLowerCase().includes(search.toLowerCase())),
+  const { data, loading, error, refetch } = useClientAPI(
+    "/client/daily-logs?limit=50",
   );
+
+  if (loading) return <PageLoader />;
+  if (error) return <PageError message={error} onRetry={refetch} />;
+
+  const logs = data?.logs || [];
+
+  // Unique milestone names for tag filter
+  const tags = [
+    "all",
+    ...new Set(logs.map((l) => l.milestone_name).filter(Boolean)),
+  ];
+
+  const filtered = logs.filter((l) => {
+    const matchTag = tagFilter === "all" || l.milestone_name === tagFilter;
+    const matchSearch =
+      (l.work_done || "").toLowerCase().includes(search.toLowerCase()) ||
+      fmtDate(l.report_date).toLowerCase().includes(search.toLowerCase());
+    return matchTag && matchSearch;
+  });
 
   return (
     <div className="cl-page">
@@ -149,7 +174,8 @@ export default function DailyLogs() {
           <div className="cl-eyebrow">Progress</div>
           <h1 className="cl-page-title">Daily Site Logs</h1>
           <p className="cl-page-sub">
-            Submitted by site engineer after each working day
+            {data?.total ?? logs.length} log{logs.length !== 1 ? "s" : ""} ·
+            submitted by site engineer
           </p>
         </div>
       </div>
@@ -168,10 +194,19 @@ export default function DailyLogs() {
         >
           {tags.map((t) => (
             <option key={t} value={t}>
-              {t === "all" ? "All tags" : t}
+              {t === "all" ? "All milestones" : t}
             </option>
           ))}
         </select>
+        <span
+          style={{
+            fontSize: 13,
+            color: "var(--text-muted)",
+            marginLeft: "auto",
+          }}
+        >
+          {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
       <div className="dl-feed">
@@ -179,7 +214,8 @@ export default function DailyLogs() {
           filtered.map((log) => <LogEntry key={log.id} log={log} />)
         ) : (
           <div className="cl-empty">
-            <div className="cl-empty__icon">📋</div>No logs match your filter.
+            <div className="cl-empty__icon">📋</div>
+            <p>No logs match your filter.</p>
           </div>
         )}
       </div>

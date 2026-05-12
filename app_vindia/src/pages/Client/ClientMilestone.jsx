@@ -1,71 +1,11 @@
 import { useState } from "react";
+import {
+  useClientAPI,
+  PageLoader,
+  PageError,
+  fmtDate,
+} from "../../hooks/Useclientapi.jsx";
 import "../../styles/Client.css";
-
-const MILESTONES = [
-  {
-    id: 1,
-    name: "Foundation & excavation",
-    start: "Jan 10, 2024",
-    due: "Mar 15, 2024",
-    status: "done",
-    progress: 100,
-    tasks: [
-      { name: "Soil testing & report", done: true },
-      { name: "Excavation works", done: true },
-      { name: "PCC layer", done: true },
-      { name: "Foundation reinforcement", done: true },
-    ],
-  },
-  {
-    id: 2,
-    name: "Structural frame – floors 1–5",
-    start: "Mar 20, 2024",
-    due: "Jun 15, 2024",
-    status: "in_progress",
-    progress: 72,
-    tasks: [
-      { name: "Column casting – F1 to F3", done: true },
-      { name: "Slab work – F1 to F3", done: true },
-      { name: "Column casting – F4 & F5", done: false },
-      { name: "Slab work – F4 & F5", done: false },
-    ],
-  },
-  {
-    id: 3,
-    name: "MEP rough-in",
-    start: "Jun 20, 2024",
-    due: "Jul 30, 2024",
-    status: "delayed",
-    progress: 18,
-    tasks: [
-      { name: "Electrical conduit layout", done: true },
-      { name: "Plumbing rough-in – lower floors", done: false },
-      { name: "HVAC ducting", done: false },
-      { name: "Fire suppression pipe", done: false },
-    ],
-  },
-  {
-    id: 4,
-    name: "Finishing & handover",
-    start: "Aug 1, 2024",
-    due: "Dec 10, 2024",
-    status: "pending",
-    progress: 0,
-    tasks: [
-      { name: "Plaster & putty", done: false },
-      { name: "Flooring", done: false },
-      { name: "Paint – interior", done: false },
-      { name: "Handover inspection", done: false },
-    ],
-  },
-];
-
-const OVERVIEW = [
-  { label: "Total milestones", val: 4 },
-  { label: "Completed", val: 1 },
-  { label: "In progress", val: 1 },
-  { label: "Delayed", val: 1 },
-];
 
 function StatusPill({ status }) {
   const map = {
@@ -80,8 +20,10 @@ function StatusPill({ status }) {
 
 function MilestoneRow({ m, index }) {
   const [open, setOpen] = useState(false);
+  const status = m.display_status || "pending";
+
   return (
-    <div className={`cm-milestone-row cm-milestone-row--${m.status}`}>
+    <div className={`cm-milestone-row cm-milestone-row--${status}`}>
       <div
         className="cm-row-header"
         onClick={() => setOpen((v) => !v)}
@@ -92,38 +34,63 @@ function MilestoneRow({ m, index }) {
         <div className="cm-row-info">
           <div className="cm-row-name">{m.name}</div>
           <div className="cm-row-dates">
-            {m.start} → {m.due}
+            {fmtDate(m.start_date)} → {fmtDate(m.due_date)}
           </div>
         </div>
         <div className="cm-row-right">
-          <StatusPill status={m.status} />
-          <span className="cm-row-pct">{m.progress}%</span>
+          <StatusPill status={status} />
+          <span className="cm-row-pct">{m.progress ?? 0}%</span>
           <span className={`cm-chevron ${open ? "open" : ""}`}>›</span>
         </div>
       </div>
+
       <div className="cm-bar-wrap">
         <div className="cm-bar-bg">
           <div
-            className={`cm-bar-fill cm-bar-fill--${m.status}`}
-            style={{ width: `${m.progress}%` }}
+            className={`cm-bar-fill cm-bar-fill--${status}`}
+            style={{ width: `${m.progress ?? 0}%` }}
           />
         </div>
       </div>
+
       {open && (
         <div className="cm-subtasks">
-          <div className="cm-subtask-head">Sub-tasks</div>
+          <div className="cm-subtask-head">
+            Sub-tasks · {m.subtask_done ?? 0} / {m.subtask_count ?? 0} done
+          </div>
           <ul className="cm-subtask-list">
-            {m.tasks.map((t, i) => (
+            {(m.subtasks || []).map((t) => {
+              const isDone = [
+                "DONE",
+                "COMPLETED",
+                "done",
+                "completed",
+              ].includes(t.status);
+              return (
+                <li
+                  key={t.id}
+                  className={`cm-subtask-item ${isDone ? "cm-subtask-item--done" : ""}`}
+                >
+                  <span className="cm-check">
+                    {isDone && <span className="cm-check-tick">✓</span>}
+                  </span>
+                  <span style={{ flex: 1 }}>{t.name}</span>
+                  {t.due_date && (
+                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                      {fmtDate(t.due_date)}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+            {(m.subtasks || []).length === 0 && (
               <li
-                key={i}
-                className={`cm-subtask-item ${t.done ? "cm-subtask-item--done" : ""}`}
+                className="cm-subtask-item"
+                style={{ color: "var(--text-muted)" }}
               >
-                <span className="cm-check">
-                  {t.done && <span className="cm-check-tick">✓</span>}
-                </span>
-                {t.name}
+                No sub-tasks added yet.
               </li>
-            ))}
+            )}
           </ul>
         </div>
       )}
@@ -132,18 +99,34 @@ function MilestoneRow({ m, index }) {
 }
 
 export default function ClientMilestone() {
+  const { data, loading, error, refetch } = useClientAPI("/client/milestones");
+
+  if (loading) return <PageLoader />;
+  if (error) return <PageError message={error} onRetry={refetch} />;
+
+  const project = data?.project || {};
+  const milestones = data?.milestones || [];
+  const ov = data?.overview || {};
+
+  const overviewItems = [
+    { label: "Total milestones", val: ov.total ?? 0 },
+    { label: "Completed", val: ov.done ?? 0 },
+    { label: "In progress", val: ov.in_progress ?? 0 },
+    { label: "Delayed", val: ov.delayed ?? 0 },
+  ];
+
   return (
     <div className="cl-page">
       <div className="cl-page-header">
         <div className="cl-page-header__left">
           <div className="cl-eyebrow">Progress</div>
           <h1 className="cl-page-title">Milestones</h1>
-          <p className="cl-page-sub">Greenview Residences – Tower B</p>
+          <p className="cl-page-sub">{project.name || "Your project"}</p>
         </div>
       </div>
 
       <div className="cm-progress-overview">
-        {OVERVIEW.map((o) => (
+        {overviewItems.map((o) => (
           <div key={o.label} className="cm-prog-item">
             <div className="cm-prog-item__label">{o.label}</div>
             <div className="cm-prog-item__val">{o.val}</div>
@@ -151,11 +134,21 @@ export default function ClientMilestone() {
         ))}
       </div>
 
-      <div>
-        {MILESTONES.map((m, i) => (
-          <MilestoneRow key={m.id} m={m} index={i} />
-        ))}
-      </div>
+      {milestones.length === 0 ? (
+        <div className="cl-empty">
+          <div className="cl-empty__icon">🏗️</div>
+          <p>
+            No milestones are visible yet. Your project manager will share them
+            soon.
+          </p>
+        </div>
+      ) : (
+        <div>
+          {milestones.map((m, i) => (
+            <MilestoneRow key={m.id} m={m} index={i} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,130 +1,38 @@
 import { useState } from "react";
+import {
+  useClientAPI,
+  PageLoader,
+  PageError,
+  fmtDate,
+} from "../../hooks/Useclientapi.jsx";
 import "../../styles/Client.css";
 
-const PHOTOS = [
-  {
-    id: 1,
-    title: "F4 column casting – north",
-    date: "May 9, 2024",
-    tag: "Structural frame",
-    milestone: "Structural frame – floors 1–5",
-    uploader: "Ravi Kumar",
-  },
-  {
-    id: 2,
-    title: "F3 slab shuttering removal",
-    date: "May 9, 2024",
-    tag: "Structural frame",
-    milestone: "Structural frame – floors 1–5",
-    uploader: "Ravi Kumar",
-  },
-  {
-    id: 3,
-    title: "Electrical conduit – F5",
-    date: "May 8, 2024",
-    tag: "MEP rough-in",
-    milestone: "MEP rough-in",
-    uploader: "Ravi Kumar",
-  },
-  {
-    id: 4,
-    title: "Safety inspection – F4",
-    date: "May 7, 2024",
-    tag: "Safety",
-    milestone: "Structural frame – floors 1–5",
-    uploader: "Suresh",
-  },
-  {
-    id: 5,
-    title: "Scaffolding near-miss site",
-    date: "May 7, 2024",
-    tag: "Safety",
-    milestone: "Structural frame – floors 1–5",
-    uploader: "Suresh",
-  },
-  {
-    id: 6,
-    title: "F4 formwork erected",
-    date: "May 6, 2024",
-    tag: "Structural frame",
-    milestone: "Structural frame – floors 1–5",
-    uploader: "Ravi Kumar",
-  },
-  {
-    id: 7,
-    title: "South side backfill",
-    date: "May 6, 2024",
-    tag: "Structural frame",
-    milestone: "Structural frame – floors 1–5",
-    uploader: "Ravi Kumar",
-  },
-  {
-    id: 8,
-    title: "F3 slab pour – in progress",
-    date: "May 5, 2024",
-    tag: "Structural frame",
-    milestone: "Structural frame – floors 1–5",
-    uploader: "Ravi Kumar",
-  },
-  {
-    id: 9,
-    title: "Concrete pump on site",
-    date: "May 5, 2024",
-    tag: "Structural frame",
-    milestone: "Structural frame – floors 1–5",
-    uploader: "Ravi Kumar",
-  },
-  {
-    id: 10,
-    title: "Foundation completed",
-    date: "Mar 14, 2024",
-    tag: "Foundation",
-    milestone: "Foundation & excavation",
-    uploader: "Ravi Kumar",
-  },
-  {
-    id: 11,
-    title: "PCC layer – finished",
-    date: "Mar 10, 2024",
-    tag: "Foundation",
-    milestone: "Foundation & excavation",
-    uploader: "Ravi Kumar",
-  },
-  {
-    id: 12,
-    title: "Excavation complete",
-    date: "Feb 18, 2024",
-    tag: "Foundation",
-    milestone: "Foundation & excavation",
-    uploader: "Ravi Kumar",
-  },
-];
-
-const TAG_COLORS = {
-  "Structural frame": "pill--info",
-  "MEP rough-in": "pill--warning",
-  Safety: "pill--danger",
-  Foundation: "pill--success",
+const SOURCE_PILL = {
+  incident: "pill--warning",
+  task: "pill--info",
 };
 
-// Emoji stand-ins for photo thumbnails (replace with real <img> when connected to API)
-const THUMB_EMOJIS = {
-  "Structural frame": "🏗️",
-  "MEP rough-in": "🔧",
-  Safety: "⛑️",
-  Foundation: "🪨",
-};
+const BASE_URL = import.meta.env.VITE_API_BASE || "http://localhost:5000";
 
 export default function SitePhotos() {
   const [search, setSearch] = useState("");
-  const [tagFilter, setTagFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
 
-  const tags = ["all", ...new Set(PHOTOS.map((p) => p.tag))];
-  const filtered = PHOTOS.filter(
-    (p) =>
-      (tagFilter === "all" || p.tag === tagFilter) &&
-      p.title.toLowerCase().includes(search.toLowerCase()),
-  );
+  const { data, loading, error, refetch } = useClientAPI("/client/site-photos");
+
+  if (loading) return <PageLoader />;
+  if (error) return <PageError message={error} onRetry={refetch} />;
+
+  const photos = data?.photos || [];
+
+  const filtered = photos.filter((p) => {
+    const matchSource =
+      sourceFilter === "all" || p.source_type === sourceFilter;
+    const matchSearch =
+      (p.source_title || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.uploaded_by || "").toLowerCase().includes(search.toLowerCase());
+    return matchSource && matchSearch;
+  });
 
   return (
     <div className="cl-page">
@@ -133,7 +41,8 @@ export default function SitePhotos() {
           <div className="cl-eyebrow">Progress</div>
           <h1 className="cl-page-title">Site Photos</h1>
           <p className="cl-page-sub">
-            {PHOTOS.length} photos uploaded across all milestones
+            {photos.length} photo{photos.length !== 1 ? "s" : ""} uploaded
+            across all milestones
           </p>
         </div>
       </div>
@@ -141,20 +50,18 @@ export default function SitePhotos() {
       <div className="cl-toolbar">
         <input
           className="cl-search"
-          placeholder="Search photos…"
+          placeholder="Search by title or uploader…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <select
           className="cl-select"
-          value={tagFilter}
-          onChange={(e) => setTagFilter(e.target.value)}
+          value={sourceFilter}
+          onChange={(e) => setSourceFilter(e.target.value)}
         >
-          {tags.map((t) => (
-            <option key={t} value={t}>
-              {t === "all" ? "All tags" : t}
-            </option>
-          ))}
+          <option value="all">All sources</option>
+          <option value="incident">Incidents</option>
+          <option value="task">Tasks</option>
         </select>
         <span
           style={{
@@ -163,38 +70,73 @@ export default function SitePhotos() {
             marginLeft: "auto",
           }}
         >
-          {filtered.length} photos
+          {filtered.length} photo{filtered.length !== 1 ? "s" : ""}
         </span>
       </div>
 
-      {filtered.length ? (
+      {filtered.length === 0 ? (
+        <div className="cl-empty">
+          <div className="cl-empty__icon">🖼️</div>
+          <p>No photos match your filter.</p>
+        </div>
+      ) : (
         <div className="sp-grid">
           {filtered.map((p) => (
             <div key={p.id} className="sp-card">
               <div className="sp-thumb">
-                <span style={{ fontSize: 40 }}>
-                  {THUMB_EMOJIS[p.tag] || "📷"}
+                {p.url ? (
+                  <img
+                    src={`${BASE_URL}${p.url}`}
+                    alt={p.source_title || "Site photo"}
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                      e.target.nextSibling.style.display = "flex";
+                    }}
+                  />
+                ) : null}
+                {/* Fallback shown if image fails or no url */}
+                <span
+                  style={{ fontSize: 36, display: p.url ? "none" : "flex" }}
+                >
+                  📷
                 </span>
               </div>
               <div className="sp-card__body">
-                <div className="sp-card__title">{p.title}</div>
-                <div className="sp-card__meta">
-                  {p.date} · {p.uploader}
+                <div className="sp-card__title">
+                  {p.source_title || "Site photo"}
                 </div>
-                <div className="sp-card__tag">
+                <div className="sp-card__meta">
+                  {fmtDate(p.uploaded_at)} · {p.uploaded_by || "—"}
+                </div>
+                <div className="sp-card__tag" style={{ marginTop: 6 }}>
                   <span
-                    className={`pill ${TAG_COLORS[p.tag] || "pill--neutral"}`}
+                    className={`pill ${SOURCE_PILL[p.source_type] || "pill--neutral"}`}
                   >
-                    {p.tag}
+                    {p.source_type === "incident" ? "⚠ Incident" : "✅ Task"}
                   </span>
                 </div>
               </div>
+              {p.url && (
+                <a
+                  href={`${BASE_URL}${p.url}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "block",
+                    textAlign: "center",
+                    padding: "8px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--accent)",
+                    borderTop: "1px solid var(--border)",
+                    textDecoration: "none",
+                  }}
+                >
+                  View full size ↗
+                </a>
+              )}
             </div>
           ))}
-        </div>
-      ) : (
-        <div className="cl-empty">
-          <div className="cl-empty__icon">🖼️</div>No photos match your filter.
         </div>
       )}
     </div>

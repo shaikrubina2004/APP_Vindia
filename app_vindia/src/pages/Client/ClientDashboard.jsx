@@ -1,186 +1,15 @@
 import { useState } from "react";
+import { API } from "../../services/authService";
+import {
+  useClientAPI,
+  PageLoader,
+  PageError,
+  fmtDate,
+  fmtINR,
+} from "../../hooks/Useclientapi.jsx";
 import "../../styles/Client.css";
 
-const PROJECT = {
-  name: "Greenview Residences – Tower B",
-  manager: "Arjun Mehta",
-  startDate: "Jan 2024",
-  expectedCompletion: "Dec 2024",
-  progress: 67,
-};
-
-const STATS = [
-  {
-    id: "progress",
-    label: "Overall progress",
-    value: "67%",
-    sub: "On track",
-    subType: "success",
-    icon: "📐",
-  },
-  {
-    id: "milestones",
-    label: "Active milestones",
-    value: "3",
-    sub: "1 delayed",
-    subType: "warning",
-    icon: "🏗️",
-  },
-  {
-    id: "invoices",
-    label: "Pending invoices",
-    value: "₹14.2L",
-    sub: "Due in 5 days",
-    subType: "danger",
-    icon: "🧾",
-  },
-  {
-    id: "incidents",
-    label: "Open incidents",
-    value: "2",
-    sub: "Awaiting response",
-    subType: "warning",
-    icon: "⚠️",
-  },
-];
-
-const MILESTONES = [
-  {
-    id: 1,
-    name: "Foundation & excavation",
-    due: "Mar 15, 2024",
-    status: "done",
-    progress: 100,
-    tasks: [
-      { name: "Soil testing & report", done: true },
-      { name: "Excavation works", done: true },
-      { name: "PCC layer", done: true },
-      { name: "Foundation reinforcement", done: true },
-    ],
-  },
-  {
-    id: 2,
-    name: "Structural frame – floors 1–5",
-    due: "Jun 15, 2024",
-    status: "in_progress",
-    progress: 72,
-    tasks: [
-      { name: "Column casting – F1 to F3", done: true },
-      { name: "Slab work – F1 to F3", done: true },
-      { name: "Column casting – F4 & F5", done: false },
-      { name: "Slab work – F4 & F5", done: false },
-    ],
-  },
-  {
-    id: 3,
-    name: "MEP rough-in",
-    due: "Jul 30, 2024",
-    status: "delayed",
-    progress: 18,
-    tasks: [
-      { name: "Electrical conduit layout", done: true },
-      { name: "Plumbing rough-in – lower floors", done: false },
-      { name: "HVAC ducting", done: false },
-      { name: "Fire suppression pipe", done: false },
-    ],
-  },
-  {
-    id: 4,
-    name: "Finishing & handover",
-    due: "Dec 10, 2024",
-    status: "pending",
-    progress: 0,
-    tasks: [
-      { name: "Plaster & putty", done: false },
-      { name: "Flooring", done: false },
-      { name: "Paint – interior", done: false },
-      { name: "Handover inspection", done: false },
-    ],
-  },
-];
-
-const INVOICES = [
-  {
-    id: "INV-2024-003",
-    desc: "Structural work – Phase 2",
-    amount: "₹14,20,000",
-    due: "May 14, 2024",
-    status: "due",
-  },
-  {
-    id: "INV-2024-002",
-    desc: "Foundation completion",
-    amount: "₹22,80,000",
-    due: "Mar 30, 2024",
-    status: "paid",
-  },
-  {
-    id: "INV-2024-001",
-    desc: "Mobilisation & setup",
-    amount: "₹8,50,000",
-    due: "Jan 20, 2024",
-    status: "paid",
-  },
-];
-
-const DAILY_LOGS = [
-  {
-    id: 1,
-    engineer: "Ravi Kumar",
-    role: "Site Engineer",
-    date: "Today, 6:30 PM",
-    photos: 6,
-    weather: "Partly cloudy · 31°C",
-    crew: 24,
-    tag: "Structural frame",
-    summary:
-      "Column casting completed for F4 north side. Shuttering removed for F3 slab. Concrete pour scheduled for F4 south tomorrow 7 AM.",
-  },
-  {
-    id: 2,
-    engineer: "Ravi Kumar",
-    role: "Site Engineer",
-    date: "Yesterday, 6:15 PM",
-    photos: 4,
-    weather: "Clear · 33°C",
-    crew: 21,
-    tag: "MEP rough-in",
-    summary:
-      "Plumbing rough-in delayed — materials not delivered. Raised procurement request. Electrical conduit work on F5 progressing well, 80% done.",
-  },
-  {
-    id: 3,
-    engineer: "Ravi Kumar",
-    role: "Site Engineer",
-    date: "May 7, 5:45 PM",
-    photos: 3,
-    weather: "Hot · 35°C",
-    crew: 26,
-    tag: "Safety",
-    summary:
-      "Safety inspection completed by officer Suresh. All workers with helmets & harness. One near-miss reported at F4 level, incident filed.",
-  },
-];
-
-const INCIDENTS = [
-  {
-    id: "INC-042",
-    title: "Tile selection approval pending from client",
-    raised: "May 6, 2024",
-    severity: "medium",
-    status: "open",
-    assignee: "Arjun Mehta",
-  },
-  {
-    id: "INC-039",
-    title: "Near-miss at F4 scaffolding — worker safety report",
-    raised: "May 7, 2024",
-    severity: "high",
-    status: "under_review",
-    assignee: "Suresh (Safety Officer)",
-  },
-];
-
+// ── Shared pill ────────────────────────────────────────────────────────────
 function StatusPill({ status }) {
   const map = {
     done: ["Done", "pill--success"],
@@ -191,30 +20,41 @@ function StatusPill({ status }) {
     paid: ["Paid", "pill--success"],
     open: ["Open", "pill--warning"],
     under_review: ["Under review", "pill--info"],
+    Created: ["Created", "pill--neutral"],
+    Resolved: ["Resolved", "pill--success"],
+    Closed: ["Closed", "pill--neutral"],
   };
   const [label, cls] = map[status] || [status, "pill--neutral"];
   return <span className={`pill ${cls}`}>{label}</span>;
 }
 
-function StatCard({ stat }) {
+// ── Stat card ──────────────────────────────────────────────────────────────
+function StatCard({ icon, label, value, sub, subType = "info" }) {
   return (
     <div className="stat-card">
-      <div className="stat-card__icon">{stat.icon}</div>
+      <div className="stat-card__icon">{icon}</div>
       <div className="stat-card__body">
-        <span className="stat-card__label">{stat.label}</span>
-        <span className="stat-card__value">{stat.value}</span>
-        <span className={`stat-card__sub stat-card__sub--${stat.subType}`}>
-          {stat.sub}
-        </span>
+        <span className="stat-card__label">{label}</span>
+        <span className="stat-card__value">{value ?? "—"}</span>
+        {sub && (
+          <span className={`stat-card__sub stat-card__sub--${subType}`}>
+            {sub}
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
+// ── Milestone card (expandable) ────────────────────────────────────────────
 function MilestoneCard({ m }) {
   const [open, setOpen] = useState(false);
+  const status = m.display_status || "pending";
+  const done = m.subtask_done ?? 0;
+  const total = m.subtask_count ?? 0;
+
   return (
-    <div className={`milestone-card milestone-card--${m.status}`}>
+    <div className={`milestone-card milestone-card--${status}`}>
       <div
         className="milestone-card__header"
         onClick={() => setOpen((v) => !v)}
@@ -223,11 +63,11 @@ function MilestoneCard({ m }) {
       >
         <div className="milestone-card__left">
           <div className="milestone-card__name">{m.name}</div>
-          <div className="milestone-card__meta">Due {m.due}</div>
+          <div className="milestone-card__meta">Due {fmtDate(m.due_date)}</div>
         </div>
         <div className="milestone-card__right">
-          <StatusPill status={m.status} />
-          <span className="milestone-card__pct">{m.progress}%</span>
+          <StatusPill status={status} />
+          <span className="milestone-card__pct">{m.progress ?? 0}%</span>
           <span className={`milestone-card__chevron ${open ? "open" : ""}`}>
             ›
           </span>
@@ -235,88 +75,128 @@ function MilestoneCard({ m }) {
       </div>
       <div className="milestone-card__bar-bg">
         <div
-          className={`milestone-card__bar-fill milestone-card__bar-fill--${m.status}`}
-          style={{ width: `${m.progress}%` }}
+          className={`milestone-card__bar-fill milestone-card__bar-fill--${status}`}
+          style={{ width: `${m.progress ?? 0}%` }}
         />
       </div>
       {open && (
         <ul className="milestone-card__tasks">
-          {m.tasks.map((t, i) => (
-            <li
-              key={i}
-              className={`task-item ${t.done ? "task-item--done" : ""}`}
-            >
-              <span className="task-item__dot" />
-              {t.name}
+          {(m.subtasks || []).map((t) => {
+            const isDone = ["DONE", "COMPLETED", "done", "completed"].includes(
+              t.status,
+            );
+            return (
+              <li
+                key={t.id}
+                className={`task-item ${isDone ? "task-item--done" : ""}`}
+              >
+                <span className="task-item__dot" />
+                {t.name}
+              </li>
+            );
+          })}
+          {total === 0 && (
+            <li className="task-item" style={{ color: "var(--text-muted)" }}>
+              No sub-tasks
             </li>
-          ))}
+          )}
         </ul>
       )}
     </div>
   );
 }
 
+// ── Daily log card ─────────────────────────────────────────────────────────
 function LogCard({ log }) {
+  const isSafety =
+    (log.milestone_name || "").toLowerCase().includes("safety") ||
+    (log.work_done || "").toLowerCase().includes("safety");
+  const initials = (log.submitted_by_name || "SE")
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2);
   return (
-    <div
-      className={`log-card ${log.tag === "Safety" ? "log-card--safety" : ""}`}
-    >
+    <div className={`log-card ${isSafety ? "log-card--safety" : ""}`}>
       <div className="log-card__header">
         <div className="log-card__who">
-          <div className="log-card__avatar">
-            {log.engineer
-              .split(" ")
-              .map((n) => n[0])
-              .join("")}
-          </div>
+          <div className="log-card__avatar">{initials}</div>
           <div>
-            <div className="log-card__name">{log.engineer}</div>
-            <div className="log-card__role">{log.role}</div>
+            <div className="log-card__name">
+              {log.submitted_by_name || "Site Engineer"}
+            </div>
+            <div className="log-card__role">Site Engineer</div>
           </div>
         </div>
         <div className="log-card__meta-right">
-          <span className="log-card__date">{log.date}</span>
-          <span className="log-tag">{log.tag}</span>
+          <span className="log-card__date">{fmtDate(log.report_date)}</span>
+          {log.milestone_name && (
+            <span className="log-tag">{log.milestone_name}</span>
+          )}
         </div>
       </div>
-      <p className="log-card__summary">{log.summary}</p>
+      <p className="log-card__summary">{log.work_done || "—"}</p>
       <div className="log-card__footer">
-        <span className="log-card__stat">📷 {log.photos} photos</span>
-        <span className="log-card__stat">👷 {log.crew} crew</span>
-        <span className="log-card__stat">🌤 {log.weather}</span>
+        {log.labour_total != null && (
+          <span className="log-card__stat">👷 {log.labour_total} crew</span>
+        )}
+        {log.weather_am && (
+          <span className="log-card__stat">
+            🌤 {log.weather_am} {log.temp_c ? `· ${log.temp_c}°C` : ""}
+          </span>
+        )}
+        {log.delay_type && (
+          <span className="log-card__stat" style={{ color: "var(--amber)" }}>
+            ⚠ {log.delay_type}
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
+// ── Invoice row ────────────────────────────────────────────────────────────
 function InvoiceRow({ inv }) {
+  const statusKey =
+    inv.status === "finalised" || inv.status === "finalized"
+      ? "paid"
+      : inv.status === "pending_pm" || inv.status === "pending_se"
+        ? "due"
+        : inv.status;
   return (
     <div className="invoice-row">
       <div className="invoice-row__left">
-        <span className="invoice-row__id">{inv.id}</span>
-        <span className="invoice-row__desc">{inv.desc}</span>
+        <span className="invoice-row__id">BOQ-{inv.id}</span>
+        <span className="invoice-row__desc">{inv.milestone_name}</span>
       </div>
       <div className="invoice-row__right">
-        <span className="invoice-row__amount">{inv.amount}</span>
-        <StatusPill status={inv.status} />
+        <span className="invoice-row__amount">
+          {fmtINR(inv.amount ?? inv.grand_total)}
+        </span>
+        <StatusPill status={statusKey} />
       </div>
-      <div className="invoice-row__due">Due {inv.due}</div>
+      <div className="invoice-row__due">
+        {inv.invoice_date
+          ? `Finalised ${fmtDate(inv.invoice_date)}`
+          : "Pending finalisation"}
+      </div>
     </div>
   );
 }
 
+// ── Incident row ───────────────────────────────────────────────────────────
 function IncidentRow({ inc }) {
-  const sev = { high: "sev--high", medium: "sev--medium", low: "sev--low" };
+  const sev = { P1: "sev--high", P2: "sev--medium", P3: "sev--low" };
   return (
     <div className="incident-row">
-      <span className={`sev-dot ${sev[inc.severity]}`} />
+      <span className={`sev-dot ${sev[inc.priority] || "sev--medium"}`} />
       <div className="incident-row__body">
         <div className="incident-row__title">
-          <span className="incident-row__id">{inc.id}</span>
+          <span className="incident-row__id">{inc.incident_no}</span>
           {inc.title}
         </div>
         <div className="incident-row__meta">
-          Raised {inc.raised} · {inc.assignee}
+          Raised {fmtDate(inc.created_at)} · {inc.created_by_name || "—"}
         </div>
       </div>
       <StatusPill status={inc.status} />
@@ -324,44 +204,119 @@ function IncidentRow({ inc }) {
   );
 }
 
+// ── Progress ring ──────────────────────────────────────────────────────────
+function ProgressRing({ pct = 0 }) {
+  const circumference = 188.5;
+  return (
+    <div className="cd-header__progress-ring">
+      <svg viewBox="0 0 72 72" width="72" height="72">
+        <circle cx="36" cy="36" r="30" className="ring-bg" />
+        <circle
+          cx="36"
+          cy="36"
+          r="30"
+          className="ring-fill"
+          strokeDasharray={`${(pct / 100) * circumference} ${circumference}`}
+          strokeDashoffset="47"
+        />
+      </svg>
+      <span className="ring-label">{pct}%</span>
+    </div>
+  );
+}
+
+// ── Main dashboard ─────────────────────────────────────────────────────────
 export default function ClientDashboard() {
+  const { data, loading, error, refetch } = useClientAPI("/client/milestones");
+  const { data: logsData } = useClientAPI("/client/daily-logs?limit=3");
+  const { data: invoicesData } = useClientAPI("/client/invoices");
+  const { data: incidentsData } = useClientAPI("/client/incidents");
+
+  if (loading) return <PageLoader />;
+  if (error) return <PageError message={error} onRetry={refetch} />;
+
+  const project = data?.project || {};
+  const overview = data?.overview || {};
+  const milestones = (data?.milestones || []).slice(0, 4);
+  const logs = logsData?.logs || [];
+  const invoices = (invoicesData?.invoices || []).slice(0, 3);
+  const incidents = (incidentsData?.incidents || [])
+    .filter((i) => i.status !== "Closed")
+    .slice(0, 3);
+
+  const progress = Math.round(project.progress ?? 0);
+
   return (
     <div className="cd-root">
+      {/* Header */}
       <header className="cd-header">
         <div className="cd-header__left">
           <div className="cd-header__eyebrow">Client portal</div>
-          <h1 className="cd-header__title">{PROJECT.name}</h1>
+          <h1 className="cd-header__title">{project.name || "Your Project"}</h1>
           <div className="cd-header__meta">
-            <span>PM: {PROJECT.manager}</span>
-            <span className="sep">·</span>
-            <span>Started {PROJECT.startDate}</span>
-            <span className="sep">·</span>
-            <span>Expected completion: {PROJECT.expectedCompletion}</span>
+            {project.start_date && (
+              <>
+                <span>Started {fmtDate(project.start_date)}</span>
+                <span className="sep">·</span>
+              </>
+            )}
+            {project.end_date && (
+              <>
+                <span>Expected {fmtDate(project.end_date)}</span>
+                <span className="sep">·</span>
+              </>
+            )}
+            <span style={{ textTransform: "capitalize" }}>
+              {project.status || ""}
+            </span>
           </div>
         </div>
-        <div className="cd-header__progress-ring">
-          <svg viewBox="0 0 72 72" width="72" height="72">
-            <circle cx="36" cy="36" r="30" className="ring-bg" />
-            <circle
-              cx="36"
-              cy="36"
-              r="30"
-              className="ring-fill"
-              strokeDasharray={`${(PROJECT.progress / 100) * 188.5} 188.5`}
-              strokeDashoffset="47"
-            />
-          </svg>
-          <span className="ring-label">{PROJECT.progress}%</span>
-        </div>
+        <ProgressRing pct={progress} />
       </header>
 
+      {/* Stat cards */}
       <section className="cd-stats">
-        {STATS.map((s) => (
-          <StatCard key={s.id} stat={s} />
-        ))}
+        <StatCard
+          icon="📐"
+          label="Overall progress"
+          value={`${progress}%`}
+          sub={
+            progress >= 75
+              ? "On track"
+              : progress > 0
+                ? "In progress"
+                : "Not started"
+          }
+          subType={progress >= 75 ? "success" : "info"}
+        />
+        <StatCard
+          icon="🏗️"
+          label="Active milestones"
+          value={overview.in_progress ?? 0}
+          sub={
+            overview.delayed ? `${overview.delayed} delayed` : "All on track"
+          }
+          subType={overview.delayed ? "warning" : "success"}
+        />
+        <StatCard
+          icon="🧾"
+          label="Total invoiced"
+          value={fmtINR(invoicesData?.summary?.total_billed)}
+          sub={fmtINR(invoicesData?.summary?.total_pending) + " pending"}
+          subType="danger"
+        />
+        <StatCard
+          icon="⚠️"
+          label="Open incidents"
+          value={incidents.length}
+          sub="Awaiting response"
+          subType="warning"
+        />
       </section>
 
+      {/* Grid */}
       <div className="cd-grid">
+        {/* Left col */}
         <div className="cd-col">
           <div className="cd-card">
             <div className="cd-card__head">
@@ -369,23 +324,46 @@ export default function ClientDashboard() {
               <span className="cd-card__hint">Click to expand sub-tasks</span>
             </div>
             <div className="milestone-list">
-              {MILESTONES.map((m) => (
-                <MilestoneCard key={m.id} m={m} />
-              ))}
+              {milestones.length ? (
+                milestones.map((m) => <MilestoneCard key={m.id} m={m} />)
+              ) : (
+                <p
+                  style={{
+                    padding: 16,
+                    fontSize: 13,
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  No milestones yet.
+                </p>
+              )}
             </div>
           </div>
+
           <div className="cd-card">
             <div className="cd-card__head">
               <span className="cd-card__title">Incidents</span>
-              <span className="incident-count">{INCIDENTS.length} open</span>
+              <span className="incident-count">{incidents.length} open</span>
             </div>
             <div className="incident-list">
-              {INCIDENTS.map((inc) => (
-                <IncidentRow key={inc.id} inc={inc} />
-              ))}
+              {incidents.length ? (
+                incidents.map((inc) => <IncidentRow key={inc.id} inc={inc} />)
+              ) : (
+                <p
+                  style={{
+                    padding: 16,
+                    fontSize: 13,
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  No open incidents.
+                </p>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Right col */}
         <div className="cd-col">
           <div className="cd-card">
             <div className="cd-card__head">
@@ -393,20 +371,43 @@ export default function ClientDashboard() {
               <span className="cd-card__hint">By site engineer</span>
             </div>
             <div className="log-list">
-              {DAILY_LOGS.map((log) => (
-                <LogCard key={log.id} log={log} />
-              ))}
+              {logs.length ? (
+                logs.map((log) => <LogCard key={log.id} log={log} />)
+              ) : (
+                <p
+                  style={{
+                    padding: 16,
+                    fontSize: 13,
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  No logs yet.
+                </p>
+              )}
             </div>
           </div>
+
           <div className="cd-card">
             <div className="cd-card__head">
               <span className="cd-card__title">Invoices</span>
-              <button className="cd-card__link">View all →</button>
+              <a href="/client/invoices" className="cd-card__link">
+                View all →
+              </a>
             </div>
             <div className="invoice-list">
-              {INVOICES.map((inv) => (
-                <InvoiceRow key={inv.id} inv={inv} />
-              ))}
+              {invoices.length ? (
+                invoices.map((inv) => <InvoiceRow key={inv.id} inv={inv} />)
+              ) : (
+                <p
+                  style={{
+                    padding: 16,
+                    fontSize: 13,
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  No invoices yet.
+                </p>
+              )}
             </div>
           </div>
         </div>

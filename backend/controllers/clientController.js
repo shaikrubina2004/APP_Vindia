@@ -776,6 +776,73 @@ const createClientRfi = async (req, res) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  SHARED FILES  (drawings issued for coordination / construction)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/client/shared-files
+ * Returns drawings that are Issued for Coordination or Construction,
+ * joined with the latest version's approval statuses for the client to see.
+ */
+const getClientSharedFiles = async (req, res) => {
+  try {
+    const project = await getClientProject(req.user.id);
+    if (!project)
+      return res
+        .status(404)
+        .json({ message: "No project found for this client." });
+
+    const result = await pool.query(
+      `SELECT
+         d.id,
+         d.name,
+         d.drawing_no,
+         d.drawing_number,
+         d.discipline,
+         d.sub_discipline,
+         pf.name                    AS floor_name,
+         dv.revision_number         AS current_revision,
+         dv.file_url,
+         dv.file_size,
+         dv.uploaded_at,
+         dv.status                  AS display_status,
+         -- MEP review
+         dv.mep_status,
+         um.name                    AS mep_reviewed_by_name,
+         dv.mep_reviewed_at,
+         -- Arch review
+         dv.arch_status,
+         ua.name                    AS arch_reviewed_by_name,
+         dv.arch_reviewed_at,
+         -- Structural review
+         dv.str_status,
+         us.name                    AS str_reviewed_by_name,
+         dv.str_reviewed_at,
+         dv.fully_approved_at,
+         dv.issued_for_construction_at
+       FROM drawings d
+       JOIN drawing_versions dv  ON dv.id = d.current_version_id
+       JOIN project_floors   pf  ON pf.id = d.floor_id
+       LEFT JOIN users       um  ON um.id = dv.mep_reviewed_by
+       LEFT JOIN users       ua  ON ua.id = dv.arch_reviewed_by
+       LEFT JOIN users       us  ON us.id = dv.str_reviewed_by
+       WHERE d.project_id = $1
+         AND d.is_deleted  = false
+         AND dv.status IN ('Issued for Coordination','Issued for Construction','Approved')
+       ORDER BY dv.uploaded_at DESC`,
+      [project.id],
+    );
+
+    return res
+      .status(200)
+      .json({ files: result.rows, total: result.rows.length });
+  } catch (err) {
+    console.error("getClientSharedFiles:", err);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 module.exports = {
@@ -804,6 +871,9 @@ module.exports = {
   getClientIncidents,
   getClientIncidentById,
   createClientIncident,
+
+  // Shared files
+  getClientSharedFiles,
 
   // RFI
   getClientRfis,
