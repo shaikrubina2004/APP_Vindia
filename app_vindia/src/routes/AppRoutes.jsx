@@ -27,7 +27,6 @@ import Travel from "../pages/hr/Travel";
 
 import DigitalMarketing from "../pages/business-development/digital-marketing/DigitalMarketing";
 import DigitalMarketingLayout from "../layouts/DigitalMarketingLayout";
-import ThreeDVisualizerDashboard from "../pages/3DVisualizer/ThreeDVisualizerDashboard";
 import FinanceManagerDashboard from "../pages/Finance/FinanceManagerDashboard";
 
 /* ── PROJECT MANAGER ─────────────────────────────────────── */
@@ -40,7 +39,6 @@ import AppShell from "../components/incidents/AppShell";
 import SharedDrawingPage from "../components/project/SharedDrawingPage";
 
 /* ── SITE ENGINEER ───────────────────────────────────────── */
-// Using sub-router (from v1) — keeps SE routes modular
 import SiteEngineerRoutes from "./SiteEngineerRoutes";
 
 /* ── QUANTITY SURVEYOR ───────────────────────────────────── */
@@ -50,11 +48,15 @@ import Qsboq from "../pages/Quality Surveyor/Qsboq";
 import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
 import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
 import Qsmeasurement from "../pages/Quality Surveyor/Qsmeasurement";
+
 /* ── MEP ─────────────────────────────────────────────────── */
 import MEPRoutes from "./MepRoutes";
 import ClientRoutes from "./ClientRoutes";
-
 import MEPCoordination from "../pages/MEP Engineer/MEPCoordination";
+
+/* ── 3D VISUALIZER ───────────────────────────────────────── */
+import ThreeDVisualizerLayout from "../layouts/ThreeDVisualizerLayout";
+import ThreeDVisualizerDashboard from "../pages/3DVisualizer/ThreeDVisualizerDashboard";
 
 /* ── OTHER ROLES ─────────────────────────────────────────── */
 import PlanningEngineerDashboard from "../pages/Planning Engineer/PlanningEngineerDashboard";
@@ -74,8 +76,8 @@ import ArchitectDailyLogins from "../pages/Architect/ArchitectDailyLogins";
 import ArchitectDesigns from "../pages/Architect/ArchitectDesigns";
 import ArchitectAssign from "../pages/Architect/ArchitectAssign";
 import ArchitectProject from "../pages/Architect/ArchitectProject";
-import ArchitectSnagList from "../pages/Architect/ArchitectSnagList"; // from v1
-import RFIPage from "../pages/StructuralEngineer/RFI"; // shared RFI page
+import ArchitectSnagList from "../pages/Architect/ArchitectSnagList";
+import RFIPage from "../pages/StructuralEngineer/RFI";
 import RFIDetailPage from "../pages/StructuralEngineer/RFIDetails";
 
 /* ── PROJECT COORDINATOR ─────────────────────────────────── */
@@ -89,7 +91,6 @@ import BDADashboard from "../pages/business-development/business-development-ana
 import BDALeads from "../pages/business-development/business-development-analyst/BDALeads";
 import BDAAddLead from "../pages/business-development/business-development-analyst/BDAAddLead";
 import BDAFollowUp from "../pages/business-development/business-development-analyst/BDAFollowUp";
-// v2 uses BDAReportsWithRole — more complete version
 import BDAReportsWithRole from "../pages/business-development/business-development-analyst/BDAReportsWithRole";
 
 /* ── COMMON ──────────────────────────────────────────────── */
@@ -130,6 +131,7 @@ const AppRoutes = () => {
         {/* ══ AUTH ══════════════════════════════════════════ */}
         <Route path="/" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
+
         {/* ══ CEO ═══════════════════════════════════════════ */}
         <Route
           path="/dashboard"
@@ -171,6 +173,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         {/* ══ PROJECT MANAGER ═══════════════════════════════ */}
         <Route
           path="/pm/team"
@@ -182,16 +185,11 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/pm/incidents"
           element={
             <ProtectedRoute
-              allowedRoles={[
-                ROLES.CEO,
-                ROLES.MEP_ENGINEER,
-                ROLES.PROJECT_MANAGER,
-              ]}
+              allowedRoles={[ROLES.CEO, ROLES.MEP_ENGINEER, ROLES.PROJECT_MANAGER]}
             >
               <ProjectManagerLayout>
                 <AppShell key="pm-incidents" />
@@ -219,6 +217,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         {/* ══ HR ════════════════════════════════════════════ */}
         <Route
           path="/hr"
@@ -310,8 +309,10 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         {/* ══ SITE ENGINEER — sub-router handles all /site-engineer/* ═══ */}
         {SiteEngineerRoutes}
+
         {/* ══ QUANTITY SURVEYOR ═════════════════════════════ */}
         <Route
           path="/quantity-surveyor/dashboard"
@@ -369,8 +370,8 @@ const AppRoutes = () => {
             </QuantitySurveyorLayout>
           }
         />
-          <Route
-          path= "/quantity-surveyor/rfi"
+        <Route
+          path="/quantity-surveyor/rfi"
           element={
             <QuantitySurveyorLayout>
               <RFIPage />
@@ -385,6 +386,7 @@ const AppRoutes = () => {
             </QuantitySurveyorLayout>
           }
         />
+
         {/* ══ MEP ═══════════════════════════════════════════ */}
         <Route path="/mep/*" element={<MEPRoutes />} />
         <Route path="/client/*" element={<ClientRoutes />} />
@@ -414,8 +416,10 @@ const AppRoutes = () => {
             </ProjectManagerLayout>
           }
         />
+
         {/* ══ STRUCTURAL ════════════════════════════════════ */}
         <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
+
         {/* ══ FINANCE ═══════════════════════════════════════ */}
         <Route
           path="/finance/*"
@@ -427,7 +431,6 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/finance-manager/dashboard"
           element={
@@ -438,6 +441,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         {/* ══ ARCHITECT ═════════════════════════════════════ */}
         <Route
           path="/architect/dashboard"
@@ -445,29 +449,6 @@ const AppRoutes = () => {
             <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
               <ArchitectLayout>
                 <ArchitectDashboard />
-              </ArchitectLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/3d-visualizer/dashboard"
-          element={
-            <ProtectedRoute
-              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
-            >
-              <ArchitectLayout>
-                <ThreeDVisualizerDashboard />
-              </ArchitectLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/finance-manager/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.FINANCE_MANAGER, ROLES.CEO]}>
-              <ArchitectLayout>
-                <FinanceManagerDashboard />
               </ArchitectLayout>
             </ProtectedRoute>
           }
@@ -560,6 +541,7 @@ const AppRoutes = () => {
             </ArchitectLayout>
           }
         />
+
         {/* ══ PROJECT COORDINATOR ═══════════════════════════ */}
         <Route
           path="/project-coordinator/dashboard"
@@ -625,19 +607,19 @@ const AppRoutes = () => {
             </ProjectCoordinatorLayout>
           }
         />
+
         {/* ══ TIMESHEET ═════════════════════════════════════ */}
         <Route
           path="/timesheet"
           element={
-            <ProtectedRoute
-              allowedRoles={[ROLES.CEO, ROLES.HR, ...PROJECT_ROLES]}
-            >
+            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR, ...PROJECT_ROLES]}>
               <CEOLayout>
                 <Timesheet />
               </CEOLayout>
             </ProtectedRoute>
           }
         />
+
         {/* ══ BDA ═══════════════════════════════════════════ */}
         <Route
           path="/business-development/dashboard"
@@ -689,7 +671,100 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-        {/* ══ DIGITAL MARKETING══════════════════════════════════════ */}
+
+        {/* ══ 3D VISUALIZER ═════════════════════════════════ */}
+        <Route
+          path="/3d-visualizer/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+              <ThreeDVisualizerLayout>
+                <ThreeDVisualizerDashboard />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/3d-visualizer/drawings"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+              <ThreeDVisualizerLayout>
+                <SharedDrawingPage />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/3d-visualizer/models"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+              <ThreeDVisualizerLayout>
+                <SharedDrawingPage />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/3d-visualizer/revisions"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+              <ThreeDVisualizerLayout>
+                <SharedDrawingPage />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/3d-visualizer/daily-logs"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+              <ThreeDVisualizerLayout>
+                <SharedDrawingPage />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/3d-visualizer/tasks"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+              <ThreeDVisualizerLayout>
+                <AppShell key="viz-tasks" />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/3d-visualizer/rfi"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+              <ThreeDVisualizerLayout>
+                <RFIPage />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/3d-visualizer/rfi/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+              <ThreeDVisualizerLayout>
+                <RFIDetailPage />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/3d-visualizer/incidents"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+              <ThreeDVisualizerLayout>
+                <AppShell key="viz-incidents" />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ══ DIGITAL MARKETING ═════════════════════════════ */}
         <Route
           path="/digital-marketing/dashboard"
           element={
@@ -700,6 +775,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         {/* ══ FALLBACK ══════════════════════════════════════ */}
         <Route
           path="*"
