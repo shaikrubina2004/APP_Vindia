@@ -3,6 +3,7 @@ const router   = express.Router();
 const ctrl     = require("../controllers/teamController");
 const protect  = require("../middleware/authMiddleware");
 
+router.get   ("/",               protect, ctrl.getAllTeam);
 router.get   ("/:projectId",     protect, ctrl.getTeamByProject);
 router.post  ("/",               protect, ctrl.addMember);
 router.put   ("/:id",            protect, ctrl.updateMember);

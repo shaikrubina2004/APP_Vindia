@@ -6,6 +6,11 @@ const headers = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
 });
 
+export const fetchAllTeam = () =>
+  axios
+    .get(`${BASE}/api/team`, { headers: headers() })
+    .then((r) => r.data);
+
 export const fetchTeam = (projectId) =>
   axios
     .get(`${BASE}/api/team/${projectId}`, { headers: headers() })

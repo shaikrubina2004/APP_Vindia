@@ -1,5 +1,49 @@
 const pool = require("../config/db");
 
+// ── GET ALL members (across all projects) ──
+exports.getAllTeam = async (req, res) => {
+  try {
+    const membersRes = await pool.query(
+      `SELECT tm.*, p.name AS project_name
+       FROM team_members tm
+       LEFT JOIN projects p ON p.id = tm.project_id
+       ORDER BY tm.name ASC`
+    );
+
+    const memberIds = membersRes.rows.map((m) => m.id);
+    let incidents = [];
+
+    if (memberIds.length > 0) {
+      const incRes = await pool.query(
+        `SELECT * FROM team_incidents
+         WHERE member_id = ANY($1::int[])
+         ORDER BY created_at DESC`,
+        [memberIds]
+      );
+      incidents = incRes.rows;
+    }
+
+    const members = membersRes.rows.map((m) => ({
+      ...m,
+      incidents: incidents
+        .filter((i) => i.member_id === m.id)
+        .map((i) => ({
+          text: i.text,
+          severity: i.severity,
+          date: new Date(i.created_at).toLocaleDateString("en-IN", {
+            month: "short",
+            day: "numeric",
+          }),
+        })),
+    }));
+
+    res.json(members);
+  } catch (err) {
+    console.error("getAllTeam error:", err);
+    res.status(500).json({ error: "Failed to fetch team" });
+  }
+};
+
 // ── GET all members for a project ──
 exports.getTeamByProject = async (req, res) => {
   try {
@@ -55,26 +99,27 @@ exports.getTeamByProject = async (req, res) => {
 // ── ADD member ──
 exports.addMember = async (req, res) => {
   try {
-    const { name, role, type, status, project_id, wage, days_worked } = req.body;
+    const { name, role, type, status, project_id, wage, days_worked, team_head } = req.body;
 
-    console.log("addMember body:", req.body); // ✅ debug log
+    console.log("addMember body:", req.body);
 
     if (!name?.trim() || !role?.trim() || !project_id) {
       return res.status(400).json({ error: "name, role, and project_id are required" });
     }
 
     const result = await pool.query(
-      `INSERT INTO team_members (name, role, type, status, project_id, wage, days_worked)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO team_members (name, role, type, status, project_id, wage, days_worked, team_head)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         name.trim(),
         role.trim(),
         type || "Staff",
         status || "Active",
-        parseInt(project_id), // ✅ ensure integer
+        parseInt(project_id),
         wage ? Number(wage) : null,
         days_worked ? Number(days_worked) : 0,
+        team_head?.trim() || null,
       ]
     );
 
@@ -99,7 +144,7 @@ exports.addMember = async (req, res) => {
 exports.updateMember = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, role, status, project_id, wage, days_worked, tasks_count } = req.body;
+    const { name, role, status, project_id, wage, days_worked, tasks_count, team_head } = req.body;
 
     const existing = await pool.query(
       "SELECT * FROM team_members WHERE id = $1",
@@ -118,17 +163,19 @@ exports.updateMember = async (req, res) => {
          project_id  = $4,
          wage        = $5,
          days_worked = $6,
-         tasks_count = $7
-       WHERE id = $8
+         tasks_count = $7,
+         team_head   = $8
+       WHERE id = $9
        RETURNING *`,
       [
         name?.trim()          || old.name,
         role?.trim()          || old.role,
         status                || old.status,
-        project_id ? parseInt(project_id) : old.project_id, // ✅ ensure integer
+        project_id ? parseInt(project_id) : old.project_id,
         wage != null ? Number(wage) : old.wage,
         days_worked != null ? Number(days_worked) : old.days_worked,
         tasks_count != null ? Number(tasks_count) : old.tasks_count,
+        team_head != null ? (team_head.trim() || null) : old.team_head,
         id,
       ]
     );

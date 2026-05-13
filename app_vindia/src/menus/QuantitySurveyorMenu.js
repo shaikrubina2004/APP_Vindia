@@ -41,6 +41,7 @@ const QuantitySurveyorMenu = [
     path: "/quantity-surveyor/incident?page=tasks",
     icon: "check-square",
   },
+   { name: "RFI", path: "/quantity-surveyor/rfi", icon: "help-circle" },
 ];
 
 export default QuantitySurveyorMenu;
