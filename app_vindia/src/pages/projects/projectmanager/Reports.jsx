@@ -1,84 +1,48 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import "../../../styles/Reports.css";
 import { useProject } from "../../../context/ProjectContext";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-const headers = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+const token = () => localStorage.getItem("token");
 
-// ── Helpers ──────────────────────────────────────────────────
-const fmt = (n) =>
-  n >= 1000000 ? `₹${(n / 1000000).toFixed(2)}M` : `₹${(n / 1000).toFixed(0)}K`;
-const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+const fmt = (n) => n >= 1e6 ? `₹${(n/1e6).toFixed(2)}M` : n >= 1e3 ? `₹${(n/1e3).toFixed(0)}K` : `₹${n||0}`;
+const pct = (a,b) => b ? Math.round((a/b)*100) : 0;
 
-function DeltaBadge({ delta, suffix = "" }) {
-  if (!delta || delta.dir === "flat") return null;
+function Bar({ value, max=100, color="#1e5a96", height=6 }) {
+  const w = Math.min(100, Math.round((value/(max||1))*100));
   return (
-    <span className={`rpt-delta rpt-delta-${delta.dir}`}>
-      {delta.dir === "up" ? "▲" : "▼"} {delta.val}
-      {suffix}
-    </span>
-  );
-}
-
-function Bar({ value, max = 100, color = "var(--primary-blue)", height = 6 }) {
-  const w = Math.min(100, Math.round((value / (max || 1)) * 100));
-  return (
-    <div className="rpt-bar-track" style={{ height }}>
-      <div className="rpt-bar-fill" style={{ width: `${w}%`, background: color, height }} />
+    <div style={{background:"#e6e8ec",borderRadius:99,height,overflow:"hidden",flex:1}}>
+      <div style={{width:`${w}%`,background:color,height,borderRadius:99,transition:"width .4s"}}/>
     </div>
   );
 }
 
-function Donut({ value, max = 100, size = 80, stroke = 10, color = "var(--primary-blue)" }) {
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
-  const p = Math.min((value || 0) / (max || 1), 1);
+function Donut({ value, max=100, size=76, stroke=9, color="#1e5a96" }) {
+  const r=(size-stroke)/2, circ=2*Math.PI*r, p=Math.min((value||0)/(max||1),1);
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e6e8ec" strokeWidth={stroke} />
-      <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
-        strokeDasharray={`${circ * p} ${circ}`} strokeLinecap="round"
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e6e8ec" strokeWidth={stroke}/>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+        strokeDasharray={`${circ*p} ${circ}`} strokeLinecap="round"
+        transform={`rotate(-90 ${size/2} ${size/2})`}/>
       <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle"
-        fontSize={size * 0.18} fontWeight="700" fill={color}>
-        {Math.round(p * 100)}%
-      </text>
+        fontSize={size*.18} fontWeight="700" fill={color}>{Math.round(p*100)}%</text>
     </svg>
   );
 }
 
-function EfficiencyCell({ value }) {
-  const isHigh = value >= 90, isMid = value >= 75;
-  const fill  = isHigh ? "#22c55e" : isMid ? "#f59e0b" : "#ef4444";
-  const bg    = isHigh ? "#dcfce7" : isMid ? "#fef3c7" : "#fee2e2";
-  const color = isHigh ? "#15803d" : isMid ? "#b45309" : "#dc2626";
-  return (
-    <div className="rpt-eff-cell">
-      <div className="rpt-eff-bar-wrap">
-        <div className="rpt-eff-track">
-          <div className="rpt-eff-fill" style={{ width: `${value}%`, background: fill }} />
-        </div>
-      </div>
-      <span className="rpt-eff-pill" style={{ background: bg, color }}>{value}%</span>
-    </div>
-  );
-}
-
-function BarChart({ data, valueKey, labelKey }) {
-  const max = Math.max(...data.map((d) => d[valueKey] || 0), 1);
+function MiniBarChart({ data, valueKey, labelKey }) {
+  const max = Math.max(...data.map(d=>Number(d[valueKey])||0), 1);
   return (
     <div className="rpt-chart">
-      {data.map((d, i) => {
-        const heightPct = Math.round(((d[valueKey] || 0) / max) * 100);
-        const isActive = i === data.length - 1;
+      {data.map((d,i)=>{
+        const h=Math.round(((Number(d[valueKey])||0)/max)*100);
+        const last=i===data.length-1;
         return (
-          <div key={i} className={`rpt-chart-col${isActive ? " rpt-chart-col-active" : ""}`}>
+          <div key={i} className={`rpt-chart-col${last?" rpt-chart-col-active":""}`}>
             <span className="rpt-chart-val">{d[valueKey]}</span>
             <div className="rpt-chart-bar-wrap">
-              <div className="rpt-chart-bar"
-                style={{ height: `${heightPct}%`, background: isActive ? "var(--primary-blue)" : "#c7d9ef" }} />
+              <div className="rpt-chart-bar" style={{height:`${h}%`,background:last?"#1e5a96":"#c7d9ef"}}/>
             </div>
             <span className="rpt-chart-label">{d[labelKey]}</span>
           </div>
@@ -88,230 +52,240 @@ function BarChart({ data, valueKey, labelKey }) {
   );
 }
 
-function LoadingSpinner() {
+function Spinner() {
   return (
-    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 300, flexDirection: "column", gap: 12 }}>
-      <div className="tm-spinner" />
-      <p style={{ color: "#6b7280", fontSize: 14 }}>Loading report data…</p>
+    <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:260,flexDirection:"column",gap:14}}>
+      <div className="tm-spinner"/>
+      <p style={{color:"#6b7280",fontSize:13}}>Loading report…</p>
     </div>
   );
 }
 
-function ErrorMsg({ msg }) {
+function ErrBox({ msg, onRetry }) {
   return (
-    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 200, flexDirection: "column", gap: 8 }}>
-      <div style={{ fontSize: 32 }}>⚠️</div>
-      <p style={{ color: "#ef4444", fontSize: 14 }}>{msg}</p>
+    <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:220,flexDirection:"column",gap:10}}>
+      <div style={{fontSize:38}}>⚠️</div>
+      <p style={{color:"#ef4444",fontSize:13,textAlign:"center",maxWidth:420}}>{msg}</p>
+      <button onClick={onRetry}
+        style={{marginTop:4,padding:"7px 20px",background:"#1e5a96",color:"#fff",border:"none",borderRadius:8,fontSize:13,cursor:"pointer"}}>
+        Retry
+      </button>
     </div>
   );
 }
 
-// ── Main Component ───────────────────────────────────────────
+const TABS = [
+  { id:"project",   label:"Project Report",  icon:"📈" },
+  { id:"cost",      label:"Cost Report",      icon:"💰" },
+  { id:"timesheet", label:"Timesheet Report", icon:"⏱" },
+  { id:"incidents", label:"Incident Report",  icon:"🚨" },
+];
+
 export default function Reports() {
-  const { activeProject, PROJECTS, loading: projectsLoading } = useProject();
+  const { activeProject, setActiveProject, PROJECTS, loading: projectsLoading } = useProject();
 
-  const [activeReport, setActiveReport] = useState("project");
+  const [tab, setTab]         = useState("project");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError]     = useState(null);
+  const [data, setData]       = useState(null);
 
-  // Per-tab data
-  const [projectData, setProjectData]     = useState(null);
-  const [costData, setCostData]           = useState(null);
-  const [timesheetData, setTimesheetData] = useState(null);
-  const [incidentData, setIncidentData]   = useState(null);
+  const projectList = (PROJECTS||[]).filter(p => p.id !== null);
+  const projectId   = activeProject?.id ?? null;
 
-  const projectId = activeProject?.id ? String(activeProject.id) : null;
-
-  // Fetch on tab/project change
-  useEffect(() => {
-    if (!projectId || projectsLoading) return;
-    fetchReport(activeReport);
-  }, [activeReport, projectId, projectsLoading]);
-
-  async function fetchReport(type) {
+  // useCallback so the function reference is stable and useEffect dep works correctly
+  const fetchTab = useCallback(async (t, pid) => {
+    if (!pid) return;
     setLoading(true);
     setError(null);
+    setData(null);
     try {
-      const res = await fetch(`${BASE}/api/pm-reports/${projectId}/${type}`, { headers: headers() });
-      if (!res.ok) throw new Error(`Server returned ${res.status}`);
-      const data = await res.json();
-      if (type === "project")   setProjectData(data);
-      if (type === "cost")      setCostData(data);
-      if (type === "timesheet") setTimesheetData(data);
-      if (type === "incidents") setIncidentData(data);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to load report data. Please check your connection.");
+      const res = await fetch(`${BASE}/api/pm-reports/${pid}/${t}`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || json.error || `HTTP ${res.status}`);
+      setData(json);
+    } catch(e) {
+      console.error("Report fetch error:", e);
+      setError(e.message || "Failed to load report. Check backend is running.");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function handleExport() {
+  // Re-fetch whenever tab OR project changes
+  useEffect(() => {
+    if (projectsLoading) return;
+    if (!projectId) { setData(null); setError(null); setLoading(false); return; }
+    fetchTab(tab, projectId);
+  }, [tab, projectId, projectsLoading, fetchTab]);
+
+  function handleExport() {
     if (!projectId) return;
-    const typeMap = { project: "project", cost: "cost", timesheet: "timesheet", incident: "incident" };
-    const t = typeMap[activeReport] || activeReport;
-    window.open(`${BASE}/api/pm-reports/${projectId}/export?type=${t}`, "_blank");
+    const map = { project:"project", cost:"cost", timesheet:"timesheet", incidents:"incident" };
+    window.open(`${BASE}/api/pm-reports/${projectId}/export?type=${map[tab]||tab}`, "_blank");
   }
 
-  const REPORTS = [
-    { id: "project",   label: "Project Report",  icon: "📈" },
-    { id: "cost",      label: "Cost Report",      icon: "💰" },
-    { id: "timesheet", label: "Timesheet Report", icon: "⏱" },
-    { id: "incidents", label: "Incident Report",  icon: "🚨" },
-  ];
-
-  if (projectsLoading) return <LoadingSpinner />;
-
-  if (!projectId) {
-    return (
-      <div className="rpt-page">
-        <div className="rpt-header">
-          <div className="rpt-header-title"><h1>Reports</h1><p>Select a project to view reports</p></div>
-        </div>
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 300, flexDirection: "column", gap: 12 }}>
-          <div style={{ fontSize: 36 }}>📊</div>
-          <p style={{ color: "#6b7280", fontSize: 14 }}>No project selected. Please select a project from the top bar.</p>
-        </div>
-      </div>
-    );
+  function handleProjectChange(e) {
+    const p = projectList.find(x => String(x.id) === e.target.value);
+    if (p) setActiveProject(p);
   }
 
-  const projectName = activeProject?.name || "Project";
+  // What to show in the content area
+  const showSpinner  = projectId && loading;
+  const showError    = projectId && !loading && error;
+  const showEmpty    = !projectId && !projectsLoading;
+  const showContent  = projectId && !loading && !error && data;
 
   return (
     <div className="rpt-page">
-      {/* Header */}
-      <div className="rpt-header">
-        <div className="rpt-header-title">
-          <h1>Reports</h1>
-          <p>{projectName} — Live analytics</p>
+
+      {/* ── Project selector banner ── */}
+      <div className="rpt-selector-banner">
+        <div className="rpt-selector-left">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1e5a96" strokeWidth="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span className="rpt-selector-label">Select Project</span>
         </div>
-        <div className="rpt-export-group">
-          <button className="rpt-export-btn rpt-excel" onClick={handleExport}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/>
-            </svg>
-            Export Excel
-          </button>
+        <div className="rpt-selector-right">
+          {projectsLoading ? (
+            <span style={{fontSize:13,color:"#9ca3af"}}>Loading projects…</span>
+          ) : projectList.length === 0 ? (
+            <span style={{fontSize:13,color:"#ef4444"}}>No projects found</span>
+          ) : (
+            <div className="rpt-selector-wrap">
+              <select className="rpt-selector-select"
+                value={String(projectId ?? "")}
+                onChange={handleProjectChange}>
+                <option value="" disabled>— Choose a project —</option>
+                {projectList.map(p => (
+                  <option key={p.id} value={String(p.id)}>{p.name}</option>
+                ))}
+              </select>
+              <svg className="rpt-selector-chevron" width="14" height="14" viewBox="0 0 24 24"
+                fill="none" stroke="#1e5a96" strokeWidth="2.5">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          )}
+          {projectId && (
+            <div className="rpt-selector-active-badge">
+              <span className="rpt-selector-active-dot"/>
+              {activeProject?.name}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* ── Header ── */}
+      <div className="rpt-header">
+        <div className="rpt-header-title">
+          <h1>Reports</h1>
+          <p>{projectId ? `${activeProject?.name} — Live analytics` : "Select a project to begin"}</p>
+        </div>
+        <button className="rpt-export-btn rpt-excel" onClick={handleExport}
+          disabled={!projectId || loading}
+          style={{marginLeft:"auto",opacity:projectId?1:0.45,cursor:projectId?"pointer":"not-allowed"}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="8" y1="13" x2="16" y2="13"/>
+          </svg>
+          Export Excel
+        </button>
+      </div>
+
+      {/* ── Tabs ── */}
       <div className="rpt-tabs">
-        {REPORTS.map((r) => (
-          <button key={r.id}
-            className={`rpt-tab${activeReport === r.id ? " rpt-tab-active" : ""}`}
-            onClick={() => setActiveReport(r.id)}>
-            <span className="rpt-tab-icon">{r.icon}</span>{r.label}
+        {TABS.map(t => (
+          <button key={t.id}
+            className={`rpt-tab${tab===t.id?" rpt-tab-active":""}`}
+            onClick={() => setTab(t.id)}
+            disabled={!projectId}>
+            <span className="rpt-tab-icon">{t.icon}</span>{t.label}
           </button>
         ))}
       </div>
 
-      {loading && <LoadingSpinner />}
-      {error && !loading && <ErrorMsg msg={error} />}
+      {/* ── States ── */}
+      {showEmpty   && (
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+          height:320,gap:14,background:"#f8fafc",borderRadius:16,margin:"8px 0"}}>
+          <div style={{fontSize:52}}>📊</div>
+          <p style={{color:"#374151",fontSize:15,fontWeight:600}}>No project selected</p>
+          <p style={{color:"#9ca3af",fontSize:13,textAlign:"center",maxWidth:300}}>
+            Use the <strong>Select Project</strong> dropdown above to load a report.
+          </p>
+        </div>
+      )}
+      {showSpinner && <Spinner/>}
+      {showError   && <ErrBox msg={error} onRetry={() => fetchTab(tab, projectId)}/>}
 
-      {/* ══ PROJECT ══ */}
-      {!loading && !error && activeReport === "project" && projectData && (
+      {/* ══ PROJECT REPORT ══ */}
+      {showContent && tab === "project" && (
         <div className="rpt-content">
           <div className="rpt-kpi-row">
             <div className="rpt-kpi-card">
-              <Donut value={projectData.overall} color="#1e5a96" size={72} />
+              <Donut value={data.overall} color="#1e5a96" size={76}/>
               <div>
                 <span className="rpt-kpi-label">Overall Progress</span>
-                <span className="rpt-kpi-val">{projectData.overall}%</span>
+                <span className="rpt-kpi-val">{data.overall}%</span>
               </div>
             </div>
             <div className="rpt-kpi-card">
-              <div className="rpt-kpi-icon kpi-green">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </div>
+              <div className="rpt-kpi-icon kpi-green">✔</div>
               <div>
                 <span className="rpt-kpi-label">Phases Complete</span>
-                <span className="rpt-kpi-val">
-                  {projectData.phases.filter((p) => p.status === "done" || p.progress === 100).length} / {projectData.phases.length}
-                </span>
+                <span className="rpt-kpi-val">{(data.phases||[]).filter(p=>p.progress===100).length} / {(data.phases||[]).length}</span>
               </div>
             </div>
             <div className="rpt-kpi-card">
-              <div className="rpt-kpi-icon kpi-amber">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                </svg>
-              </div>
+              <div className="rpt-kpi-icon kpi-amber">⏱</div>
               <div>
-                <span className="rpt-kpi-label">Delayed Milestones</span>
-                <span className="rpt-kpi-val">{projectData.delayedMilestones}</span>
+                <span className="rpt-kpi-label">Delayed Phases</span>
+                <span className="rpt-kpi-val">{data.delayedMilestones||0}</span>
               </div>
             </div>
             <div className="rpt-kpi-card">
-              <div className="rpt-kpi-icon kpi-blue">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="9 11 12 14 22 4"/>
-                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                </svg>
-              </div>
+              <div className="rpt-kpi-icon kpi-blue">📋</div>
               <div>
                 <span className="rpt-kpi-label">Reports This Week</span>
-                <span className="rpt-kpi-val">{projectData.weeklyTasks}</span>
+                <span className="rpt-kpi-val">{data.weeklyTasks||0}</span>
               </div>
             </div>
           </div>
-
           <div className="rpt-grid-2">
             <div className="rpt-card">
-              <div className="rpt-card-header"><h3>Phase Progress</h3><span className="rpt-card-sub">Planned vs Actual</span></div>
-              {projectData.phases.length === 0 ? (
-                <p style={{ color: "#9ca3af", padding: "20px 0", textAlign: "center" }}>No WBS phases found for this project.</p>
-              ) : (
+              <div className="rpt-card-header"><h3>Phase Progress</h3></div>
+              {!data.phases?.length ? <p className="rpt-empty">No WBS phases found.</p> : (
                 <div className="rpt-phase-list">
-                  {projectData.phases.map((p, i) => (
+                  {data.phases.map((p,i)=>(
                     <div key={i} className="rpt-phase-row">
-                      <div className="rpt-phase-info">
-                        <span className="rpt-phase-name">{p.name}</span>
-                        <div className="rpt-phase-days">
-                          {p.planned > 0 && <span className="rpt-days-planned">Plan: {p.planned}d</span>}
-                          {p.actual > 0 && (
-                            <span className={`rpt-days-actual ${p.actual > p.planned ? "over" : "under"}`}>
-                              Act: {p.actual}d
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                      <span className="rpt-phase-name">{p.name}</span>
                       <div className="rpt-phase-bar-area">
-                        <Bar value={p.progress}
-                          color={p.progress === 100 ? "#22c55e" : p.progress > 0 ? "#1e5a96" : "#e6e8ec"} />
+                        <Bar value={p.progress} color={p.progress===100?"#22c55e":p.progress>0?"#1e5a96":"#e6e8ec"}/>
                         <span className="rpt-phase-pct">{p.progress}%</span>
                       </div>
-                      <span className={`rpt-phase-status rpt-ps-${p.progress === 100 ? "done" : p.progress > 0 ? "inprogress" : "pending"}`}>
-                        {p.progress === 100 ? "✔ Done" : p.progress > 0 ? "◐ Active" : "○ Pending"}
+                      <span className={`rpt-phase-status rpt-ps-${p.progress===100?"done":p.progress>0?"inprogress":"pending"}`}>
+                        {p.progress===100?"✔ Done":p.progress>0?"◐ Active":"○ Pending"}
                       </span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-
             <div className="rpt-card">
-              <div className="rpt-card-header"><h3>Milestones</h3><span className="rpt-card-sub">Key project dates</span></div>
-              {(!projectData.milestones || projectData.milestones.length === 0) ? (
-                <p style={{ color: "#9ca3af", padding: "20px 0", textAlign: "center" }}>No milestones found.</p>
-              ) : (
+              <div className="rpt-card-header"><h3>Milestones</h3></div>
+              {!data.milestones?.length ? <p className="rpt-empty">No milestones found.</p> : (
                 <div className="rpt-milestone-list">
-                  {projectData.milestones.map((m, i) => (
+                  {data.milestones.map((m,i)=>(
                     <div key={i} className="rpt-milestone-row">
-                      <div className={`rpt-ms-dot rpt-ms-${m.status || "pending"}`}>
-                        {m.status === "done" ? "✔" : m.status === "delayed" ? "!" : "○"}
-                      </div>
-                      <div className="rpt-ms-info">
-                        <span className="rpt-ms-name">{m.name}</span>
-                        <span className="rpt-ms-date">{m.target_date ? new Date(m.target_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</span>
-                      </div>
-                      <span className={`rpt-ms-badge rpt-ms-${m.status || "pending"}`}>
-                        {m.status === "done" ? "Complete" : m.status === "delayed" ? "Delayed" : "Upcoming"}
+                      <div className={`rpt-ms-dot rpt-ms-${m.status}`}>{m.status==="done"?"✔":m.status==="delayed"?"!":"○"}</div>
+                      <div className="rpt-ms-info"><span className="rpt-ms-name">{m.name}</span></div>
+                      <span className={`rpt-ms-badge rpt-ms-${m.status}`}>
+                        {m.status==="done"?"Complete":m.status==="delayed"?"Delayed":"Upcoming"}
                       </span>
                     </div>
                   ))}
@@ -322,63 +296,47 @@ export default function Reports() {
         </div>
       )}
 
-      {/* ══ COST ══ */}
-      {!loading && !error && activeReport === "cost" && costData && (
+      {/* ══ COST REPORT ══ */}
+      {showContent && tab === "cost" && (
         <div className="rpt-content">
           <div className="rpt-kpi-row">
             <div className="rpt-kpi-card">
-              <Donut value={pct(costData.spent, costData.budget)}
-                color={costData.spent > costData.budget ? "#ef4444" : "#1e5a96"} size={72} />
+              <Donut value={pct(data.spent,data.budget)} color={data.spent>data.budget?"#ef4444":"#1e5a96"} size={76}/>
               <div>
                 <span className="rpt-kpi-label">Budget Used</span>
-                <span className="rpt-kpi-val">{pct(costData.spent, costData.budget)}%</span>
-                {costData.spent > costData.budget && <span className="rpt-over-badge">Over Budget</span>}
+                <span className="rpt-kpi-val">{pct(data.spent,data.budget)}%</span>
+                {data.spent>data.budget && <span className="rpt-over-badge">Over Budget</span>}
               </div>
             </div>
             <div className="rpt-kpi-card">
               <div className="rpt-kpi-icon kpi-blue">₹</div>
-              <div>
-                <span className="rpt-kpi-label">Total Budget</span>
-                <span className="rpt-kpi-val">{fmt(costData.budget)}</span>
-              </div>
+              <div><span className="rpt-kpi-label">Total Budget</span><span className="rpt-kpi-val">{fmt(data.budget)}</span></div>
             </div>
             <div className="rpt-kpi-card">
-              <div className={`rpt-kpi-icon ${costData.spent > costData.budget ? "kpi-red" : "kpi-amber"}`}>₹</div>
-              <div>
-                <span className="rpt-kpi-label">Total Spent</span>
-                <span className="rpt-kpi-val">{fmt(costData.spent)}</span>
-              </div>
+              <div className={`rpt-kpi-icon ${data.spent>data.budget?"kpi-red":"kpi-amber"}`}>₹</div>
+              <div><span className="rpt-kpi-label">Total Spent</span><span className="rpt-kpi-val">{fmt(data.spent)}</span></div>
             </div>
             <div className="rpt-kpi-card">
-              <div className={`rpt-kpi-icon ${costData.budget - costData.spent < 0 ? "kpi-red" : "kpi-green"}`}>₹</div>
-              <div>
-                <span className="rpt-kpi-label">Remaining</span>
-                <span className="rpt-kpi-val">{fmt(Math.abs(costData.budget - costData.spent))}</span>
-                {costData.spent > costData.budget && <span className="rpt-over-badge">Overspent</span>}
-              </div>
+              <div className={`rpt-kpi-icon ${(data.budget-data.spent)<0?"kpi-red":"kpi-green"}`}>₹</div>
+              <div><span className="rpt-kpi-label">Remaining</span><span className="rpt-kpi-val">{fmt(Math.abs(data.budget-data.spent))}</span></div>
             </div>
           </div>
-
           <div className="rpt-grid-2">
             <div className="rpt-card">
               <div className="rpt-card-header"><h3>Budget vs Spent by Phase</h3></div>
-              {costData.categories.length === 0 ? (
-                <p style={{ color: "#9ca3af", padding: "20px 0", textAlign: "center" }}>No cost data yet.</p>
-              ) : (
+              {!data.categories?.length ? <p className="rpt-empty">No cost data yet.</p> : (
                 <div className="rpt-cost-list">
-                  {costData.categories.map((c, i) => {
-                    const up = pct(c.spent, c.budget);
-                    const over = c.spent > c.budget;
+                  {data.categories.map((c,i)=>{
+                    const u=pct(c.spent,c.budget||1), over=c.spent>c.budget;
                     return (
                       <div key={i} className="rpt-cost-row">
                         <span className="rpt-cost-name">{c.name}</span>
                         <div className="rpt-cost-bars">
                           <div className="rpt-cost-bar-track">
-                            <div className="rpt-cost-bar-budget" style={{ width: "100%" }} />
-                            <div className={`rpt-cost-bar-spent${over ? " over-budget" : ""}`}
-                              style={{ width: `${Math.min(up, 100)}%` }} />
+                            <div className="rpt-cost-bar-budget" style={{width:"100%"}}/>
+                            <div className={`rpt-cost-bar-spent${over?" over-budget":""}`} style={{width:`${Math.min(u,100)}%`}}/>
                           </div>
-                          <span className={`rpt-cost-pct${over ? " text-red" : ""}`}>{up}%</span>
+                          <span className={`rpt-cost-pct${over?" text-red":""}`}>{u}%</span>
                         </div>
                         <div className="rpt-cost-amounts">
                           <span className="rpt-cost-spent">{fmt(c.spent)}</span>
@@ -390,87 +348,49 @@ export default function Reports() {
                 </div>
               )}
             </div>
-
             <div className="rpt-card">
               <div className="rpt-card-header"><h3>Weekly Spend Trend</h3></div>
-              {costData.trend && costData.trend.length > 0 ? (
-                <BarChart data={costData.trend} valueKey="spent" labelKey="week" />
-              ) : (
-                <p style={{ color: "#9ca3af", padding: "20px 0", textAlign: "center" }}>No weekly trend data yet.</p>
-              )}
+              {data.trend?.length>0 ? <MiniBarChart data={data.trend} valueKey="spent" labelKey="week"/> : <p className="rpt-empty">No spend data yet.</p>}
             </div>
           </div>
         </div>
       )}
 
-      {/* ══ TIMESHEET ══ */}
-      {!loading && !error && activeReport === "timesheet" && timesheetData && (
+      {/* ══ TIMESHEET REPORT ══ */}
+      {showContent && tab === "timesheet" && (
         <div className="rpt-content">
           <div className="rpt-kpi-row">
             <div className="rpt-kpi-card">
-              <div className="rpt-kpi-icon kpi-blue">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                </svg>
-              </div>
-              <div>
-                <span className="rpt-kpi-label">Total Hours</span>
-                <span className="rpt-kpi-val">{timesheetData.totalHours}</span>
-              </div>
+              <div className="rpt-kpi-icon kpi-blue">⏱</div>
+              <div><span className="rpt-kpi-label">Total Hours</span><span className="rpt-kpi-val">{data.totalHours||0}</span></div>
             </div>
             <div className="rpt-kpi-card">
-              <div className="rpt-kpi-icon kpi-green">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
-              </div>
-              <div>
-                <span className="rpt-kpi-label">Active Workers</span>
-                <span className="rpt-kpi-val">{timesheetData.activeWorkers}</span>
-              </div>
+              <div className="rpt-kpi-icon kpi-green">👥</div>
+              <div><span className="rpt-kpi-label">Active Workers</span><span className="rpt-kpi-val">{data.activeWorkers||0}</span></div>
             </div>
             <div className="rpt-kpi-card">
-              <div className="rpt-kpi-icon kpi-amber">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                </svg>
-              </div>
-              <div>
-                <span className="rpt-kpi-label">Total Tasks</span>
-                <span className="rpt-kpi-val">{timesheetData.totalTasks}</span>
-              </div>
+              <div className="rpt-kpi-icon kpi-amber">✅</div>
+              <div><span className="rpt-kpi-label">Total Tasks</span><span className="rpt-kpi-val">{data.totalTasks||0}</span></div>
             </div>
           </div>
-
           <div className="rpt-ts-grid">
             <div className="rpt-card">
-              <div className="rpt-card-header">
-                <h3>Team Productivity</h3>
-                <span className="rpt-card-sub">{projectName}</span>
-              </div>
-              {timesheetData.employees.length === 0 ? (
-                <p style={{ color: "#9ca3af", padding: "20px 0", textAlign: "center" }}>No active team members found.</p>
-              ) : (
+              <div className="rpt-card-header"><h3>Team Members</h3></div>
+              {!data.employees?.length ? <p className="rpt-empty">No active team members found.</p> : (
                 <div className="rpt-table-wrap">
                   <table className="rpt-table">
-                    <thead>
-                      <tr><th>Employee</th><th>Role</th><th>Type</th><th>Hours</th><th>Tasks</th><th>Days Worked</th></tr>
-                    </thead>
+                    <thead><tr><th>Employee</th><th>Role</th><th>Type</th><th>Hours</th><th>Tasks</th><th>Days</th></tr></thead>
                     <tbody>
-                      {timesheetData.employees.map((e, i) => (
+                      {data.employees.map((e,i)=>(
                         <tr key={i}>
                           <td>
                             <div className="rpt-emp-cell">
-                              <div className="rpt-emp-avatar">{e.name.charAt(0)}</div>
+                              <div className="rpt-emp-avatar">{(e.name||"?").charAt(0).toUpperCase()}</div>
                               {e.name}
                             </div>
                           </td>
                           <td><span className="rpt-role-badge">{e.role}</span></td>
-                          <td>
-                            <span className={`pill pill-${(e.type || "").toLowerCase()}`}>{e.type}</span>
-                          </td>
+                          <td><span className={`pill pill-${(e.type||"").toLowerCase()}`}>{e.type}</span></td>
                           <td><strong>{e.hours}h</strong></td>
                           <td>{e.tasks}</td>
                           <td>{e.days_worked}</td>
@@ -481,126 +401,79 @@ export default function Reports() {
                 </div>
               )}
             </div>
-
             <div className="rpt-card">
-              <div className="rpt-card-header"><h3>Daily Report Submissions</h3><span className="rpt-card-sub">Recent weeks</span></div>
-              {timesheetData.trend && timesheetData.trend.length > 0 ? (
-                <BarChart data={timesheetData.trend} valueKey="submissions" labelKey="week" />
-              ) : (
-                <p style={{ color: "#9ca3af", padding: "20px 0", textAlign: "center" }}>No submissions data yet.</p>
-              )}
+              <div className="rpt-card-header"><h3>Daily Report Submissions</h3></div>
+              {data.trend?.length>0 ? <MiniBarChart data={data.trend} valueKey="submissions" labelKey="week"/> : <p className="rpt-empty">No submission data yet.</p>}
             </div>
           </div>
         </div>
       )}
 
-      {/* ══ INCIDENT ══ */}
-      {!loading && !error && activeReport === "incidents" && incidentData && (
+      {/* ══ INCIDENT REPORT ══ */}
+      {showContent && tab === "incidents" && (
         <div className="rpt-content">
           <div className="rpt-kpi-row">
             <div className="rpt-kpi-card">
-              <Donut value={incidentData.total > 0 ? pct(incidentData.closed, incidentData.total) : 100}
-                color="#22c55e" size={72} />
+              <Donut value={data.total>0?pct(data.closed,data.total):100} color="#22c55e" size={76}/>
               <div>
                 <span className="rpt-kpi-label">Resolution Rate</span>
-                <span className="rpt-kpi-val">
-                  {incidentData.total > 0 ? pct(incidentData.closed, incidentData.total) : 100}%
-                </span>
+                <span className="rpt-kpi-val">{data.total>0?pct(data.closed,data.total):100}%</span>
               </div>
             </div>
             <div className="rpt-kpi-card">
-              <div className="rpt-kpi-icon kpi-blue">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
-              </div>
-              <div>
-                <span className="rpt-kpi-label">Total Incidents</span>
-                <span className="rpt-kpi-val">{incidentData.total}</span>
-              </div>
+              <div className="rpt-kpi-icon kpi-blue">📋</div>
+              <div><span className="rpt-kpi-label">Total</span><span className="rpt-kpi-val">{data.total||0}</span></div>
             </div>
             <div className="rpt-kpi-card">
-              <div className="rpt-kpi-icon kpi-amber">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="12"/>
-                  <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-              </div>
-              <div>
-                <span className="rpt-kpi-label">Open</span>
-                <span className="rpt-kpi-val">{incidentData.open}</span>
-              </div>
+              <div className="rpt-kpi-icon kpi-amber">⚠️</div>
+              <div><span className="rpt-kpi-label">Open</span><span className="rpt-kpi-val">{data.open||0}</span></div>
             </div>
             <div className="rpt-kpi-card">
-              <div className="rpt-kpi-icon kpi-green">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </div>
-              <div>
-                <span className="rpt-kpi-label">Closed</span>
-                <span className="rpt-kpi-val">{incidentData.closed}</span>
-              </div>
+              <div className="rpt-kpi-icon kpi-green">✔</div>
+              <div><span className="rpt-kpi-label">Closed</span><span className="rpt-kpi-val">{data.closed||0}</span></div>
             </div>
           </div>
-
           <div className="rpt-grid-2">
             <div className="rpt-card">
               <div className="rpt-card-header"><h3>By Priority</h3></div>
               <div className="rpt-inc-priority-list">
-                {incidentData.byPriority.map((p, i) => (
+                {(data.byPriority||[]).map((p,i)=>(
                   <div key={i} className="rpt-inc-p-row">
                     <div className="rpt-inc-p-info">
-                      <span className="rpt-inc-p-dot" style={{ background: p.color }} />
+                      <span className="rpt-inc-p-dot" style={{background:p.color}}/>
                       <span className="rpt-inc-p-label">{p.label}</span>
                     </div>
-                    <Bar value={p.count} max={incidentData.total || 1} color={p.color} />
+                    <Bar value={p.count} max={data.total||1} color={p.color}/>
                     <span className="rpt-inc-p-count">{p.count}</span>
                   </div>
                 ))}
               </div>
-              <div className="rpt-card-header" style={{ marginTop: 20 }}><h3>By Status</h3></div>
+              <div style={{marginTop:20}} className="rpt-card-header"><h3>By Status</h3></div>
               <div className="rpt-inc-status-list">
-                {incidentData.byStatus.map((s, i) => (
+                {(data.byStatus||[]).map((s,i)=>(
                   <div key={i} className="rpt-inc-s-row">
                     <span className="rpt-inc-s-label">{s.label}</span>
                     <div className="rpt-inc-s-bar">
-                      <div className="rpt-inc-s-fill"
-                        style={{ width: `${pct(s.count, incidentData.total || 1)}%` }} />
+                      <div className="rpt-inc-s-fill" style={{width:`${pct(s.count,data.total||1)}%`}}/>
                     </div>
                     <span className="rpt-inc-s-count">{s.count}</span>
                   </div>
                 ))}
               </div>
             </div>
-
             <div className="rpt-card">
               <div className="rpt-card-header"><h3>Recent Incidents</h3></div>
-              {incidentData.recent.length === 0 ? (
-                <p style={{ color: "#9ca3af", padding: "20px 0", textAlign: "center" }}>No incidents found for this project.</p>
-              ) : (
+              {!data.recent?.length ? <p className="rpt-empty">No incidents found.</p> : (
                 <div className="rpt-table-wrap">
                   <table className="rpt-table">
                     <thead><tr><th>ID</th><th>Title</th><th>Priority</th><th>Status</th><th>Age</th></tr></thead>
                     <tbody>
-                      {incidentData.recent.map((inc, i) => (
+                      {data.recent.map((inc,i)=>(
                         <tr key={i}>
                           <td><code className="rpt-inc-id">{inc.id}</code></td>
-                          <td style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {inc.title}
-                          </td>
-                          <td>
-                            <span className={`rpt-p-badge rpt-p-${(inc.priority || "p3").toLowerCase()}`}>
-                              {inc.priority}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`rpt-s-badge rpt-s-${(inc.status || "").toLowerCase().replace(/ /g, "-")}`}>
-                              {inc.status}
-                            </span>
-                          </td>
+                          <td style={{maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{inc.title}</td>
+                          <td><span className={`rpt-p-badge rpt-p-${(inc.priority||"p3").toLowerCase()}`}>{inc.priority}</span></td>
+                          <td><span className={`rpt-s-badge rpt-s-${(inc.status||"").toLowerCase().replace(/ /g,"-")}`}>{inc.status}</span></td>
                           <td className="rpt-age">{inc.age}</td>
                         </tr>
                       ))}
@@ -610,12 +483,12 @@ export default function Reports() {
               )}
               <div className="rpt-open-closed">
                 <div className="rpt-oc-bar">
-                  <div className="rpt-oc-open" style={{ width: `${pct(incidentData.open, incidentData.total || 1)}%` }} />
-                  <div className="rpt-oc-closed" style={{ width: `${pct(incidentData.closed, incidentData.total || 1)}%` }} />
+                  <div className="rpt-oc-open" style={{width:`${pct(data.open,data.total||1)}%`}}/>
+                  <div className="rpt-oc-closed" style={{width:`${pct(data.closed,data.total||1)}%`}}/>
                 </div>
                 <div className="rpt-oc-legend">
-                  <span><span className="rpt-oc-dot open" /> Open ({incidentData.open})</span>
-                  <span><span className="rpt-oc-dot closed" /> Closed ({incidentData.closed})</span>
+                  <span><span className="rpt-oc-dot open"/> Open ({data.open||0})</span>
+                  <span><span className="rpt-oc-dot closed"/> Closed ({data.closed||0})</span>
                 </div>
               </div>
             </div>
