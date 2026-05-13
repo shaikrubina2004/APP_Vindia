@@ -6,7 +6,9 @@ const {
   getAllProjects,
   getSiteEngineers,
   getManagers,
-  getCoordinators, // ✅ added
+  getCoordinators,
+  getArchitects,
+  getClients,
 } = require("../controllers/projectController");
 
 // ✅ Routes
@@ -15,5 +17,7 @@ router.get("/", getAllProjects);
 router.get("/site-engineers", getSiteEngineers);
 router.get("/managers", getManagers);
 router.get("/coordinators", getCoordinators); // ✅ added
+router.get("/architects", getArchitects);
+router.get("/clients", getClients);
 
 module.exports = router;

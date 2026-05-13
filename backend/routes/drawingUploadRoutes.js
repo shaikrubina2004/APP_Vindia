@@ -126,7 +126,7 @@ router.get("/daily-logs/all", async (req, res) => {
        LEFT JOIN users u ON u.id = dl.submitted_by
        LEFT JOIN projects p ON p.id = dl.project_id
        ORDER BY dl.log_date DESC, dl.created_at DESC
-       LIMIT 200`
+       LIMIT 200`,
     );
     res.json(result.rows);
   } catch (err) {

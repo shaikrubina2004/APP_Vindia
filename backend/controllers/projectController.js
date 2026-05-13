@@ -43,6 +43,8 @@ exports.createProject = async (req, res) => {
       manager_id,
       site_engineer_id,
       coordinator_id,
+      architect_id,
+      client_user_id,
       location,
       description,
       building_type,
@@ -69,10 +71,11 @@ exports.createProject = async (req, res) => {
       `INSERT INTO projects (
         name, client, start_date, end_date, budget,
         manager_id, site_engineer_id, coordinator_id,
+        architect_id, client_user_id,
         location, description,
         building_type, floors, plot_size, phone
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
       RETURNING *`,
       [
         name,
@@ -83,6 +86,8 @@ exports.createProject = async (req, res) => {
         manager_id,
         site_engineer_id,
         coordinator_id || null,
+        architect_id || null,
+        client_user_id || null,
         location || null,
         description || null,
         building_type || null,
@@ -98,11 +103,15 @@ exports.createProject = async (req, res) => {
         p.*,
         m.name AS manager_name,
         s.name AS site_engineer_name,
-        u.name AS coordinator_name
+        u.name AS coordinator_name,
+        ua.name AS architect_name,
+        uc2.name AS client_user_name
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
-       LEFT JOIN employees s ON p.site_engineer_id = s.id
+       LEFT JOIN users s ON p.site_engineer_id = s.id
        LEFT JOIN users u ON p.coordinator_id = u.id
+       LEFT JOIN users ua ON p.architect_id = ua.id
+       LEFT JOIN users uc2 ON p.client_user_id = uc2.id
        WHERE p.id = $1`,
       [result.rows[0].id],
     );
@@ -187,8 +196,8 @@ exports.getSiteEngineers = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, name 
-       FROM employees
-       WHERE designation = 'Site Engineer'`,
+       FROM users
+       WHERE role_id = 23`,
     );
     res.json(result.rows);
   } catch (err) {
@@ -196,7 +205,35 @@ exports.getSiteEngineers = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+exports.getArchitects = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.name
+       FROM users u
+       INNER JOIN roles r ON u.role_id = r.id
+       WHERE LOWER(r.name) LIKE '%architect%'
+       ORDER BY u.name`,
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 
+exports.getClients = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.name
+       FROM users u
+       INNER JOIN roles r ON u.role_id = r.id
+       WHERE LOWER(r.name) LIKE '%client%'
+       ORDER BY u.name`,
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 /**
  * ✅ Get All Projects
  */
@@ -207,11 +244,15 @@ exports.getAllProjects = async (req, res) => {
         p.*,
         m.name AS manager_name,
         s.name AS site_engineer_name,
-        u.name AS coordinator_name
+        u.name AS coordinator_name,
+        ua.name AS architect_name,
+        uc2.name AS client_user_name
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
-       LEFT JOIN employees s ON p.site_engineer_id = s.id
+       LEFT JOIN users s ON p.site_engineer_id = s.id
        LEFT JOIN users u ON p.coordinator_id = u.id
+       LEFT JOIN users ua ON p.architect_id = ua.id
+       LEFT JOIN users uc2 ON p.client_user_id = uc2.id
        ORDER BY p.created_at DESC`,
     );
     return res.status(200).json(result.rows);
@@ -232,11 +273,15 @@ exports.getProjectById = async (req, res) => {
         p.*,
         m.name AS manager_name,
         s.name AS site_engineer_name,
-        u.name AS coordinator_name
+        u.name AS coordinator_name,
+        ua.name AS architect_name,
+        uc2.name AS client_user_name,
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
-       LEFT JOIN employees s ON p.site_engineer_id = s.id
+       LEFT JOIN users s ON p.site_engineer_id = s.id
        LEFT JOIN users u ON p.coordinator_id = u.id
+       LEFT JOIN users ua ON p.architect_id = ua.id
+       LEFT JOIN users uc2 ON p.client_user_id = uc2.id
        WHERE p.id = $1`,
       [id],
     );
