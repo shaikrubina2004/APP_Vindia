@@ -9,7 +9,8 @@ import {
 import "./AddEmployee.css";
 
 // ─── Fetch roles from your backend ───────────────────────────────────────────
-const getRoles = () => fetch("http://localhost:5000/api/roles").then((r) => r.json());
+const getRoles = () =>
+  fetch("http://localhost:5000/api/roles").then((r) => r.json());
 
 export default function AddEmployee() {
   const navigate = useNavigate();
@@ -17,11 +18,25 @@ export default function AddEmployee() {
   const editingEmployee = location.state;
 
   const [form, setForm] = useState({
-    name: "", email: "", phone: "", department: "", role: "",
-    joining_date: "", salary: "", status: "active", address: "",
-    dob: "", gender: "", marital_status: "", nationality: "",
-    employee_code: "", employment_type: "", work_location: "",
-    shift_timing: "", experience: "", previous_company: "",
+    name: "",
+    email: "",
+    phone: "",
+    department: "",
+    role: "",
+    joining_date: "",
+    salary: "",
+    status: "active",
+    address: "",
+    dob: "",
+    gender: "",
+    marital_status: "",
+    nationality: "",
+    employee_code: "",
+    employment_type: "",
+    work_location: "",
+    shift_timing: "",
+    experience: "",
+    previous_company: "",
     profile_photo: "",
     account_no: "",
     ifsc: "",
@@ -32,17 +47,24 @@ export default function AddEmployee() {
     gov_id_number: "",
   });
 
-  const [employees, setEmployees]   = useState([]);
-  const [roles, setRoles]           = useState([]);
-  const [managerId, setManagerId]   = useState("");
-  const [errors, setErrors]         = useState({});
+  const [employees, setEmployees] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [managerId, setManagerId] = useState("");
+  const [errors, setErrors] = useState({});
 
   // ─── Toast state ─────────────────────────────────────────────────────────────
-  const [toast, setToast] = useState({ visible: false, message: "", type: "success" });
+  const [toast, setToast] = useState({
+    visible: false,
+    message: "",
+    type: "success",
+  });
 
   const showToast = (message, type = "success") => {
     setToast({ visible: true, message, type });
-    setTimeout(() => setToast({ visible: false, message: "", type: "success" }), 3500);
+    setTimeout(
+      () => setToast({ visible: false, message: "", type: "success" }),
+      3500,
+    );
   };
 
   // ─── Load employees + roles on mount ────────────────────────────────────────
@@ -117,7 +139,10 @@ export default function AddEmployee() {
       } else if (value.length === 10) {
         setErrors((prev) => ({ ...prev, phone: "Phone must start with 6-9" }));
       } else {
-        setErrors((prev) => ({ ...prev, phone: "Phone number must be 10 digits" }));
+        setErrors((prev) => ({
+          ...prev,
+          phone: "Phone number must be 10 digits",
+        }));
       }
     }
 
@@ -127,7 +152,10 @@ export default function AddEmployee() {
       if (value.length >= 9 && value.length <= 18) {
         setErrors((prev) => ({ ...prev, account_no: "" }));
       } else if (value.length > 0) {
-        setErrors((prev) => ({ ...prev, account_no: "Account number must be 9-18 digits" }));
+        setErrors((prev) => ({
+          ...prev,
+          account_no: "Account number must be 9-18 digits",
+        }));
       }
     }
 
@@ -138,7 +166,10 @@ export default function AddEmployee() {
       if (upperValue.length === 11 && ifscRegex.test(upperValue)) {
         setErrors((prev) => ({ ...prev, ifsc: "" }));
       } else if (upperValue.length === 11) {
-        setErrors((prev) => ({ ...prev, ifsc: "Invalid IFSC format (SBIN0001234)" }));
+        setErrors((prev) => ({
+          ...prev,
+          ifsc: "Invalid IFSC format (SBIN0001234)",
+        }));
       } else if (upperValue.length > 0) {
         setErrors((prev) => ({ ...prev, ifsc: "IFSC must be 11 characters" }));
       }
@@ -147,7 +178,10 @@ export default function AddEmployee() {
     if (name === "gov_id_number") {
       const type = form.gov_id_type;
       let error = "";
-      if (type === "pan" && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(value.toUpperCase())) {
+      if (
+        type === "pan" &&
+        !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(value.toUpperCase())
+      ) {
         error = "Invalid PAN format (ABCDE1234F)";
       }
       if (type === "aadhar" && !/^\d{12}$/.test(value)) {
@@ -156,7 +190,10 @@ export default function AddEmployee() {
       if (type === "passport" && !/^[A-Z0-9]{6,9}$/.test(value.toUpperCase())) {
         error = "Invalid Passport number";
       }
-      if (type === "driving" && !/^[A-Z0-9-]{8,15}$/.test(value.toUpperCase())) {
+      if (
+        type === "driving" &&
+        !/^[A-Z0-9-]{8,15}$/.test(value.toUpperCase())
+      ) {
         error = "Invalid Driving License";
       }
       if (type === "voter" && !/^[A-Z]{3}[0-9]{7}$/.test(value.toUpperCase())) {
@@ -191,7 +228,9 @@ export default function AddEmployee() {
     setForm((prev) => ({
       ...prev,
       role: selectedRoleName,
-      department: selectedRole ? (DEPT_MAP[selectedRole.department_id] || prev.department) : prev.department,
+      department: selectedRole
+        ? DEPT_MAP[selectedRole.department_id] || prev.department
+        : prev.department,
     }));
   };
 
@@ -217,10 +256,13 @@ export default function AddEmployee() {
       const duplicate = employees.find(
         (emp) =>
           emp.gov_id_number === form.gov_id_number &&
-          emp.id !== editingEmployee?.id
+          emp.id !== editingEmployee?.id,
       );
       if (duplicate) {
-        showToast("This ID number already exists. Cannot upload proof.", "error");
+        showToast(
+          "This ID number already exists. Cannot upload proof.",
+          "error",
+        );
         return;
       }
     }
@@ -239,7 +281,8 @@ export default function AddEmployee() {
   const validateForm = () => {
     const newErrors = {};
     if (!form.phone || !/^[6-9]\d{9}$/.test(form.phone)) {
-      newErrors.phone = "Enter valid Indian phone number (10 digits, starts with 6-9)";
+      newErrors.phone =
+        "Enter valid Indian phone number (10 digits, starts with 6-9)";
     }
     if (!form.name) newErrors.name = "Name is required";
     if (!form.email) {
@@ -271,8 +314,8 @@ export default function AddEmployee() {
       }
       const duplicate = employees.find(
         (emp) =>
-          emp.gov_id_number?.toUpperCase() === form.gov_id_number.toUpperCase() &&
-          emp.id !== editingEmployee?.id
+          emp.gov_id_number?.toUpperCase() ===
+            form.gov_id_number.toUpperCase() && emp.id !== editingEmployee?.id,
       );
       if (duplicate) {
         newErrors.gov_id_number = "This ID number already exists";
@@ -285,7 +328,8 @@ export default function AddEmployee() {
       }
     }
     if (form.id_proof && (!form.gov_id_type || !form.gov_id_number)) {
-      newErrors.id_proof = "Select ID type and enter ID number before uploading document";
+      newErrors.id_proof =
+        "Select ID type and enter ID number before uploading document";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -298,14 +342,17 @@ export default function AddEmployee() {
     const duplicate = employees.find(
       (emp) =>
         emp.gov_id_number === form.gov_id_number &&
-        emp.id !== editingEmployee?.id
+        emp.id !== editingEmployee?.id,
     );
     if (duplicate) {
       showToast("Duplicate ID number not allowed", "error");
       return;
     }
     if (form.id_proof && (!form.gov_id_type || !form.gov_id_number)) {
-      showToast("Upload ID proof only after entering valid ID details", "error");
+      showToast(
+        "Upload ID proof only after entering valid ID details",
+        "error",
+      );
       return;
     }
 
@@ -362,7 +409,8 @@ export default function AddEmployee() {
 
   // ─── Group roles by department ───────────────────────────────────────────────
   const rolesByDept = roles.reduce((acc, role) => {
-    const deptName = DEPT_MAP[role.department_id] || `Dept ${role.department_id}`;
+    const deptName =
+      DEPT_MAP[role.department_id] || `Dept ${role.department_id}`;
     if (!acc[deptName]) acc[deptName] = [];
     acc[deptName].push(role);
     return acc;
@@ -370,18 +418,31 @@ export default function AddEmployee() {
 
   return (
     <div className="add-employee-page">
-
       {/* ── TOAST NOTIFICATION ── */}
       {toast.visible && (
         <div className="toast-overlay">
           <div className={`toast-box toast-${toast.type}`}>
             <div className="toast-icon-wrap">
               {toast.type === "success" ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               ) : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -393,8 +454,19 @@ export default function AddEmployee() {
               </p>
               <p className="toast-message">{toast.message}</p>
             </div>
-            <button className="toast-close" onClick={() => setToast({ visible: false, message: "", type: "success" })}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <button
+              className="toast-close"
+              onClick={() =>
+                setToast({ visible: false, message: "", type: "success" })
+              }
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -430,7 +502,9 @@ export default function AddEmployee() {
                 className={errors.email ? "error" : ""}
                 required
               />
-              {errors.email && <span className="error-text">{errors.email}</span>}
+              {errors.email && (
+                <span className="error-text">{errors.email}</span>
+              )}
             </div>
             <div>
               <input
@@ -442,7 +516,9 @@ export default function AddEmployee() {
                 maxLength="10"
                 required
               />
-              {errors.phone && <span className="error-text">{errors.phone}</span>}
+              {errors.phone && (
+                <span className="error-text">{errors.phone}</span>
+              )}
             </div>
           </div>
         </div>
@@ -512,7 +588,9 @@ export default function AddEmployee() {
                 className={errors.salary ? "error" : ""}
                 required
               />
-              {errors.salary && <span className="error-text">{errors.salary}</span>}
+              {errors.salary && (
+                <span className="error-text">{errors.salary}</span>
+              )}
             </div>
 
             <select name="status" value={form.status} onChange={handleChange}>
@@ -544,21 +622,35 @@ export default function AddEmployee() {
         <div className="form-section">
           <h3>Personal Details</h3>
           <div className="grid">
-            <input type="date" name="dob" value={form.dob} onChange={handleChange} />
+            <input
+              type="date"
+              name="dob"
+              value={form.dob}
+              onChange={handleChange}
+            />
             <select name="gender" value={form.gender} onChange={handleChange}>
               <option value="">Select Gender</option>
               <option value="Male">Male</option>
               <option value="Female">Female</option>
               <option value="Other">Other</option>
             </select>
-            <select name="marital_status" value={form.marital_status} onChange={handleChange}>
+            <select
+              name="marital_status"
+              value={form.marital_status}
+              onChange={handleChange}
+            >
               <option value="">Marital Status</option>
               <option value="Single">Single</option>
               <option value="Married">Married</option>
               <option value="Divorced">Divorced</option>
               <option value="Widowed">Widowed</option>
             </select>
-            <input name="nationality" placeholder="Nationality" value={form.nationality} onChange={handleChange} />
+            <input
+              name="nationality"
+              placeholder="Nationality"
+              value={form.nationality}
+              onChange={handleChange}
+            />
           </div>
         </div>
 
@@ -566,18 +658,47 @@ export default function AddEmployee() {
         <div className="form-section">
           <h3>Employment Details</h3>
           <div className="grid">
-            <input name="employee_code" placeholder="Employee Code" value={form.employee_code} onChange={handleChange} />
-            <select name="employment_type" value={form.employment_type} onChange={handleChange}>
+            <input
+              name="employee_code"
+              placeholder="Employee Code"
+              value={form.employee_code}
+              onChange={handleChange}
+            />
+            <select
+              name="employment_type"
+              value={form.employment_type}
+              onChange={handleChange}
+            >
               <option value="">Employment Type</option>
               <option value="Full-Time">Full-Time</option>
               <option value="Part-Time">Part-Time</option>
               <option value="Contract">Contract</option>
               <option value="Intern">Intern</option>
             </select>
-            <input name="work_location" placeholder="Work Location" value={form.work_location} onChange={handleChange} />
-            <input name="shift_timing" placeholder="Shift Timing (e.g. 9AM-6PM)" value={form.shift_timing} onChange={handleChange} />
-            <input name="experience" placeholder="Experience (years)" value={form.experience} onChange={handleChange} />
-            <input name="previous_company" placeholder="Previous Company" value={form.previous_company} onChange={handleChange} />
+            <input
+              name="work_location"
+              placeholder="Work Location"
+              value={form.work_location}
+              onChange={handleChange}
+            />
+            <input
+              name="shift_timing"
+              placeholder="Shift Timing (e.g. 9AM-6PM)"
+              value={form.shift_timing}
+              onChange={handleChange}
+            />
+            <input
+              name="experience"
+              placeholder="Experience (years)"
+              value={form.experience}
+              onChange={handleChange}
+            />
+            <input
+              name="previous_company"
+              placeholder="Previous Company"
+              value={form.previous_company}
+              onChange={handleChange}
+            />
           </div>
         </div>
 
@@ -594,7 +715,9 @@ export default function AddEmployee() {
                 className={errors.account_no ? "error" : ""}
                 maxLength="18"
               />
-              {errors.account_no && <span className="error-text">{errors.account_no}</span>}
+              {errors.account_no && (
+                <span className="error-text">{errors.account_no}</span>
+              )}
             </div>
             <div>
               <input
@@ -653,16 +776,30 @@ export default function AddEmployee() {
               <p className="doc-title">Profile Photo</p>
               <label className="upload-btn">
                 + Upload File
-                <input type="file" onChange={(e) => handleFileChange(e, "profile_photo")} accept="application/pdf,image/*" hidden />
+                <input
+                  type="file"
+                  onChange={(e) => handleFileChange(e, "profile_photo")}
+                  accept="application/pdf,image/*"
+                  hidden
+                />
               </label>
               {form.profile_photo_name || form.profile_photo ? (
                 <p className="file-name">{form.profile_photo_name || ""}</p>
               ) : (
                 <p className="empty-text">No file selected</p>
               )}
-              {editingEmployee && form.profile_photo && typeof form.profile_photo === "string" && (
-                <a href={`http://localhost:5000/uploads/${form.profile_photo}`} target="_blank" rel="noreferrer" className="view-btn">View Document</a>
-              )}
+              {editingEmployee &&
+                form.profile_photo &&
+                typeof form.profile_photo === "string" && (
+                  <a
+                    href={`http://localhost:5000/uploads/${form.profile_photo}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="view-btn"
+                  >
+                    View Document
+                  </a>
+                )}
             </div>
 
             {/* ID Proof */}
@@ -670,17 +807,33 @@ export default function AddEmployee() {
               <p className="doc-title">ID Proof</p>
               <label className="upload-btn">
                 + Upload File
-                <input type="file" onChange={(e) => handleFileChange(e, "id_proof")} accept="application/pdf,image/*" hidden />
+                <input
+                  type="file"
+                  onChange={(e) => handleFileChange(e, "id_proof")}
+                  accept="application/pdf,image/*"
+                  hidden
+                />
               </label>
               {form.id_proof_name || form.id_proof ? (
                 <p className="file-name">{form.id_proof_name || ""}</p>
               ) : (
                 <p className="empty-text">No file selected</p>
               )}
-              {errors.id_proof && <span className="error-text">{errors.id_proof}</span>}
-              {editingEmployee && form.id_proof && typeof form.id_proof === "string" && (
-                <a href={`http://localhost:5000/uploads/${form.id_proof}`} target="_blank" rel="noreferrer" className="view-btn">View Document</a>
+              {errors.id_proof && (
+                <span className="error-text">{errors.id_proof}</span>
               )}
+              {editingEmployee &&
+                form.id_proof &&
+                typeof form.id_proof === "string" && (
+                  <a
+                    href={`http://localhost:5000/uploads/${form.id_proof}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="view-btn"
+                  >
+                    View Document
+                  </a>
+                )}
             </div>
 
             {/* Offer Letter */}
@@ -688,16 +841,30 @@ export default function AddEmployee() {
               <p className="doc-title">Offer Letter</p>
               <label className="upload-btn">
                 + Upload File
-                <input type="file" onChange={(e) => handleFileChange(e, "offer_letter")} accept="application/pdf,image/*" hidden />
+                <input
+                  type="file"
+                  onChange={(e) => handleFileChange(e, "offer_letter")}
+                  accept="application/pdf,image/*"
+                  hidden
+                />
               </label>
               {form.offer_letter_name || form.offer_letter ? (
                 <p className="file-name">{form.offer_letter_name || ""}</p>
               ) : (
                 <p className="empty-text">No file selected</p>
               )}
-              {editingEmployee && form.offer_letter && typeof form.offer_letter === "string" && (
-                <a href={`http://localhost:5000/uploads/${form.offer_letter}`} target="_blank" rel="noreferrer" className="view-btn">View Document</a>
-              )}
+              {editingEmployee &&
+                form.offer_letter &&
+                typeof form.offer_letter === "string" && (
+                  <a
+                    href={`http://localhost:5000/uploads/${form.offer_letter}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="view-btn"
+                  >
+                    View Document
+                  </a>
+                )}
             </div>
 
             {/* Certificates */}
@@ -705,23 +872,42 @@ export default function AddEmployee() {
               <p className="doc-title">Certificates</p>
               <label className="upload-btn">
                 + Upload File
-                <input type="file" onChange={(e) => handleFileChange(e, "certificates")} accept="application/pdf,image/*" hidden />
+                <input
+                  type="file"
+                  onChange={(e) => handleFileChange(e, "certificates")}
+                  accept="application/pdf,image/*"
+                  hidden
+                />
               </label>
               {form.certificates_name || form.certificates ? (
                 <p className="file-name">{form.certificates_name || ""}</p>
               ) : (
                 <p className="empty-text">No file selected</p>
               )}
-              {editingEmployee && form.certificates && typeof form.certificates === "string" && (
-                <a href={`http://localhost:5000/uploads/${form.certificates}`} target="_blank" rel="noreferrer" className="view-btn">View Document</a>
-              )}
+              {editingEmployee &&
+                form.certificates &&
+                typeof form.certificates === "string" && (
+                  <a
+                    href={`http://localhost:5000/uploads/${form.certificates}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="view-btn"
+                  >
+                    View Document
+                  </a>
+                )}
             </div>
           </div>
         </div>
 
         <div className="form-section">
           <h3>Address</h3>
-          <textarea name="address" rows="4" value={form.address} onChange={handleChange} />
+          <textarea
+            name="address"
+            rows="4"
+            value={form.address}
+            onChange={handleChange}
+          />
         </div>
 
         <button className="primary-btn" type="submit">

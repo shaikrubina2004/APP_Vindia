@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import "../../styles/HRDashboard.css";
+//import "../../styles/HRDashboard.css";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -32,9 +32,9 @@ const fmtTime = (t) => {
 
 const CheckInButton = ({ employeeId }) => {
   const [attendance, setAttendance] = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [busy, setBusy]             = useState(false);
-  const [elapsed, setElapsed]       = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [elapsed, setElapsed] = useState("");
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -51,7 +51,10 @@ const CheckInButton = ({ employeeId }) => {
         const nowMs = new Date() - new Date().setHours(0, 0, 0, 0);
         const diff = Math.max(0, nowMs - inMs);
         const th = String(Math.floor(diff / 3600000)).padStart(2, "0");
-        const tm = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
+        const tm = String(Math.floor((diff % 3600000) / 60000)).padStart(
+          2,
+          "0",
+        );
         const ts = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
         setElapsed(`${th}:${tm}:${ts}`);
       };
@@ -66,7 +69,7 @@ const CheckInButton = ({ employeeId }) => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `http://localhost:5000/api/attendance/today?employee_id=${employeeId}`
+        `http://localhost:5000/api/attendance/today?employee_id=${employeeId}`,
       );
       setAttendance(res.data || null);
     } catch (err) {
@@ -116,7 +119,7 @@ const CheckInButton = ({ employeeId }) => {
 
       const res = await axios.put(
         `http://localhost:5000/api/attendance/${attendance.id}`,
-        { check_out: timeStr }
+        { check_out: timeStr },
       );
       setAttendance(res.data);
       clearInterval(timerRef.current);
@@ -128,7 +131,7 @@ const CheckInButton = ({ employeeId }) => {
     }
   };
 
-  const isCheckedIn  = attendance?.check_in && !attendance?.check_out;
+  const isCheckedIn = attendance?.check_in && !attendance?.check_out;
   const isCheckedOut = attendance?.check_in && attendance?.check_out;
 
   if (loading) {
@@ -136,12 +139,28 @@ const CheckInButton = ({ employeeId }) => {
       <button
         disabled
         style={{
-          padding: "8px 18px", borderRadius: 10, border: "1.5px solid #e2e8f0",
-          background: "#f8fafc", color: "#94a3b8", fontSize: 13, fontWeight: 600,
-          cursor: "not-allowed", display: "flex", alignItems: "center", gap: 6,
+          padding: "8px 18px",
+          borderRadius: 10,
+          border: "1.5px solid #e2e8f0",
+          background: "#f8fafc",
+          color: "#94a3b8",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "not-allowed",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
         }}
       >
-        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#cbd5e1", display: "inline-block" }} />
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "#cbd5e1",
+            display: "inline-block",
+          }}
+        />
         Loading…
       </button>
     );
@@ -149,16 +168,39 @@ const CheckInButton = ({ employeeId }) => {
 
   if (isCheckedOut) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: 2,
+        }}
+      >
         <button
           disabled
           style={{
-            padding: "8px 18px", borderRadius: 10, border: "1.5px solid #86efac",
-            background: "#f0fdf4", color: "#16a34a", fontSize: 13, fontWeight: 700,
-            cursor: "not-allowed", display: "flex", alignItems: "center", gap: 6,
+            padding: "8px 18px",
+            borderRadius: 10,
+            border: "1.5px solid #86efac",
+            background: "#f0fdf4",
+            color: "#16a34a",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "not-allowed",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
           }}
         >
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "#16a34a",
+              display: "inline-block",
+            }}
+          />
           ✓ Done for Today
         </button>
         <span style={{ fontSize: 10, color: "#64748b" }}>
@@ -170,30 +212,60 @@ const CheckInButton = ({ employeeId }) => {
 
   if (isCheckedIn) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: 2,
+        }}
+      >
         <button
           onClick={handleCheckOut}
           disabled={busy}
           style={{
-            padding: "8px 18px", borderRadius: 10, border: "none",
+            padding: "8px 18px",
+            borderRadius: 10,
+            border: "none",
             background: busy ? "#fca5a5" : "#dc2626",
-            color: "#fff", fontSize: 13, fontWeight: 700,
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 700,
             cursor: busy ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", gap: 6,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
             transition: "all .2s",
             boxShadow: "0 2px 8px rgba(220,38,38,0.3)",
           }}
         >
-          <span style={{
-            width: 8, height: 8, borderRadius: "50%", background: "#fff",
-            display: "inline-block",
-            animation: "pulse 1.2s ease-in-out infinite",
-          }} />
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "#fff",
+              display: "inline-block",
+              animation: "pulse 1.2s ease-in-out infinite",
+            }}
+          />
           {busy ? "Saving…" : "Check Out"}
         </button>
-        <span style={{ fontSize: 10, color: "#64748b", fontVariantNumeric: "tabular-nums" }}>
+        <span
+          style={{
+            fontSize: 10,
+            color: "#64748b",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
           In: {fmtTime(attendance.check_in)}
-          {elapsed && <> &nbsp;·&nbsp; <strong style={{ color: "#2563eb" }}>{elapsed}</strong></>}
+          {elapsed && (
+            <>
+              {" "}
+              &nbsp;·&nbsp;{" "}
+              <strong style={{ color: "#2563eb" }}>{elapsed}</strong>
+            </>
+          )}
         </span>
       </div>
     );
@@ -204,16 +276,30 @@ const CheckInButton = ({ employeeId }) => {
       onClick={handleCheckIn}
       disabled={busy}
       style={{
-        padding: "8px 18px", borderRadius: 10, border: "none",
+        padding: "8px 18px",
+        borderRadius: 10,
+        border: "none",
         background: busy ? "#86efac" : "#16a34a",
-        color: "#fff", fontSize: 13, fontWeight: 700,
+        color: "#fff",
+        fontSize: 13,
+        fontWeight: 700,
         cursor: busy ? "not-allowed" : "pointer",
-        display: "flex", alignItems: "center", gap: 6,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
         transition: "all .2s",
         boxShadow: "0 2px 8px rgba(22,163,74,0.3)",
       }}
     >
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff", display: "inline-block" }} />
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: "#fff",
+          display: "inline-block",
+        }}
+      />
       {busy ? "Saving…" : "Check In"}
     </button>
   );
@@ -222,18 +308,15 @@ const CheckInButton = ({ employeeId }) => {
 // ─── Stat Card ───────────────────────────────────────────────────────────────
 
 const STAT_GRADIENTS = {
-  navy:  "linear-gradient(135deg, #001D39 0%, #0A4174 100%)",
-  teal:  "linear-gradient(135deg, #093d2e 0%, #0d5c42 100%)",
-  blue:  "linear-gradient(135deg, #0A4174 0%, #49769F 100%)",
-  sky:   "linear-gradient(135deg, #4E8EA2 0%, #7BBDE8 100%)",
+  navy: "linear-gradient(135deg, #001D39 0%, #0A4174 100%)",
+  teal: "linear-gradient(135deg, #093d2e 0%, #0d5c42 100%)",
+  blue: "linear-gradient(135deg, #0A4174 0%, #49769F 100%)",
+  sky: "linear-gradient(135deg, #4E8EA2 0%, #7BBDE8 100%)",
 };
 
 function StatCard({ label, value, icon, colorKey }) {
   return (
-    <div
-      className="stat-card"
-      style={{ background: STAT_GRADIENTS[colorKey] }}
-    >
+    <div className="stat-card" style={{ background: STAT_GRADIENTS[colorKey] }}>
       <div className="stat-card-icon">{icon}</div>
       <div className="stat-card-value">{value ?? "—"}</div>
       <div className="stat-card-label">{label}</div>
@@ -244,8 +327,18 @@ function StatCard({ label, value, icon, colorKey }) {
 // ─── Calendar ────────────────────────────────────────────────────────────────
 
 const MONTH_NAMES = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December"
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 function TrainingCalendar({ employees }) {
@@ -272,13 +365,17 @@ function TrainingCalendar({ employees }) {
   });
 
   function prevMonth() {
-    if (month === 0) { setMonth(11); setYear(y => y - 1); }
-    else setMonth(m => m - 1);
+    if (month === 0) {
+      setMonth(11);
+      setYear((y) => y - 1);
+    } else setMonth((m) => m - 1);
     setSelected(null);
   }
   function nextMonth() {
-    if (month === 11) { setMonth(0); setYear(y => y + 1); }
-    else setMonth(m => m + 1);
+    if (month === 11) {
+      setMonth(0);
+      setYear((y) => y + 1);
+    } else setMonth((m) => m + 1);
     setSelected(null);
   }
 
@@ -295,7 +392,10 @@ function TrainingCalendar({ employees }) {
 
   function saveNote() {
     if (selected) {
-      setNotes(prev => ({ ...prev, [`${year}-${month}-${selected}`]: noteInput }));
+      setNotes((prev) => ({
+        ...prev,
+        [`${year}-${month}-${selected}`]: noteInput,
+      }));
       setSelected(null);
     }
   }
@@ -306,11 +406,13 @@ function TrainingCalendar({ employees }) {
     <div className="calendar-card">
       <div className="calendar-header">
         <div className="calendar-month-selector">
-          <button className="cal-nav-btn" onClick={prevMonth}>‹</button>
+          <button className="cal-nav-btn" onClick={prevMonth}>
+            ‹
+          </button>
           <div className="month-dropdown-wrap">
             <button
               className="month-dropdown-trigger"
-              onClick={() => setDropdownOpen(o => !o)}
+              onClick={() => setDropdownOpen((o) => !o)}
             >
               {MONTH_NAMES[month]} {year}
               <span className="dropdown-arrow">{dropdownOpen ? "▲" : "▼"}</span>
@@ -329,13 +431,17 @@ function TrainingCalendar({ employees }) {
               </div>
             )}
           </div>
-          <button className="cal-nav-btn" onClick={nextMonth}>›</button>
+          <button className="cal-nav-btn" onClick={nextMonth}>
+            ›
+          </button>
         </div>
       </div>
 
       <div className="calendar-grid">
         {dayLabels.map((d, i) => (
-          <div key={i} className="cal-day-label">{d}</div>
+          <div key={i} className="cal-day-label">
+            {d}
+          </div>
         ))}
         {Array.from({ length: firstDay }).map((_, i) => (
           <div key={`e${i}`} />
@@ -359,7 +465,9 @@ function TrainingCalendar({ employees }) {
                 hasNote ? "cal-has-note" : "",
                 hasBirthday ? "cal-birthday" : "",
                 isSelected ? "cal-selected" : "",
-              ].filter(Boolean).join(" ")}
+              ]
+                .filter(Boolean)
+                .join(" ")}
               onClick={() => handleDayClick(day)}
               title={hasBirthday ? `🎂 ${birthdayDays[day].join(", ")}` : ""}
             >
@@ -371,16 +479,26 @@ function TrainingCalendar({ employees }) {
       </div>
 
       <div className="cal-legend">
-        <span><span className="legend-dot today-dot" /> Today</span>
-        <span><span className="legend-dot note-dot" /> Reminder</span>
-        <span><span className="legend-dot bday-dot" /> Birthday</span>
+        <span>
+          <span className="legend-dot today-dot" /> Today
+        </span>
+        <span>
+          <span className="legend-dot note-dot" /> Reminder
+        </span>
+        <span>
+          <span className="legend-dot bday-dot" /> Birthday
+        </span>
       </div>
 
       {selected && (
         <div className="note-editor">
-          <p className="note-editor-title">{MONTH_NAMES[month]} {selected}</p>
+          <p className="note-editor-title">
+            {MONTH_NAMES[month]} {selected}
+          </p>
           {birthdayDays[selected] && (
-            <p className="birthday-notice">🎂 {birthdayDays[selected].join(", ")}</p>
+            <p className="birthday-notice">
+              🎂 {birthdayDays[selected].join(", ")}
+            </p>
           )}
           <textarea
             value={noteInput}
@@ -389,8 +507,12 @@ function TrainingCalendar({ employees }) {
             rows={2}
           />
           <div className="note-actions">
-            <button onClick={saveNote} className="note-save">Save</button>
-            <button onClick={() => setSelected(null)} className="note-cancel">Cancel</button>
+            <button onClick={saveNote} className="note-save">
+              Save
+            </button>
+            <button onClick={() => setSelected(null)} className="note-cancel">
+              Cancel
+            </button>
           </div>
         </div>
       )}
@@ -413,29 +535,74 @@ function AttendanceDonut({ present, absent, onLeave, total }) {
   return (
     <div className="attendance-donut-wrap">
       <svg viewBox="0 0 110 110" width="110" height="110">
-        <circle cx="55" cy="55" r={r} fill="none" stroke="#e8f0f7" strokeWidth="10" />
-        <circle cx="55" cy="55" r={r} fill="none" stroke="#7BBDE8"
+        <circle
+          cx="55"
+          cy="55"
+          r={r}
+          fill="none"
+          stroke="#e8f0f7"
+          strokeWidth="10"
+        />
+        <circle
+          cx="55"
+          cy="55"
+          r={r}
+          fill="none"
+          stroke="#7BBDE8"
           strokeWidth="10"
           strokeDasharray={`${seg1} ${circ - seg1}`}
           strokeDashoffset={circ / 4}
-          strokeLinecap="butt" />
-        <circle cx="55" cy="55" r={r} fill="none" stroke="#0A4174"
+          strokeLinecap="butt"
+        />
+        <circle
+          cx="55"
+          cy="55"
+          r={r}
+          fill="none"
+          stroke="#0A4174"
           strokeWidth="10"
           strokeDasharray={`${seg2} ${circ - seg2}`}
           strokeDashoffset={circ / 4 - seg1}
-          strokeLinecap="butt" />
-        <circle cx="55" cy="55" r={r} fill="none" stroke="#BDD8E9"
+          strokeLinecap="butt"
+        />
+        <circle
+          cx="55"
+          cy="55"
+          r={r}
+          fill="none"
+          stroke="#BDD8E9"
           strokeWidth="10"
           strokeDasharray={`${seg3} ${circ - seg3}`}
           strokeDashoffset={circ / 4 - seg1 - seg2}
-          strokeLinecap="butt" />
-        <text x="55" y="51" textAnchor="middle" fontSize="14" fontWeight="700" fill="#001D39">{total}</text>
-        <text x="55" y="64" textAnchor="middle" fontSize="8" fill="#6EA2B3">Total</text>
+          strokeLinecap="butt"
+        />
+        <text
+          x="55"
+          y="51"
+          textAnchor="middle"
+          fontSize="14"
+          fontWeight="700"
+          fill="#001D39"
+        >
+          {total}
+        </text>
+        <text x="55" y="64" textAnchor="middle" fontSize="8" fill="#6EA2B3">
+          Total
+        </text>
       </svg>
       <div className="donut-legend">
-        <span><span className="legend-dot" style={{ background: "#7BBDE8" }} /> Present <strong>{present}</strong></span>
-        <span><span className="legend-dot" style={{ background: "#0A4174" }} /> Absent <strong>{absent}</strong></span>
-        <span><span className="legend-dot" style={{ background: "#BDD8E9" }} /> On Leave <strong>{onLeave}</strong></span>
+        <span>
+          <span className="legend-dot" style={{ background: "#7BBDE8" }} />{" "}
+          Present <strong>{present}</strong>
+        </span>
+        <span>
+          <span className="legend-dot" style={{ background: "#0A4174" }} />{" "}
+          Absent <strong>{absent}</strong>
+        </span>
+        <span>
+          <span className="legend-dot" style={{ background: "#BDD8E9" }} /> On
+          Leave <strong>{onLeave}</strong>
+        </span>
       </div>
     </div>
   );
@@ -470,7 +637,10 @@ function NewJoinersChart({ employees }) {
           <div key={m.key} className="bar-col">
             <span className="bar-val">{values[i]}</span>
             <div className="bar-track">
-              <div className="bar-fill" style={{ height: `${(values[i] / max) * 100}%` }} />
+              <div
+                className="bar-fill"
+                style={{ height: `${(values[i] / max) * 100}%` }}
+              />
             </div>
             <span className="bar-label">{m.label}</span>
           </div>
@@ -517,11 +687,11 @@ function HRDashboard() {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const newJoiners = employees.filter(
-    (e) => e.join_date && new Date(e.join_date) >= thirtyDaysAgo
+    (e) => e.join_date && new Date(e.join_date) >= thirtyDaysAgo,
   ).length;
 
   const pendingLeaves = (dashboard?.pending || []).filter(
-    (r) => r.status === "pending"
+    (r) => r.status === "pending",
   ).length;
 
   const present = dashboard?.attendance?.present ?? Math.round(active * 0.85);
@@ -529,10 +699,10 @@ function HRDashboard() {
   const attendanceOnLeave = dashboard?.attendance?.on_leave ?? onLeave;
 
   const statCards = [
-    { label: "Total Employees", value: total,      icon: "👥", colorKey: "navy" },
-    { label: "Active Employees", value: active,    icon: "✅", colorKey: "teal" },
-    { label: "New Joiners",      value: newJoiners, icon: "🌟", colorKey: "blue" },
-    { label: "On Leave",         value: onLeave,   icon: "🗓️", colorKey: "sky"  },
+    { label: "Total Employees", value: total, icon: "👥", colorKey: "navy" },
+    { label: "Active Employees", value: active, icon: "✅", colorKey: "teal" },
+    { label: "New Joiners", value: newJoiners, icon: "🌟", colorKey: "blue" },
+    { label: "On Leave", value: onLeave, icon: "🗓️", colorKey: "sky" },
   ];
 
   const pendingRequests = (dashboard?.pending || [])
@@ -544,8 +714,12 @@ function HRDashboard() {
       {/* ── Top Bar ── */}
       <div className="top-bar">
         <div className="greeting-block">
-          <h1 className="greeting-name">{getGreeting()}, {hrName}!</h1>
-          <p className="greeting-sub">Here's what's happening in your organization today</p>
+          <h1 className="greeting-name">
+            {getGreeting()}, {hrName}!
+          </h1>
+          <p className="greeting-sub">
+            Here's what's happening in your organization today
+          </p>
         </div>
         <div className="top-actions">
           <div className="search-box">
@@ -556,7 +730,10 @@ function HRDashboard() {
           {/* ── CHECK IN / OUT — same as ProjectCoordinatorDashboard ── */}
           {employeeId && <CheckInButton employeeId={employeeId} />}
 
-          <button className="upgrade-btn" onClick={() => navigate("/hr/employees")}>
+          <button
+            className="upgrade-btn"
+            onClick={() => navigate("/hr/employees")}
+          >
             All Employees
           </button>
         </div>
@@ -570,7 +747,9 @@ function HRDashboard() {
             <span className="card-subtitle">Today</span>
           </div>
           <div className="stat-cards-grid">
-            {statCards.map((c, i) => <StatCard key={i} {...c} />)}
+            {statCards.map((c, i) => (
+              <StatCard key={i} {...c} />
+            ))}
           </div>
         </div>
 
@@ -596,7 +775,10 @@ function HRDashboard() {
         <div className="bottom-card pending-leaves-card">
           <div className="card-header-line">
             <span className="card-title">Pending Leave Requests</span>
-            <button className="add-new-btn" onClick={() => navigate("/hr/leaves")}>
+            <button
+              className="add-new-btn"
+              onClick={() => navigate("/hr/leaves")}
+            >
               View All <span>→</span>
             </button>
           </div>
@@ -612,10 +794,15 @@ function HRDashboard() {
                 <div className="leave-info">
                   <p className="leave-name">{req.employee_name || req.name}</p>
                   <p className="leave-meta">
-                    {req.leave_type || "Leave"} · {req.from_date || req.start_date} → {req.to_date || req.end_date}
+                    {req.leave_type || "Leave"} ·{" "}
+                    {req.from_date || req.start_date} →{" "}
+                    {req.to_date || req.end_date}
                   </p>
                 </div>
-                <button className="approve-btn" onClick={() => navigate("/hr/leaves")}>
+                <button
+                  className="approve-btn"
+                  onClick={() => navigate("/hr/leaves")}
+                >
                   Approve
                 </button>
               </div>

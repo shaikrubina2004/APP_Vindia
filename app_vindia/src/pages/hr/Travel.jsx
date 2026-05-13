@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import "./Travel.css";
+//import "./Travel.css";
 import {
   MoreHorizontal,
   Bell,
@@ -34,8 +34,8 @@ const requests = [
     budgetType: "company",
     paymentMode: "self",
     expenses: {
-      travel:        { amount: "$620" },
-      food:          { amount: "$180" },
+      travel: { amount: "$620" },
+      food: { amount: "$180" },
       accommodation: { amount: "$440" },
     },
     receipts: ["receipt-ny-summit-1.jpg", "receipt-ny-summit-2.pdf"],
@@ -52,8 +52,8 @@ const requests = [
     budgetType: "project",
     paymentMode: "hr",
     expenses: {
-      travel:        { amount: "$490" },
-      food:          { amount: "$150" },
+      travel: { amount: "$490" },
+      food: { amount: "$150" },
       accommodation: { amount: "$250" },
     },
     receipts: null,
@@ -70,8 +70,8 @@ const requests = [
     budgetType: "company",
     paymentMode: "self",
     expenses: {
-      travel:        { amount: "$200" },
-      food:          { amount: "$90"  },
+      travel: { amount: "$200" },
+      food: { amount: "$90" },
       accommodation: { amount: "$250" },
     },
     receipts: ["training-receipt.pdf"],
@@ -88,8 +88,8 @@ const requests = [
     budgetType: "project",
     paymentMode: "hr",
     expenses: {
-      travel:        { amount: "$860" },
-      food:          { amount: "$300" },
+      travel: { amount: "$860" },
+      food: { amount: "$300" },
       accommodation: { amount: "$600" },
     },
     receipts: null,
@@ -106,8 +106,8 @@ const requests = [
     budgetType: "company",
     paymentMode: "self",
     expenses: {
-      travel:        { amount: "$380" },
-      food:          { amount: "$200" },
+      travel: { amount: "$380" },
+      food: { amount: "$200" },
       accommodation: { amount: "$400" },
     },
     receipts: ["expo-tickets.jpg"],
@@ -124,8 +124,8 @@ const requests = [
     budgetType: "project",
     paymentMode: "hr",
     expenses: {
-      travel:        { amount: "$900" },
-      food:          { amount: "$400" },
+      travel: { amount: "$900" },
+      food: { amount: "$400" },
       accommodation: { amount: "$800" },
     },
     receipts: null,
@@ -135,16 +135,23 @@ const requests = [
 
 const getStatusIcon = (status) => {
   switch (status) {
-    case "Approved": return <CheckCircle size={13} />;
-    case "Rejected": return <XCircle size={13} />;
-    default:         return <Clock size={13} />;
+    case "Approved":
+      return <CheckCircle size={13} />;
+    case "Rejected":
+      return <XCircle size={13} />;
+    default:
+      return <Clock size={13} />;
   }
 };
 
 const expenseConfig = {
-  travel:        { icon: Plane,     label: "Travel",        iconClass: "travel" },
-  food:          { icon: Utensils,  label: "Food & Meals",  iconClass: "food" },
-  accommodation: { icon: BedDouble, label: "Accommodation", iconClass: "accommodation" },
+  travel: { icon: Plane, label: "Travel", iconClass: "travel" },
+  food: { icon: Utensils, label: "Food & Meals", iconClass: "food" },
+  accommodation: {
+    icon: BedDouble,
+    label: "Accommodation",
+    iconClass: "accommodation",
+  },
 };
 
 // ─── Upload zone ─────────────────────────────────────────────────────────────
@@ -162,7 +169,10 @@ const UploadZone = ({ label, uploadedFiles, onUpload }) => {
       <label
         className="receipt-upload-zone"
         onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          handleFiles(e.dataTransfer.files);
+        }}
         onClick={() => inputRef.current.click()}
       >
         <input
@@ -172,7 +182,9 @@ const UploadZone = ({ label, uploadedFiles, onUpload }) => {
           accept=".jpg,.jpeg,.png,.pdf"
           onChange={(e) => handleFiles(e.target.files)}
         />
-        <div className="upload-icon"><Upload size={15} /></div>
+        <div className="upload-icon">
+          <Upload size={15} />
+        </div>
         <div className="upload-text">
           <p>Attach receipt for {label}</p>
           <small>JPG, PNG or PDF · max 10MB each</small>
@@ -199,7 +211,7 @@ const UploadZone = ({ label, uploadedFiles, onUpload }) => {
 // ─── Modal ───────────────────────────────────────────────────────────────────
 
 const RequestDetailModal = ({ request, onClose }) => {
-  const isHR   = request.paymentMode === "hr";
+  const isHR = request.paymentMode === "hr";
   const isSelf = request.paymentMode === "self";
 
   // HR mode: editable amounts pre-filled from data
@@ -212,19 +224,24 @@ const RequestDetailModal = ({ request, onClose }) => {
   });
 
   // Self mode: per-expense uploaded files
-  const [uploads, setUploads] = useState({ travel: [], food: [], accommodation: [] });
+  const [uploads, setUploads] = useState({
+    travel: [],
+    food: [],
+    accommodation: [],
+  });
   const addUpload = (key, files) =>
     setUploads((prev) => ({ ...prev, [key]: [...prev[key], ...files] }));
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-
         {/* Header */}
         <div className="modal-head">
           <div>
             <h3>{request.trip}</h3>
-            <p>#{String(request.id).padStart(4, "0")} · {request.date}</p>
+            <p>
+              #{String(request.id).padStart(4, "0")} · {request.date}
+            </p>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close">
             <X size={16} />
@@ -233,7 +250,6 @@ const RequestDetailModal = ({ request, onClose }) => {
 
         {/* Body */}
         <div className="modal-body">
-
           {/* Employee */}
           <div>
             <div className="section-label">Employee</div>
@@ -262,21 +278,35 @@ const RequestDetailModal = ({ request, onClose }) => {
           <div>
             <div className="section-label">Budget Type</div>
             <div className="type-tabs">
-              <div className={`type-tab ${request.budgetType === "company" ? "active company" : ""}`}>
+              <div
+                className={`type-tab ${request.budgetType === "company" ? "active company" : ""}`}
+              >
                 <CreditCard size={14} /> Company Expense
               </div>
-              <div className={`type-tab ${request.budgetType === "project" ? "active project" : ""}`}>
+              <div
+                className={`type-tab ${request.budgetType === "project" ? "active project" : ""}`}
+              >
                 <Briefcase size={14} /> Project Budget
               </div>
             </div>
           </div>
 
           {/* Payment Mode Banner */}
-          <div className={`payment-mode-banner ${isHR ? "mode-hr" : "mode-self"}`}>
+          <div
+            className={`payment-mode-banner ${isHR ? "mode-hr" : "mode-self"}`}
+          >
             {isHR ? (
-              <><Building2 size={15} /><span>HR / Company books &amp; pays for all expenses</span></>
+              <>
+                <Building2 size={15} />
+                <span>HR / Company books &amp; pays for all expenses</span>
+              </>
             ) : (
-              <><User size={15} /><span>Employee self-paid — upload receipts for reimbursement</span></>
+              <>
+                <User size={15} />
+                <span>
+                  Employee self-paid — upload receipts for reimbursement
+                </span>
+              </>
             )}
           </div>
 
@@ -285,7 +315,7 @@ const RequestDetailModal = ({ request, onClose }) => {
             <div className="section-label">Expense Breakdown</div>
             <div className="expense-breakdown">
               {Object.entries(request.expenses).map(([key, info]) => {
-                const cfg      = expenseConfig[key];
+                const cfg = expenseConfig[key];
                 const IconComp = cfg.icon;
 
                 return (
@@ -298,7 +328,13 @@ const RequestDetailModal = ({ request, onClose }) => {
                         {cfg.label}
                       </div>
 
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.625rem",
+                        }}
+                      >
                         {/* HR → editable input. Self → static amount */}
                         {isHR ? (
                           <div className="amount-input-wrap">
@@ -311,19 +347,31 @@ const RequestDetailModal = ({ request, onClose }) => {
                               placeholder="0.00"
                               value={hrAmounts[key] ?? ""}
                               onChange={(e) =>
-                                setHrAmounts((prev) => ({ ...prev, [key]: e.target.value }))
+                                setHrAmounts((prev) => ({
+                                  ...prev,
+                                  [key]: e.target.value,
+                                }))
                               }
                             />
                           </div>
                         ) : (
-                          <span className="expense-amount-static">{info.amount}</span>
+                          <span className="expense-amount-static">
+                            {info.amount}
+                          </span>
                         )}
 
-                        <span className={`payment-pill ${isHR ? "company-paid" : "self"}`}>
-                          {isHR
-                            ? <><Building2 size={10} /> HR / Company</>
-                            : <><User size={10} /> Self-paid</>
-                          }
+                        <span
+                          className={`payment-pill ${isHR ? "company-paid" : "self"}`}
+                        >
+                          {isHR ? (
+                            <>
+                              <Building2 size={10} /> HR / Company
+                            </>
+                          ) : (
+                            <>
+                              <User size={10} /> Self-paid
+                            </>
+                          )}
                         </span>
                       </div>
                     </div>
@@ -365,7 +413,9 @@ const RequestDetailModal = ({ request, onClose }) => {
 
         {/* Footer */}
         <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Close</button>
+          <button className="btn-secondary" onClick={onClose}>
+            Close
+          </button>
           <div className="action-group">
             <button className="btn-primary">Approve</button>
             <button className="btn-danger">Reject</button>
@@ -401,10 +451,10 @@ const TravelExpenseDashboard = () => {
 
       <div className="stats-grid">
         {[
-          { label: "Total Requests",   value: "132" },
-          { label: "Pending Approval", value: "34"  },
-          { label: "Approved",         value: "76"  },
-          { label: "Rejected",         value: "22"  },
+          { label: "Total Requests", value: "132" },
+          { label: "Pending Approval", value: "34" },
+          { label: "Approved", value: "76" },
+          { label: "Rejected", value: "22" },
         ].map((s) => (
           <div className="stat-card" key={s.label}>
             <span>{s.label}</span>

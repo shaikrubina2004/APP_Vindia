@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useContext } from "react";
-import "./TravelRequest.css";
+//import "./TravelRequest.css";
 import {
   Plane,
   Utensils,
@@ -38,9 +38,7 @@ const UploadZone = ({ label, files, onAdd, onRemove }) => {
   const inputRef = useRef();
 
   const handleFiles = (raw) => {
-    const valid = Array.from(raw).filter(
-      (f) => f.size <= 10 * 1024 * 1024
-    );
+    const valid = Array.from(raw).filter((f) => f.size <= 10 * 1024 * 1024);
     if (valid.length) onAdd(valid);
   };
 
@@ -148,9 +146,13 @@ const RequestCard = ({ req }) => (
         }`}
       >
         {req.budget_type === "project" ? (
-          <><Briefcase size={10} /> Project</>
+          <>
+            <Briefcase size={10} /> Project
+          </>
         ) : (
-          <><CreditCard size={10} /> Company</>
+          <>
+            <CreditCard size={10} /> Company
+          </>
         )}
       </span>
     </div>
@@ -180,9 +182,9 @@ const TravelRequest = () => {
     travel_to_date: "",
     purpose: "",
     notes: "",
-    budget_type: "company",   // "company" | "project"
+    budget_type: "company", // "company" | "project"
     project_id: "",
-    payment_mode: "company",  // "company" | "self"
+    payment_mode: "company", // "company" | "self"
     travel_amount: "",
     food_amount: "",
     accommodation_amount: "",
@@ -280,7 +282,7 @@ const TravelRequest = () => {
         file_name: f.name,
         file_url: `/uploads/travel/${Date.now()}_${f.name}`, // placeholder
         file_size_kb: Math.round(f.size / 1024),
-      }))
+      })),
     );
 
     // Derive user info from auth context + roles
@@ -299,7 +301,13 @@ const TravelRequest = () => {
       await API.post("/travel-expenses", payload);
       showToast("success", "Travel expense request submitted successfully!");
       setForm(emptyForm);
-      setReceipts({ travel: [], food: [], accommodation: [], other: [], general: [] });
+      setReceipts({
+        travel: [],
+        food: [],
+        accommodation: [],
+        other: [],
+        general: [],
+      });
     } catch (err) {
       console.error(err);
       showToast("error", "Failed to submit. Please try again.");
