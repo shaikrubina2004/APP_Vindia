@@ -22,11 +22,37 @@ const protect = (req, res, next) => {
 
     req.user = decoded;
     next();
-
   } catch (err) {
-    console.error("❌ JWT ERROR:", err.message); // tells us exact reason
-    return res.status(401).json({ message: "Invalid token", detail: err.message });
+    console.error("❌ JWT ERROR:", err.message);
+    return res
+      .status(401)
+      .json({ message: "Invalid token", detail: err.message });
   }
 };
 
+// ── Role guard — use after protect ────────────────────────────────────────
+// Usage: router.use(requireRole("client"))
+//        router.use(requireRole("admin", "ceo"))
+const requireRole =
+  (...roles) =>
+  (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated." });
+    }
+    if (!roles.includes(req.user.role)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. Insufficient role." });
+    }
+    next();
+  };
+
+// ── Export both ───────────────────────────────────────────────────────────
+// clientRoutes.js uses:  const protect = require("../middleware/authMiddleware");
+// Other routes that need requireRole use:
+//   const { protect, requireRole } = require("../middleware/authMiddleware");
+//
+// Both work because protect is the default AND named export.
 module.exports = protect;
+module.exports.protect = protect;
+module.exports.requireRole = requireRole;

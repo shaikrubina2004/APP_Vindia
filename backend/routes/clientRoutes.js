@@ -1,11 +1,11 @@
 const express = require("express");
 const router = express.Router();
 
-const { verifyToken, requireRole } = require("../middleware/authMiddleware");
+// ── Auth middleware ───────────────────────────────────────────────────────
+const protect = require("../middleware/authMiddleware");
 
-// ── Auth guard — every client route requires a valid JWT with role = client ──
-router.use(verifyToken);
-router.use(requireRole("client"));
+// ── Auth guard — every client route requires a valid JWT ──────────────────
+router.use(protect);
 
 // ── Single controller for all client endpoints ─────────────────────────────
 const {
