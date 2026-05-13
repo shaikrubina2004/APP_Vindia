@@ -1,0 +1,553 @@
+/* ── Finance Settings ─────────────────────────────────────────── */
+:root {
+  --fs-primary:       #2563eb;
+  --fs-primary-light: #eff6ff;
+  --fs-primary-hover: #1d4ed8;
+  --fs-border:        #e5e7eb;
+  --fs-border-hover:  #d1d5db;
+  --fs-bg:            #f8fafc;
+  --fs-white:         #ffffff;
+  --fs-text:          #111827;
+  --fs-text-muted:    #6b7280;
+  --fs-text-light:    #9ca3af;
+  --fs-sidebar-w:     220px;
+  --fs-radius:        8px;
+  --fs-radius-lg:     12px;
+  --fs-shadow:        0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.05);
+}
+
+/* ── Layout ────────────────────────────────────────────────────── */
+.fs-root {
+  display: flex;
+  min-height: 100vh;
+  background: var(--fs-bg);
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  color: var(--fs-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────── */
+.fs-sidebar {
+  width: var(--fs-sidebar-w);
+  flex-shrink: 0;
+  background: var(--fs-white);
+  border-right: 1px solid var(--fs-border);
+  padding: 24px 12px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.fs-sidebar__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--fs-text-light);
+  padding: 0 8px;
+  margin: 0 0 8px;
+}
+
+.fs-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fs-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  background: transparent;
+  border-radius: var(--fs-radius);
+  cursor: pointer;
+  color: var(--fs-text-muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  transition: background .15s, color .15s;
+}
+
+.fs-nav-item:hover {
+  background: var(--fs-bg);
+  color: var(--fs-text);
+}
+
+.fs-nav-item--active {
+  background: var(--fs-primary-light);
+  color: var(--fs-primary);
+}
+
+.fs-nav-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.fs-nav-label { flex: 1; }
+
+/* ── Main ──────────────────────────────────────────────────────── */
+.fs-main {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 40px;
+  max-width: 860px;
+}
+
+.fs-main__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 16px;
+}
+
+.fs-main__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--fs-text);
+  margin: 0 0 4px;
+}
+
+.fs-main__sub {
+  font-size: 13px;
+  color: var(--fs-text-muted);
+  margin: 0;
+}
+
+.fs-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.fs-save-toast {
+  font-size: 13px;
+  color: #16a34a;
+  font-weight: 500;
+  animation: fs-fade-in .2s ease;
+}
+
+@keyframes fs-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+.fs-btn-primary {
+  background: var(--fs-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--fs-radius);
+  padding: 8px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+}
+
+.fs-btn-primary:hover  { background: var(--fs-primary-hover); }
+.fs-btn-primary:active { transform: scale(.98); }
+
+.fs-btn-ghost {
+  background: transparent;
+  border: 1.5px dashed var(--fs-border-hover);
+  border-radius: var(--fs-radius);
+  color: var(--fs-text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 8px 16px;
+  transition: border-color .15s, color .15s, background .15s;
+  width: 100%;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.fs-btn-ghost:hover {
+  border-color: var(--fs-primary);
+  color: var(--fs-primary);
+  background: var(--fs-primary-light);
+}
+
+.fs-btn-icon {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  opacity: .5;
+  transition: opacity .15s, background .15s;
+}
+
+.fs-btn-icon:hover { opacity: 1; background: var(--fs-bg); }
+
+/* ── Section ───────────────────────────────────────────────────── */
+.fs-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Card ──────────────────────────────────────────────────────── */
+.fs-card {
+  background: var(--fs-white);
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius-lg);
+  box-shadow: var(--fs-shadow);
+  overflow: hidden;
+}
+
+.fs-card__header {
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--fs-border);
+}
+
+.fs-card__title {
+  font-size: 14.5px;
+  font-weight: 650;
+  color: var(--fs-text);
+  margin: 0 0 2px;
+}
+
+.fs-card__subtitle {
+  font-size: 12.5px;
+  color: var(--fs-text-muted);
+  margin: 0;
+}
+
+.fs-card__body {
+  padding: 8px 24px 20px;
+}
+
+/* ── Field Row ─────────────────────────────────────────────────── */
+.fs-field-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px 0;
+}
+
+.fs-field-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.fs-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 550;
+  color: var(--fs-text);
+  margin-bottom: 2px;
+}
+
+.fs-hint {
+  display: block;
+  font-size: 12px;
+  color: var(--fs-text-muted);
+}
+
+.fs-field-control {
+  flex-shrink: 0;
+  width: 260px;
+}
+
+/* ── Form Elements ─────────────────────────────────────────────── */
+.fs-input,
+.fs-select,
+.fs-textarea {
+  width: 100%;
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+  padding: 7px 11px;
+  font-size: 13.5px;
+  color: var(--fs-text);
+  background: var(--fs-white);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.fs-input:focus,
+.fs-select:focus,
+.fs-textarea:focus {
+  border-color: var(--fs-primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+}
+
+.fs-input::placeholder { color: var(--fs-text-light); }
+.fs-textarea { resize: vertical; line-height: 1.5; }
+.fs-select   { cursor: pointer; appearance: auto; }
+
+/* ── Toggle ────────────────────────────────────────────────────── */
+.fs-toggle {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: none;
+  background: #d1d5db;
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  transition: background .2s;
+  flex-shrink: 0;
+}
+
+.fs-toggle--on { background: var(--fs-primary); }
+
+.fs-toggle__thumb {
+  display: block;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: transform .2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+
+.fs-toggle--on .fs-toggle__thumb { transform: translateX(20px); }
+
+/* ── Divider ───────────────────────────────────────────────────── */
+.fs-divider {
+  height: 1px;
+  background: var(--fs-border);
+  margin: 4px 0;
+}
+
+/* ── Badge ─────────────────────────────────────────────────────── */
+.fs-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+
+.fs-badge--blue  { background: #dbeafe; color: #1e40af; }
+.fs-badge--green { background: #dcfce7; color: #15803d; }
+.fs-badge--gray  { background: #f3f4f6; color: #374151; }
+.fs-badge--amber { background: #fef3c7; color: #92400e; }
+.fs-badge--red   { background: #fee2e2; color: #991b1b; }
+
+/* ── Preview Tag ───────────────────────────────────────────────── */
+.fs-preview-tag {
+  font-size: 12.5px;
+  color: var(--fs-text-muted);
+  background: var(--fs-bg);
+  border: 1px dashed var(--fs-border-hover);
+  border-radius: var(--fs-radius);
+  padding: 8px 14px;
+  margin-top: 4px;
+}
+
+.fs-preview-tag strong {
+  color: var(--fs-primary);
+  font-weight: 650;
+}
+
+/* ── Table ─────────────────────────────────────────────────────── */
+.fs-table-wrap { overflow-x: auto; margin-bottom: 12px; }
+
+.fs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.fs-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--fs-text-muted);
+  background: var(--fs-bg);
+  border-bottom: 1px solid var(--fs-border);
+}
+
+.fs-table td {
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--fs-border);
+  vertical-align: middle;
+}
+
+.fs-table tr:last-child td { border-bottom: none; }
+.fs-table__name { font-weight: 550; color: var(--fs-text); }
+
+/* ── Gateway Cards ─────────────────────────────────────────────── */
+.fs-gateway-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  gap: 16px;
+}
+
+.fs-gateway-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.fs-gateway-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  flex-shrink: 0;
+}
+
+.fs-gateway-logo--upi    { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.fs-gateway-logo--rz     { background: #fdf2f8; color: #86198f; border: 1px solid #f5d0fe; }
+.fs-gateway-logo--stripe { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+
+.fs-gateway-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--fs-text);
+  margin: 0 0 2px;
+}
+
+.fs-gateway-detail {
+  padding: 4px 0 8px 58px;
+  border-top: 1px solid var(--fs-border);
+  background: var(--fs-bg);
+  margin: 0 -24px;
+  padding: 12px 24px 12px 82px;
+}
+
+/* ── Bank Cards ────────────────────────────────────────────────── */
+.fs-bank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.fs-bank-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--fs-bg);
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+}
+
+.fs-bank-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--fs-primary-light);
+  color: var(--fs-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.fs-bank-details { flex: 1; min-width: 0; }
+
+.fs-bank-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--fs-text);
+  margin: 0 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Role List ─────────────────────────────────────────────────── */
+.fs-role-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 16px;
+}
+
+.fs-role-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--fs-border);
+}
+
+.fs-role-row:last-child { border-bottom: none; }
+
+.fs-role-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 550;
+  min-width: 160px;
+  flex-shrink: 0;
+}
+
+.fs-role-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fs-role-dot--blue  { background: #2563eb; }
+.fs-role-dot--green { background: #16a34a; }
+.fs-role-dot--gray  { background: #6b7280; }
+.fs-role-dot--amber { background: #d97706; }
+
+.fs-role-perms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .fs-root { flex-direction: column; }
+
+  .fs-sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    border-right: none;
+    border-bottom: 1px solid var(--fs-border);
+    padding: 16px;
+  }
+
+  .fs-sidebar__nav { flex-direction: row; flex-wrap: wrap; }
+
+  .fs-nav-item { width: auto; flex: 0 0 auto; }
+
+  .fs-main { padding: 20px 16px; }
+
+  .fs-field-row { flex-direction: column; gap: 8px; }
+
+  .fs-field-control { width: 100%; }
+
+  .fs-main__header { flex-direction: column; align-items: flex-start; }
+}
