@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { createEmployee, updateEmployee } from "../../services/employeeService";
+import { getNextEmployeeCode } from "../../services/employeeService";
 
 function AddEmployeeModal({ onClose, onSuccess, employee }) {
   const [form, setForm] = useState({
@@ -10,6 +11,7 @@ function AddEmployeeModal({ onClose, onSuccess, employee }) {
     designation: "",
     salary: "",
     join_date: "",
+    employee_code: "",
   });
 
   const [files, setFiles] = useState({
@@ -18,6 +20,15 @@ function AddEmployeeModal({ onClose, onSuccess, employee }) {
     offer_letter: null,
     certificates: null,
   });
+
+  // Auto-generate code for new employees
+  useEffect(() => {
+    if (!employee) {
+      getNextEmployeeCode()
+        .then((res) => setForm((prev) => ({ ...prev, employee_code: res.data.employee_code })))
+        .catch((err) => console.error("Failed to generate employee code", err));
+    }
+  }, []);
 
   useEffect(() => {
     if (employee) {
@@ -29,6 +40,7 @@ function AddEmployeeModal({ onClose, onSuccess, employee }) {
         designation: employee.designation || "",
         salary: employee.salary || "",
         join_date: employee.join_date || "",
+        employee_code: employee.employee_code || "",
       });
     }
   }, [employee]);
@@ -83,6 +95,22 @@ function AddEmployeeModal({ onClose, onSuccess, employee }) {
         <h3>{employee ? "Edit Employee" : "Add Employee"}</h3>
 
         <form onSubmit={handleSubmit}>
+          {/* Employee Code - auto-generated, read-only for new employees */}
+          <label>Employee Code</label>
+          <input
+            name="employee_code"
+            placeholder="Auto-generating..."
+            value={form.employee_code}
+            readOnly={!employee}
+            onChange={employee ? handleChange : undefined}
+            style={{
+              background: employee ? "" : "#f0f4ff",
+              color: employee ? "" : "#2563eb",
+              fontWeight: "600",
+              cursor: employee ? "text" : "default",
+            }}
+            title={employee ? "Employee Code" : "Auto-generated unique code"}
+          />
           <input name="name" placeholder="Name" value={form.name} onChange={handleChange} required />
           <input name="email" type="email" placeholder="Email" value={form.email} onChange={handleChange} required />
           <input name="phone" placeholder="Phone" value={form.phone} onChange={handleChange} />
@@ -114,4 +142,4 @@ function AddEmployeeModal({ onClose, onSuccess, employee }) {
   );
 }
 
-export default AddEmployeeModal;
+export default AddEmployeeModal; 

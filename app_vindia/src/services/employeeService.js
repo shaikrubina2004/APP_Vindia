@@ -14,6 +14,7 @@ API.interceptors.request.use((req) => {
 export const getEmployees = () => API.get("/");
 export const getEmployeeById = (id) => API.get(`/${id}`);
 export const deleteEmployee = (id) => API.delete(`/${id}`);
+export const getNextEmployeeCode = () => API.get("/generate-code");
 
 // ✅ CREATE (send FormData directly)
 export const createEmployee = (data) => {
@@ -23,7 +24,7 @@ export const createEmployee = (data) => {
     },
   });
 };
-
+ 
 // ✅ UPDATE (send FormData directly)
 export const updateEmployee = (id, data) => {
   return API.put(`/${id}`, data, {

@@ -97,7 +97,7 @@ export default function AddEmployee() {
       setForm({
         name: editingEmployee.name || "",
         email: editingEmployee.email || "",
-        phone: editingEmployee.phone || "",
+        phone: (editingEmployee.phone === "N/A" || !editingEmployee.phone) ? "" : editingEmployee.phone,
         department: editingEmployee.department || "",
         role: editingEmployee.designation || "",
         joining_date: editingEmployee.join_date?.split("T")[0] || "",
@@ -132,18 +132,25 @@ export default function AddEmployee() {
     const { name, value } = e.target;
 
     if (name === "phone") {
-      if (!/^\d*$/.test(value)) return;
-      if (value.length > 10) return;
-      if (value.length === 10 && /^[6-9]\d{9}$/.test(value)) {
-        setErrors((prev) => ({ ...prev, phone: "" }));
-      } else if (value.length === 10) {
-        setErrors((prev) => ({ ...prev, phone: "Phone must start with 6-9" }));
+      // Strip any non-digit characters (handles N/A or other bad prefilled values)
+      const digitsOnly = value.replace(/[^0-9]/g, "");
+      // Cap at 10 digits
+      const capped = digitsOnly.slice(0, 10);
+      // Validate only when 10 digits entered
+      if (capped.length === 10) {
+        if (/^[6-9][0-9]{9}$/.test(capped)) {
+          setErrors((prev) => ({ ...prev, phone: "" }));
+        } else {
+          setErrors((prev) => ({ ...prev, phone: "Phone must start with 6-9" }));
+        }
       } else {
         setErrors((prev) => ({
           ...prev,
           phone: "Phone number must be 10 digits",
         }));
       }
+      setForm((prev) => ({ ...prev, phone: capped }));
+      return;
     }
 
     if (name === "account_no") {
@@ -477,6 +484,33 @@ export default function AddEmployee() {
 
       <h2>{editingEmployee ? "Edit Employee" : "Add Employee"}</h2>
 
+      {/* DEV HELPER — remove before production */}
+      {!editingEmployee && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
+          <button
+            type="button"
+            onClick={fillDummyData}
+            style={{
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              padding: "0.45rem 1.1rem",
+              fontSize: "0.82rem",
+              fontWeight: "600",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              boxShadow: "0 2px 8px rgba(99,102,241,0.35)",
+            }}
+            title="Fills all fields with sample employee data (dev only)"
+          >
+            🧪 Fill Dummy Data
+          </button>
+        </div>
+      )}
+
       <form className="employee-form" onSubmit={handleSubmit}>
         {/* BASIC */}
         <div className="form-section">
@@ -508,12 +542,14 @@ export default function AddEmployee() {
             </div>
             <div>
               <input
+                type="tel"
                 name="phone"
-                placeholder="Phone"
+                placeholder="Phone (10 digits)"
                 value={form.phone}
                 onChange={handleChange}
                 className={errors.phone ? "error" : ""}
                 maxLength="10"
+                inputMode="numeric"
                 required
               />
               {errors.phone && (
@@ -668,7 +704,7 @@ export default function AddEmployee() {
               name="employment_type"
               value={form.employment_type}
               onChange={handleChange}
-            >
+            > 
               <option value="">Employment Type</option>
               <option value="Full-Time">Full-Time</option>
               <option value="Part-Time">Part-Time</option>

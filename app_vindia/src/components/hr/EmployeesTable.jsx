@@ -19,7 +19,7 @@ function EmployeesTable({ employees, search }) {
   // 🔍 FUZZY SEARCH
   const fuse = useMemo(() => {
     return new Fuse(employees, {
-      keys: ["name", "email", "department", "designation"],
+      keys: ["name", "email", "department", "designation", "role", "user_department"],
       threshold: 0.3,
     });
   }, [employees]);
@@ -51,6 +51,9 @@ function EmployeesTable({ employees, search }) {
               ...emp,
               assignedTo: emp.manager_name || "Not Assigned",
               status: emp.status || "active",
+              // ✅ Use role from users table when linked, fallback to employee columns
+              displayRole: emp.role || emp.designation || "—",
+              displayDept: emp.user_department || emp.department || "—",
             };
 
             // ✅ FIXED STATUS
@@ -71,8 +74,8 @@ function EmployeesTable({ employees, search }) {
                 </td>
 
                 <td>{formatted.email}</td>
-                <td>{formatted.department}</td>
-                <td>{formatted.designation}</td>
+                <td>{formatted.displayDept}</td>
+                <td>{formatted.displayRole}</td>
 
                 <td>{formatted.assignedTo}</td>
 
@@ -103,4 +106,4 @@ function EmployeesTable({ employees, search }) {
   );
 }
 
-export default EmployeesTable;
+export default EmployeesTable; 

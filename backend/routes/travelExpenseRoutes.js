@@ -1,11 +1,7 @@
 // backend/routes/travelExpenseRoutes.js
 const express = require("express");
-const {
-  createRequest,
-  getRequests,
-  getRequestById,
-  updateStatus,
-} = require("../controllers/travelExpenseController");
+const { createRequest, getRequests, getRequestById,
+        updateStatus, pmUpdateStatus } = require("../controllers/travelExpenseController");
 
 const router = express.Router();
 
@@ -20,9 +16,11 @@ router.get("/:id", getRequestById);
 
 // HR approve / reject
 router.put("/:id/status", updateStatus);
+router.put("/:id/pm-status", pmUpdateStatus);   // ← ADD THIS
+  // existing HR route
 
 module.exports = router;
-
+ 
 /* ─────────────────────────────────────────────────────────────────────────────
    In your server.js, add:
 

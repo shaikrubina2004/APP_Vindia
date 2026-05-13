@@ -10,7 +10,11 @@ const {
   getEmployeeById,
   updateEmployee,
   deleteEmployee,
+  getNextEmployeeCode,
 } = require("../controllers/employeeController");
+
+// ✅ GENERATE NEXT EMPLOYEE CODE (must be before /:id routes)
+router.get("/generate-code", authMiddleware, getNextEmployeeCode);
 
 // ✅ CREATE EMPLOYEE (WITH FILE UPLOAD)
 router.post(

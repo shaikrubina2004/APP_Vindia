@@ -1,4 +1,34 @@
 const pool = require("../config/db");
+const bcrypt = require("bcryptjs");
+
+// ✅ GENERATE NEXT UNIQUE EMPLOYEE CODE (e.g. EMP001, EMP002 ...)
+const generateNextEmployeeCode = async () => {
+  const result = await pool.query(`
+    SELECT employee_code FROM employees
+    WHERE employee_code ~ '^EMP[0-9]+$'
+    ORDER BY CAST(SUBSTRING(employee_code FROM 4) AS INTEGER) DESC
+    LIMIT 1
+  `);
+
+  if (result.rows.length === 0) {
+    return "EMP001";
+  }
+
+  const last = result.rows[0].employee_code; // e.g. "EMP007"
+  const num  = parseInt(last.replace("EMP", ""), 10);
+  return "EMP" + String(num + 1).padStart(3, "0");
+};
+
+// ✅ API HANDLER: GET /api/employees/generate-code
+const getNextEmployeeCode = async (req, res) => {
+  try {
+    const code = await generateNextEmployeeCode();
+    res.status(200).json({ employee_code: code });
+  } catch (error) {
+    console.error("Generate code error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
 // ✅ DEFAULT FILE PLACEHOLDERS
 const DEFAULTS = {
@@ -11,7 +41,7 @@ const DEFAULTS = {
 // ✅ VALID GOV ID TYPES
 const validTypes = ["pan", "aadhar", "passport", "driving", "voter"];
 
-// ✅ CREATE EMPLOYEE
+// ✅ CREATE EMPLOYEE → also creates/links a user account
 const createEmployee = async (req, res) => {
   const {
     name, email, phone, department, designation, salary,
@@ -20,7 +50,8 @@ const createEmployee = async (req, res) => {
     employee_code, employment_type, work_location,
     shift_timing, experience, previous_company,
     account_no, ifsc,
-    gov_id_type, gov_id_number  // ✅ NEW: Replaced pan/aadhar
+    gov_id_type, gov_id_number,
+    password  // ✅ optional: HR can set a login password for the employee
   } = req.body;
 
   const files = req.files || {};
@@ -31,28 +62,60 @@ const createEmployee = async (req, res) => {
   const certificates = files.certificates?.[0]?.filename || DEFAULTS.certificates;
 
   try {
-    // ✅ REQUIRED VALIDATION
     if (!name || !email || !phone || !department || !designation || salary == null || !join_date) {
       return res.status(400).json({ message: "Required fields missing" });
     }
 
-    // ✅ GOV ID TYPE VALIDATION
     if (gov_id_type && !validTypes.includes(gov_id_type.toLowerCase())) {
-      return res.status(400).json({ 
-        message: `Invalid ID type. Must be one of: ${validTypes.join(", ")}` 
+      return res.status(400).json({
+        message: `Invalid ID type. Must be one of: ${validTypes.join(", ")}`
       });
     }
 
-    // ✅ EMAIL UNIQUENESS CHECK (case insensitive)
     const existingEmployee = await pool.query(
       "SELECT id FROM employees WHERE LOWER(email) = LOWER($1)",
       [email]
     );
-
     if (existingEmployee.rows.length > 0) {
       return res.status(400).json({ message: "Employee with this email already exists" });
     }
 
+    // ✅ STEP 1: Check if a user account already exists for this email
+    let userId = null;
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE LOWER(email) = LOWER($1)",
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
+      // User already exists — just grab their ID to link
+      userId = existingUser.rows[0].id;
+    } else {
+      // ✅ STEP 2: No user exists — create one automatically
+      const rawPassword = password || "Vindia@123";
+      const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+      // ✅ Look up role_id from the roles table using the designation name
+      // This ensures the new user gets the correct role so they land on the right dashboard
+      const roleResult = await pool.query(
+        "SELECT id FROM roles WHERE LOWER(name) = LOWER($1) LIMIT 1",
+        [designation.trim()]
+      );
+      const roleId = roleResult.rows[0]?.id || null;
+
+      const newUser = await pool.query(
+        `INSERT INTO users (name, email, password, role_id, status)
+         VALUES ($1, $2, $3, $4, 'active')
+         RETURNING id`,
+        [name.trim(), email.toLowerCase().trim(), hashedPassword, roleId]
+      );
+      userId = newUser.rows[0].id;
+    }
+
+    // ✅ STEP 2.5: Auto-generate employee_code if not provided
+    const finalEmployeeCode = employee_code?.trim() || await generateNextEmployeeCode();
+
+    // ✅ STEP 3: Insert the employee record, linked to the user
     const result = await pool.query(
       `INSERT INTO employees (
         name, email, phone, department, designation, salary,
@@ -61,13 +124,13 @@ const createEmployee = async (req, res) => {
         employee_code, employment_type, work_location,
         shift_timing, experience, previous_company,
         profile_photo, account_no, ifsc, gov_id_type, gov_id_number,
-        id_proof, offer_letter, certificates
+        id_proof, offer_letter, certificates, user_id
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
         $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-        $21,$22,$23,$24,$25,$26,$27,$28
-      )
+        $21,$22,$23,$24,$25,$26,$27,$28,$29
+      ) 
       RETURNING *`,
       [
         name.trim(),
@@ -80,34 +143,35 @@ const createEmployee = async (req, res) => {
         manager_id ? Number(manager_id) : null,
         status ? status.toLowerCase().trim() : "active",
         address?.trim() || null,
-
         dob || null,
         gender?.trim() || null,
         marital_status?.trim() || null,
         nationality?.trim() || null,
-
-        employee_code?.trim() || null,
+        finalEmployeeCode,
         employment_type?.trim() || null,
         work_location?.trim() || null,
         shift_timing?.trim() || null,
         Number(experience) || null,
         previous_company?.trim() || null,
-
         profile_photo,
         account_no?.trim() || null,
         ifsc?.trim().toUpperCase() || null,
         gov_id_type ? gov_id_type.toLowerCase().trim() : null,
         gov_id_number?.trim() || null,
-
         id_proof,
         offer_letter,
-        certificates
+        certificates,
+        userId  // ✅ linked user_id
       ]
     );
 
     res.status(201).json({
       message: "Employee created successfully 🚀",
-      employee: result.rows[0]
+      employee: result.rows[0],
+      user_id: userId,
+      note: existingUser.rows.length > 0
+        ? "Linked to existing user account"
+        : "New user account created with default password: Vindia@123"
     });
 
   } catch (error) {
@@ -116,19 +180,24 @@ const createEmployee = async (req, res) => {
   }
 };
 
-// ✅ GET ALL EMPLOYEES
+// ✅ GET ALL EMPLOYEES — now includes role from users table
 const getAllEmployees = async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
         e.id, e.name, e.email, e.phone, e.department, 
         e.designation, e.salary, e.status, e.join_date,
-        e.gov_id_type, e.gov_id_number,
-        m.name AS manager_name
+        e.gov_id_type, e.gov_id_number, e.user_id,
+        m.name AS manager_name,
+        r.name AS role,
+        d.name AS user_department
       FROM employees e
       LEFT JOIN employees m ON e.manager_id = m.id
+      LEFT JOIN users u ON u.id = e.user_id
+      LEFT JOIN roles r ON r.id = u.role_id
+      LEFT JOIN departments d ON d.id = r.department_id
       ORDER BY e.id DESC
-      LIMIT 50
+      LIMIT 100
     `);
 
     res.status(200).json(result.rows);
@@ -147,9 +216,13 @@ const getEmployeeById = async (req, res) => {
       SELECT 
         e.*, 
         m.name AS manager_name,
-        m.designation AS manager_designation
+        m.designation AS manager_designation,
+        r.name AS role,
+        u.status AS login_status
       FROM employees e
       LEFT JOIN employees m ON e.manager_id = m.id
+      LEFT JOIN users u ON u.id = e.user_id
+      LEFT JOIN roles r ON r.id = u.role_id
       WHERE e.id = $1
     `, [id]);
 
@@ -175,7 +248,7 @@ const updateEmployee = async (req, res) => {
     employee_code, employment_type, work_location,
     shift_timing, experience, previous_company,
     account_no, ifsc,
-    gov_id_type, gov_id_number  // ✅ NEW: Replaced pan/aadhar
+    gov_id_type, gov_id_number
   } = req.body;
 
   const files = req.files || {};
@@ -189,14 +262,12 @@ const updateEmployee = async (req, res) => {
 
     const old = existing.rows[0];
 
-    // ✅ GOV ID TYPE VALIDATION
     if (gov_id_type && !validTypes.includes(gov_id_type.toLowerCase())) {
-      return res.status(400).json({ 
-        message: `Invalid ID type. Must be one of: ${validTypes.join(", ")}` 
+      return res.status(400).json({
+        message: `Invalid ID type. Must be one of: ${validTypes.join(", ")}`
       });
     }
 
-    // ✅ File handling with fallback
     const profile_photo = files.profile_photo?.[0]?.filename || old.profile_photo || DEFAULTS.profile_photo;
     const id_proof = files.id_proof?.[0]?.filename || old.id_proof || DEFAULTS.id_proof;
     const offer_letter = files.offer_letter?.[0]?.filename || old.offer_letter || DEFAULTS.offer_letter;
@@ -224,31 +295,35 @@ const updateEmployee = async (req, res) => {
         manager_id !== undefined ? (manager_id ? Number(manager_id) : null) : old.manager_id,
         status ? status.toLowerCase().trim() : old.status,
         address?.trim() || old.address,
-
         dob || old.dob,
         gender?.trim() || old.gender,
         marital_status?.trim() || old.marital_status,
         nationality?.trim() || old.nationality,
-
         employee_code?.trim() || old.employee_code,
         employment_type?.trim() || old.employment_type,
         work_location?.trim() || old.work_location,
         shift_timing?.trim() || old.shift_timing,
         experience !== undefined ? Number(experience) || null : old.experience,
         previous_company?.trim() || old.previous_company,
-
         profile_photo,
         account_no?.trim() || old.account_no,
         ifsc?.trim().toUpperCase() || old.ifsc,
         gov_id_type ? gov_id_type.toLowerCase().trim() : old.gov_id_type,
         gov_id_number?.trim() || old.gov_id_number,
-
         id_proof,
         offer_letter,
         certificates,
         id
       ]
     );
+
+    // ✅ Also sync name to users table if linked
+    if (name && old.user_id) {
+      await pool.query(
+        "UPDATE users SET name = $1 WHERE id = $2",
+        [name.trim(), old.user_id]
+      );
+    }
 
     res.status(200).json({
       message: "Employee updated successfully ✏️",
@@ -267,7 +342,7 @@ const deleteEmployee = async (req, res) => {
 
   try {
     const result = await pool.query("DELETE FROM employees WHERE id = $1 RETURNING id", [id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Employee not found" });
     }
@@ -285,4 +360,5 @@ module.exports = {
   getEmployeeById,
   updateEmployee,
   deleteEmployee,
+  getNextEmployeeCode,
 };
