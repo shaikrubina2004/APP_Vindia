@@ -46,6 +46,6 @@ export const ArchitectMenu = [
     path: "/architect/rfi",
     icon: "help-circle",  
   },
-  
+  { name: "Travel Requests", path: "/architect/travelrequest", icon: "file-plus" }
 
 ];

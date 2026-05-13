@@ -33,14 +33,22 @@ export default function AddEmployee() {
   });
 
   const [employees, setEmployees]   = useState([]);
-  const [roles, setRoles]           = useState([]);        // ← NEW
+  const [roles, setRoles]           = useState([]);
   const [managerId, setManagerId]   = useState("");
   const [errors, setErrors]         = useState({});
+
+  // ─── Toast state ─────────────────────────────────────────────────────────────
+  const [toast, setToast] = useState({ visible: false, message: "", type: "success" });
+
+  const showToast = (message, type = "success") => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => setToast({ visible: false, message: "", type: "success" }), 3500);
+  };
 
   // ─── Load employees + roles on mount ────────────────────────────────────────
   useEffect(() => {
     fetchEmployees();
-    fetchRoles();          // ← NEW
+    fetchRoles();
   }, []);
 
   const fetchEmployees = async () => {
@@ -52,11 +60,9 @@ export default function AddEmployee() {
     }
   };
 
-  // ── NEW: load roles from DB ─────────────────────────────────────────────────
   const fetchRoles = async () => {
     try {
       const data = await getRoles();
-      // data may be an array directly or wrapped in { data: [...] }
       setRoles(Array.isArray(data) ? data : data.data || []);
     } catch (err) {
       console.error("Failed to load roles", err);
@@ -99,7 +105,7 @@ export default function AddEmployee() {
     }
   }, [editingEmployee]);
 
-  // ─── handleChange (unchanged from your original) ────────────────────────────
+  // ─── handleChange ────────────────────────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -166,9 +172,7 @@ export default function AddEmployee() {
     setForm((prev) => ({ ...prev, [name]: finalValue }));
   };
 
-  // ─── NEW: when role is selected, auto-fill department ───────────────────────
-  // Your roles table has department_id but not department name directly.
-  // We'll map department_id → department name using a local lookup.
+  // ─── Department map ──────────────────────────────────────────────────────────
   const DEPT_MAP = {
     1: "HR",
     2: "IT",
@@ -184,11 +188,9 @@ export default function AddEmployee() {
   const handleRoleChange = (e) => {
     const selectedRoleName = e.target.value;
     const selectedRole = roles.find((r) => r.name === selectedRoleName);
-
     setForm((prev) => ({
       ...prev,
       role: selectedRoleName,
-      // auto-fill department from role's department_id
       department: selectedRole ? (DEPT_MAP[selectedRole.department_id] || prev.department) : prev.department,
     }));
   };
@@ -205,11 +207,11 @@ export default function AddEmployee() {
   const handleFileChange = (e, fieldName) => {
     if (fieldName === "id_proof") {
       if (!form.gov_id_type || !form.gov_id_number) {
-        alert("Please enter ID type and number first");
+        showToast("Please enter ID type and number first", "error");
         return;
       }
       if (errors.gov_id_number) {
-        alert("Enter a valid ID number first");
+        showToast("Enter a valid ID number first", "error");
         return;
       }
       const duplicate = employees.find(
@@ -218,7 +220,7 @@ export default function AddEmployee() {
           emp.id !== editingEmployee?.id
       );
       if (duplicate) {
-        alert("This ID number already exists. Cannot upload proof.");
+        showToast("This ID number already exists. Cannot upload proof.", "error");
         return;
       }
     }
@@ -283,8 +285,7 @@ export default function AddEmployee() {
       }
     }
     if (form.id_proof && (!form.gov_id_type || !form.gov_id_number)) {
-      newErrors.id_proof =
-        "Select ID type and enter ID number before uploading document";
+      newErrors.id_proof = "Select ID type and enter ID number before uploading document";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -300,11 +301,11 @@ export default function AddEmployee() {
         emp.id !== editingEmployee?.id
     );
     if (duplicate) {
-      alert("Duplicate ID number not allowed");
+      showToast("Duplicate ID number not allowed", "error");
       return;
     }
     if (form.id_proof && (!form.gov_id_type || !form.gov_id_number)) {
-      alert("Upload ID proof only after entering valid ID details");
+      showToast("Upload ID proof only after entering valid ID details", "error");
       return;
     }
 
@@ -346,20 +347,20 @@ export default function AddEmployee() {
 
       if (editingEmployee) {
         await updateEmployee(editingEmployee.id, formData);
-        alert("Employee updated successfully ✏️");
+        showToast("Employee updated successfully", "success");
       } else {
         await createEmployee(formData);
-        alert("Employee added successfully 🚀");
+        showToast("Employee added successfully", "success");
       }
 
-      navigate("/hr/employees");
+      setTimeout(() => navigate("/hr/employees"), 2000);
     } catch (err) {
       console.error(err.response?.data || err);
-      alert("Operation failed ❌");
+      showToast("Something went wrong. Please try again.", "error");
     }
   };
 
-  // ─── Group roles by department for a neat optgroup dropdown ─────────────────
+  // ─── Group roles by department ───────────────────────────────────────────────
   const rolesByDept = roles.reduce((acc, role) => {
     const deptName = DEPT_MAP[role.department_id] || `Dept ${role.department_id}`;
     if (!acc[deptName]) acc[deptName] = [];
@@ -369,6 +370,39 @@ export default function AddEmployee() {
 
   return (
     <div className="add-employee-page">
+
+      {/* ── TOAST NOTIFICATION ── */}
+      {toast.visible && (
+        <div className="toast-overlay">
+          <div className={`toast-box toast-${toast.type}`}>
+            <div className="toast-icon-wrap">
+              {toast.type === "success" ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              )}
+            </div>
+            <div className="toast-content">
+              <p className="toast-title">
+                {toast.type === "success" ? "Success" : "Error"}
+              </p>
+              <p className="toast-message">{toast.message}</p>
+            </div>
+            <button className="toast-close" onClick={() => setToast({ visible: false, message: "", type: "success" })}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <h2>{editingEmployee ? "Edit Employee" : "Add Employee"}</h2>
 
       <form className="employee-form" onSubmit={handleSubmit}>
@@ -417,28 +451,30 @@ export default function AddEmployee() {
         <div className="form-section">
           <h3>Job Details</h3>
           <div className="grid">
+            <div>
+              <select
+                name="role"
+                value={form.role}
+                onChange={handleRoleChange}
+                className={errors.role ? "error" : ""}
+                required
+              >
+                <option value="">Select Designation</option>
+                {Object.entries(rolesByDept).map(([deptName, deptRoles]) => (
+                  <optgroup key={deptName} label={deptName}>
+                    {deptRoles
+                      .filter((r) => r.is_active)
+                      .map((r) => (
+                        <option key={r.id} value={r.name}>
+                          {r.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
+              </select>
+              {errors.role && <span className="error-text">{errors.role}</span>}
+            </div>
 
-            {/* ── DESIGNATION DROPDOWN (from roles) ── */}
-            <select
-  name="role"
-  value={form.role}
-  onChange={handleRoleChange}
-  className={errors.role ? "error" : ""}
-  required
-  size={1}
->
-  <option value="">Select Designation</option>
-  {roles
-    .filter((r) => r.is_active)
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((r) => (
-      <option key={r.id} value={r.name}>
-        {r.name} ({DEPT_MAP[r.department_id] || "Other"})
-      </option>
-    ))}
-</select>
-
-            {/* ── DEPARTMENT — auto-filled but still editable ── */}
             <div>
               <input
                 name="department"

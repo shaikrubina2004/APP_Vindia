@@ -62,13 +62,13 @@ img {
 /* ================= INPUT GRID & OVERFLOW FIX ================= */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); 
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 20px;
   width: 100%;
 }
 
 .grid > div {
-  min-width: 0; 
+  min-width: 0;
   width: 100%;
 }
 
@@ -83,25 +83,25 @@ img {
   font-size: 15px;
   font-family: inherit;
   transition: all 0.25s ease;
-  background-color: #ffffff !important; 
+  background-color: #ffffff !important;
   color: #001D39 !important;
   box-sizing: border-box;
 }
 
-.employee-form input, 
+.employee-form input,
 .employee-form select {
   height: 50px;
 }
 
 .employee-form textarea {
-  min-height: 110px; 
+  min-height: 110px;
   resize: vertical;
   display: block;
 }
 
 @media (min-width: 900px) {
   .grid textarea {
-    grid-column: span 2; 
+    grid-column: span 2;
   }
 }
 
@@ -114,13 +114,25 @@ img {
   outline: none;
 }
 
-/* ================= DOCUMENT GRID (REFINED ALIGNMENT) ================= */
+/* ================= ERROR STATES ================= */
+.employee-form input.error,
+.employee-form select.error {
+  border-color: #e74c3c;
+}
+
+.error-text {
+  font-size: 12px;
+  color: #e74c3c;
+  margin-top: 4px;
+  display: block;
+}
+
+/* ================= DOCUMENT GRID ================= */
 .document-grid {
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: wrap;
-  /* space-between ensures the first and last cards align with section edges */
-  justify-content: space-between; 
+  justify-content: space-between;
   gap: 20px;
   width: 100%;
   padding: 10px 0;
@@ -128,7 +140,6 @@ img {
 
 /* ================= DOCUMENT CARDS ================= */
 .doc-card {
-  /* Adjusted flex to ensure 4-column symmetry */
   flex: 0 1 calc(25% - 15px);
   min-width: 260px;
   background: #ffffff;
@@ -139,9 +150,9 @@ img {
   text-align: center;
   display: flex;
   flex-direction: column;
-  justify-content: center; 
+  justify-content: center;
   align-items: center;
-  gap: 12px; 
+  gap: 12px;
   box-shadow: 0 4px 15px rgba(0, 29, 57, 0.04);
   transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
   cursor: pointer;
@@ -171,19 +182,15 @@ img {
   object-fit: cover;
   border-radius: 12px;
   border: 2px solid #ffffff;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
   background: #fff;
   z-index: 1;
 }
 
 .upload-btn {
-  /* Change width from 100% to a smaller fixed size or percentage */
-  width: auto; 
-  min-width: 140px; /* Gives it a consistent small size */
-  
-  /* Reduce padding for a slimmer look */
-  padding: 8px 20px; 
-  
+  width: auto;
+  min-width: 140px;
+  padding: 8px 20px;
   font-size: 12px;
   font-weight: 700;
   border-radius: 10px;
@@ -191,15 +198,11 @@ img {
   color: white;
   border: none;
   z-index: 1;
-
-  /* Keeps the text centered inside the button */
   display: inline-flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   cursor: pointer;
-  
-  /* Smooth hover effect since it's now a smaller target */
   transition: transform 0.2s ease, background 0.2s ease;
 }
 
@@ -208,14 +211,29 @@ img {
   transform: translateY(-1px);
 }
 
+.file-name {
+  font-size: 12px;
+  color: #4E8EA2;
+  font-weight: 600;
+  word-break: break-all;
+  z-index: 1;
+}
+
+.empty-text {
+  font-size: 12px;
+  color: #aab8c2;
+  z-index: 1;
+}
+
 .view-btn {
   font-size: 11px;
   color: #0A4174;
   font-weight: 700;
   text-decoration: none;
   z-index: 1;
-  margin-top: 2px; /* Increased slightly from -4px for better breathing room */
+  margin-top: 2px;
 }
+
 /* ================= PRIMARY BUTTON ================= */
 .primary-btn {
   padding: 18px;
@@ -228,6 +246,158 @@ img {
   cursor: pointer;
   width: 100%;
   margin-top: 15px;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.primary-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+/* ================= TOAST NOTIFICATION ================= */
+.toast-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  /* subtle dark backdrop */
+  background: rgba(0, 15, 30, 0.35);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: toastBackdropIn 0.25s ease forwards;
+}
+
+.toast-box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 28px;
+  border-radius: 20px;
+  font-family: inherit;
+  min-width: 340px;
+  max-width: 500px;
+  width: auto;
+  position: relative;
+  animation: toastPopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.25),
+    0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Success variant ── */
+.toast-success {
+  background: linear-gradient(135deg, #0A4174 0%, #1a6b8a 60%, #4E8EA2 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ── Error variant ── */
+.toast-error {
+  background: linear-gradient(135deg, #7b1a1a 0%, #b83232 60%, #e05555 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ── Icon circle ── */
+.toast-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+}
+
+.toast-icon-wrap svg {
+  width: 20px;
+  height: 20px;
+  color: #ffffff;
+}
+
+/* ── Text content ── */
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+  margin-bottom: 3px;
+}
+
+.toast-message {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.4;
+}
+
+/* ── Close button ── */
+.toast-close {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+  padding: 0;
+}
+
+.toast-close:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.toast-close svg {
+  width: 14px;
+  height: 14px;
+  color: #ffffff;
+}
+
+/* ── Progress bar at the bottom ── */
+.toast-box::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 0 0 20px 20px;
+  background: rgba(255, 255, 255, 0.45);
+  animation: toastProgress 3.5s linear forwards;
+}
+
+/* ── Keyframes ── */
+@keyframes toastBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes toastPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.82) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes toastProgress {
+  from { width: 100%; }
+  to   { width: 0%; }
 }
 
 /* ================= RESPONSIVE ================= */
@@ -235,11 +405,14 @@ img {
   .document-grid { justify-content: center; }
   .doc-card { flex: 0 1 calc(33.33% - 20px); }
 }
+
 @media (max-width: 900px) {
   .doc-card { flex: 0 1 calc(50% - 20px); }
 }
+
 @media (max-width: 600px) {
   .document-grid { flex-direction: column !important; gap: 15px; }
   .doc-card { flex: 0 0 100% !important; min-width: 100%; }
   .form-section { padding: 20px; }
+  .toast-box { min-width: 90vw; padding: 18px 20px; }
 }

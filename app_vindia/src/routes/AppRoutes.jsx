@@ -24,6 +24,7 @@ import Documents from "../pages/hr/Documents";
 import Leaves from "../pages/hr/Leaves";
 import Payroll from "../pages/hr/Payroll";
 import Travel from "../pages/hr/Travel";
+import TravelRequest from "../pages/hr/TravelRequest";
 
 import DigitalMarketing from "../pages/business-development/digital-marketing/DigitalMarketing";
 import DigitalMarketingLayout from "../layouts/DigitalMarketingLayout";
@@ -300,6 +301,16 @@ const AppRoutes = () => {
           }
         />
         <Route
+  path="/hr/travelrequest"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
+      <HRLayout>
+        <TravelRequest />
+      </HRLayout>
+    </ProtectedRoute>
+  }
+/>
+        <Route
           path="/hr/leaves"
           element={
             <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
@@ -541,6 +552,16 @@ const AppRoutes = () => {
             </ArchitectLayout>
           }
         />
+          <Route
+  path="/architect/travelrequest"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
+      <ArchitectLayout>
+        <TravelRequest />
+     </ArchitectLayout>
+    </ProtectedRoute>
+  }
+/>
 
         {/* ══ PROJECT COORDINATOR ═══════════════════════════ */}
         <Route

@@ -5,5 +5,6 @@ export const hrMenu = [
   { name: "Leaves", path: "/hr/leaves", icon: "file-text" },
   { name: "Payroll", path: "/hr/payroll", icon: "credit-card" },
   { name: "Documents", path: "/hr/documents", icon: "folder" },
-  { name: "Travel Requests", path: "/hr/travel", icon: "map" }
+  { name: "Travel ", path: "/hr/travel", icon: "map" },
+  { name: "Travel Requests", path: "/hr/travelrequest", icon: "file-plus" }
 ];
