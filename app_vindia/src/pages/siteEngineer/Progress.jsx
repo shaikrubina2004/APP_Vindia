@@ -6,6 +6,7 @@ import api from "../../services/api";
 import "../../styles/shared-pages.css";
 import "../../styles/Progress.css";
 
+const BASE_URL = import.meta.env.VITE_API_URL;
 const DRAFT_KEY   = "progress:draft:v5";
 const QUEUE_KEY   = "progress:queue:v5";
 const PAGE_SIZE   = 8;
@@ -16,26 +17,10 @@ const BLANK_M     = { item: "", qty: "", unit: "sqft", status: "draft" };
 const AREA_UNITS  = ["sqft","m²","m³","m","kg","tonne","no.","LS","bag","litre","rft"];
 
 // Work types — some use sqft, some don't (description only)
-const WORK_TYPES = [
-  { value: "rebar_fixing",    label: "Rebar Fixing",        sqft: false },
-  { value: "formwork",        label: "Formwork",            sqft: true  },
-  { value: "concrete_pour",   label: "Concrete Pour",       sqft: false },
-  { value: "slab_work",       label: "Slab Work",           sqft: true  },
-  { value: "plastering",      label: "Plastering",          sqft: true  },
-  { value: "brickwork",       label: "Brickwork / Masonry", sqft: true  },
-  { value: "tiling",          label: "Tiling",              sqft: true  },
-  { value: "waterproofing",   label: "Waterproofing",       sqft: true  },
-  { value: "painting",        label: "Painting",            sqft: true  },
-  { value: "excavation",      label: "Excavation",          sqft: false },
-  { value: "column_casting",  label: "Column Casting",      sqft: false },
-  { value: "beam_casting",    label: "Beam Casting",        sqft: false },
-  { value: "mep_rough_in",    label: "MEP Rough-in",        sqft: false },
-  { value: "curing",          label: "Curing",              sqft: true  },
-  { value: "other",           label: "Other",               sqft: false },
-];
+
 
 const BLANK = {
-  date: "", zone: "", work_type: "", activity: "",
+  date: "", zone: "", project_id: "",activity: "", wbs_id: "", 
   // Morning fields
   morning_skilled: 0, morning_unskilled: 0, morning_supervisors: 0,
   morning_note: "",
@@ -67,7 +52,7 @@ async function flushQueue() {
   const rem = [];
   for (const item of q) {
     try {
-      const r = await api.post("/progress", item.payload);
+      const r = await api.post("/site-progress", item.payload);
       if (!r || (r.status && r.status >= 400)) throw new Error();
     } catch { rem.push(item); }
   }
@@ -78,10 +63,16 @@ function nowISO() { return new Date().toISOString().slice(0, 10); }
 
 function validate(f) {
   const e = {};
+  if (!f.project_id?.trim())
+  e.project_id = "Project required";
   if (!f.date)            e.date = "Date required";
   if (!f.zone?.trim())    e.zone = "Zone required";
-  if (!f.work_type)       e.work_type = "Select work type";
+  if (!f.wbs_id)
+  e.wbs_id = "Select milestone";
   const p = Number(f.percent_complete);
+  if (Number(f.percent_complete) === 0 && f.sqft_completed) {
+  e.percent_complete = "Enter realistic % based on work done";
+}
   if (!Number.isFinite(p) || p < 0 || p > 100) e.percent_complete = "0–100";
   // Evening: either sqft or description required
   if (f.sqft_applicable && !f.sqft_completed && !f.evening_description?.trim())
@@ -120,6 +111,9 @@ export default function Progress() {
   const [activeTab, setTab]    = useState("morning"); // "morning" | "evening" | "measurements"
   const autoSave = useRef(null);
   const alive    = useRef(true);
+  const [projects, setProjects] = useState([]);
+  
+  const [wbsList, setWbsList] = useState([]);
 
   useEffect(() => {
     alive.current = true;
@@ -128,12 +122,78 @@ export default function Progress() {
     return () => { alive.current = false; clearTimeout(autoSave.current); };
   }, []);
 
+  useEffect(() => {
+  if (!form.project_id) return;
+
+  async function loadWBS() {
+    try {
+      const res = await api.get(`/wbs?project_id=${form.project_id}`);
+
+      console.log("WBS 👉", res.data);
+
+      const list =
+  res.data?.data ||
+  res.data ||
+  [];
+
+// ✅ only top-level (1,2,3 — no decimals)
+const filtered = list.filter(w => !w.parent_id);
+
+setWbsList(filtered);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  loadWBS();
+}, [form.project_id]);
+
+  useEffect(() => {
+  async function loadProjects() {
+    try {
+      const res = await api.get("/projects");
+
+      console.log("PROJECT API 👉", res.data);
+
+      setProjects(
+        res.data.data || 
+        res.data.projects || 
+        res.data || 
+        []
+      );
+
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  loadProjects();
+}, []);
+// 🔥 AUTO-FILL BASED ON LAST ENTRY
+useEffect(() => {
+  if (!form.zone) return;
+
+  const last = [...entries]
+  .filter(e => e.zone === form.zone)
+  .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+
+  if (last) {
+    setForm(f => ({
+      ...f,
+      planned_percent: last.planned_percent || f.planned_percent,
+      activity: last.activity || f.activity,
+    }));
+  }
+}, [form.zone, entries]);
+
   async function loadList() {
     setLL(true);
     try {
-      const res = await api.get("/progress");
+      const res = await api.get("/site-progress");
       if (!alive.current) return;
-      const raw = Array.isArray(res?.data) ? res.data.slice().reverse() : [];
+      const raw = Array.isArray(res?.data?.data)
+  ? res.data.data.slice().reverse()
+  : [];
       const seen = new Set();
       setEntries(raw.filter(it => { const k = stableKey(it); if (seen.has(k)) return false; seen.add(k); return true; }));
     } catch (e) { console.error(e); }
@@ -152,13 +212,31 @@ export default function Progress() {
   }, []);
 
   // When work type changes, auto-set sqft_applicable
-  const setWorkType = useCallback(v => {
-    const wt = WORK_TYPES.find(w => w.value === v);
-    setForm(f => ({ ...f, work_type: v, sqft_applicable: wt ? wt.sqft : false }));
-    setErrors(e => { const c = { ...e }; delete c.work_type; delete c.evening; return c; });
-  }, []);
+  
 
-  const handleFiles   = useCallback(e => { setForm(f => ({ ...f, photos: [...f.photos, ...Array.from(e.target.files || [])] })); e.target.value = null; }, []);
+const handleFiles = useCallback((e) => {
+  console.log("INPUT CLICKED");
+
+  const files = e.target.files;
+  console.log("FILES 👉", files);
+
+  if (!files || files.length === 0) {
+    console.log("❌ No file selected");
+    return;
+  }
+
+  const fileArray = Array.from(files);
+  console.log("FILE ARRAY 👉", fileArray);
+
+  setForm(f => ({
+    ...f,
+    photos: [...f.photos, ...fileArray]
+  }));
+
+  console.log("UPDATED PHOTOS 👉", fileArray);
+
+  e.target.value = null;
+}, []);
   const removePhoto   = useCallback(i => setForm(f => ({ ...f, photos: f.photos.filter((_, j) => j !== i) })), []);
   const setM          = useCallback((i, k, v) => setForm(f => { const m = [...f.measurements]; m[i] = { ...m[i], [k]: v }; return { ...f, measurements: m }; }), []);
   const addM          = useCallback(() => setForm(f => ({ ...f, measurements: [...f.measurements, { ...BLANK_M }] })), []);
@@ -170,6 +248,16 @@ export default function Progress() {
 
   const submit = useCallback(async ev => {
     ev?.preventDefault();
+    const exists = entries.some(e =>
+  e.date === form.date &&
+  e.zone === form.zone &&
+  e.project_id === form.project_id
+);
+
+if (exists) {
+  setStatus("Entry already exists for this zone today");
+  return;
+}
     if (submitting) return;
     const errs = validate(form);
     setErrors(errs);
@@ -182,32 +270,62 @@ export default function Progress() {
     try {
       let res;
       const payload = {
-        ...form,
-        labour_skilled:   Number(form.morning_skilled)     || 0,
-        labour_unskilled: Number(form.morning_unskilled)   || 0,
-        labour_supervisors: Number(form.morning_supervisors) || 0,
-        labour_total:     totalLabour,
-        measurements: JSON.stringify(form.measurements),
-      };
+  ...form,
 
-      if (form.photos.length) {
-        const fd = new FormData();
-        Object.entries(payload).forEach(([k, v]) => {
-          if (k !== "photos") fd.append(k, typeof v === "object" ? JSON.stringify(v) : String(v ?? ""));
-        });
-        form.photos.forEach(f => fd.append("photos", f, f.name));
-        res = await api.post("/progress", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      } else {
-        const { photos: _, ...clean } = payload;
-        res = await api.post("/progress", clean);
-      }
+  wbs_id: Number(form.wbs_id),
+
+  
+  measurements: JSON.stringify(form.measurements),
+};
+// 🔍 DEBUG: check photos before FormData
+console.log("FORM PHOTOS 👉", form.photos);
+
+form.photos.forEach((file, i) => {
+  console.log(`FILE ${i} 👉`, file.name, file.size);
+});
+
+if (form.planned_percent > form.percent_complete && !form.delay_type) {
+  payload.delay_type = "progress_delay";
+}
+
+// ✅ CREATE FORMDATA
+const formData = new FormData();
+
+// add all fields
+Object.keys(payload).forEach(key => {
+  if (key !== "photos") {
+    formData.append(key, payload[key]);
+  }
+});
+
+// add files
+form.photos.forEach(file => {
+  formData.append("photos", file);
+});
+
+// ✅ SEND
+res = await api.post("/site-progress", formData, {
+  headers: {
+    "Content-Type": "multipart/form-data",
+  },
+});
+
+      
 
       if (!res || (res.status && res.status >= 400)) throw new Error();
       await loadList();
       ls.del(DRAFT_KEY);
       setForm({ ...BLANK, date: nowISO(), measurements: [{ ...BLANK_M }] });
       setStatus("Progress saved ✓");
-      setTab("morning");
+
+setTimeout(() => {
+  setStatus("");
+}, 3000);
+
+// 🔥 ADD THIS LINE HERE
+window.dispatchEvent(new Event("progress_updated"));
+
+setTab("morning");
     } catch {
       enqueue((({ photos: _, ...p }) => p)(form));
       setEntries(s => s.map(it => it.id === opt.id ? { ...it, queued: true } : it));
@@ -235,7 +353,7 @@ export default function Progress() {
   const pendingQS = useMemo(() => allM.filter(m => m.status === "submitted").length, [allM]);
 
   // Tab completion indicators
-  const morningDone = totalLabour > 0;
+  const morningDone = totalLabour > 0 && form.wbs_id;
   const eveningDone = form.sqft_applicable ? !!form.sqft_completed : !!form.evening_description?.trim();
 
   return (
@@ -272,7 +390,10 @@ export default function Progress() {
               <div
                 key={i}
                 className={`prog-wf-step${activeTab === s.tab ? " prog-wf-step--active" : ""}${s.done ? " prog-wf-step--done" : ""}`}
-                onClick={() => setTab(s.tab)}
+                onClick={() => {
+  if (s.tab === "evening" && !morningDone) return;
+  setTab(s.tab);
+}}
               >
                 <span className="prog-wf-icon">{s.done ? "✅" : s.icon}</span>
                 <div>
@@ -326,6 +447,22 @@ export default function Progress() {
                       <div className="prog-section-title">Entry Details</div>
                       <div className="prog-grid-2">
                         <div className="prog-field">
+  <label className="prog-label">Project *</label>
+  <select
+  value={form.project_id}
+  onChange={e => {
+  setF("project_id", e.target.value);
+  setF("wbs_id", "");
+}}
+>
+  <option value="">Select project</option>
+  {projects.map(p => (
+    <option key={p.id} value={p.id}>{p.name}</option>
+  ))}
+</select>
+  {errors.project_id && <div className="prog-error">{errors.project_id}</div>}
+</div>
+                        <div className="prog-field">
                           <label className="prog-label">Date *</label>
                           <input type="date" className="prog-input" value={form.date} onChange={e => setF("date", e.target.value)} />
                           {errors.date && <div className="prog-error">{errors.date}</div>}
@@ -337,12 +474,26 @@ export default function Progress() {
                           {errors.zone && <div className="prog-error">{errors.zone}</div>}
                         </div>
                         <div className="prog-field">
-                          <label className="prog-label">Work Type *</label>
-                          <select className="prog-input" value={form.work_type} onChange={e => setWorkType(e.target.value)}>
-                            <option value="">Select work type…</option>
-                            {WORK_TYPES.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
-                          </select>
-                          {errors.work_type && <div className="prog-error">{errors.work_type}</div>}
+                          <label className="prog-label">Milestone *</label>
+                          <select
+  value={form.wbs_id || ""}
+  onChange={e => setF("wbs_id", e.target.value)}
+>
+  <option value="">Select milestone</option>
+
+  {wbsList.length === 0 ? (
+    <option disabled>Loading...</option>
+  ) : (
+    wbsList.map(w => (
+  <option key={w.id} value={w.id}>
+    {w.code} - {w.name}
+  </option>
+    ))
+  )}
+</select>
+{errors.wbs_id && <div className="prog-error">{errors.wbs_id}</div>}
+
+                          
                         </div>
                         <div className="prog-field">
                           <label className="prog-label">Activity Description</label>
@@ -436,9 +587,9 @@ export default function Progress() {
                             onChange={e => setF("sqft_applicable", e.target.checked)}
                           />
                           <span className="prog-toggle-text">
-                            {form.work_type
-                              ? `${WORK_TYPES.find(w => w.value === form.work_type)?.label || form.work_type} — sqft/area applicable`
-                              : "Area measurement applicable for this work"}
+                            {form.wbs_id
+                            ? "Milestone selected"
+                            : "Area measurement applicable for this work"}
                           </span>
                         </label>
                         {!form.sqft_applicable && (
@@ -654,9 +805,11 @@ export default function Progress() {
                   const actual  = Math.max(0, Math.min(100, Number(p.percent_complete || 0)));
                   const planned = Math.max(0, Math.min(100, Number(p.planned_percent  || 0)));
                   const delay   = planned - actual;
-                  const totalW  = (Number(p.labour_skilled || p.morning_skilled || 0)) + (Number(p.labour_unskilled || p.morning_unskilled || 0)) + (Number(p.labour_supervisors || p.morning_supervisors || 0));
-                  const mRows   = (() => { if (!p.measurements) return []; if (typeof p.measurements === "string") { try { return JSON.parse(p.measurements); } catch { return []; } } return Array.isArray(p.measurements) ? p.measurements : []; })();
-                  const workLabel = WORK_TYPES.find(w => w.value === p.work_type)?.label;
+const totalW =
+  Number(p.morning_skilled || 0) +
+  Number(p.morning_unskilled || 0) +
+  Number(p.morning_supervisors || 0);                  const mRows   = (() => { if (!p.measurements) return []; if (typeof p.measurements === "string") { try { return JSON.parse(p.measurements); } catch { return []; } } return Array.isArray(p.measurements) ? p.measurements : []; })();
+                  const workLabel = p.milestone_name || p.wbs_id;
 
                   return (
                     <div key={stableKey(p)} className="prog-list-item">
@@ -687,6 +840,28 @@ export default function Progress() {
                           <span className="prog-item-summary-label">🌅 Crew</span>
                           <span className="prog-item-summary-val">{totalW} workers</span>
                         </div>
+                        {/* 📷 PHOTOS */}
+{p.photos && p.photos.length > 0 && (
+  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+    {p.photos.map((img, i) => (
+      <img
+        key={i}
+
+src={`${BASE_URL}/${img}`}
+        alt="progress"
+        style={{
+          width: 80,
+          height: 80,
+          objectFit: "cover",
+          borderRadius: 6,
+          border: "1px solid #ccc",
+          cursor: "pointer"
+        }}
+        onClick={() => window.open(`${BASE_URL}/${img}`, "_blank")}
+      />
+    ))}
+  </div>
+)}
                         {(p.sqft_completed || p.evening_description) && (
                           <div className="prog-item-summary-block">
                             <span className="prog-item-summary-label">🌆 Completed</span>

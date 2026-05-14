@@ -12,6 +12,7 @@ function normaliseIncident(inc) {
     title: inc.title,
     description: inc.description ?? "",
     priority: inc.priority,
+    type: inc.type ?? "Quality",
     status: inc.status,
     createdByName: inc.created_by_name ?? "",
     assignedTo: inc.assigned_role ?? "",
@@ -73,7 +74,7 @@ function normaliseTask(t) {
 }
 
 export default function AppShell() {
-  const { activeProject } = useProject();
+  const { activeProject } = useProject() || {};
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(
     searchParams.get("page") === "tasks" ? "taskqueue" : "incidents",

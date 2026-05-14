@@ -1,34 +1,24 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
 
-const authMiddleware = require("../middleware/authMiddleware");
+const upload = multer({ dest: "uploads/" });
 
 const {
-  createDiary,
-  getDiary,
-  getDiaryById,
-  getMilestones,
-  getWbs
-} = require("../controllers/siteDiaryController");
-
-
-// ================= IMPORTANT (ORDER MATTERS) =================
-
-// ✅ FIRST: custom routes
-router.get("/milestones", authMiddleware, getMilestones);
-router.get("/wbs", authMiddleware, getWbs);
-
-
-// ================= CRUD ROUTES =================
+  createSiteProgress,
+  getSiteProgress,
+  getSiteProgressById,
+  deleteSiteProgress,
+} = require("../controllers/siteProgressController");
 
 // CREATE
-router.post("/", authMiddleware, createDiary);
+router.post("/", upload.array("photos"), createSiteProgress);
 
-// GET ALL
-router.get("/", authMiddleware, getDiary);
+// GET
+router.get("/", getSiteProgress);
+router.get("/:id", getSiteProgressById);
 
-// GET BY ID (⚠️ KEEP LAST)
-router.get("/:id", authMiddleware, getDiaryById);
-
+// DELETE
+router.delete("/:id", deleteSiteProgress);
 
 module.exports = router;

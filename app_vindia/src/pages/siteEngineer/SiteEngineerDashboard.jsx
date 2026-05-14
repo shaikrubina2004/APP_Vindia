@@ -47,9 +47,16 @@ const ZONE_CFG = {
 };
 
 const PIP = {
-  rfi: "#7BBDE8", ncr: "#b83232", dsr: "#6EA2B3", itp: "#4E8EA2",
-  mat: "#49769F", att: "#BDD8E9", snag: "#EF9F27", si: "#C49FDC",
-  approval: "#5DCAA5", photo: "#6EA2B3",
+  rfi: "#7BBDE8",
+  incident: "#b83232", 
+  dsr: "#6EA2B3",
+  itp: "#4E8EA2",
+  mat: "#49769F",
+  att: "#BDD8E9",
+  snag: "#EF9F27",
+  si: "#C49FDC",
+  approval: "#5DCAA5",
+  photo: "#6EA2B3",
 };
 
 /* ── quick actions — all wired to real routes ────────────── */
@@ -79,7 +86,8 @@ export default function SiteEngineerDashboard() {
 
   // Module data
   const [rfis, setRFIs]             = useState([]);
-  const [ncrs, setNCRs]             = useState([]);
+  const [incidents, setIncidents] = useState([]);
+
   const [progressEntries, setProg]  = useState([]);
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [openSnags, setOpenSnags]   = useState([]);
@@ -90,10 +98,7 @@ export default function SiteEngineerDashboard() {
   const loaded = useRef(false);
 
   // ── clock ──────────────────────────────────────────────────
-  useEffect(() => {
-    const tick = setInterval(() => setTime(new Date()), 60_000);
-    return () => clearInterval(tick);
-  }, []);
+ 
 
   // ── data load ──────────────────────────────────────────────
   useEffect(() => {
@@ -111,7 +116,7 @@ export default function SiteEngineerDashboard() {
       // 🔹 Full module data (IMPORTANT)
       const [
         rfiRes,
-        ncrRes,
+        incRes,
         progRes,
         aprRes,
         snagRes,
@@ -120,8 +125,8 @@ export default function SiteEngineerDashboard() {
         diaryRes
       ] = await Promise.allSettled([
         api.get("/site-engineer/rfi"),
-        api.get("/ncr"),
-        api.get("/progress"),
+        api.get("/incidents"),
+        api.get("/site-progress"),
         api.get("/approvals"),
         api.get("/snags"),
         api.get("/site-instructions"),
@@ -132,11 +137,11 @@ export default function SiteEngineerDashboard() {
       if (rfiRes.status === "fulfilled")
         setRFIs(Array.isArray(rfiRes.value?.data) ? rfiRes.value.data : []);
 
-      if (ncrRes.status === "fulfilled")
-        setNCRs(Array.isArray(ncrRes.value?.data) ? ncrRes.value.data : []);
+      if (incRes.status === "fulfilled")
+  setIncidents(Array.isArray(incRes.value?.data) ? incRes.value.data : []);
 
       if (progRes.status === "fulfilled")
-        setProg(Array.isArray(progRes.value?.data) ? progRes.value.data : []);
+        setProg(Array.isArray(progRes.value?.data?.data) ? progRes.value.data.data : []);
 
       if (aprRes.status === "fulfilled") {
         const all = aprRes.value?.data || [];
@@ -175,7 +180,10 @@ export default function SiteEngineerDashboard() {
 
   // ── derived ────────────────────────────────────────────────
   const openRFIs  = useMemo(() => rfis.filter(r => !r?.status || r.status === "open"), [rfis]);
-  const openNCRs  = useMemo(() => ncrs.filter(n => !n?.status || n.status === "open"), [ncrs]);
+  const openIncidents = useMemo(
+  () => incidents.filter(i => !["Resolved", "Closed"].includes(i.status)),
+  [incidents]
+);
 
   // Planned vs Actual from progress entries
   const avgPlanned = useMemo(() =>
@@ -194,28 +202,48 @@ export default function SiteEngineerDashboard() {
 
   // Build zone summary from progress entries (group by zone, take latest)
   const zoneSummary = useMemo(() => {
-    const map = {};
-    progressEntries.forEach(e => {
-      if (!e.zone) return;
-      if (!map[e.zone] || new Date(e.date) > new Date(map[e.zone].date)) map[e.zone] = e;
-    });
-    return Object.entries(map).slice(0, 6).map(([zone, entry]) => {
-      const actual  = Number(entry.percent_complete || 0);
-      const planned = Number(entry.planned_percent  || 0);
-      let status = "not_started";
-      if (actual >= 100) status = "complete";
-      else if (actual >= planned - 2) status = actual >= 90 ? "near" : "in_progress";
-      else status = "delayed";
-      return { name: zone, planned, actual, status };
-    });
-  }, [progressEntries]);
+  const map = {};
+
+  progressEntries.forEach(e => {
+    if (!e.zone) return;
+
+    // take latest entry per zone
+    if (!map[e.zone] || new Date(e.date) > new Date(map[e.zone].date)) {
+      map[e.zone] = e;
+    }
+  });
+
+  return Object.entries(map).map(([zone, entry]) => {
+    const actual = Number(entry.percent_complete || 0);
+    const planned = Number(entry.planned_percent || 0);
+
+    let status = "not_started";
+
+    if (actual >= 100) status = "complete";
+    else if (actual >= planned - 2) status = actual >= 90 ? "near" : "in_progress";
+    else status = "delayed";
+
+    return {
+      name: zone,
+      planned,
+      actual,
+      status
+    };
+  });
+
+}, [progressEntries]);
 
   // Recent activity feed — built from live data
   const activityFeed = useMemo(() => {
     const items = [];
     rfis.slice(0, 2).forEach(r => items.push({ label: `RFI ${r.refNo || ""} — ${r.title || r.subject || "raised"}`, type: "rfi", time: r.createdAt }));
-    ncrs.slice(0, 2).forEach(n => items.push({ label: `NCR ${n.refNo || ""} — ${n.description?.slice(0, 60) || "raised"}`, type: "ncr", time: n.createdAt }));
-    pendingSIs.slice(0, 1).forEach(s => items.push({ label: `Site Instruction received: ${s.title || s.si_number || ""}`, type: "si", time: s.issued_date || s.createdAt }));
+incidents.slice(0, 2).forEach(i =>
+  items.push({
+    label: `Incident ${i.incidentNo} — ${i.title}`,
+    type: "incident",
+    time: i.createdAt
+  })
+);    pendingSIs.slice(0, 1).forEach(s => items.push({ label: `Site Instruction received: ${s.title || s.si_number || ""}`, type: "si", time: s.issued_date || s.createdAt }));
     openSnags.slice(0, 1).forEach(s => items.push({ label: `Snag open: ${s.title || s.snag_number || ""} — ${s.zone || ""}`, type: "snag", time: s.raised_date || s.createdAt }));
     pendingApprovals.slice(0, 1).forEach(a => items.push({ label: `Approval pending: ${a.title || ""}`, type: "approval", time: a.createdAt }));
     if (diaryToday) items.push({ label: "Daily Diary submitted today ✓", type: "dsr", time: new Date().toISOString() });
@@ -223,7 +251,7 @@ export default function SiteEngineerDashboard() {
       .filter(i => i.time)
       .sort((a, b) => new Date(b.time) - new Date(a.time))
       .slice(0, 6);
-  }, [rfis, ncrs, pendingSIs, openSnags, pendingApprovals, diaryToday]);
+  }, [rfis, incidents, pendingSIs, openSnags, pendingApprovals, diaryToday]);
 
   // ── loading ────────────────────────────────────────────────
   if (loading) {
@@ -372,11 +400,18 @@ export default function SiteEngineerDashboard() {
             <div className="dash-kpi-sub">{rfis.length} total raised</div>
           </div>
 
-          <div className="dash-kpi dash-kpi--danger" style={{ cursor: "pointer" }} onClick={() => navigate("/site-engineer/ncr")}>
-            <div className="dash-kpi-label">Open NCRs</div>
-            <div className="dash-kpi-value">{openNCRs.length}</div>
-            <div className="dash-kpi-sub">{ncrs.length} total raised</div>
-          </div>
+          <div
+  className="dash-kpi dash-kpi--danger"
+  onClick={() => navigate("/site-engineer/incidents")}
+>
+  <div className="dash-kpi-label">Incidents</div>
+  <div className="dash-kpi-value">{openIncidents.length}</div>
+  <div className="dash-kpi-sub">
+    {incidents.length} total · {
+      incidents.filter(i => i.priority === "P1").length
+    } urgent
+  </div>
+</div>
 
           <div className="dash-kpi dash-kpi--navy" style={{ cursor: "pointer" }} onClick={() => navigate("/site-engineer/materials")}>
             <div className="dash-kpi-label">Material Requests</div>
@@ -527,7 +562,13 @@ export default function SiteEngineerDashboard() {
                 {[
                   { label: "Daily Diary",       icon: "📋", value: diaryToday ? "Submitted ✓" : "⚠ Not submitted", ok: diaryToday,  route: "/site-engineer/diary"             },
                   { label: "Open RFIs",         icon: "❓", value: `${openRFIs.length} open`,                       ok: openRFIs.length === 0, route: "/site-engineer/rfi"     },
-                  { label: "Open NCRs",         icon: "⚠️", value: `${openNCRs.length} open`,                       ok: openNCRs.length === 0, route: "/site-engineer/ncr"     },
+{ 
+  label: "Incidents", 
+  icon: "🚨", 
+  value: `${openIncidents.length} open`, 
+  ok: openIncidents.length === 0, 
+  route: "/site-engineer/incidents" 
+},
                   { label: "Site Instructions", icon: "📝", value: pendingSIs.length > 0 ? `${pendingSIs.length} need acknowledgement` : "All acknowledged ✓", ok: pendingSIs.length === 0, route: "/site-engineer/site-instructions" },
                   { label: "Snag List",         icon: "🔧", value: `${openSnags.length} open`,                      ok: openSnags.length === 0, route: "/site-engineer/snag-list" },
                   { label: "Approvals",         icon: "✅", value: `${pendingApprovals.length} pending`,             ok: pendingApprovals.length === 0, route: "/site-engineer/approvals" },
@@ -549,40 +590,7 @@ export default function SiteEngineerDashboard() {
               </div>
             </div>
 
-            {/* NCR Table */}
-            <div className="dash-panel">
-              <div className="dash-panel-head">
-                <div>
-                  <div className="dash-panel-title">NCR Register</div>
-                  <div className="dash-panel-hint">Non-Conformance Reports</div>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <span className="dash-pill dash-pill--danger">{openNCRs.length} Open</span>
-                  <button className="dash-pill" style={{ background: "#b83232", color: "#fff", border: "none", cursor: "pointer" }} onClick={() => navigate("/site-engineer/ncr")}>+ Raise</button>
-                </div>
-              </div>
-              {ncrs.length === 0
-                ? <div className="dash-empty">No NCRs raised yet</div>
-                : (
-                  <div className="dash-table-wrap">
-                    <table className="dash-table">
-                      <thead><tr><th>Ref</th><th>Description</th><th>Zone</th><th>Priority</th><th>Hold</th></tr></thead>
-                      <tbody>
-                        {ncrs.slice(0, 5).map(n => (
-                          <tr key={makeKey(n)} style={{ cursor: "pointer" }} onClick={() => navigate("/site-engineer/ncr")}>
-                            <td className="dash-ref dash-ref--danger">{n.refNo || `NCR-${String(n.id ?? "").padStart(3, "0")}`}</td>
-                            <td className="dash-trunc">{n.description || n.subject || "—"}</td>
-                            <td className="dash-muted">{n.zone || "—"}</td>
-                            <td><PriorityBadge p={n.priority || "medium"} /></td>
-                            <td>{n.holdPlaced ? <span className="dash-hold">HOLD</span> : <span className="dash-muted">—</span>}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )
-              }
-            </div>
+            
 
             {/* Activity Feed — live */}
             <div className="dash-panel">
