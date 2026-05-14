@@ -7,35 +7,23 @@ const {
   getAttendanceByDateRange,
   updateAttendance,
   getTotalEmployees,
-  getTodayAttendance,   // ✅ new
+  getTodayAttendance,
+  getTodayAllEmployees,
 } = require("../controllers/attendanceController");
 
 const router = express.Router();
 
-/* ================= EMPLOYEE ROUTES ================= */
-// Employee marks attendance (Check In)
-router.post("/", markAttendance);
+// ── Specific routes FIRST (before /:id) ──────────────────────────────────────
+router.get("/employees/count",  getTotalEmployees);
+router.get("/today/all",        getTodayAllEmployees);   // all employees + today's status
+router.get("/today",            getTodayAttendance);     // single employee today check
+router.get("/date/:date",       getAttendanceByDate);
+router.get("/filter/date",      getAttendanceByDateRange);
 
-// Total employee count
-router.get("/employees/count", getTotalEmployees);
-
-/* ================= HR / ADMIN ROUTES ================= */
-// Get all attendance
-router.get("/", getAllAttendance);
-
-// Get attendance by exact date
-router.get("/date/:date", getAttendanceByDate);
-
-// Filter attendance by date range
-router.get("/filter/date", getAttendanceByDateRange);
-
-// Update attendance (Check Out + HR status edit)
+// ── General routes ────────────────────────────────────────────────────────────
+router.post("/",   markAttendance);
+router.get("/",    getAllAttendance);
 router.put("/:id", updateAttendance);
-
-// ✅ Get today's attendance for logged-in employee — MUST be before /:id
-router.get("/today", getTodayAttendance);
-
-// Employee specific — KEEP LAST (/:id catches everything)
-router.get("/:id", getAttendanceByEmployee);
+router.get("/:id", getAttendanceByEmployee);  // must be last
 
 module.exports = router;

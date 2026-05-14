@@ -4,6 +4,7 @@ import {
   createEmployee,
   updateEmployee,
   getEmployees,
+  getNextEmployeeCode,
 } from "../../services/employeeService";
 
 import "./AddEmployee.css";
@@ -51,6 +52,7 @@ export default function AddEmployee() {
   const [roles, setRoles] = useState([]);
   const [managerId, setManagerId] = useState("");
   const [errors, setErrors] = useState({});
+  const [autoCode, setAutoCode] = useState("");   // ← auto-generated employee code
 
   // ─── Toast state ─────────────────────────────────────────────────────────────
   const [toast, setToast] = useState({
@@ -71,7 +73,20 @@ export default function AddEmployee() {
   useEffect(() => {
     fetchEmployees();
     fetchRoles();
+    if (!editingEmployee) {
+      fetchNextCode();
+    }
   }, []);
+
+  const fetchNextCode = async () => {
+    try {
+      const res = await getNextEmployeeCode();
+      setAutoCode(res.data.employee_code);
+    } catch (err) {
+      console.error("Failed to fetch employee code", err);
+      setAutoCode("EMP001");
+    }
+  };
 
   const fetchEmployees = async () => {
     try {
@@ -379,7 +394,7 @@ export default function AddEmployee() {
       formData.append("gender", form.gender || "");
       formData.append("marital_status", form.marital_status || "");
       formData.append("nationality", form.nationality || "");
-      formData.append("employee_code", form.employee_code || "");
+      formData.append("employee_code", editingEmployee ? (form.employee_code || "") : autoCode);
       formData.append("employment_type", form.employment_type || "");
       formData.append("work_location", form.work_location || "");
       formData.append("shift_timing", form.shift_timing || "");
@@ -404,7 +419,10 @@ export default function AddEmployee() {
         showToast("Employee updated successfully", "success");
       } else {
         await createEmployee(formData);
-        showToast("Employee added successfully", "success");
+        showToast(
+          `Employee added! Login: ${form.email} / Password: Vindia@123`,
+          "success"
+        );
       }
 
       setTimeout(() => navigate("/hr/employees"), 2000);
@@ -487,27 +505,7 @@ export default function AddEmployee() {
       {/* DEV HELPER — remove before production */}
       {!editingEmployee && (
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
-          <button
-            type="button"
-            onClick={fillDummyData}
-            style={{
-              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              padding: "0.45rem 1.1rem",
-              fontSize: "0.82rem",
-              fontWeight: "600",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              boxShadow: "0 2px 8px rgba(99,102,241,0.35)",
-            }}
-            title="Fills all fields with sample employee data (dev only)"
-          >
-            🧪 Fill Dummy Data
-          </button>
+         
         </div>
       )}
 
@@ -632,6 +630,7 @@ export default function AddEmployee() {
             <select name="status" value={form.status} onChange={handleChange}>
               <option value="active">Active</option>
               <option value="on_leave">On Leave</option>
+              <option value="work_from_home">Work From Home</option>
             </select>
 
             <div>
@@ -694,12 +693,35 @@ export default function AddEmployee() {
         <div className="form-section">
           <h3>Employment Details</h3>
           <div className="grid">
-            <input
-              name="employee_code"
-              placeholder="Employee Code"
-              value={form.employee_code}
-              onChange={handleChange}
-            />
+            {/* Auto-generated employee code — read only */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 500, marginBottom: 2 }}>
+                Employee Code (Auto-generated)
+              </label>
+              <div style={{
+                padding: "9px 14px",
+                background: "#f0fdf4",
+                border: "1.5px solid #86efac",
+                borderRadius: 8,
+                fontWeight: 700,
+                color: "#15803d",
+                fontSize: 14,
+                letterSpacing: 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                  stroke="#16a34a" strokeWidth="2.5">
+                  <path d="M20 12V22H4V12" /><path d="M22 7H2v5h20V7z" />
+                  <path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+                  <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+                </svg>
+                {editingEmployee
+                  ? (editingEmployee.employee_code || "—")
+                  : (autoCode || "Generating…")}
+              </div>
+            </div>
             <select
               name="employment_type"
               value={form.employment_type}

@@ -22,6 +22,11 @@ function EmployeeStats({ employees = [], setFilter, activeFilter }) {
     emp => emp.status?.toLowerCase() === "on_leave"
   ).length;
 
+  // 🔵 WORK FROM HOME
+  const wfh = employees.filter(
+    emp => emp.status?.toLowerCase() === "work_from_home"
+  ).length;
+
   return (
     <div className="hr-stats">
 
@@ -50,6 +55,15 @@ function EmployeeStats({ employees = [], setFilter, activeFilter }) {
       >
         <h3>On Leave</h3>
         <h2>{onLeave}</h2>
+      </div>
+
+      {/* 🔵 WFH */}
+      <div
+        className={`stat-card purple ${activeFilter === "wfh" ? "active-stat" : ""}`}
+        onClick={() => setFilter("wfh")}
+      >
+        <h3>Work From Home</h3>
+        <h2>{wfh}</h2>
       </div>
 
       {/* 🔴 NEW JOINERS */}

@@ -20,6 +20,14 @@ import {
   AlertCircle,
   Wallet,
   BadgeCheck,
+  Hotel,
+  UtensilsCrossed,
+  Train,
+  Plus,
+  Trash2,
+  IndianRupee,
+  Eye,
+  ExternalLink,
 } from "lucide-react";
 import { API } from "../../services/authService";
 import { AuthContext } from "../../context/useAuth";

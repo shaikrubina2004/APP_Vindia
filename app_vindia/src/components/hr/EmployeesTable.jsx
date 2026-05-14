@@ -106,4 +106,4 @@ function EmployeesTable({ employees, search }) {
   );
 }
 
-export default EmployeesTable; 
+export default EmployeesTable;
