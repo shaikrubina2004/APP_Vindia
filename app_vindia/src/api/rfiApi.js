@@ -3,6 +3,7 @@
 
 import axios from "axios";
 
+
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 console.log("📌 API Base URL:", BASE); // Debug
@@ -25,17 +26,18 @@ function authHeaders() {
 }
 
 // ── Fetch RFIs (all | sent | received) ───────────────────────────────────────
-export const fetchRFIs = async (view) => {
+export const fetchRFIs = async (view = "all") => {
   console.log(`🔥 CALLING RFI API with view: ${view}`);
 
   try {
     const res = await axios.get(`${BASE}/api/rfis?view=${view}`, {
       headers: authHeaders(),
     });
+
     console.log("✅ RFI RESPONSE:", res.data);
 
-    // Ensure we return the rfis array
     const rfis = res.data.rfis || res.data || [];
+
     return Array.isArray(rfis) ? rfis : [];
   } catch (err) {
     console.error("❌ RFI API ERROR:", err.response?.data || err.message);
@@ -179,3 +181,5 @@ export const ROLE_OPTIONS = [
 export const ROLE_LABELS = Object.fromEntries(
   ROLE_OPTIONS.map((r) => [r.value, r.label]),
 );
+
+

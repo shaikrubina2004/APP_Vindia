@@ -45,6 +45,7 @@ export default function RFIPage() {
   const [isError, setIsError] = useState(false);
 
   useEffect(() => {
+    console.log("CURRENT VIEW:", view);
     const load = async () => {
       try {
         console.log("🔥 FETCHING RFIs...");
