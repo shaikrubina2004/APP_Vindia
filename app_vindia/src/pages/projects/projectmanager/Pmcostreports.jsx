@@ -123,6 +123,33 @@ const STYLES = `
   .pmcr__action-bar{flex-direction:column;align-items:flex-start;}
   .pmcr__summary-strip{flex-direction:column;}
 }
+/* ── Calendar View ── */
+.pmcr__view-toggle{display:flex;gap:4px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:4px;margin-left:auto;}
+.pmcr__vtab{padding:6px 14px;border-radius:6px;border:none;background:transparent;color:#6b7280;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;}
+.pmcr__vtab:hover{color:#0f172a;}
+.pmcr__vtab--on{background:#0a4174;color:#fff;}
+.pmcr__cal{background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin-bottom:20px;}
+.pmcr__cal-nav{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #f3f4f6;background:#f8f9fc;}
+.pmcr__cal-title{font-size:15px;font-weight:600;color:#0f172a;}
+.pmcr__cal-btn{background:none;border:1px solid #e5e7eb;border-radius:6px;padding:5px 10px;font-size:14px;cursor:pointer;color:#374151;transition:background .12s;}
+.pmcr__cal-btn:hover{background:#f1f5f9;}
+.pmcr__cal-grid{display:grid;grid-template-columns:repeat(7,1fr);}
+.pmcr__cal-head{background:#f8f9fc;padding:8px 4px;text-align:center;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;border-right:1px solid #f3f4f6;border-bottom:1px solid #e5e7eb;}
+.pmcr__cal-head:last-child{border-right:none;}
+.pmcr__cal-cell{min-height:90px;padding:6px;border-right:1px solid #f3f4f6;border-bottom:1px solid #f3f4f6;vertical-align:top;position:relative;}
+.pmcr__cal-cell:last-child{border-right:none;}
+.pmcr__cal-cell--other{background:#fafafa;}
+.pmcr__cal-cell--today{background:#eff6ff;}
+.pmcr__cal-day{font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;}
+.pmcr__cal-cell--today .pmcr__cal-day{color:#0a4174;background:#dbeafe;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;}
+.pmcr__cal-chip{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;margin-bottom:2px;cursor:pointer;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .1s;}
+.pmcr__cal-chip:hover{opacity:.8;}
+.pmcr__cal-chip--amber{background:#fef3c7;color:#92400e;border-left:3px solid #f59e0b;}
+.pmcr__cal-chip--green{background:#dcfce7;color:#15803d;border-left:3px solid #22c55e;}
+.pmcr__cal-chip--red{background:#fef2f2;color:#b91c1c;border-left:3px solid #ef4444;}
+.pmcr__cal-legend{display:flex;gap:16px;padding:12px 20px;border-top:1px solid #f3f4f6;flex-wrap:wrap;}
+.pmcr__cal-leg{display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;}
+.pmcr__cal-leg-dot{width:10px;height:10px;border-radius:2px;}
 `;
 
 const CR_API  = "/api/cost-report";
@@ -146,6 +173,110 @@ const safeArr = (val) => {
   return [];
 };
 
+// ── Weekly Calendar View Component ───────────────────────────────────────────
+function CalendarView({ reports, weekStart, onPrev, onNext, onToday, onOpen, onApprove, onReject, submitting }) {
+  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // Build 7-day cells
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart); d.setDate(d.getDate() + i); return d;
+  });
+
+  // Parse createdDate (e.g. "14 May 2026") -> Date
+  const parseDate = (str) => {
+    if (!str) return null;
+    const d = new Date(str);
+    if (!isNaN(d)) return d;
+    // Try "DD Mon YYYY"
+    const parts = str.split(" ");
+    if (parts.length === 3) {
+      const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+      return new Date(parseInt(parts[2]), months[parts[1]], parseInt(parts[0]));
+    }
+    return null;
+  };
+
+  // Map day-date-string -> reports
+  const reportsByDay = {};
+  (reports || []).forEach(r => {
+    const d = parseDate(r.createdDate);
+    if (!d) return;
+    d.setHours(0,0,0,0);
+    const key = d.toISOString().slice(0,10);
+    if (!reportsByDay[key]) reportsByDay[key] = [];
+    reportsByDay[key].push(r);
+  });
+
+  const fmtWeek = () => {
+    const end = new Date(weekStart); end.setDate(end.getDate() + 6);
+    const mo = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    if (weekStart.getMonth() === end.getMonth())
+      return `${weekStart.getDate()}–${end.getDate()} ${mo[weekStart.getMonth()]} ${weekStart.getFullYear()}`;
+    return `${weekStart.getDate()} ${mo[weekStart.getMonth()]} – ${end.getDate()} ${mo[end.getMonth()]} ${end.getFullYear()}`;
+  };
+
+  return (
+    <div className="pmcr__cal">
+      <div className="pmcr__cal-nav">
+        <button className="pmcr__cal-btn" onClick={onPrev}>‹ Prev</button>
+        <div>
+          <span className="pmcr__cal-title">Week of {fmtWeek()}</span>
+          <button className="pmcr__cal-btn" style={{marginLeft:10,fontSize:12}} onClick={onToday}>Today</button>
+        </div>
+        <button className="pmcr__cal-btn" onClick={onNext}>Next ›</button>
+      </div>
+      <div className="pmcr__cal-grid">
+        {DAY_NAMES.map(d => <div key={d} className="pmcr__cal-head">{d}</div>)}
+        {days.map(day => {
+          const key     = day.toISOString().slice(0,10);
+          const isToday = day.getTime() === today.getTime();
+          const dayReps = reportsByDay[key] || [];
+          return (
+            <div key={key} className={`pmcr__cal-cell${isToday ? " pmcr__cal-cell--today" : ""}`}>
+              <div className="pmcr__cal-day">{day.getDate()}</div>
+              {dayReps.map(r => {
+                const st = STATUS[r.status] || STATUS.pending_pm;
+                return (
+                  <span
+                    key={r.id}
+                    className={`pmcr__cal-chip pmcr__cal-chip--${st.color}`}
+                    title={`${r.projectName} — ${r.milestoneName} — ${fmt(r.totalCost)}`}
+                    onClick={() => onOpen(r)}
+                  >
+                    {st.icon} {r.projectName}
+                  </span>
+                );
+              })}
+              {dayReps.filter(r => r.status === "pending_pm").map(r => (
+                <div key={r.id + "_actions"} style={{display:"flex",gap:3,marginTop:2}}>
+                  <button
+                    style={{fontSize:9,padding:"1px 5px",borderRadius:3,border:"none",background:"#16a34a",color:"#fff",cursor:"pointer",fontWeight:600}}
+                    disabled={submitting}
+                    onClick={e => { e.stopPropagation(); onApprove(r.id); }}
+                  >✔</button>
+                  <button
+                    style={{fontSize:9,padding:"1px 5px",borderRadius:3,border:"none",background:"#dc2626",color:"#fff",cursor:"pointer",fontWeight:600}}
+                    disabled={submitting}
+                    onClick={e => { e.stopPropagation(); onReject(r.id); }}
+                  >✘</button>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      <div className="pmcr__cal-legend">
+        <span className="pmcr__cal-leg"><span className="pmcr__cal-leg-dot" style={{background:"#fde68a"}}/>⏳ Pending</span>
+        <span className="pmcr__cal-leg"><span className="pmcr__cal-leg-dot" style={{background:"#86efac"}}/>✅ Approved</span>
+        <span className="pmcr__cal-leg"><span className="pmcr__cal-leg-dot" style={{background:"#fca5a5"}}/>↩️ Rejected</span>
+        <span className="pmcr__cal-leg" style={{marginLeft:"auto",color:"#9ca3af",fontSize:11}}>Click a report to view details · ✔/✘ to approve/reject pending</span>
+      </div>
+    </div>
+  );
+}
+
+
 export default function PMCostReports() {
   const [reports,       setReports]       = useState([]);
   const [projects,      setProjects]      = useState([]);
@@ -157,6 +288,12 @@ export default function PMCostReports() {
   const [rejectModal,   setRejectModal]   = useState(null);
   const [rejectComment, setRejectComment] = useState("");
   const [submitting,    setSubmitting]    = useState(false);
+  const [viewMode,      setViewMode]      = useState("list");
+  const [calWeekStart,  setCalWeekStart]  = useState(() => {
+    const d = new Date(); d.setHours(0,0,0,0);
+    d.setDate(d.getDate() - d.getDay());
+    return d;
+  });
 
   const notify = (msg, type = "success") => {
     setToast({ msg, type });
@@ -188,6 +325,17 @@ export default function PMCostReports() {
   }, [filterProject, filterStatus]);
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
+
+  // allReports: all reports regardless of filter (for calendar)
+  const [allReports, setAllReports] = useState([]);
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filterProject) params.append("projectId", filterProject);
+    fetch(`${CR_API}?${params}`)
+      .then(r => r.json())
+      .then(data => Array.isArray(data) ? setAllReports(data) : setAllReports([]))
+      .catch(() => setAllReports([]));
+  }, [filterProject]);
 
   const openDetail = async (report) => {
     setViewingReport(report);
@@ -442,11 +590,27 @@ export default function PMCostReports() {
           <option value="">All Projects</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
+        <div className="pmcr__view-toggle">
+          <button className={`pmcr__vtab ${viewMode === "list" ? "pmcr__vtab--on" : ""}`} onClick={() => setViewMode("list")}>☰ List</button>
+          <button className={`pmcr__vtab ${viewMode === "calendar" ? "pmcr__vtab--on" : ""}`} onClick={() => setViewMode("calendar")}>📅 Calendar</button>
+        </div>
       </div>
 
-      {/* Report list */}
+      {/* Report list or Calendar */}
       {loading ? (
         <div className="pmcr__loading"><div className="pmcr__spinner"/> Loading reports…</div>
+      ) : viewMode === "calendar" ? (
+        <CalendarView
+          reports={allReports}
+          weekStart={calWeekStart}
+          onPrev={() => { const d = new Date(calWeekStart); d.setDate(d.getDate()-7); setCalWeekStart(d); }}
+          onNext={() => { const d = new Date(calWeekStart); d.setDate(d.getDate()+7); setCalWeekStart(d); }}
+          onToday={() => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-d.getDay()); setCalWeekStart(d); }}
+          onOpen={openDetail}
+          onApprove={handleApprove}
+          onReject={openReject}
+          submitting={submitting}
+        />
       ) : reports.length === 0 ? (
         <div className="pmcr__empty">
           <div>💰</div>

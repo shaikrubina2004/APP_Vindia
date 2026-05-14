@@ -126,6 +126,33 @@ exports.createNotification = async (req, res) => {
   }
 };
 
+/* ── Helper — direct object-style call from other controllers ─ */
+exports.createNotificationDirect = async ({
+  type         = "task",
+  title        = "",
+  message      = "",
+  severity     = "info",
+  reference_id = null,
+  user_id      = null,
+} = {}) => {
+  try {
+    await pool.query(
+      `INSERT INTO qs_notifications (user_id, type, title, message, severity, reference_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        user_id      ?? null,
+        (type        ?? "task").toLowerCase(),
+        title        ?? "",
+        message      ?? "",
+        severity     ?? "info",
+        reference_id ?? null,
+      ],
+    );
+  } catch (err) {
+    console.error("createNotificationDirect error:", err.message);
+  }
+};
+
 /* ── Helper — call from other controllers ─────────────────── */
 exports.insertNotification = async (
   userId,
