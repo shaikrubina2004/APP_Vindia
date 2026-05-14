@@ -21,7 +21,9 @@ const fmtTime = (t) => {
 };
 
 const fmtDateTime = (v) =>
-  v ? new Date(v).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+  v ? new Date(v).toLocaleString("en-GB", {
+    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+  }) : "—";
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -61,7 +63,8 @@ const StatusPill = ({ status }) => {
   };
   const cfg = map[status] || { bg: "#f8fafc", color: "#64748b", border: "#e2e8f0" };
   return (
-    <span className="tviz-status-pill" style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
+    <span className="tviz-status-pill"
+      style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
       <span className="tviz-status-dot" style={{ background: cfg.color }} />
       {status}
     </span>
@@ -71,17 +74,18 @@ const StatusPill = ({ status }) => {
 /* ── Badge ────────────────────────────────────────────────── */
 const Badge = ({ status }) => {
   const map = {
-    active: "blue", "in-progress": "blue", pending: "amber", approved: "green",
-    rejected: "red", open: "blue", closed: "green", resolved: "green",
-    completed: "green", sent: "green", draft: "gray",
+    active: "blue", "in-progress": "blue", pending: "amber",
+    approved: "green", rejected: "red", open: "blue",
+    closed: "green", resolved: "green", completed: "green",
+    sent: "green", draft: "gray",
   };
   const color = map[(status || "").toLowerCase()] || "gray";
   return <span className={`tviz-badge tviz-badge--${color}`}>{status || "—"}</span>;
 };
 
-/* ── Project card ─────────────────────────────────────────── */
-const ProjectCard = ({ proj, isActive, onClick }) => (
-  <div className={`tviz-proj-card ${isActive ? "active" : ""}`} onClick={onClick}>
+/* ── Project card (read-only, no click-to-select) ─────────── */
+const ProjectCard = ({ proj }) => (
+  <div className="tviz-proj-card">
     <div className="tviz-proj-card__accent" />
     <div className="tviz-proj-card__top">
       <div className="tviz-proj-card__info">
@@ -99,26 +103,9 @@ const ProjectCard = ({ proj, isActive, onClick }) => (
       <div><p className="tviz-meta-lbl">Budget</p><p className="tviz-meta-val">{fmt(proj.budget)}</p></div>
       <div><p className="tviz-meta-lbl">Deadline</p><p className="tviz-meta-val">{fmtDate(proj.end_date)}</p></div>
     </div>
-    <div className="tviz-bar-track"><div className="tviz-bar-fill" style={{ width: `${proj.progress || 0}%` }} /></div>
-  </div>
-);
-
-/* ── Detail row ───────────────────────────────────────────── */
-const DetailRow = ({ icon, label, value }) => (
-  <div className="tviz-detail-row">
-    <span className="tviz-detail-row__icon">{icon}</span>
-    <div>
-      <p className="tviz-detail-row__label">{label}</p>
-      <p className="tviz-detail-row__value">{value || "—"}</p>
+    <div className="tviz-bar-track">
+      <div className="tviz-bar-fill" style={{ width: `${proj.progress || 0}%` }} />
     </div>
-  </div>
-);
-
-/* ── Mini stat ────────────────────────────────────────────── */
-const MiniStat = ({ label, value, color }) => (
-  <div className="tviz-mini-stat">
-    <p className="tviz-mini-stat__label">{label}</p>
-    <p className="tviz-mini-stat__value" style={{ color }}>{value}</p>
   </div>
 );
 
@@ -129,7 +116,9 @@ const PanelHeader = ({ title, count, linkLabel, onLink }) => (
       {title}
       {count != null && <span className="tviz-count-chip">{count}</span>}
     </span>
-    {linkLabel && <button className="tviz-link-btn" onClick={onLink}>{linkLabel} →</button>}
+    {linkLabel && (
+      <button className="tviz-link-btn" onClick={onLink}>{linkLabel} →</button>
+    )}
   </div>
 );
 
@@ -159,8 +148,11 @@ const CheckInButton = ({ employeeId }) => {
         const ts = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
         setElapsed(`${th}:${tm}:${ts}`);
       };
-      tick(); timerRef.current = setInterval(tick, 1000);
-    } else { setElapsed(""); }
+      tick();
+      timerRef.current = setInterval(tick, 1000);
+    } else {
+      setElapsed("");
+    }
   }, [attendance]);
 
   const fetchToday = async () => {
@@ -181,12 +173,13 @@ const CheckInButton = ({ employeeId }) => {
       const shiftStart = new Date(); shiftStart.setHours(9, 0, 0, 0);
       const lateMinutes = Math.floor(Math.max(0, now - shiftStart) / 60000);
       const res = await api.post("/attendance", {
-        employee_id: employeeId,
-        date: now.toISOString().slice(0, 10),
-        check_in: now.toTimeString().slice(0, 8),
-        status: "Present", shift: "morning",
+        employee_id:  employeeId,
+        date:         now.toISOString().slice(0, 10),
+        check_in:     now.toTimeString().slice(0, 8),
+        status:       "Present",
+        shift:        "morning",
         late_minutes: lateMinutes,
-        remarks: lateMinutes > 0 ? `Late by ${lateMinutes} min` : "",
+        remarks:      lateMinutes > 0 ? `Late by ${lateMinutes} min` : "",
       });
       setAttendance(res.data);
     } catch (err) { console.error(err); alert("Check-in failed."); }
@@ -206,36 +199,46 @@ const CheckInButton = ({ employeeId }) => {
     finally { setBusy(false); }
   };
 
-  const isIn  = attendance?.check_in && !attendance?.check_out;
-  const isDone = attendance?.check_in && attendance?.check_out;
+  const isIn   = attendance?.check_in && !attendance?.check_out;
+  const isDone = attendance?.check_in &&  attendance?.check_out;
 
-  if (loading) return <button disabled className="tviz-ci-btn tviz-ci-btn--gray"><span className="tviz-ci-dot" /> Loading…</button>;
-
+  if (loading) return (
+    <button disabled className="tviz-ci-btn tviz-ci-btn--gray">
+      <span className="tviz-ci-dot" /> Loading…
+    </button>
+  );
   if (isDone) return (
     <div className="tviz-ci-wrap">
-      <button disabled className="tviz-ci-btn tviz-ci-btn--done"><span className="tviz-ci-dot tviz-ci-dot--green" /> ✓ Done for Today</button>
-      <span className="tviz-ci-sub">{fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}</span>
+      <button disabled className="tviz-ci-btn tviz-ci-btn--done">
+        <span className="tviz-ci-dot tviz-ci-dot--green" /> ✓ Done for Today
+      </button>
+      <span className="tviz-ci-sub">
+        {fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}
+      </span>
     </div>
   );
-
   if (isIn) return (
     <div className="tviz-ci-wrap">
       <button onClick={handleCheckOut} disabled={busy} className="tviz-ci-btn tviz-ci-btn--out">
-        <span className="tviz-ci-dot tviz-ci-dot--pulse" /> {busy ? "Saving…" : "Check Out"}
+        <span className="tviz-ci-dot tviz-ci-dot--pulse" />
+        {busy ? "Saving…" : "Check Out"}
       </button>
-      <span className="tviz-ci-sub">In: {fmtTime(attendance.check_in)}{elapsed && <> · <strong style={{ color: "#2563eb" }}>{elapsed}</strong></>}</span>
+      <span className="tviz-ci-sub">
+        In: {fmtTime(attendance.check_in)}
+        {elapsed && <> · <strong style={{ color: "#2563eb" }}>{elapsed}</strong></>}
+      </span>
     </div>
   );
-
   return (
     <button onClick={handleCheckIn} disabled={busy} className="tviz-ci-btn tviz-ci-btn--in">
-      <span className="tviz-ci-dot" /> {busy ? "Saving…" : "Check In"}
+      <span className="tviz-ci-dot" />
+      {busy ? "Saving…" : "Check In"}
     </button>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════
-   MAIN
+   MAIN DASHBOARD
 ═══════════════════════════════════════════════════════════ */
 export default function ThreeDVisualizerDashboard() {
   const navigate   = useNavigate();
@@ -248,7 +251,6 @@ export default function ThreeDVisualizerDashboard() {
   const [drawings,  setDrawings]  = useState([]);
   const [rfis,      setRfis]      = useState([]);
   const [incidents, setIncidents] = useState([]);
-  const [selected,  setSelected]  = useState(null);
   const [showAll,   setShowAll]   = useState(false);
   const [loading,   setLoading]   = useState(true);
 
@@ -258,10 +260,6 @@ export default function ThreeDVisualizerDashboard() {
       const projRes = await getProjects();
       const data    = projRes.data || [];
       setProjects(data);
-      if (data.length > 0) {
-        const sorted = [...data.filter(p => p.status === "IN PROGRESS"), ...data.filter(p => p.status !== "IN PROGRESS")];
-        setSelected(sorted[0]);
-      }
 
       const [drawRes, rfiRes, incRes] = await Promise.allSettled([
         fetch(`/api/architect-drawings?userId=${userId}&role=3d_visualizer`).then(r => r.json()),
@@ -269,35 +267,54 @@ export default function ThreeDVisualizerDashboard() {
         fetch("/api/incidents").then(r => r.json()),
       ]);
 
-      if (drawRes.status === "fulfilled") { const d = drawRes.value?.data ?? drawRes.value ?? []; setDrawings(Array.isArray(d) ? d : []); }
-      if (rfiRes.status  === "fulfilled") { const d = rfiRes.value?.data  ?? rfiRes.value  ?? []; setRfis(Array.isArray(d) ? d : []); }
-      if (incRes.status  === "fulfilled") { const d = incRes.value?.data  ?? incRes.value  ?? []; setIncidents(Array.isArray(d) ? d : []); }
-    } catch (err) { console.error("[3D Viz]", err); }
-    finally { setLoading(false); }
+      if (drawRes.status === "fulfilled") {
+        const d = drawRes.value?.data ?? drawRes.value ?? [];
+        setDrawings(Array.isArray(d) ? d : []);
+      }
+      if (rfiRes.status === "fulfilled") {
+        const d = rfiRes.value?.data ?? rfiRes.value ?? [];
+        setRfis(Array.isArray(d) ? d : []);
+      }
+      if (incRes.status === "fulfilled") {
+        const d = incRes.value?.data ?? incRes.value ?? [];
+        setIncidents(Array.isArray(d) ? d : []);
+      }
+    } catch (err) {
+      console.error("[3D Viz]", err);
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  const sortedProjects  = [...projects.filter(p => p.status === "IN PROGRESS"), ...projects.filter(p => p.status !== "IN PROGRESS")];
+  /* ── derived ── */
+  const sortedProjects  = [
+    ...projects.filter(p => p.status === "IN PROGRESS"),
+    ...projects.filter(p => p.status !== "IN PROGRESS"),
+  ];
   const visibleProjects = showAll ? sortedProjects : sortedProjects.slice(0, 3);
   const hasMore         = sortedProjects.length > 3;
-  const activeCount     = projects.filter(p => ["active","in progress"].includes((p.status||"").toLowerCase())).length;
-  const pendingRfis     = rfis.filter(r => ["open","pending"].includes((r.status||"").toLowerCase()));
-  const openIncidents   = incidents.filter(i => !["closed","resolved"].includes((i.status||"").toLowerCase()));
-  const recentDrawings  = [...drawings].sort((a,b) => new Date(b.created_at||0)-new Date(a.created_at||0)).slice(0,5);
+  const activeCount     = projects.filter(p =>
+    ["active", "in progress"].includes((p.status || "").toLowerCase())
+  ).length;
+  const pendingRfis     = rfis.filter(r =>
+    ["open", "pending"].includes((r.status || "").toLowerCase())
+  );
+  const openIncidents   = incidents.filter(i =>
+    !["closed", "resolved"].includes((i.status || "").toLowerCase())
+  );
+  const recentDrawings  = [...drawings]
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+    .slice(0, 6);
 
-  const p         = selected?.progress || 0;
-  const budget    = Number(selected?.budget || 0);
-  const spent     = Number(selected?.spent || 0);
-  const paid      = Number(selected?.client_paid || 0);
-  const remaining = Math.max(0, budget - spent);
-  const spentPct  = budget ? (spent / budget) * 100 : 0;
-  const paidPct   = budget ? (paid  / budget) * 100 : 0;
-
+  /* ── skeleton ── */
   if (loading) return (
     <div className="tviz-page">
       <div className="tviz-sk tviz-sk--hdr" />
-      <div className="tviz-proj-row">{[1,2,3].map(i => <div key={i} className="tviz-sk tviz-sk--card" />)}</div>
+      <div className="tviz-proj-row">
+        {[1, 2, 3].map(i => <div key={i} className="tviz-sk tviz-sk--card" />)}
+      </div>
       <div className="tviz-sk tviz-sk--body" />
     </div>
   );
@@ -305,7 +322,7 @@ export default function ThreeDVisualizerDashboard() {
   return (
     <div className="tviz-page">
 
-      {/* HEADER */}
+      {/* ── HEADER ─────────────────────────────────────── */}
       <div className="tviz-header">
         <div>
           <p className="tviz-breadcrumb">Dashboard</p>
@@ -315,16 +332,18 @@ export default function ThreeDVisualizerDashboard() {
         </div>
         <div className="tviz-header-actions">
           {employeeId && <CheckInButton employeeId={employeeId} />}
-          <button className="tviz-btn tviz-btn--outline" onClick={() => navigate("/3d-visualizer/drawings")}>
+          <button className="tviz-btn tviz-btn--outline"
+            onClick={() => navigate("/3d-visualizer/drawings")}>
             Drawings
           </button>
-          <button className="tviz-btn tviz-btn--primary" onClick={() => navigate("/3d-visualizer/models")}>
+          <button className="tviz-btn tviz-btn--primary"
+            onClick={() => navigate("/3d-visualizer/models")}>
             + Upload Model
           </button>
         </div>
       </div>
 
-      {/* STAT CHIPS */}
+      {/* ── STAT CHIPS ─────────────────────────────────── */}
       <div className="tviz-stat-row">
         <div className="tviz-stat tviz-stat--blue">
           <p className="tviz-stat__num">{activeCount}</p>
@@ -344,127 +363,121 @@ export default function ThreeDVisualizerDashboard() {
         </div>
       </div>
 
-      {/* PROJECT CARDS */}
+      {/* ── PROJECT CARDS (no click handler, no detail panel) ── */}
       <div className="tviz-proj-row">
         {projects.length === 0 ? (
-          <p className="tviz-empty">No projects assigned.</p>
+          <p className="tviz-empty-text">No projects assigned.</p>
         ) : (
           visibleProjects.map(proj => (
-            <ProjectCard key={proj.id} proj={proj} isActive={selected?.id === proj.id} onClick={() => setSelected(proj)} />
+            <ProjectCard key={proj.id} proj={proj} />
           ))
         )}
       </div>
 
+      {/* see more / less */}
       {hasMore && (
-        <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:18, marginTop:-6 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20, marginTop: -4 }}>
           <button className="tviz-see-more" onClick={() => setShowAll(v => !v)}>
             {showAll ? "Show Less ↑" : `See More ↓ (${sortedProjects.length - 3} more)`}
           </button>
         </div>
       )}
 
-      {/* DETAIL GRID */}
-      {selected && (
-        <div className="tviz-main-grid">
+      {/* ── BOTTOM GRID: drawings + RFIs + incidents ───── */}
+      <div className="tviz-content-grid">
 
-          {/* left: project detail */}
-          <div className="tviz-detail-panel">
-            <div className="tviz-detail-panel__hdr">
-              <div>
-                <h2 className="tviz-detail-panel__name">{selected.name}</h2>
-                <p className="tviz-detail-panel__desc">{selected.description || "—"}</p>
-              </div>
-              <StatusPill status={selected.status} />
-            </div>
-
-            <div className="tviz-mini-row">
-              <MiniStat label="Progress"    value={`${p}%`}     color="#2563eb" />
-              <MiniStat label="Budget"      value={fmt(budget)} color="#0a2540" />
-              <MiniStat label="Spent"       value={fmt(spent)}  color="#dc2626" />
-              <MiniStat label="Client Paid" value={fmt(paid)}   color="#16a34a" />
-            </div>
-
-            <div className="tviz-budget-section">
-              <div className="tviz-budget-track">
-                <div className="tviz-budget-fill tviz-budget-fill--spent" style={{ width:`${Math.min(100,spentPct)}%` }} />
-                <div className="tviz-budget-fill tviz-budget-fill--paid"  style={{ width:`${Math.min(100,paidPct)}%` }} />
-              </div>
-              <div className="tviz-budget-legend">
-                <span><span className="tviz-ldot tviz-ldot--red" /> Spent {fmt(spent)}</span>
-                <span><span className="tviz-ldot tviz-ldot--green" /> Received {fmt(paid)}</span>
-                <span><span className="tviz-ldot tviz-ldot--blue" /> Remaining {fmt(remaining)}</span>
-              </div>
-            </div>
-
-            <div className="tviz-info-grid">
-              <DetailRow icon="📍" label="Location"      value={selected.location} />
-              <DetailRow icon="🏗️" label="Building Type" value={selected.building_type} />
-              <DetailRow icon="📐" label="Plot Size"     value={selected.plot_size} />
-              <DetailRow icon="🏢" label="Floors"        value={selected.floors} />
-              <DetailRow icon="📅" label="Start Date"    value={fmtDate(selected.start_date)} />
-              <DetailRow icon="🏁" label="End Date"      value={fmtDate(selected.end_date)} />
-              <DetailRow icon="👤" label="Client"        value={selected.client} />
-              <DetailRow icon="📞" label="Phone"         value={selected.phone} />
-            </div>
-          </div>
-
-          {/* right: drawings + RFIs + incidents */}
-          <div className="tviz-right-col">
-
-            {/* drawings */}
-            <div className="tviz-panel-card">
-              <PanelHeader title="Drawings from Architect" count={drawings.length} linkLabel="View all" onLink={() => navigate("/3d-visualizer/drawings")} />
-              {recentDrawings.length === 0 ? (
-                <p className="tviz-empty">No drawings shared yet.</p>
-              ) : recentDrawings.map(d => (
-                <div key={d.id} className="tviz-draw-row">
-                  <div className="tviz-draw-icon"><i className="ti ti-file-description" /></div>
-                  <div className="tviz-draw-info">
-                    <div className="tviz-draw-name">{d.name || "Untitled"}</div>
-                    <div className="tviz-draw-meta">{d.project_name || "—"} · Rev {d.current_revision || d.revision || "—"} · {fmtDateTime(d.created_at)}</div>
+        {/* LEFT: drawings */}
+        <div className="tviz-col-left">
+          <div className="tviz-panel-card">
+            <PanelHeader
+              title="Drawings from Architect"
+              count={drawings.length}
+              linkLabel="View all"
+              onLink={() => navigate("/3d-visualizer/drawings")}
+            />
+            {recentDrawings.length === 0 ? (
+              <p className="tviz-empty">No drawings shared with you yet.</p>
+            ) : (
+              <div className="tviz-draw-list">
+                {recentDrawings.map(d => (
+                  <div key={d.id} className="tviz-draw-row">
+                    <div className="tviz-draw-icon">
+                      <i className="ti ti-file-description" />
+                    </div>
+                    <div className="tviz-draw-info">
+                      <div className="tviz-draw-name">{d.name || d.drawing_name || "Untitled"}</div>
+                      <div className="tviz-draw-meta">
+                        {d.project_name || "—"} · Rev {d.current_revision || d.revision || "—"} · {fmtDateTime(d.created_at)}
+                      </div>
+                    </div>
+                    <span className={`tviz-tag ${d.drawing_type === "Working Drawing" ? "tviz-tag--gold" : "tviz-tag--blue"}`}>
+                      {d.drawing_type === "Working Drawing" ? "Working" : "Detailed"}
+                    </span>
+                    {d.file_url && (
+                      <a href={d.file_url} target="_blank" rel="noreferrer" className="tviz-dl-btn" title="Download">
+                        <i className="ti ti-download" />
+                      </a>
+                    )}
                   </div>
-                  <span className={`tviz-tag ${d.drawing_type === "Working Drawing" ? "tviz-tag--gold" : "tviz-tag--blue"}`}>
-                    {d.drawing_type === "Working Drawing" ? "Working" : "Detailed"}
-                  </span>
-                  {d.file_url && (
-                    <a href={d.file_url} target="_blank" rel="noreferrer" className="tviz-dl-btn"><i className="ti ti-download" /></a>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
-            {/* RFIs */}
-            <div className="tviz-panel-card">
-              <PanelHeader title="Recent RFIs" count={pendingRfis.length > 0 ? pendingRfis.length : null} linkLabel="View all" onLink={() => navigate("/3d-visualizer/rfi")} />
-              {rfis.length === 0 ? <p className="tviz-empty">No RFIs found.</p> : rfis.slice(0,4).map(r => (
-                <div key={r.id} className="tviz-rfi-row" onClick={() => navigate(`/3d-visualizer/rfi/${r.id}`)}>
-                  <div>
+        {/* RIGHT: RFIs + incidents */}
+        <div className="tviz-col-right">
+
+          {/* RFIs */}
+          <div className="tviz-panel-card">
+            <PanelHeader
+              title="Recent RFIs"
+              count={pendingRfis.length > 0 ? pendingRfis.length : null}
+              linkLabel="View all"
+              onLink={() => navigate("/3d-visualizer/rfi")}
+            />
+            {rfis.length === 0 ? (
+              <p className="tviz-empty">No RFIs found.</p>
+            ) : (
+              rfis.slice(0, 5).map(r => (
+                <div key={r.id} className="tviz-rfi-row"
+                  onClick={() => navigate(`/3d-visualizer/rfi/${r.id}`)}>
+                  <div className="tviz-rfi-left">
                     <div className="tviz-rfi-subject">{r.subject || r.title || `RFI #${r.id}`}</div>
                     <div className="tviz-rfi-meta">{r.project_name || "—"} · {fmtDateTime(r.created_at)}</div>
                   </div>
                   <Badge status={r.status || "Open"} />
                 </div>
-              ))}
-            </div>
+              ))
+            )}
+          </div>
 
-            {/* incidents */}
-            <div className="tviz-panel-card">
-              <PanelHeader title="Recent Incidents" count={openIncidents.length > 0 ? openIncidents.length : null} linkLabel="View all" onLink={() => navigate("/3d-visualizer/incidents")} />
-              {incidents.length === 0 ? <p className="tviz-empty">No incidents reported.</p> : incidents.slice(0,4).map(inc => (
+          {/* incidents */}
+          <div className="tviz-panel-card">
+            <PanelHeader
+              title="Recent Incidents"
+              count={openIncidents.length > 0 ? openIncidents.length : null}
+              linkLabel="View all"
+              onLink={() => navigate("/3d-visualizer/incidents")}
+            />
+            {incidents.length === 0 ? (
+              <p className="tviz-empty">No incidents reported.</p>
+            ) : (
+              incidents.slice(0, 5).map(inc => (
                 <div key={inc.id} className="tviz-inc-row">
-                  <div className={`tviz-inc-sev tviz-inc-sev--${(inc.severity||inc.priority||"low").toLowerCase()}`} />
+                  <div className={`tviz-inc-sev tviz-inc-sev--${(inc.severity || inc.priority || "low").toLowerCase()}`} />
                   <div className="tviz-inc-info">
                     <div className="tviz-inc-title">{inc.title || `Incident #${inc.id}`}</div>
                     <div className="tviz-inc-meta">{inc.project_name || "—"} · {fmtDateTime(inc.created_at)}</div>
                   </div>
                   <Badge status={inc.status || "Open"} />
                 </div>
-              ))}
-            </div>
-
+              ))
+            )}
           </div>
+
         </div>
-      )}
+      </div>
     </div>
   );
 }

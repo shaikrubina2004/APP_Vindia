@@ -1,5 +1,6 @@
 // src/routes/AppRoutes.jsx
 // MERGED — combines both AppRoutes versions with fixed Finance routing
+
 import { Routes, Route } from "react-router-dom";
 
 /* ── AUTH ────────────────────────────────────────────────── */
@@ -23,9 +24,14 @@ import Leaves from "../pages/hr/Leaves";
 import Payroll from "../pages/hr/Payroll";
 import Travel from "../pages/hr/Travel";
 
+/* ── DIGITAL MARKETING ───────────────────────────────────── */
 import DigitalMarketing from "../pages/business-development/digital-marketing/DigitalMarketing";
 import DigitalMarketingLayout from "../layouts/DigitalMarketingLayout";
+
+/* ── 3D VISUALIZER ───────────────────────────────────────── */
 import ThreeDVisualizerDashboard from "../pages/3DVisualizer/ThreeDVisualizerDashboard";
+import ThreeDVisualizerLayout from "../layouts/ThreeDVisualizerLayout";
+import Model from "../pages/3DVisualizer/Model";
 
 /* ── PROJECT MANAGER ─────────────────────────────────────── */
 import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
@@ -61,7 +67,7 @@ import SafetyOfficerDashboard from "../pages/Safety Officer/SafetyOfficerDashboa
 /* ── STRUCTURAL ──────────────────────────────────────────── */
 import StructuralRoutes from "./StructuralRoutes";
 
-/* ── FINANCE ═══════════════════════════════════════════════ */
+/* ── FINANCE ─────────────────────────────────────────────── */
 import FinanceRoutes from "./FinanceRoutes";
 import FinanceLayout from "../layouts/FinanceManagerLayout";
 
@@ -72,6 +78,8 @@ import ArchitectDesigns from "../pages/Architect/ArchitectDesigns";
 import ArchitectAssign from "../pages/Architect/ArchitectAssign";
 import ArchitectProject from "../pages/Architect/ArchitectProject";
 import ArchitectSnagList from "../pages/Architect/ArchitectSnagList";
+
+
 import RFIPage from "../pages/StructuralEngineer/RFI";
 import RFIDetailPage from "../pages/StructuralEngineer/RFIDetails";
 
@@ -104,9 +112,6 @@ import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
 import ArchitectLayout from "../layouts/ArchitectLayout";
 import BDALayout from "../layouts/BDALayout";
 
-/* ═══════════════════════════════════════════════════════════
-   APP ROUTES
-═════════════════════════════════════════════════════════ */
 const AppRoutes = () => {
   const PROJECT_ROLES = [
     ROLES.PROJECT_MANAGER,
@@ -123,11 +128,12 @@ const AppRoutes = () => {
   return (
     <NotificationProvider>
       <Routes>
-        {/* ══ AUTH ══════════════════════════════════════════ */}
+
+        {/* AUTH */}
         <Route path="/" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
 
-        {/* ══ CEO ═══════════════════════════════════════════ */}
+        {/* CEO */}
         <Route
           path="/dashboard"
           element={
@@ -138,6 +144,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/ceo"
           element={
@@ -148,6 +155,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/users"
           element={
@@ -158,6 +166,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/project-manager/dashboard"
           element={
@@ -169,7 +178,7 @@ const AppRoutes = () => {
           }
         />
 
-        {/* ══ PROJECT MANAGER ═══════════════════════════════ */}
+        {/* PROJECT MANAGER */}
         <Route
           path="/pm/team"
           element={
@@ -180,6 +189,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/pm/incidents"
           element={
@@ -196,6 +206,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/pm/daily-updates"
           element={
@@ -206,6 +217,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/pm/cost-reports"
           element={
@@ -216,6 +228,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/pm/reports"
           element={
@@ -227,7 +240,7 @@ const AppRoutes = () => {
           }
         />
 
-        {/* ══ HR ════════════════════════════════════════════ */}
+        {/* HR */}
         <Route
           path="/hr"
           element={
@@ -238,6 +251,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/hr/employees"
           element={
@@ -248,6 +262,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/hr/add-employee"
           element={
@@ -258,6 +273,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/hr/employee/:id"
           element={
@@ -268,6 +284,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/hr/attendance"
           element={
@@ -278,6 +295,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/hr/documents"
           element={
@@ -288,6 +306,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/hr/payroll"
           element={
@@ -298,6 +317,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/hr/travel"
           element={
@@ -308,6 +328,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/hr/leaves"
           element={
@@ -319,109 +340,17 @@ const AppRoutes = () => {
           }
         />
 
-        {/* ══ SITE ENGINEER ═════════════════════════════════ */}
+        {/* SITE ENGINEER */}
         {SiteEngineerRoutes}
 
-        {/* ══ QUANTITY SURVEYOR ═════════════════════════════ */}
-        <Route
-          path="/quantity-surveyor/dashboard"
-          element={
-            <QuantitySurveyorLayout>
-              <QuantitySurveyorDashboard />
-            </QuantitySurveyorLayout>
-          }
-        />
-        <Route
-          path="/quantity-surveyor/daily-updates"
-          element={
-            <QuantitySurveyorLayout>
-              <Qsdailyupdates />
-            </QuantitySurveyorLayout>
-          }
-        />
-        <Route
-          path="/quantity-surveyor/quantity-report"
-          element={
-            <QuantitySurveyorLayout>
-              <Qsquantityreport />
-            </QuantitySurveyorLayout>
-          }
-        />
-        <Route
-          path="/quantity-surveyor/cost-report"
-          element={
-            <QuantitySurveyorLayout>
-              <Qscostreport />
-            </QuantitySurveyorLayout>
-          }
-        />
-        <Route
-          path="/quantity-surveyor/boq"
-          element={
-            <QuantitySurveyorLayout>
-              <Qsboq />
-            </QuantitySurveyorLayout>
-          }
-        />
-        <Route
-          path="/quantity-surveyor/coordination"
-          element={
-            <QuantitySurveyorLayout>
-              <MEPCoordination />
-            </QuantitySurveyorLayout>
-          }
-        />
-        <Route
-          path="/quantity-surveyor/incident"
-          element={
-            <QuantitySurveyorLayout>
-              <AppShell key="qs-incidents" />
-            </QuantitySurveyorLayout>
-          }
-        />
-        <Route
-          path="/quantity-surveyor/measurement"
-          element={
-            <QuantitySurveyorLayout>
-              <Qsmeasurement />
-            </QuantitySurveyorLayout>
-          }
-        />
-
-        {/* ══ MEP ═══════════════════════════════════════════ */}
+        {/* MEP */}
         <Route path="/mep/*" element={<MEPRoutes />} />
         <Route path="/client/*" element={<ClientRoutes />} />
 
-        {/* ══ PLANNING / QC / SAFETY ════════════════════════ */}
-        <Route
-          path="/planning-engineer/dashboard"
-          element={
-            <ProjectManagerLayout>
-              <PlanningEngineerDashboard />
-            </ProjectManagerLayout>
-          }
-        />
-        <Route
-          path="/qc/dashboard"
-          element={
-            <ProjectManagerLayout>
-              <QCDashboard />
-            </ProjectManagerLayout>
-          }
-        />
-        <Route
-          path="/safety/dashboard"
-          element={
-            <ProjectManagerLayout>
-              <SafetyOfficerDashboard />
-            </ProjectManagerLayout>
-          }
-        />
-
-        {/* ══ STRUCTURAL ════════════════════════════════════ */}
+        {/* STRUCTURAL */}
         <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
 
-        {/* ══ FINANCE ═══════════════════════════════════════ */}
+        {/* FINANCE */}
         <Route
           path="/finance-manager/*"
           element={
@@ -433,7 +362,7 @@ const AppRoutes = () => {
           }
         />
 
-        {/* ══ ARCHITECT ═════════════════════════════════════ */}
+        {/* ARCHITECT */}
         <Route
           path="/architect/dashboard"
           element={
@@ -444,18 +373,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/3d-visualizer/dashboard"
-          element={
-            <ProtectedRoute
-              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
-            >
-              <ArchitectLayout>
-                <ThreeDVisualizerDashboard />
-              </ArchitectLayout>
-            </ProtectedRoute>
-          }
-        />
+
         <Route
           path="/architect/snags"
           element={
@@ -466,6 +384,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/architect/logs"
           element={
@@ -476,6 +395,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/architect/designs"
           element={
@@ -486,6 +406,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/architect/assign"
           element={
@@ -496,6 +417,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/architect/projects"
           element={
@@ -506,200 +428,98 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
+        
+
+        {/* 3D VISUALIZER */}
         <Route
-          path="/architect/rfi"
+          path="/3d-visualizer/dashboard"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-              <ArchitectLayout>
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
+              <ThreeDVisualizerLayout>
+                <ThreeDVisualizerDashboard />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/3d-visualizer/drawings"
+          element={
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
+              <ThreeDVisualizerLayout>
+                <ArchitectDesigns />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/3d-visualizer/tasks"
+          element={
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
+              <ThreeDVisualizerLayout>
+                <AppShell key="viz-tasks" />
+              </ThreeDVisualizerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/3d-visualizer/rfi"
+          element={
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
+              <ThreeDVisualizerLayout>
                 <RFIPage />
-              </ArchitectLayout>
+              </ThreeDVisualizerLayout>
             </ProtectedRoute>
           }
         />
+
         <Route
-          path="/architect/rfi/:id"
+          path="/3d-visualizer/rfi/:id"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
-              <ArchitectLayout>
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
+              <ThreeDVisualizerLayout>
                 <RFIDetailPage />
-              </ArchitectLayout>
+              </ThreeDVisualizerLayout>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/architect/shared/drawings"
+          path="/3d-visualizer/models"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
-              <ArchitectLayout>
-                <SharedDrawingPage />
-              </ArchitectLayout>
+            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+              <ThreeDVisualizerLayout>
+                <Model currentRole="visualizer" />
+              </ThreeDVisualizerLayout>
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/architect/incidents"
-          element={
-            <ArchitectLayout>
-              <AppShell key="arch-incidents" />
-            </ArchitectLayout>
-          }
-        />
 
-        {/* ══ PROJECT COORDINATOR ═══════════════════════════ */}
         <Route
-          path="/project-coordinator/dashboard"
-          element={
-            <ProjectCoordinatorLayout>
-              <ProjectCoordinatorDashboard />
-            </ProjectCoordinatorLayout>
-          }
-        />
-        <Route
-          path="/project-coordinator/daily"
-          element={
-            <ProjectCoordinatorLayout>
-              <DailyUpdatesPC />
-            </ProjectCoordinatorLayout>
-          }
-        />
-        <Route
-          path="/project-coordinator/milestone"
-          element={
-            <ProjectCoordinatorLayout>
-              <Milestone />
-            </ProjectCoordinatorLayout>
-          }
-        />
-        <Route
-          path="/project-coordinator/payments"
-          element={
-            <ProjectCoordinatorLayout>
-              <Payment />
-            </ProjectCoordinatorLayout>
-          }
-        />
-        <Route
-          path="/project-coordinator/designs"
-          element={
-            <ProjectCoordinatorLayout>
-              <ArchitectDesigns />
-            </ProjectCoordinatorLayout>
-          }
-        />
-        <Route
-          path="/project-coordinator/incidents"
-          element={
-            <ProjectCoordinatorLayout>
-              <AppShell key="pc-incidents" />
-            </ProjectCoordinatorLayout>
-          }
-        />
-        <Route
-          path="/project-coordinator/rfi"
-          element={
-            <ProjectCoordinatorLayout>
-              <RFIPage />
-            </ProjectCoordinatorLayout>
-          }
-        />
-        <Route
-          path="/project-coordinator/rfi/:id"
-          element={
-            <ProjectCoordinatorLayout>
-              <RFIDetailPage />
-            </ProjectCoordinatorLayout>
-          }
-        />
-
-        {/* ══ TIMESHEET ═════════════════════════════════════ */}
-        <Route
-          path="/timesheet"
+          path="/3d-visualizer/incidents"
           element={
             <ProtectedRoute
-              allowedRoles={[ROLES.CEO, ROLES.HR, ...PROJECT_ROLES]}
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
             >
-              <CEOLayout>
-                <Timesheet />
-              </CEOLayout>
+              <ThreeDVisualizerLayout>
+                <AppShell key="viz-incidents" />
+              </ThreeDVisualizerLayout>
             </ProtectedRoute>
           }
         />
 
-        {/* ══ BDA ═══════════════════════════════════════════ */}
-        <Route
-          path="/business-development/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
-              <BDALayout>
-                <BDADashboard />
-              </BDALayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/bda/leads"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
-              <BDALayout>
-                <BDALeads />
-              </BDALayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/bda/add-lead"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
-              <BDALayout>
-                <BDAAddLead />
-              </BDALayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/bda/follow-up"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
-              <BDALayout>
-                <BDAFollowUp />
-              </BDALayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/bda/reports"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
-              <BDALayout>
-                <BDAReportsWithRole />
-              </BDALayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* ══ DIGITAL MARKETING ═════════════════════════════ */}
-        <Route
-          path="/digital-marketing/dashboard"
-          element={
-            <ProtectedRoute
-              allowedRoles={[ROLES.DIGITAL_MARKETING, ROLES.CEO]}
-            >
-              <DigitalMarketingLayout>
-                <DigitalMarketing />
-              </DigitalMarketingLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* ══ FALLBACK ══════════════════════════════════════ */}
-        <Route
-          path="*"
-          element={
-            <h2 style={{ padding: 40, textAlign: "center" }}>
-              404 — Page Not Found
-            </h2>
-          }
-        />
       </Routes>
     </NotificationProvider>
   );
