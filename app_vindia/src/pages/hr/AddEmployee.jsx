@@ -848,7 +848,8 @@ export default function AddEmployee() {
               )}
               {editingEmployee &&
                 form.profile_photo &&
-                typeof form.profile_photo === "string" && (
+                typeof form.profile_photo === "string" &&
+                !["default-profile.png","default-id.pdf","default-offer.pdf","default-cert.pdf"].includes(form.profile_photo) && (
                   <a
                     href={`http://localhost:5000/uploads/${form.profile_photo}`}
                     target="_blank"
@@ -882,7 +883,8 @@ export default function AddEmployee() {
               )}
               {editingEmployee &&
                 form.id_proof &&
-                typeof form.id_proof === "string" && (
+                typeof form.id_proof === "string" &&
+                !["default-profile.png","default-id.pdf","default-offer.pdf","default-cert.pdf"].includes(form.id_proof) && (
                   <a
                     href={`http://localhost:5000/uploads/${form.id_proof}`}
                     target="_blank"
@@ -913,7 +915,8 @@ export default function AddEmployee() {
               )}
               {editingEmployee &&
                 form.offer_letter &&
-                typeof form.offer_letter === "string" && (
+                typeof form.offer_letter === "string" &&
+                !["default-profile.png","default-id.pdf","default-offer.pdf","default-cert.pdf"].includes(form.offer_letter) && (
                   <a
                     href={`http://localhost:5000/uploads/${form.offer_letter}`}
                     target="_blank"
@@ -944,7 +947,8 @@ export default function AddEmployee() {
               )}
               {editingEmployee &&
                 form.certificates &&
-                typeof form.certificates === "string" && (
+                typeof form.certificates === "string" &&
+                !["default-profile.png","default-id.pdf","default-offer.pdf","default-cert.pdf"].includes(form.certificates) && (
                   <a
                     href={`http://localhost:5000/uploads/${form.certificates}`}
                     target="_blank"

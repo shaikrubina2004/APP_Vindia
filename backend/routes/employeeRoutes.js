@@ -11,10 +11,14 @@ const {
   updateEmployee,
   deleteEmployee,
   getNextEmployeeCode,
+  backfillEmployeeCodes,
 } = require("../controllers/employeeController");
 
 // ✅ GENERATE NEXT EMPLOYEE CODE (must be before /:id routes)
 router.get("/generate-code", authMiddleware, getNextEmployeeCode);
+
+// ✅ BACKFILL MISSING EMPLOYEE CODES
+router.post("/backfill-codes", authMiddleware, backfillEmployeeCodes);
 
 // ✅ CREATE EMPLOYEE (WITH FILE UPLOAD)
 router.post(

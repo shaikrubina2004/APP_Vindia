@@ -1,29 +1,37 @@
 const pool = require("../config/db");
 const bcrypt = require("bcryptjs");
 
-// ✅ GENERATE NEXT UNIQUE EMPLOYEE CODE (e.g. EMP001, EMP002 ...)
-const generateNextEmployeeCode = async () => {
-  const result = await pool.query(`
-    SELECT employee_code FROM employees
-    WHERE employee_code ~ '^EMP[0-9]+$'
-    ORDER BY CAST(SUBSTRING(employee_code FROM 4) AS INTEGER) DESC
-    LIMIT 1
-  `);
-
-  if (result.rows.length === 0) {
-    return "EMP001";
-  }
-
-  const last = result.rows[0].employee_code; // e.g. "EMP007"
-  const num  = parseInt(last.replace("EMP", ""), 10);
-  return "EMP" + String(num + 1).padStart(3, "0");
+// ✅ GENERATE NEXT UNIQUE EMPLOYEE CODE from a known set of used codes (in-memory, no extra DB call)
+//    Pass in the Set of already-assigned codes so each call just increments a counter.
+const nextCodeFromCounter = (usedCodes, counter) => {
+  let num = counter;
+  let code;
+  do {
+    code = "EMP" + String(num).padStart(4, "0");
+    num++;
+  } while (usedCodes.has(code));
+  usedCodes.add(code);   // mark as used so the next call skips it
+  return { code, nextCounter: num };
 };
 
-// ✅ API HANDLER: GET /api/employees/generate-code
+// ✅ API HANDLER: GET /api/employees/generate-code  (used when adding a new employee via the form)
 const getNextEmployeeCode = async (req, res) => {
   try {
-    const code = await generateNextEmployeeCode();
-    res.status(200).json({ employee_code: code });
+    // Single DB call — grab the highest existing EMP#### code
+    const result = await pool.query(`
+      SELECT employee_code FROM employees
+      WHERE employee_code ~ '^EMP[0-9]+$'
+      ORDER BY CAST(SUBSTRING(employee_code FROM 4) AS INTEGER) DESC
+      LIMIT 1
+    `);
+
+    let next = "EMP1001";
+    if (result.rows.length > 0) {
+      const num = parseInt(result.rows[0].employee_code.replace("EMP", ""), 10);
+      next = "EMP" + String(num + 1).padStart(4, "0");
+    }
+
+    res.status(200).json({ employee_code: next });
   } catch (error) {
     console.error("Generate code error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -113,7 +121,21 @@ const createEmployee = async (req, res) => {
     }
 
     // ✅ STEP 2.5: Auto-generate employee_code if not provided
-    const finalEmployeeCode = employee_code?.trim() || await generateNextEmployeeCode();
+    let finalEmployeeCode = employee_code?.trim();
+    if (!finalEmployeeCode) {
+      const codeResult = await pool.query(`
+        SELECT employee_code FROM employees
+        WHERE employee_code ~ '^EMP[0-9]+$'
+        ORDER BY CAST(SUBSTRING(employee_code FROM 4) AS INTEGER) DESC
+        LIMIT 1
+      `);
+      if (codeResult.rows.length === 0) {
+        finalEmployeeCode = "EMP1001";
+      } else {
+        const num = parseInt(codeResult.rows[0].employee_code.replace("EMP", ""), 10);
+        finalEmployeeCode = "EMP" + String(num + 1).padStart(4, "0");
+      }
+    }
 
     // ✅ STEP 3: Insert the employee record, linked to the user
     const result = await pool.query(
@@ -187,7 +209,7 @@ const getAllEmployees = async (req, res) => {
       SELECT 
         e.id, e.name, e.email, e.phone, e.department, 
         e.designation, e.salary, e.status, e.join_date,
-        e.gov_id_type, e.gov_id_number, e.user_id,
+        e.employee_code, e.gov_id_type, e.gov_id_number, e.user_id,
         m.name AS manager_name,
         r.name AS role,
         d.name AS user_department
@@ -203,7 +225,21 @@ const getAllEmployees = async (req, res) => {
     res.status(200).json(result.rows);
   } catch (error) {
     console.error("Get all error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    // DB unreachable (DNS failure, network down, Supabase paused, etc.)
+    if (
+      error.code === "EAI_AGAIN" ||
+      error.code === "ENOTFOUND" ||
+      error.code === "ECONNREFUSED" ||
+      error.code === "ETIMEDOUT"
+    ) {
+      return res.status(503).json({
+        message: "Database is currently unreachable. Please try again shortly.",
+        error: error.message,
+      });
+    }
+
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -354,6 +390,87 @@ const deleteEmployee = async (req, res) => {
   }
 };
 
+// ✅ BACKFILL: One DB read → compute all codes in-memory → one bulk UPDATE.
+//             Fixes duplicates AND fills nulls in a single pass.
+const backfillEmployeeCodes = async (req, res) => {
+  try {
+    // Single read — get every employee's id + current code
+    const { rows } = await pool.query(
+      "SELECT id, employee_code FROM employees ORDER BY id ASC"
+    );
+
+    // Build a Set of all valid, non-duplicate codes already in use
+    // "Valid" means matches EMP#### format
+    const codeCount = {};
+    for (const r of rows) {
+      if (r.employee_code && /^EMP\d+$/.test(r.employee_code)) {
+        codeCount[r.employee_code] = (codeCount[r.employee_code] || 0) + 1;
+      }
+    }
+
+    // usedCodes = codes that are assigned exactly once (safe to keep)
+    const usedCodes = new Set(
+      Object.entries(codeCount)
+        .filter(([, count]) => count === 1)
+        .map(([code]) => code)
+    );
+
+    // Find the highest existing number so we start the counter just above it
+    let maxNum = 1028; // safe floor based on your current data (EMP1028 is the highest)
+    for (const code of usedCodes) {
+      const n = parseInt(code.replace("EMP", ""), 10);
+      if (n > maxNum) maxNum = n;
+    }
+    let counter = maxNum + 1;
+
+    // Determine which employees need a new code:
+    //   - employee_code is null / empty
+    //   - employee_code is a duplicate (keep oldest id, reassign the rest)
+    const seenOnce = new Set(); // tracks first occurrence of each code
+    const toUpdate = [];        // { id, newCode }
+
+    for (const r of rows) {
+      const code = r.employee_code;
+      const needsNew =
+        !code ||                              // null / empty
+        !/^EMP\d+$/.test(code) ||            // not a valid EMP#### format
+        (codeCount[code] > 1 && seenOnce.has(code)); // duplicate — not the first occurrence
+
+      if (codeCount[code] > 1 && !seenOnce.has(code) && code) {
+        seenOnce.add(code); // mark first occurrence as "kept"
+      }
+
+      if (needsNew) {
+        const result = nextCodeFromCounter(usedCodes, counter);
+        counter = result.nextCounter;
+        toUpdate.push({ id: r.id, newCode: result.code });
+      }
+    }
+
+    if (toUpdate.length === 0) {
+      return res.status(200).json({ message: "All employees already have unique codes.", updated: 0 });
+    }
+
+    // Bulk update — one query per employee (pg doesn't support bulk UPDATE with different values easily,
+    // but this is a one-time operation so N small queries is fine)
+    for (const { id, newCode } of toUpdate) {
+      await pool.query(
+        "UPDATE employees SET employee_code = $1 WHERE id = $2",
+        [newCode, id]
+      );
+    }
+
+    res.status(200).json({
+      message: `✅ Done. Updated ${toUpdate.length} employee code(s).`,
+      updated: toUpdate.length,
+      assignments: toUpdate, // shows exactly what was assigned to whom
+    });
+  } catch (error) {
+    console.error("Backfill error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   createEmployee,
   getAllEmployees,
@@ -361,4 +478,5 @@ module.exports = {
   updateEmployee,
   deleteEmployee,
   getNextEmployeeCode,
+  backfillEmployeeCodes,
 };

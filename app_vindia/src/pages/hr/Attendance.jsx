@@ -386,11 +386,6 @@ function AttendanceManagement() {
                       </div>
                       <div className="am-emp-info">
                         <span className="am-emp-name">{record.name}</span>
-                        {record.designation && record.designation !== "—" && (
-                          <span style={{ fontSize: 11, color: "#94a3b8" }}>
-                            {record.designation}
-                          </span>
-                        )}
                       </div>
                     </div>
                   </td>
