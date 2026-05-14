@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
-import "../../styles/ApprovalWorkflow.css";
+import "../../styles/Approvalworkflow.css";
 
 const QUEUE_KEY = "approvals:queue:v1";
 const PAGE_SIZE = 8;

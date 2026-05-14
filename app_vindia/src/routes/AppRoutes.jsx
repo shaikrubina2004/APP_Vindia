@@ -23,7 +23,7 @@ import Documents from "../pages/hr/Documents";
 import Leaves from "../pages/hr/Leaves";
 import Payroll from "../pages/hr/Payroll";
 import Travel from "../pages/hr/Travel";
-
+import TravelRequest from "../pages/hr/TravelRequest";
 /* ── DIGITAL MARKETING ───────────────────────────────────── */
 import DigitalMarketing from "../pages/business-development/digital-marketing/DigitalMarketing";
 import DigitalMarketingLayout from "../layouts/DigitalMarketingLayout";
@@ -327,7 +327,16 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/hr/travelrequest"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
+              <HRLayout>
+                <TravelRequest />
+              </HRLayout>
+            </ProtectedRoute>
+          }
+        />
         {/* ══ SITE ENGINEER ═════════════════════════════════ */}
         {SiteEngineerRoutes}
 
@@ -454,7 +463,7 @@ const AppRoutes = () => {
         <Route
           path="/architect/dashboard"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
               <ArchitectLayout>
                 <ArchitectDashboard />
               </ArchitectLayout>
@@ -464,7 +473,7 @@ const AppRoutes = () => {
         <Route
           path="/architect/snags"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
               <ArchitectLayout>
                 <ArchitectSnagList />
               </ArchitectLayout>
@@ -474,7 +483,7 @@ const AppRoutes = () => {
         <Route
           path="/architect/logs"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
               <ArchitectLayout>
                 <ArchitectDailyLogins />
               </ArchitectLayout>
@@ -484,7 +493,7 @@ const AppRoutes = () => {
         <Route
           path="/architect/designs"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
               <ArchitectLayout>
                 <ArchitectDesigns />
               </ArchitectLayout>
@@ -494,7 +503,7 @@ const AppRoutes = () => {
         <Route
           path="/architect/assign"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
               <ArchitectLayout>
                 <ArchitectAssign />
               </ArchitectLayout>
@@ -504,7 +513,7 @@ const AppRoutes = () => {
         <Route
           path="/architect/projects"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
               <ArchitectLayout>
                 <ArchitectProject />
               </ArchitectLayout>
@@ -514,7 +523,7 @@ const AppRoutes = () => {
         <Route
           path="/architect/rfi"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
               <ArchitectLayout>
                 <RFIPage />
               </ArchitectLayout>
@@ -524,7 +533,7 @@ const AppRoutes = () => {
         <Route
           path="/architect/rfi/:id"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT, ROLES.CEO]}>
+            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
               <ArchitectLayout>
                 <RFIDetailPage />
               </ArchitectLayout>
@@ -549,6 +558,16 @@ const AppRoutes = () => {
             </ArchitectLayout>
           }
         />
+        <Route
+  path="/architect/travelrequest"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
+      <ArchitectLayout>
+        <TravelRequest />
+      </ArchitectLayout>
+    </ProtectedRoute>
+  }
+/>
 
         {/* ══ 3D VISUALIZER ════════════════════════════════ */}
         <Route
