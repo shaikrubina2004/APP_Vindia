@@ -1,4 +1,5 @@
 // FILE PATH: src/pages/StructuralEngineer/CreateRFI.jsx
+// ✅ FIXED VERSION - Handles empty date fields properly
 
 import { useState, useRef, useEffect } from "react";
 import { createRFI } from "../../api/rfiApi";
@@ -10,8 +11,8 @@ export default function CreateRFIModal({ onClose, onCreated }) {
     subject: "",
     description: "",
     priority: "medium",
-    project_id: "",       // store project ID
-    project_name: "",     // store project name (for display + backend)
+    project_id: "",
+    project_name: "",
     drawing_ref: "",
     grid_ref: "",
     zone: "",
@@ -22,7 +23,6 @@ export default function CreateRFIModal({ onClose, onCreated }) {
   const [roles, setRoles] = useState([]);
   const [rolesLoading, setRolesLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState(null);
-  // selectedRole = { id, name, code } from DB
 
   // ── Users ──────────────────────────────────────────────────
   const [users, setUsers] = useState([]);
@@ -45,10 +45,11 @@ export default function CreateRFIModal({ onClose, onCreated }) {
       setRolesLoading(true);
       try {
         const data = await fetchRoles();
-        // Filter active roles
-        setRoles(data.filter((r) => r.is_active !== false));
+        const activeRoles = data.filter((r) => r.is_active !== false);
+        console.log("✅ Roles loaded:", activeRoles);
+        setRoles(activeRoles);
       } catch (err) {
-        console.error("Error fetching roles:", err);
+        console.error("❌ Error fetching roles:", err);
         setError("Failed to load roles. Please refresh the page.");
       } finally {
         setRolesLoading(false);
@@ -63,9 +64,10 @@ export default function CreateRFIModal({ onClose, onCreated }) {
       setProjectsLoading(true);
       try {
         const data = await fetchProjects();
+        console.log("✅ Projects loaded:", data);
         setProjects(data);
       } catch (err) {
-        console.error("Error fetching projects:", err);
+        console.error("❌ Error fetching projects:", err);
       } finally {
         setProjectsLoading(false);
       }
@@ -84,11 +86,12 @@ export default function CreateRFIModal({ onClose, onCreated }) {
       setUsersLoading(true);
       setAssignedUser("");
       try {
-        // Pass role NAME — backend: WHERE LOWER(r.name) = LOWER($1)
+        console.log("🔄 Fetching users for role:", selectedRole.name);
         const data = await fetchUsersByRole(selectedRole.name);
+        console.log("✅ Users loaded:", data);
         setUsers(data);
       } catch (err) {
-        console.error("Error fetching users for role:", err);
+        console.error("❌ Error fetching users:", err);
         setUsers([]);
       } finally {
         setUsersLoading(false);
@@ -109,7 +112,10 @@ export default function CreateRFIModal({ onClose, onCreated }) {
       return;
     }
     const role = roles.find((r) => String(r.id) === roleId);
-    setSelectedRole(role ?? null);
+    if (role) {
+      console.log("🎯 Role selected:", role);
+      setSelectedRole(role);
+    }
   };
 
   // ── Project dropdown handler ───────────────────────────────
@@ -129,32 +135,84 @@ export default function CreateRFIModal({ onClose, onCreated }) {
 
   // ── Submit ─────────────────────────────────────────────────
   const submit = async () => {
-    if (!form.subject.trim() || !selectedRole) {
-      setError("Subject and Assigned Role are required.");
+    // Validation
+    if (!form.subject.trim()) {
+      setError("Subject is required.");
       return;
     }
+    if (!selectedRole) {
+      setError("Please select an Assign To role.");
+      return;
+    }
+
     setLoading(true);
     setError("");
+
     try {
       const fd = new FormData();
 
-      // Append all form fields except project_id (backend uses project_name)
-      // eslint-disable-next-line no-unused-vars
-      const { project_id, ...formFields } = form;
-      Object.entries(formFields).forEach(([k, v]) => fd.append(k, v));
+      console.log("📝 Form state:", {
+        form,
+        selectedRole,
+        assignedUser,
+        file: file?.name,
+      });
 
-      // Role code (e.g. "structural_engineer") — stored in rfis.assigned_to_role
-      fd.append("assigned_to_role", selectedRole.code || selectedRole.name);
+      // ✅ FIX: Convert empty strings to null for optional fields
+      const cleanForm = {};
+      Object.entries(form).forEach(([k, v]) => {
+        // Skip project_id (we don't send it, only project_name)
+        if (k === "project_id") return;
+        
+        // For date/optional fields: convert empty string to null
+        if ((k === "response_required_by" || k === "drawing_ref" || k === "grid_ref" || k === "zone") && v === "") {
+          cleanForm[k] = null; // Will be sent as empty string, backend should handle
+          return;
+        }
+        
+        cleanForm[k] = v;
+      });
 
-      // Specific user within that role (optional)
-      if (assignedUser) fd.append("assigned_to_user_id", assignedUser);
+      // Append clean form fields
+      Object.entries(cleanForm).forEach(([k, v]) => {
+        // Only append non-null values, or empty string for optional fields
+        // Actually, don't append if it's null - let backend use defaults
+        if (v !== null && v !== "") {
+          fd.append(k, v);
+          console.log(`  ✓ appending ${k}:`, v);
+        } else if (v === null) {
+          // Don't append null values - let backend handle as undefined
+          console.log(`  ⊘ skipping ${k} (null/empty)`);
+        }
+      });
 
-      if (file) fd.append("file", file);
+      // ✅ CRITICAL: Append role code (lowercase for consistency)
+      const roleCode = (selectedRole.code || selectedRole.name).toLowerCase();
+      fd.append("assigned_to_role", roleCode);
+      console.log(`  ✓ appending assigned_to_role:`, roleCode);
 
-      await createRFI(fd);
+      // Append optional user
+      if (assignedUser) {
+        fd.append("assigned_to_user_id", assignedUser);
+        console.log(`  ✓ appending assigned_to_user_id:`, assignedUser);
+      }
+
+      // Append file if present
+      if (file) {
+        fd.append("file", file);
+        console.log(`  ✓ appending file:`, file.name);
+      }
+
+      console.log("🚀 Submitting RFI...");
+      const result = await createRFI(fd);
+      console.log("✅ RFI created successfully:", result);
+
+      setError(""); // Clear any errors
       onCreated();
     } catch (err) {
-      setError("Failed to create RFI. " + err.message);
+      console.error("❌ RFI creation error:", err);
+      const errorMsg = err.message || "Failed to create RFI";
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -170,7 +228,7 @@ export default function CreateRFIModal({ onClose, onCreated }) {
         </div>
 
         <div className="rfi-modal-body">
-          {error && <p className="rfi-modal-error">{error}</p>}
+          {error && <p className="rfi-modal-error">⚠️ {error}</p>}
 
           {/* Subject */}
           <label>Subject <span className="req">*</span></label>
@@ -267,7 +325,7 @@ export default function CreateRFIModal({ onClose, onCreated }) {
           />
 
           {/* Technical Fields */}
-          <label>Drawing Reference</label>
+          <label>Drawing Reference <span className="rfi-optional">(optional)</span></label>
           <input
             name="drawing_ref"
             value={form.drawing_ref}
@@ -275,7 +333,7 @@ export default function CreateRFIModal({ onClose, onCreated }) {
             placeholder="e.g. STR-FDN-001"
           />
 
-          <label>Grid / Zone Reference</label>
+          <label>Grid / Zone Reference <span className="rfi-optional">(optional)</span></label>
           <input
             name="grid_ref"
             value={form.grid_ref}
@@ -283,7 +341,7 @@ export default function CreateRFIModal({ onClose, onCreated }) {
             placeholder="e.g. Grid C3"
           />
 
-          <label>Zone / Location</label>
+          <label>Zone / Location <span className="rfi-optional">(optional)</span></label>
           <input
             name="zone"
             value={form.zone}
@@ -291,7 +349,7 @@ export default function CreateRFIModal({ onClose, onCreated }) {
             placeholder="e.g. Level 2"
           />
 
-          <label>Response Required By</label>
+          <label>Response Required By <span className="rfi-optional">(optional)</span></label>
           <input
             type="date"
             name="response_required_by"
