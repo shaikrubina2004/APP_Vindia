@@ -380,6 +380,14 @@ const AppRoutes = () => {
             </QuantitySurveyorLayout>
           }
         />
+                    <Route
+          path="/quantity-surveyor/rfi"
+          element={
+            <QuantitySurveyorLayout>
+              <RFIPage />
+            </QuantitySurveyorLayout>
+          }
+        />
         <Route
           path="/quantity-surveyor/incident"
           element={
