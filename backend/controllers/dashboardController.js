@@ -1,48 +1,52 @@
-// backend/controllers/dashboardController.js
+const pool = require("../config/db");
 const Dashboard = require("../models/Dashboard");
 
-// Get Site Engineer Dashboard summary
+// ✅ MAIN DASHBOARD (ONLY ONE VERSION)
 const getSiteEngineerDashboard = async (req, res) => {
   try {
-    const [rfiSummary, ncrSummary, activity, labourCount, zoneProgress, weekProgress] = await Promise.all([
-      Dashboard.getRFISummary(),
-      Dashboard.getNCRSummary(),
-      Dashboard.getRecentActivity(10),
-      Dashboard.getLabourToday(),
-      Dashboard.getZoneProgress(),
-      Dashboard.getWeekProgress(),
+    const projectId = req.query.project_id;
+
+    if (!projectId) {
+      return res.status(400).json({
+        success: false,
+        message: "project_id required"
+      });
+    }
+
+    const [
+      rfiSummary,
+      ncrSummary,
+      activity,
+      labourCount,
+      zoneProgress,
+      weekProgress
+    ] = await Promise.all([
+      Dashboard.getRFISummary(projectId),
+      Dashboard.getNCRSummary(projectId),
+      Dashboard.getRecentActivity(10, projectId),
+      Dashboard.getLabourToday(projectId),
+      Dashboard.getZoneProgress(projectId),
+      Dashboard.getWeekProgress(projectId),
     ]);
 
     res.json({
       success: true,
       data: {
         kpi: {
-          weekProgress,
-          openRFIs: rfiSummary.open_count,
-          totalRFIs: rfiSummary.total,
-          openNCRs: ncrSummary.open_count,
-          totalNCRs: ncrSummary.total,
-          criticalHolds: ncrSummary.hold_count,
-          labourToday: labourCount,
+          labourToday: labourCount || 0,
         },
-        zones: zoneProgress,
-        activity: activity.map(a => ({
-          type: a.type.toLowerCase(),
-          id: a.id,
-          label: a.label,
-          priority: a.priority,
-          status: a.status,
-          timestamp: a.created_at,
-        })),
-      },
+        zones: zoneProgress || [],
+        activity
+      }
     });
+
   } catch (error) {
-    console.error("Error fetching dashboard:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch dashboard data" });
+    console.error("Dashboard Error 👉", error);
+    res.status(500).json({ success: false });
   }
 };
 
-// Get RFI and NCR counts
+// ✅ METRICS
 const getDashboardMetrics = async (req, res) => {
   try {
     const rfiSummary = await Dashboard.getRFISummary();
@@ -52,24 +56,81 @@ const getDashboardMetrics = async (req, res) => {
       success: true,
       data: {
         rfi: {
-          open: rfiSummary.open_count,
-          total: rfiSummary.total,
-          critical: rfiSummary.critical_count,
+          open: rfiSummary?.open_count || 0,
+          total: rfiSummary?.total || 0,
+          critical: rfiSummary?.critical_count || 0,
         },
         ncr: {
-          open: ncrSummary.open_count,
-          total: ncrSummary.total,
-          holds: ncrSummary.hold_count,
+          open: ncrSummary?.open_count || 0,
+          total: ncrSummary?.total || 0,
+          holds: ncrSummary?.hold_count || 0,
         },
       },
     });
+
   } catch (error) {
-    console.error("Error fetching metrics:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch metrics" });
+    console.error("Metrics Error 👉", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch metrics",
+    });
+  }
+};
+
+// ✅ ZONE PROGRESS
+const getZoneProgress = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        zone,
+        ROUND(AVG(percent_complete), 2) as progress
+      FROM site_progress
+      GROUP BY zone
+      ORDER BY zone
+    `);
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+
+  } catch (error) {
+    console.error("Zone Progress Error 👉", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch zone progress"
+    });
+  }
+};
+
+// ✅ LABOUR
+const getLabourToday = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COALESCE(SUM(morning_skilled),0) +
+        COALESCE(SUM(morning_unskilled),0) +
+        COALESCE(SUM(morning_supervisors),0) AS total_labour
+      FROM site_progress
+      WHERE date = CURRENT_DATE
+    `);
+
+    res.json({
+      success: true,
+      data: result.rows[0].total_labour || 0
+    });
+
+  } catch (error) {
+    console.error("Labour Error 👉", error);
+    res.status(500).json({
+      success: false
+    });
   }
 };
 
 module.exports = {
   getSiteEngineerDashboard,
   getDashboardMetrics,
+  getZoneProgress,
+  getLabourToday,
 };

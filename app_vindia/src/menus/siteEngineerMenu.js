@@ -26,11 +26,11 @@ const siteEngineerMenu = [
     path: "/site-engineer/rfi",
     icon: "alert-circle",
   },
-  {
-    name: "NCR Register",
-    path: "/site-engineer/ncr",
-    icon: "x-circle",
-  },
+  // {
+  //   name: "NCR Register",
+  //   path: "/site-engineer/ncr",
+  //   icon: "x-circle",
+  // },
   {
     name: "Incidents",
     path: "/site-engineer/incidents",

@@ -8,6 +8,7 @@ import ProjectSwitcher from "../project/ProjectSwitcher";
 import {
   PRIORITY_CONFIG,
   STATUS_FLOW,
+  INCIDENT_TYPES,
   STATUS_CONFIG,
   TASK_STATUS_CONFIG,
 } from "./incidentConfig";
@@ -41,6 +42,7 @@ export default function IncidentManagement({
     title: "",
     description: "",
     priority: "P2",
+    type: "Quality",
     assignedId: "",
     roleName: "",
   });
@@ -89,6 +91,7 @@ export default function IncidentManagement({
         priority: form.priority,
         assigned_to_user_id: form.assignedId,
         project_id: activeProject?.id ?? null,
+        type: form.type,
       };
 
       // ✅ NOW log it
@@ -524,6 +527,17 @@ export default function IncidentManagement({
                     <span className={`inc-priority-badge ${pcfg.color}`}>
                       {pcfg.icon} {inc.priority}
                     </span>
+                    {inc?.type && (
+                    <span className={`inc-type-chip type-${inc.type.toLowerCase()}`}>
+                      {
+                        INCIDENT_TYPES.find(
+                          (t) => t.value === inc.type
+                        )?.icon
+                      }
+                      {" "}
+                      {inc.type}
+                    </span>
+                  )}
                     <span className="inc-id">{inc.incidentNo}</span>
                     {taskCount > 0 && (
                       <span className="inc-task-count-badge">
@@ -985,6 +999,31 @@ export default function IncidentManagement({
                   </div>
                 </div>
               </div>
+                            <div className="inc-form-row">
+
+                              <div className="inc-form-group">
+                            <label>Incident Type</label>
+
+                            <select
+                              className="inc-form-select"
+                              value={form.type}
+                              onChange={(e) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  type: e.target.value,
+                                }))
+                              }
+                            >
+                              {INCIDENT_TYPES.map((t) => (
+                                <option key={t.value} value={t.value}>
+                                  {t.icon} {t.value}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                            </div>
+
+
               <div className="inc-form-row">
                 <div className="inc-form-group">
                   <label>

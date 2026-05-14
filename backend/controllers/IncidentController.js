@@ -381,6 +381,7 @@ exports.createIncident = async (req, res) => {
     title,
     description,
     priority = "P2",
+    type = "Quality",
     assigned_to_user_id,
     project_id,
   } = req.body;
@@ -421,17 +422,19 @@ exports.createIncident = async (req, res) => {
     }
 
     const cols = [
-      "title",
-      "description",
-      "priority",
-      "assigned_to",
-      "deadline_at",
-      "project_id",
-    ];
+  "title",
+  "description",
+  "priority",
+  "type",
+  "assigned_to",
+  "deadline_at",
+  "project_id",
+];
     const vals = [
       title.trim(),
       description ?? null,
       priority,
+      type,
       assigned_to_user_id ?? null,
       deadline_at,
       project_id ?? null,
@@ -493,6 +496,7 @@ exports.createStandaloneTask = async (req, res) => {
     title,
     note,
     priority = "P2",
+    type = "Quality",
     assigned_to_user_id,
     project_id,
   } = req.body;
@@ -512,12 +516,13 @@ exports.createStandaloneTask = async (req, res) => {
     await client.query("BEGIN");
 
     const { rows } = await client.query(
-      `INSERT INTO tasks (title, note, priority, assigned_to, created_by, project_id, deadline_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO tasks (title, note, priority,type, assigned_to, created_by, project_id, deadline_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         title.trim(),
         note ?? null,
         priority,
+        type,
         assigned_to_user_id,
         created_by,
         project_id ?? null,

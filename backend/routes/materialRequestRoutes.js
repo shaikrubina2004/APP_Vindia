@@ -11,6 +11,16 @@ router.get("/", controller.getRequests);
 
 router.post("/", controller.createRequest);
 
-router.put("/:id", controller.updateRequest);
+// ✅ FULL EDIT (not just status)
+router.put("/:id", controller.updateFullRequest);
+
+// ✅ DELETE
+router.delete("/:id", controller.deleteRequest);
+
+// status update (if needed separately)
+router.put("/status/:id", controller.updateRequest);
+
+router.post("/delivery", controller.addDelivery);
+router.post("/receive", controller.receiveMaterial);
 
 module.exports = router;

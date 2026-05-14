@@ -21,11 +21,44 @@ export const PRIORITY_CONFIG = {
     desc: "Low priority",
   },
 };
+export const INCIDENT_TYPES = [
+  {
+    value: "Quality",
+    color: "type-quality",
+    icon: "🟣",
+  },
+  {
+    value: "Safety",
+    color: "type-safety",
+    icon: "🔴",
+  },
+  {
+    value: "Delay",
+    color: "type-delay",
+    icon: "🟡",
+  },
+  {
+    value: "Equipment",
+    color: "type-equipment",
+    icon: "🔵",
+  },
+  {
+    value: "Logistics",
+    color: "type-logistics",
+    icon: "🟢",
+  },
+  {
+    value: "Environment",
+    color: "type-environment",
+    icon: "🌿",
+  },
+];
 
 export const STATUS_FLOW = [
   "Created",
   "Assigned",
   "In Progress",
+  "On Hold",
   "Resolved",
   "Closed",
 ];
@@ -35,6 +68,10 @@ export const STATUS_CONFIG = {
   Assigned: { color: "s-assigned", icon: "◎" },
   "In Progress": { color: "s-inprogress", icon: "◐" },
   Resolved: { color: "s-resolved", icon: "✔" },
+  "On Hold": {
+  color: "s-onhold",
+  icon: "⏸",
+},
   Closed: { color: "s-closed", icon: "■" },
 };
 

@@ -42,7 +42,7 @@ async function flushQueue() {
 
   for (const item of q) {
     try {
-      const res = await api.post("/se-daily-reports", item.payload);
+      const res = await api.post("/diary", item.payload);
       if (!res || (res.status && res.status >= 400)) throw new Error();
     } catch {
       rem.push(item);
@@ -78,16 +78,25 @@ const BLANK = {
   linked_rfi: "",
   linked_incident: "",
   //
-  instructions: "", next_day: "", notes: "", attachments: [],
+  instructions: "", next_day: "", notes: "",
 };
 
 export default function DailyDiary() {
 const [projects, setProjects] = useState([]);
   const draft = ls.load(DRAFT_KEY);
-  const [form, setForm]       = useState({ ...BLANK, date: nowISO(), ...draft, attachments: [] });
+const [form, setForm] = useState({
+  ...BLANK,
+  date: nowISO(),
+  ...draft,
+  attachments: draft?.attachments || []
+});
   const [errors, setErrors]   = useState({});
   const [status, setStatus]   = useState("");
   const [submitting, setSub]  = useState(false);
+  useEffect(() => {
+    console.log("ATTACHMENTS STATE 👉", form.attachments);
+  }, [form.attachments]);
+
   const [diaries, setDiaries] = useState([]);
   const [milestones, setMilestones] = useState([]);
 const [wbsList, setWbsList] = useState([]);
@@ -112,7 +121,7 @@ const [wbsList, setWbsList] = useState([]);
 
   async function loadHistory() {
     try {
-      const res = await api.get("/se-daily-reports");
+      const res = await api.get("/diary");
       if (alive.current) setDiaries(Array.isArray(res?.data) ? res.data.slice().reverse() : []);
     } catch { /* empty list */ }
   }
@@ -123,17 +132,32 @@ const [wbsList, setWbsList] = useState([]);
 async function loadProjects() {
   try {
     const res = await api.get("/projects");
-    setProjects(res.data || []);
+
+    console.log("PROJECTS 👉", res.data); // debug
+
+    // ✅ ensure array
+    if (Array.isArray(res.data)) {
+      setProjects(res.data);
+    } else {
+      setProjects([]);
+    }
+
   } catch (err) {
-    console.error("Failed to load projects");
+    console.error("Failed to load projects", err);
+    setProjects([]);
   }
 }
-  async function loadMilestones(projectId) {
+ async function loadMilestones(projectId) {
   try {
     const res = await api.get(`/diary/milestones?project_id=${projectId}`);
+
+    console.log("MILESTONES 👉", res.data); // 🔥 ADD THIS
+
     setMilestones(res.data || []);
+
   } catch (err) {
-    console.error("Failed to load milestones");
+    console.error("Failed to load milestones", err);
+    setMilestones([]);
   }
 }
 async function loadWbsByMilestone(milestoneId) {
@@ -141,9 +165,14 @@ async function loadWbsByMilestone(milestoneId) {
     const res = await api.get(
       `/diary/wbs?milestone_id=${milestoneId}&project_id=${form.project_id}`
     );
+
+    console.log("WBS 👉", res.data); // 🔥 ADD THIS
+
     setWbsList(res.data || []);
+
   } catch (err) {
-    console.error("Failed to load WBS");
+    console.error("Failed to load WBS", err);
+    setWbsList([]);
   }
 }
   const setF = (k, v) => {
@@ -153,51 +182,119 @@ async function loadWbsByMilestone(milestoneId) {
   };
   const setMat = (i, k, v) => setForm(f => { const m = [...f.materials]; m[i] = { ...m[i], [k]: v }; return { ...f, materials: m }; });
   const addMat  = () => setForm(f => ({ ...f, materials: [...f.materials, { name: "", qty: "", notes: "" }] }));
-  const handleFiles = e => {   console.log("FILES 👉", e.target.files);
-setForm(f => ({ ...f, attachments: [...f.attachments, ...Array.from(e.target.files || [])] })); e.target.value = null; };
+
+const handleFiles = (e) => {
+  const files = Array.from(e.target.files || []);
+  console.log("FILES 👉", files);
+
+  setForm(f => ({
+    ...f,
+    attachments: [...(f.attachments || []), ...files]
+  }));
+};
   const removeFile  = i => setForm(f => ({ ...f, attachments: f.attachments.filter((_, j) => j !== i) }));
 
   const totalLabour = ["labour_carpenters","labour_steel","labour_masons","labour_mep","labour_general","labour_supervisors"]
     .reduce((s, k) => s + (Number(form[k]) || 0), 0);
 
-  const submit = async ev => {
-    ev?.preventDefault();
-    if (submitting) return;
-    const errs = validate({
-      ...form,
-      labour_skilled: form.labour_carpenters + form.labour_steel + form.labour_masons + form.labour_mep,
-      labour_unskilled: form.labour_general,
-    });
-    setErrors(errs);
-    if (Object.keys(errs).length) { setStatus("Fix errors above"); return; }
-    setSub(true); setStatus("Saving…");
-   const payload = {
-  ...form,
-  project_id: form.project_id, // ✅ dynamic
-  wbs_id: form.subtask_id,
-  milestone_id: form.milestone_id,
+  const submit = async (ev) => {
+  ev?.preventDefault();
+
+  if (submitting) return;
+
+  const errs = validate({
+    ...form,
+    labour_skilled:
+      Number(form.labour_carpenters) +
+      Number(form.labour_steel) +
+      Number(form.labour_masons) +
+      Number(form.labour_mep),
+    labour_unskilled: Number(form.labour_general),
+  });
+
+  setErrors(errs);
+
+  if (Object.keys(errs).length) {
+    setStatus("Fix errors above");
+    return;
+  }
+
+  setSub(true);
+  setStatus("Saving…");
+
+  try {
+    const fd = new FormData();
+
+    // ✅ IMPORTANT: append all fields properly
+    fd.append("project_id", form.project_id || "");
+    fd.append("date", form.date || "");
+    fd.append("shift", form.shift || "");
+    fd.append("site", form.site || "");
+    fd.append("zone", form.zone || "");
+    fd.append("weather_am", form.weather_am || "");
+    fd.append("weather_pm", form.weather_pm || "");
+    fd.append("temp_c", form.temp_c || "");
+    fd.append("work_done", form.work_done || "");
+    fd.append("plant", form.plant || "");
+
+    // labour
+    fd.append("labour_carpenters", form.labour_carpenters || 0);
+    fd.append("labour_steel", form.labour_steel || 0);
+    fd.append("labour_masons", form.labour_masons || 0);
+    fd.append("labour_mep", form.labour_mep || 0);
+    fd.append("labour_general", form.labour_general || 0);
+    fd.append("labour_supervisors", form.labour_supervisors || 0);
+
+  const skilled =
+  Number(form.labour_carpenters) +
+  Number(form.labour_steel) +
+  Number(form.labour_masons) +
+  Number(form.labour_mep);
+
+const unskilled = Number(form.labour_general);
+
+fd.append("labour_skilled", skilled);
+fd.append("labour_unskilled", unskilled);
+
+    // ✅ FIX materials
+    fd.append("materials", JSON.stringify(form.materials || []));
+
+    fd.append("issues", form.issues || "");
+    fd.append("instructions", form.instructions || "");
+    fd.append("next_day", form.next_day || "");
+    fd.append("notes", form.notes || "");
+
+    fd.append("subtask_id", form.subtask_id || "");
+    fd.append("milestone_id", form.milestone_id || "");
+
+    fd.append("delay_type", form.delay_type || "");
+    fd.append("delay_description", form.delay_description || "");
+
+    fd.append("linked_rfi", form.linked_rfi || "");
+    fd.append("linked_incident", form.linked_incident || "");
+
+    // ✅ FILES (VERY IMPORTANT)
+   form.attachments.forEach(file => {
+  fd.append("attachments", file);
+});
+    const res =await api.post("/diary", fd);
+
+    console.log("SUCCESS", res.data);
+
+    await loadHistory();
+    ls.del(DRAFT_KEY);
+
+    setForm({ ...BLANK, date: nowISO(), attachments: [] });
+    setStatus("Diary submitted ✓");
+    setTab("history");
+
+  } catch (err) {
+    console.error("ERROR 👉", err.response?.data || err.message);
+    setStatus("Failed to submit ❌");
+  } finally {
+    if (alive.current) setSub(false);
+  }
 };
-    delete payload.attachments;
-    try {
-      let res;
-      if (form.attachments.length) {
-        const fd = new FormData();
-        Object.entries(payload).forEach(([k, v]) => fd.append(k, typeof v === "object" ? JSON.stringify(v) : String(v ?? "")));
-        form.attachments.forEach(f => fd.append("attachments", f, f.name));
-res = await api.post("/se-daily-reports", fd, {
-  headers: { "Content-Type": "multipart/form-data" }
-});      } else {
-        res = await api.post("/se-daily-reports", payload);
-      }
-      if (!res || (res.status && res.status >= 400)) throw new Error();
-      await loadHistory(); ls.del(DRAFT_KEY);
-      setForm({ ...BLANK, date: nowISO() });
-      setStatus("Diary submitted ✓"); setTab("history");
-    } catch {
-      enqueue(payload);
-      setStatus("Offline — queued for retry");
-    } finally { if (alive.current) setSub(false); }
-  };
 
   const fmtDate = s => s
     ? new Date(s + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
@@ -257,68 +354,92 @@ res = await api.post("/se-daily-reports", fd, {
                       <div className="dd-field">
   <label className="dd-label">Project</label>
   <select
-    className="dd-select"
-    value={form.project_id || ""}
-    onChange={(e) => {
-      const projectId = e.target.value;
-      setF("project_id", projectId);
-
-      // reset dependent fields
-      setMilestones([]);
-      setWbsList([]);
-
-      if (projectId) {
-        loadMilestones(projectId);
-      }
-    }}
-  >
-    <option value="">Select Project</option>
-    {projects.map(p => (
-      <option key={p.id} value={p.id}>
-        {p.name}
-      </option>
-    ))}
-  </select>
-</div>
-                      <div className="dd-field">
-                      <label className="dd-label">Milestone</label>
-                      <select
   className="dd-select"
-  value={form.milestone_id || ""}
-  onChange={(e) => {
-  const val = e.target.value;
-  setF("milestone_id", val);
+  value={form.project_id || ""}
+ onChange={(e) => {
+  const projectId = e.target.value;
 
-  if (val) {
-    loadWbsByMilestone(val); // ✅ clean call
-  } else {
-    setWbsList([]);
+  // set project
+  setF("project_id", projectId);
+
+  // ✅ RESET dependent fields (THIS IS WHAT YOU ASKED)
+  setF("milestone_id", "");
+  setF("subtask_id", "");
+
+  // reset lists
+  setMilestones([]);
+  setWbsList([]);
+
+  // load new data
+  if (projectId) {
+    loadMilestones(projectId);
   }
 }}
 >
+  <option value="">Select Project</option>
+
+  {projects.length > 0 ? (
+    projects.map((p) => (
+      <option key={p.id} value={p.id}>
+        {p.name}
+      </option>
+    ))
+  ) : (
+    <option disabled>Loading...</option>
+  )}
+</select>
+</div>
+                      <div className="dd-field">
+                      <label className="dd-label">Milestone</label>
+                     <select
+  className="dd-select"
+  value={form.milestone_id || ""}
+  onChange={(e) => {
+    const val = e.target.value;
+
+    setF("milestone_id", val);
+    setF("subtask_id", ""); // 🔥 RESET subtask
+
+    if (val) {
+      loadWbsByMilestone(val);
+    } else {
+      setWbsList([]);
+    }
+  }}
+>
   <option value="">Select milestone</option>
-  {milestones.map(m => (
-  <option key={m.id} value={m.id}>
-    {m.name}
-  </option>
-))}
+
+  {milestones.length > 0 ? (
+    milestones.map(m => (
+      <option key={m.id} value={m.id}>
+        {m.name}
+      </option>
+    ))
+  ) : (
+    <option disabled>No milestones</option>
+  )}
 </select>
                     </div>
 
                     <div className="dd-field">
                       <label className="dd-label">Task (WBS)</label>
-                      <select
+                    <select
   className="dd-select"
   value={form.subtask_id || ""}
   onChange={e => setF("subtask_id", e.target.value)}
-  disabled={!form.milestone_id} // 🔥 important
+  disabled={!form.milestone_id}
 >
   <option value="">Select task</option>
-  {wbsList.map(w => (
-  <option key={w.id} value={w.id}>
-    {w.name}
-  </option>
-))}
+
+  {wbsList.length > 0 ? (
+    wbsList.map(w => (
+      <option key={w.id} value={w.id}>
+        {w.name}
+      </option>
+    ))
+  ) : (
+    <option disabled>No tasks</option>
+  )}
 </select>
                       </div>
                       <div className="dd-field">
@@ -467,17 +588,23 @@ res = await api.post("/se-daily-reports", fd, {
                     </div>
                     <div className="dd-field" style={{ marginTop: 10 }}>
                       <label className="dd-label">Attachments (photos, PDFs)</label>
-                      <input type="file" multiple onChange={handleFiles} className="dd-file-input" />
-                      {form.attachments.length > 0 && (
+                       <input type="file" multiple onChange={handleFiles} />
+                      {form.attachments?.length > 0 && (
                         <div className="dd-file-list">
-                          {form.attachments.map((f, i) => (
-                            <div key={`${f.name}-${i}`} className="dd-file-item">
-                              <span>{f.name}</span>
-                              <button type="button" className="dd-file-remove" onClick={() => removeFile(i)}>×</button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                        {form.attachments.map((f, i) => (
+                          <div key={i} className="dd-file-item">
+                            <span>{f?.name || "file"}</span>
+                            <button
+                              type="button"
+                              className="dd-file-remove"
+                              onClick={() => removeFile(i)}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     </div>
                   </div>
 
