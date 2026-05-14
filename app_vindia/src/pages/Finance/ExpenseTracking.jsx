@@ -1,27 +1,58 @@
 import { useState, useEffect } from "react";
 import "./ExpenseTracking.css";
 
+/* ── Expense Classification Structure ─────────────────────── */
+const EXPENSE_TYPES = {
+  COMPANY: {
+    label: 'Company Expense',
+    description: 'Office rent, salaries, utilities, etc.',
+    categories: [
+      { id: 'rent', label: 'Rent & Utilities' },
+      { id: 'salary_admin', label: 'Salaries (Admin)' },
+      { id: 'office_exp', label: 'Office Expenses' },
+      { id: 'software', label: 'Software & IT' },
+      { id: 'travel_general', label: 'Travel (General)' },
+      { id: 'legal', label: 'Legal & Compliance' },
+      { id: 'marketing', label: 'Marketing' },
+    ]
+  },
+  PROJECT: {
+    label: 'Project Expense',
+    description: 'Materials, labour, equipment for projects',
+    categories: [
+      { id: 'material', label: 'Material' },
+      { id: 'labour', label: 'Labour' },
+      { id: 'equipment', label: 'Equipment' },
+      { id: 'transport', label: 'Transportation' },
+      { id: 'site_exp', label: 'Site Expenses' },
+      { id: 'subcontract', label: 'Subcontracting' },
+      { id: 'salary_project', label: 'Project Staff Salary' },
+    ]
+  }
+};
+
 /* ── Mock Data ─────────────────────────────────────────────── */
-const EXPENSE_CATEGORIES = [
+const INITIAL_EXPENSES = [
+  { id: 1, date: "2024-12-15", vendor: "Global Steel Ltd", category: "material", amount: 2800000, description: "High-grade steel rebar", status: "Approved", receipt: "RCP-2024-001", approvedBy: "Rajesh Kumar", department: "Procurement", expenseType: "PROJECT", projectId: 1 },
+  { id: 2, date: "2024-12-14", vendor: "SafeWork Equipment", category: "office_exp", amount: 450000, description: "Safety helmets & PPE kits", status: "Approved", receipt: "RCP-2024-002", approvedBy: "Priya Singh", department: "Safety", expenseType: "COMPANY", projectId: null },
+  { id: 3, date: "2024-12-13", vendor: "Transport Hub Co", category: "transport", amount: 1200000, description: "Fuel and logistics charges", status: "Pending", receipt: "RCP-2024-003", approvedBy: "—", department: "Logistics", expenseType: "PROJECT", projectId: 1 },
+  { id: 4, date: "2024-12-12", vendor: "Cement Suppliers Ltd", category: "material", amount: 3500000, description: "Portland cement - 500 bags", status: "Approved", receipt: "RCP-2024-004", approvedBy: "Rajesh Kumar", department: "Procurement", expenseType: "PROJECT", projectId: 2 },
+  { id: 5, date: "2024-12-11", vendor: "Electrical Systems", category: "equipment", amount: 1800000, description: "Wiring and switchboards", status: "Rejected", receipt: "RCP-2024-005", approvedBy: "—", department: "Engineering", expenseType: "PROJECT", projectId: 1 },
+];
+
+const PROJECTS = [
+  { id: 1, name: 'Tower B Construction' },
+  { id: 2, name: 'Villa Complex Phase 2' },
+  { id: 3, name: 'Commercial Hub' },
+];
+
+const EXPENSE_CATEGORIES_OLD = [
   { id: 1, name: "Materials", budget: 50000000, spent: 38500000, color: "#0A4174", icon: "📦" },
   { id: 2, name: "Labour", budget: 35000000, spent: 28900000, color: "#4E8EA2", icon: "👷" },
   { id: 3, name: "Equipment", budget: 25000000, spent: 19200000, color: "#6EA2B3", icon: "🏗️" },
   { id: 4, name: "Transportation", budget: 12000000, spent: 9800000, color: "#49769F", icon: "🚚" },
   { id: 5, name: "Utilities", budget: 8000000, spent: 6200000, color: "#7BBDE8", icon: "⚡" },
   { id: 6, name: "Safety", budget: 5000000, spent: 3100000, color: "#BDD8E9", icon: "🛡️" },
-];
-
-const EXPENSES = [
-  { id: 1, date: "2024-12-15", vendor: "Global Steel Ltd", category: "Materials", amount: 2800000, description: "High-grade steel rebar", status: "Approved", receipt: "RCP-2024-001", approvedBy: "Rajesh Kumar", department: "Procurement" },
-  { id: 2, date: "2024-12-14", vendor: "SafeWork Equipment", category: "Safety", amount: 450000, description: "Safety helmets & PPE kits", status: "Approved", receipt: "RCP-2024-002", approvedBy: "Priya Singh", department: "Safety" },
-  { id: 3, date: "2024-12-13", vendor: "Transport Hub Co", category: "Transportation", amount: 1200000, description: "Fuel and logistics charges", status: "Pending", receipt: "RCP-2024-003", approvedBy: "—", department: "Logistics" },
-  { id: 4, date: "2024-12-12", vendor: "Cement Suppliers Ltd", category: "Materials", amount: 3500000, description: "Portland cement - 500 bags", status: "Approved", receipt: "RCP-2024-004", approvedBy: "Rajesh Kumar", department: "Procurement" },
-  { id: 5, date: "2024-12-11", vendor: "Electrical Systems", category: "Equipment", amount: 1800000, description: "Wiring and switchboards", status: "Rejected", receipt: "RCP-2024-005", approvedBy: "—", department: "Engineering" },
-  { id: 6, date: "2024-12-10", vendor: "Labour Contractor A", category: "Labour", amount: 2200000, description: "Skilled workers - 50 days", status: "Approved", receipt: "RCP-2024-006", approvedBy: "Amit Patel", department: "HR" },
-  { id: 7, date: "2024-12-09", vendor: "Power Distribution", category: "Utilities", amount: 890000, description: "Electricity charges - November", status: "Approved", receipt: "RCP-2024-007", approvedBy: "Priya Singh", department: "Admin" },
-  { id: 8, date: "2024-12-08", vendor: "Mobile Cranes Inc", category: "Equipment", amount: 3200000, description: "Crane rental - 10 days", status: "Pending", receipt: "RCP-2024-008", approvedBy: "—", department: "Operations" },
-  { id: 9, date: "2024-12-07", vendor: "Labour Contractor B", category: "Labour", amount: 1950000, description: "Unskilled workers - 40 days", status: "Approved", receipt: "RCP-2024-009", approvedBy: "Amit Patel", department: "HR" },
-  { id: 10, date: "2024-12-06", vendor: "Industrial Paints", category: "Materials", amount: 680000, description: "Paint and primers - 2000L", status: "Under Review", receipt: "RCP-2024-010", approvedBy: "Rajesh Kumar", department: "Procurement" },
 ];
 
 const BUDGET_ALLOCATION = [
@@ -42,12 +73,14 @@ const DEPARTMENT_EXPENSES = [
 
 const EMPTY_EXPENSE = {
   vendor: "",
-  category: "Materials",
+  category: "material",
   amount: "",
   date: new Date().toISOString().split("T")[0],
   description: "",
   receipt: "",
   department: "",
+  expenseType: "PROJECT",
+  projectId: null,
 };
 
 /* ── Helpers ───────────────────────────────────────────────── */
@@ -57,7 +90,6 @@ const fmt = (n) =>
   : `₹${Number(n).toLocaleString("en-IN")}`;
 
 const pct = (spent, total) => Math.min(Math.round((spent / total) * 100), 100);
-
 const cls = (p) => p >= 90 ? "critical" : p >= 70 ? "warning" : "ok";
 
 const getStatusColor = (status) => {
@@ -96,7 +128,9 @@ export default function ExpenseTracking() {
   const [saved, setSaved] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
-  const [filterCategory, setFilterCategory] = useState("All");
+  // ✅ REMOVED: filterCategory / setFilterCategory (never used in ExpensesTab UI)
+  const [filterExpenseType, setFilterExpenseType] = useState("All");
+  const [expenses, setExpenses] = useState(INITIAL_EXPENSES);
 
   useEffect(() => {
     const f = requestAnimationFrame(() => setAnimIn(true));
@@ -106,33 +140,56 @@ export default function ExpenseTracking() {
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const handleSave = () => {
+    const newExpense = {
+      id: Math.max(...expenses.map(e => e.id), 0) + 1,
+      ...form,
+      amount: parseFloat(form.amount),
+      status: "Pending",
+      approvedBy: "—",
+    };
+    setExpenses([newExpense, ...expenses]);
     setSaved(true);
-    setTimeout(() => { setSaved(false); setShowForm(false); setForm(EMPTY_EXPENSE); }, 1500);
+    setTimeout(() => {
+      setSaved(false);
+      setShowForm(false);
+      setForm(EMPTY_EXPENSE);
+    }, 1500);
   };
 
-  const totalBudget = EXPENSE_CATEGORIES.reduce((s, c) => s + c.budget, 0);
-  const totalSpent = EXPENSE_CATEGORIES.reduce((s, c) => s + c.spent, 0);
+  // Calculate totals by expense type
+  const companyExpenses = expenses
+    .filter(e => e.expenseType === 'COMPANY')
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const projectExpenses = expenses
+    .filter(e => e.expenseType === 'PROJECT')
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const totalBudget = EXPENSE_CATEGORIES_OLD.reduce((s, c) => s + c.budget, 0);
+  const totalSpent = EXPENSE_CATEGORIES_OLD.reduce((s, c) => s + c.spent, 0);
   const overallPct = pct(totalSpent, totalBudget);
 
-  const filteredExpenses = EXPENSES.filter((e) => {
-    const matchesSearch = e.vendor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         e.receipt.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredExpenses = expenses.filter((e) => {
+    const matchesSearch =
+      e.vendor.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.receipt.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === "All" || e.status === filterStatus;
-    const matchesCategory = filterCategory === "All" || e.category === filterCategory;
-    return matchesSearch && matchesStatus && matchesCategory;
+    const matchesType = filterExpenseType === "All" || e.expenseType === filterExpenseType;
+    // ✅ REMOVED: matchesCategory (filterCategory state removed)
+    return matchesSearch && matchesStatus && matchesType;
   });
 
   const TABS = ["Overview", "Expenses", "Budget Analysis", "By Department"];
 
   return (
     <div className={`et-root ${animIn ? "et-in" : ""}`}>
-      
+
       {/* Header */}
       <div className="et-header">
         <div>
           <p className="et-eyebrow">Finance Manager</p>
           <h1 className="et-title">Expense Tracking</h1>
-          <p className="et-subtitle">Under construction 🏗️</p>
+          <p className="et-subtitle">Track company & project expenses</p>
         </div>
         <button className="et-btn-primary" onClick={() => setShowForm(!showForm)}>
           {showForm ? "✕ Cancel" : "+ Add Expense"}
@@ -151,6 +208,16 @@ export default function ExpenseTracking() {
           <p className="et-summary-value">{fmt(totalSpent)}</p>
           <span className="et-summary-sub">{overallPct}% utilised</span>
         </div>
+        <div className="et-summary-card" style={{ "--accent": "#F59E0B" }}>
+          <p className="et-summary-label">🏢 Company Expenses</p>
+          <p className="et-summary-value">{fmt(companyExpenses)}</p>
+          <span className="et-summary-sub">Overhead costs</span>
+        </div>
+        <div className="et-summary-card" style={{ "--accent": "#10B981" }}>
+          <p className="et-summary-label">🏗️ Project Expenses</p>
+          <p className="et-summary-value">{fmt(projectExpenses)}</p>
+          <span className="et-summary-sub">Direct project costs</span>
+        </div>
         <div className="et-summary-card" style={{ "--accent": "#059669" }}>
           <p className="et-summary-label">Remaining Budget</p>
           <p className="et-summary-value">{fmt(totalBudget - totalSpent)}</p>
@@ -158,7 +225,7 @@ export default function ExpenseTracking() {
         </div>
         <div className="et-summary-card" style={{ "--accent": "#dc2626" }}>
           <p className="et-summary-label">Pending Approval</p>
-          <p className="et-summary-value">{EXPENSES.filter(e => e.status === "Pending").length}</p>
+          <p className="et-summary-value">{expenses.filter(e => e.status === "Pending").length}</p>
           <span className="et-summary-sub">Awaiting action</span>
         </div>
       </div>
@@ -167,47 +234,91 @@ export default function ExpenseTracking() {
       {showForm && (
         <div className="et-form-card">
           <h3 className="et-form-title">Add New Expense</h3>
+
+          {/* Expense Type Selector */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '10px', fontWeight: 600 }}>Expense Type *</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {Object.entries(EXPENSE_TYPES).map(([key, val]) => (
+                <div
+                  key={key}
+                  onClick={() => setF('expenseType', key)}
+                  style={{
+                    padding: '12px',
+                    border: form.expenseType === key ? '2px solid #0A4174' : '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    background: form.expenseType === key ? '#eff6ff' : 'white',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>{val.label}</div>
+                  <div style={{ fontSize: '12px', color: '#6b7280' }}>{val.description}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="et-form-grid">
             <div className="et-form-row">
               <label>Vendor Name <span>*</span></label>
-              <input 
-                className="et-input" 
+              <input
+                className="et-input"
                 placeholder="e.g., Global Steel Ltd"
-                value={form.vendor} 
-                onChange={(e) => setF("vendor", e.target.value)} 
+                value={form.vendor}
+                onChange={(e) => setF("vendor", e.target.value)}
               />
             </div>
             <div className="et-form-row">
               <label>Category <span>*</span></label>
-              <select 
-                className="et-input" 
-                value={form.category} 
+              <select
+                className="et-input"
+                value={form.category}
                 onChange={(e) => setF("category", e.target.value)}
               >
-                {EXPENSE_CATEGORIES.map(c => (
-                  <option key={c.id}>{c.name}</option>
+                <option value="">Select category...</option>
+                {EXPENSE_TYPES[form.expenseType]?.categories.map(c => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
                 ))}
               </select>
             </div>
             <div className="et-form-row">
               <label>Amount (₹) <span>*</span></label>
-              <input 
-                className="et-input" 
-                type="number" 
+              <input
+                className="et-input"
+                type="number"
                 placeholder="e.g., 500000"
-                value={form.amount} 
-                onChange={(e) => setF("amount", e.target.value)} 
+                value={form.amount}
+                onChange={(e) => setF("amount", e.target.value)}
               />
             </div>
             <div className="et-form-row">
               <label>Date <span>*</span></label>
-              <input 
-                className="et-input" 
+              <input
+                className="et-input"
                 type="date"
-                value={form.date} 
-                onChange={(e) => setF("date", e.target.value)} 
+                value={form.date}
+                onChange={(e) => setF("date", e.target.value)}
               />
             </div>
+
+            {/* Project selector (only for PROJECT expenses) */}
+            {form.expenseType === 'PROJECT' && (
+              <div className="et-form-row">
+                <label>Project <span>*</span></label>
+                <select
+                  className="et-input"
+                  value={form.projectId || ''}
+                  onChange={(e) => setF("projectId", e.target.value ? parseInt(e.target.value) : null)}
+                >
+                  <option value="">Select project...</option>
+                  {PROJECTS.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="et-form-row">
               <label>Department</label>
               <select className="et-input" value={form.department} onChange={(e) => setF("department", e.target.value)}>
@@ -221,21 +332,21 @@ export default function ExpenseTracking() {
             </div>
             <div className="et-form-row">
               <label>Receipt Number</label>
-              <input 
-                className="et-input" 
+              <input
+                className="et-input"
                 placeholder="e.g., RCP-2024-001"
-                value={form.receipt} 
-                onChange={(e) => setF("receipt", e.target.value)} 
+                value={form.receipt}
+                onChange={(e) => setF("receipt", e.target.value)}
               />
             </div>
             <div className="et-form-row et-form-row--full">
               <label>Description</label>
-              <textarea 
-                className="et-textarea" 
-                rows={3} 
+              <textarea
+                className="et-textarea"
+                rows={3}
                 placeholder="Expense details..."
-                value={form.description} 
-                onChange={(e) => setF("description", e.target.value)} 
+                value={form.description}
+                onChange={(e) => setF("description", e.target.value)}
               />
             </div>
           </div>
@@ -262,9 +373,20 @@ export default function ExpenseTracking() {
 
       {/* Content */}
       <div className="et-body">
-        {tab === "Overview" && <OverviewTab />}
-        {tab === "Expenses" && <ExpensesTab filteredExpenses={filteredExpenses} searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatus={filterStatus} setFilterStatus={setFilterStatus} filterCategory={filterCategory} setFilterCategory={setFilterCategory} />}
-        {tab === "Budget Analysis" && <BudgetAnalysisTab />}
+        {tab === "Overview" && <OverviewTab categories={EXPENSE_CATEGORIES_OLD} />}
+        {tab === "Expenses" && (
+          <ExpensesTab
+            filteredExpenses={filteredExpenses}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            filterStatus={filterStatus}
+            setFilterStatus={setFilterStatus}
+            // ✅ REMOVED: filterCategory, setFilterCategory, allExpenses
+            filterExpenseType={filterExpenseType}
+            setFilterExpenseType={setFilterExpenseType}
+          />
+        )}
+        {tab === "Budget Analysis" && <BudgetAnalysisTab categories={EXPENSE_CATEGORIES_OLD} />}
         {tab === "By Department" && <ByDepartmentTab />}
       </div>
     </div>
@@ -274,10 +396,12 @@ export default function ExpenseTracking() {
 /* ════════════════════════════════════════════════════════════
    TAB 1 — OVERVIEW
 ════════════════════════════════════════════════════════════ */
-function OverviewTab() {
-  // FIX 1 & 2: Removed unused totalSpent and totalBudget declarations
-  // (these values are computed in the parent component; OverviewTab
-  //  derives per-category data directly from EXPENSE_CATEGORIES)
+function OverviewTab({ categories }) {
+  const EXPENSES = [
+    { id: 1, date: "2024-12-15", vendor: "Global Steel Ltd", category: "Materials", amount: 2800000, status: "Approved" },
+    { id: 2, date: "2024-12-14", vendor: "SafeWork Equipment", category: "Safety", amount: 450000, status: "Approved" },
+    { id: 3, date: "2024-12-13", vendor: "Transport Hub Co", category: "Transportation", amount: 1200000, status: "Pending" },
+  ];
 
   return (
     <div className="et-overview">
@@ -285,7 +409,7 @@ function OverviewTab() {
       <div className="et-section">
         <h2 className="et-section-title">Budget by Category</h2>
         <div className="et-category-grid">
-          {EXPENSE_CATEGORIES.map((cat) => {
+          {categories.map((cat) => {
             const used = pct(cat.spent, cat.budget);
             const status = cls(used);
             return (
@@ -317,7 +441,7 @@ function OverviewTab() {
       <div className="et-section">
         <h2 className="et-section-title">Recent Expenses</h2>
         <div className="et-expense-list">
-          {EXPENSES.slice(0, 5).map((exp) => (
+          {EXPENSES.map((exp) => (
             <div key={exp.id} className="et-expense-item">
               <div className="et-exp-left">
                 <div className="et-exp-dot" style={{ background: getStatusColor(exp.status) }} />
@@ -339,36 +463,23 @@ function OverviewTab() {
           ))}
         </div>
       </div>
-
-      {/* Spending Trend */}
-      <div className="et-section">
-        <h2 className="et-section-title">Spending Trend</h2>
-        <div className="et-chart-card">
-          <div className="et-trend-chart">
-            {BUDGET_ALLOCATION.map((q) => (
-              <div key={q.quarter} className="et-trend-item">
-                <div className="et-trend-bar-wrapper">
-                  <div className="et-trend-bar" style={{
-                    height: `${(q.spent / 100000000) * 300}px`,
-                    background: `linear-gradient(180deg, #0A4174, #4E8EA2)`
-                  }}>
-                    <span className="et-trend-pct">{q.percentage}%</span>
-                  </div>
-                </div>
-                <span className="et-trend-label">{q.quarter}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
 
 /* ════════════════════════════════════════════════════════════
    TAB 2 — EXPENSES
+   ✅ REMOVED unused props: filterCategory, setFilterCategory, allExpenses
 ════════════════════════════════════════════════════════════ */
-function ExpensesTab({ filteredExpenses, searchTerm, setSearchTerm, filterStatus, setFilterStatus, filterCategory, setFilterCategory }) {
+function ExpensesTab({
+  filteredExpenses,
+  searchTerm,
+  setSearchTerm,
+  filterStatus,
+  setFilterStatus,
+  filterExpenseType,
+  setFilterExpenseType,
+}) {
   return (
     <div className="et-expenses">
       {/* Filters */}
@@ -383,22 +494,29 @@ function ExpensesTab({ filteredExpenses, searchTerm, setSearchTerm, filterStatus
           />
         </div>
         <div className="et-filter-group">
+          <label>Type:</label>
+          <select
+            value={filterExpenseType}
+            onChange={(e) => setFilterExpenseType(e.target.value)}
+            className="et-filter-select"
+          >
+            <option>All</option>
+            <option>COMPANY</option>
+            <option>PROJECT</option>
+          </select>
+        </div>
+        <div className="et-filter-group">
           <label>Status:</label>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="et-filter-select">
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="et-filter-select"
+          >
             <option>All</option>
             <option>Approved</option>
             <option>Pending</option>
             <option>Under Review</option>
             <option>Rejected</option>
-          </select>
-        </div>
-        <div className="et-filter-group">
-          <label>Category:</label>
-          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="et-filter-select">
-            <option>All</option>
-            {EXPENSE_CATEGORIES.map(c => (
-              <option key={c.id}>{c.name}</option>
-            ))}
           </select>
         </div>
       </div>
@@ -411,33 +529,52 @@ function ExpensesTab({ filteredExpenses, searchTerm, setSearchTerm, filterStatus
               <th>Date</th>
               <th>Vendor</th>
               <th>Receipt</th>
+              <th>Type</th>
               <th>Category</th>
-              <th>Department</th>
+              <th>Project</th>
               <th>Amount</th>
               <th>Status</th>
-              <th>Approved By</th>
             </tr>
           </thead>
           <tbody>
-            {filteredExpenses.map((exp) => (
-              <tr key={exp.id} className="et-trow">
-                <td className="et-date">{formatDate(exp.date)}</td>
-                <td className="et-vendor">{exp.vendor}</td>
-                <td className="et-receipt">{exp.receipt}</td>
-                <td className="et-category">{exp.category}</td>
-                <td className="et-dept">{exp.department}</td>
-                <td className="et-amount">{fmt(exp.amount)}</td>
-                <td>
-                  <span className="et-status-badge" style={{
-                    background: getStatusBg(exp.status),
-                    color: getStatusColor(exp.status)
-                  }}>
-                    {exp.status}
-                  </span>
-                </td>
-                <td className="et-approver">{exp.approvedBy}</td>
-              </tr>
-            ))}
+            {filteredExpenses.map((exp) => {
+              const categoryLabel =
+                EXPENSE_TYPES[exp.expenseType]?.categories.find(c => c.id === exp.category)?.label || exp.category;
+              const projectName = exp.projectId
+                ? PROJECTS.find(p => p.id === exp.projectId)?.name
+                : '-';
+
+              return (
+                <tr key={exp.id} className="et-trow">
+                  <td className="et-date">{formatDate(exp.date)}</td>
+                  <td className="et-vendor">{exp.vendor}</td>
+                  <td className="et-receipt">{exp.receipt}</td>
+                  <td>
+                    <span style={{
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      background: exp.expenseType === 'COMPANY' ? '#FEF3C7' : '#DCFCE7',
+                      color: exp.expenseType === 'COMPANY' ? '#B45309' : '#047857'
+                    }}>
+                      {exp.expenseType === 'COMPANY' ? '🏢 Company' : '🏗️ Project'}
+                    </span>
+                  </td>
+                  <td className="et-category">{categoryLabel}</td>
+                  <td className="et-project">{projectName}</td>
+                  <td className="et-amount">{fmt(exp.amount)}</td>
+                  <td>
+                    <span className="et-status-badge" style={{
+                      background: getStatusBg(exp.status),
+                      color: getStatusColor(exp.status)
+                    }}>
+                      {exp.status}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {filteredExpenses.length === 0 && (
@@ -455,15 +592,21 @@ function ExpensesTab({ filteredExpenses, searchTerm, setSearchTerm, filterStatus
         </div>
         <div className="et-stat-box">
           <p className="et-stat-label">Approved</p>
-          <p className="et-stat-value">{fmt(filteredExpenses.filter(e => e.status === "Approved").reduce((s, e) => s + e.amount, 0))}</p>
+          <p className="et-stat-value">
+            {fmt(filteredExpenses.filter(e => e.status === "Approved").reduce((s, e) => s + e.amount, 0))}
+          </p>
         </div>
         <div className="et-stat-box">
           <p className="et-stat-label">Pending</p>
-          <p className="et-stat-value" style={{ color: "#f59e0b" }}>{fmt(filteredExpenses.filter(e => e.status === "Pending").reduce((s, e) => s + e.amount, 0))}</p>
+          <p className="et-stat-value" style={{ color: "#f59e0b" }}>
+            {fmt(filteredExpenses.filter(e => e.status === "Pending").reduce((s, e) => s + e.amount, 0))}
+          </p>
         </div>
         <div className="et-stat-box">
           <p className="et-stat-label">Rejected</p>
-          <p className="et-stat-value" style={{ color: "#dc2626" }}>{fmt(filteredExpenses.filter(e => e.status === "Rejected").reduce((s, e) => s + e.amount, 0))}</p>
+          <p className="et-stat-value" style={{ color: "#dc2626" }}>
+            {fmt(filteredExpenses.filter(e => e.status === "Rejected").reduce((s, e) => s + e.amount, 0))}
+          </p>
         </div>
       </div>
     </div>
@@ -473,7 +616,7 @@ function ExpensesTab({ filteredExpenses, searchTerm, setSearchTerm, filterStatus
 /* ════════════════════════════════════════════════════════════
    TAB 3 — BUDGET ANALYSIS
 ════════════════════════════════════════════════════════════ */
-function BudgetAnalysisTab() {
+function BudgetAnalysisTab({ categories }) {
   return (
     <div className="et-budget-analysis">
       <div className="et-section">
@@ -493,7 +636,10 @@ function BudgetAnalysisTab() {
                 </div>
               </div>
               <div className="et-progress-bar">
-                <div className="et-progress-fill" style={{ width: `${q.percentage}%`, background: `hsl(${q.percentage * 1.2}, 70%, 50%)` }} />
+                <div
+                  className="et-progress-fill"
+                  style={{ width: `${q.percentage}%`, background: `hsl(${q.percentage * 1.2}, 70%, 50%)` }}
+                />
               </div>
               <p className="et-budget-percentage">{q.percentage}% utilised</p>
             </div>
@@ -516,7 +662,7 @@ function BudgetAnalysisTab() {
               </tr>
             </thead>
             <tbody>
-              {EXPENSE_CATEGORIES.map((cat) => {
+              {categories.map((cat) => {
                 const used = pct(cat.spent, cat.budget);
                 const status = cls(used);
                 return (
@@ -557,31 +703,25 @@ function ByDepartmentTab() {
     <div className="et-by-dept">
       <div className="et-section">
         <h2 className="et-section-title">Department-wise Expenses</h2>
-        
-        {/* Pie Chart */}
+
         <div className="et-chart-section">
           <div className="et-pie-chart">
-            {DEPARTMENT_EXPENSES.map((dept, idx) => {
-              const startAngle = DEPARTMENT_EXPENSES.slice(0, idx).reduce((s, d) => s + (d.percentage * 3.6), 0);
-              // FIX 3: Removed unused `angle` variable; startAngle is the only value needed for positioning
-              return (
-                <div
-                  key={dept.dept}
-                  className="et-pie-segment"
-                  style={{
-                    background: dept.color,
-                    width: "140px",
-                    height: "140px",
-                    borderRadius: "50%",
-                    position: "absolute",
-                    left: "50%",
-                    top: "50%",
-                    transform: `rotate(${startAngle}deg) translateY(-70px) rotate(-${startAngle}deg)`,
-                  }}
-                  title={`${dept.dept}: ${fmt(dept.total)}`}
-                />
-              );
-            })}
+            {DEPARTMENT_EXPENSES.map((dept, idx) => (
+              <div
+                key={dept.dept}
+                style={{
+                  background: dept.color,
+                  width: "140px",
+                  height: "140px",
+                  borderRadius: "50%",
+                  position: "absolute",
+                  left: "50%",
+                  top: "50%",
+                  transform: `rotate(${DEPARTMENT_EXPENSES.slice(0, idx).reduce((s, d) => s + (d.percentage * 3.6), 0)}deg) translateY(-70px)`,
+                }}
+                title={`${dept.dept}: ${fmt(dept.total)}`}
+              />
+            ))}
           </div>
           <div className="et-legend">
             {DEPARTMENT_EXPENSES.map((dept) => (
@@ -606,7 +746,10 @@ function ByDepartmentTab() {
               </div>
               <p className="et-dept-amount">{fmt(dept.total)}</p>
               <div className="et-progress-bar">
-                <div className="et-progress-fill" style={{ width: `${dept.percentage}%`, background: dept.color }} />
+                <div
+                  className="et-progress-fill"
+                  style={{ width: `${dept.percentage}%`, background: dept.color }}
+                />
               </div>
               <p className="et-dept-of-total">of {fmt(totalDeptExpense)}</p>
             </div>

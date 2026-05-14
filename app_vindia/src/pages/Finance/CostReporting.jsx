@@ -66,7 +66,6 @@ const fmt = (n) => {
 
 const pct = (a, b) => Math.min(Math.round((a / b) * 100), 100);
 
-// FIX 1: Removed unused `varBg` helper — it was declared but never referenced in JSX.
 const varColor = (v) => (v >= 0 ? "#059669" : "#dc2626");
 const varLabel = (v) => (v >= 0 ? `▲ ${fmt(v)} under` : `▼ ${fmt(Math.abs(v))} over`);
 
@@ -257,9 +256,6 @@ function DonutChart() {
   const strokeW      = 28;
   const circumference = 2 * Math.PI * R;
 
-  // FIX 2: Pre-compute cumulative start percentages with reduce.
-  // Previously used `let cumulPct = 0; cumulPct += share` which mutates a
-  // variable after render completes — violating react-hooks/immutability rules.
   const segments = COST_CATEGORIES.reduce((acc, cat) => {
     const startPct = acc.length > 0 ? acc[acc.length - 1].startPct + acc[acc.length - 1].share : 0;
     const share    = cat.actual / total;
