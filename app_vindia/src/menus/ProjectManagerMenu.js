@@ -9,5 +9,5 @@ export const ProjectManagerMenu = [
 
   { name: "Reports", path: "/pm/reports", icon: "bar-chart-2" },
 
-  { name: "Settings", path: "/pm/settings", icon: "settings" },
+  { name: "Cost Reports",    path: "/pm/cost-reports",            icon: "dollar-sign"    },
 ];
