@@ -6,14 +6,43 @@ import "./Attendance.css";
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
 const STATUS_LABEL = {
-  present:  "Present",
-  late:     "Late",
-  absent:   "Absent",
-  wfh:      "WFH",
+  present:    "Present",
+  late:       "Late",
+  absent:     "Absent",
+  wfh:        "WFH",
   "half day": "Half Day",
 };
 
-const getStatusLabel = (s = "") => STATUS_LABEL[s.toLowerCase().trim()] ?? "Unknown";
+// Sub-label shown below the pill — derived from the remarks field
+const REMARKS_SUBLABEL = {
+  "afternoon present":       "Afternoon Present",
+  "afternoon absent":        "Afternoon Absent",
+  "late + afternoon absent": "Late + Afternoon Absent",
+  "full day":                "",
+  "present":                 "",
+};
+
+const getStatusLabel = (s = "") => STATUS_LABEL[s.toLowerCase().trim()] ?? s;
+const getRemarkLabel = (r = "") => {
+  if (!r || r === "—") return "";
+  const key = r.toLowerCase().trim();
+  if (key in REMARKS_SUBLABEL) return REMARKS_SUBLABEL[key];
+  // pass through things like "Late by 34 min" but hide generic ones
+  if (key === "present" || key === "full day" || key === "on time") return "";
+  return r;
+};
+
+// Returns the right CSS pill class including half-day variants
+const getPillClass = (status, remarks = "") => {
+  const s = status.toLowerCase().trim();
+  const r = (remarks || "").toLowerCase().trim();
+  if (s === "half day") {
+    if (r.includes("afternoon absent"))  return "am-pill-afternoon-absent";
+    if (r.includes("afternoon present")) return "am-pill-afternoon-present";
+    return "am-pill-half-day";
+  }
+  return `am-pill-${s.replace(/ /g, "-")}`;
+};
 
 const formatLate = (minutes) => {
   if (!minutes || minutes <= 0) return null;
@@ -100,6 +129,7 @@ function AttendanceManagement() {
           designation: r.designation || "—",
           department:  r.department  || "—",
           status:      (r.status || "absent").toLowerCase(),
+          empStatus:   (r.emp_status || "").toLowerCase(),
           checkIn:     fmtTime(r.check_in),
           checkOut:    fmtTime(r.check_out),
           shift:       r.shift || "Morning",
@@ -147,14 +177,19 @@ function AttendanceManagement() {
   const counts = activeRows.reduce(
     (acc, r) => {
       const s = r.status.toLowerCase().trim();
-      if (s === "present")  acc.present++;
-      else if (s === "late") { acc.late++; acc.present++; } // late counts toward present
+      const remark = (r.remarks || "").toLowerCase().trim();
+      if (s === "present")       acc.present++;
+      else if (s === "late")   { acc.late++; acc.present++; }
       else if (s === "absent")   acc.absent++;
       else if (s === "wfh")      acc.wfh++;
-      else if (s === "half day") acc.halfDay++;
+      else if (s === "half day") {
+        acc.halfDay++;
+        if (remark.includes("afternoon absent"))  acc.afternoonAbsent++;
+        else if (remark.includes("afternoon present")) acc.afternoonPresent++;
+      }
       return acc;
     },
-    { present: 0, absent: 0, late: 0, wfh: 0, halfDay: 0 }
+    { present: 0, absent: 0, late: 0, wfh: 0, halfDay: 0, afternoonAbsent: 0, afternoonPresent: 0 }
   );
   const total = activeRows.length;
 
@@ -233,6 +268,18 @@ function AttendanceManagement() {
           </div>
           <div className="am-card-value">{counts.absent}</div>
           <div className="am-card-sub">No check-in / after 10:00</div>
+        </div>
+
+        <div className="am-card am-card-wfh" onClick={() => { setSelectedStatus("wfh"); setCurrentPage(1); }}
+          style={{ cursor: "pointer" }}>
+          <div className="am-card-top">
+            <span className="am-card-title">Work From Home</span>
+            <span className="am-card-pct am-pct-wfh">
+              {total > 0 ? Math.round((counts.wfh / total) * 100) : 0}%
+            </span>
+          </div>
+          <div className="am-card-value">{counts.wfh}</div>
+          <div className="am-card-sub">Remote employees today</div>
         </div>
       </div>
 
@@ -381,11 +428,28 @@ function AttendanceManagement() {
                   </td>
                   <td className="am-td">
                     <div className="am-emp-cell">
-                      <div className="am-avatar">
+                      <div className={`am-avatar${record.empStatus === "work_from_home" ? " am-avatar-wfh" : ""}`}>
                         {record.name?.trim().charAt(0).toUpperCase() ?? "?"}
                       </div>
                       <div className="am-emp-info">
-                        <span className="am-emp-name">{record.name}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span className="am-emp-name">{record.name}</span>
+                          {record.empStatus === "work_from_home" && (
+                            <span className="am-wfh-badge">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 3 }}>
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                <polyline points="9 22 9 12 15 12 15 22"/>
+                              </svg>
+                              WFH
+                            </span>
+                          )}
+                        </div>
+                        {record.designation && record.designation !== "—" && (
+                          <span className="am-emp-designation">
+                            {record.designation}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -403,9 +467,16 @@ function AttendanceManagement() {
                     )}
                   </td>
                   <td className="am-td">
-                    <span className={`am-pill am-pill-${record.status.replace(" ", "-")}`}>
-                      {getStatusLabel(record.status)}
-                    </span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      <span className={getPillClass(record.status, record.remarks)}>
+                        {getStatusLabel(record.status)}
+                      </span>
+                      {getRemarkLabel(record.remarks) && (
+                        <span style={{ fontSize: 10, color: "#64748b", lineHeight: 1.3 }}>
+                          {getRemarkLabel(record.remarks)}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -413,12 +484,28 @@ function AttendanceManagement() {
               <tr>
                 <td colSpan={8} className="am-empty-cell">
                   <div className="am-empty-inner">
-                    <svg width="38" height="38" viewBox="0 0 24 24" fill="none"
-                      stroke="currentColor" strokeWidth="1.2">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="8" y1="12" x2="16" y2="12" />
-                    </svg>
-                    <p>No attendance records found for this date</p>
+                    {selectedStatus === "wfh" ? (
+                      <>
+                        <svg width="38" height="38" viewBox="0 0 24 24" fill="none"
+                          stroke="#3b82f6" strokeWidth="1.2">
+                          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                          <polyline points="9 22 9 12 15 12 15 22"/>
+                        </svg>
+                        <p style={{ color: "#3b82f6", fontWeight: 600 }}>No Work From Home employees today</p>
+                        <p style={{ fontSize: 12, color: "#94a3b8" }}>
+                          Employees assigned "Work From Home" status will appear here
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="38" height="38" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="1.2">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="8" y1="12" x2="16" y2="12" />
+                        </svg>
+                        <p>No attendance records found for this date</p>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

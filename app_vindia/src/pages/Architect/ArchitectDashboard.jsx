@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import { getArchitectProjects } from "../../services/architectprojectService";
 import { getDailyLog } from "../../services/architectDailyLogService";
 import { API } from "../../services/authService";
@@ -55,8 +56,152 @@ function StatusBadge({ status }) {
   return <span className={`acd-status-badge acd-status-${s}`}>{status}</span>;
 }
 
+
+// ─── CHECK IN / OUT BUTTON ────────────────────────────────────────────────────
+const fmtTime = (t) => {
+  if (!t) return "—";
+  const [h, m] = t.split(":");
+  const hh = parseInt(h, 10);
+  return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
+};
+
+const CheckInButton = ({ employeeId }) => {
+  const [attendance, setAttendance] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [elapsed, setElapsed] = useState("");
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    fetchTodayAttendance();
+    return () => clearInterval(timerRef.current);
+  }, []);
+
+  useEffect(() => {
+    clearInterval(timerRef.current);
+    if (attendance?.check_in && !attendance?.check_out) {
+      const tick = () => {
+        const [h, m, s] = attendance.check_in.split(":").map(Number);
+        const inMs = (h * 3600 + m * 60 + s) * 1000;
+        const nowMs = new Date() - new Date().setHours(0, 0, 0, 0);
+        const diff = Math.max(0, nowMs - inMs);
+        const th = String(Math.floor(diff / 3600000)).padStart(2, "0");
+        const tm = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
+        const ts = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
+        setElapsed(`${th}:${tm}:${ts}`);
+      };
+      tick();
+      timerRef.current = setInterval(tick, 1000);
+    } else {
+      setElapsed("");
+    }
+  }, [attendance]);
+
+  const fetchTodayAttendance = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(
+        `http://localhost:5000/api/attendance/today?employee_id=${employeeId}`
+      );
+      setAttendance(res.data || null);
+    } catch (err) {
+      if (err.response?.status !== 404) console.error(err);
+      setAttendance(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    setBusy(true);
+    try {
+      const now = new Date();
+      const timeStr = now.toTimeString().slice(0, 8);
+      const dateStr = now.toISOString().slice(0, 10);
+      const res = await axios.post("http://localhost:5000/api/attendance", {
+        employee_id: employeeId,
+        date: dateStr,
+        check_in: timeStr,
+        shift: "morning",
+      });
+      setAttendance(res.data);
+    } catch (err) {
+      console.error(err);
+      alert("Check-in failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCheckOut = async () => {
+    if (!attendance?.id) return;
+    setBusy(true);
+    try {
+      const now = new Date();
+      const timeStr = now.toTimeString().slice(0, 8);
+      const res = await axios.put(
+        `http://localhost:5000/api/attendance/${attendance.id}`,
+        { check_out: timeStr }
+      );
+      setAttendance(res.data);
+      clearInterval(timerRef.current);
+    } catch (err) {
+      console.error(err);
+      alert("Check-out failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const isCheckedIn  = attendance?.check_in && !attendance?.check_out;
+  const isCheckedOut = attendance?.check_in && attendance?.check_out;
+
+  if (loading) {
+    return (
+      <button disabled className="acd-checkin-btn acd-checkin-loading">
+        <span className="acd-checkin-dot" /> Loading…
+      </button>
+    );
+  }
+
+  if (isCheckedOut) {
+    return (
+      <div className="acd-checkin-wrap">
+        <button disabled className="acd-checkin-btn acd-checkin-done">
+          <span className="acd-checkin-dot acd-checkin-dot-green" /> ✓ Done for Today
+        </button>
+        <span className="acd-checkin-sub">
+          {fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}
+        </span>
+      </div>
+    );
+  }
+
+  if (isCheckedIn) {
+    return (
+      <div className="acd-checkin-wrap">
+        <button onClick={handleCheckOut} disabled={busy} className="acd-checkin-btn acd-checkin-out">
+          <span className="acd-checkin-dot acd-checkin-dot-pulse" />
+          {busy ? "Saving…" : "Check Out"}
+        </button>
+        <span className="acd-checkin-sub">
+          In: {fmtTime(attendance.check_in)}
+          {elapsed && <> &nbsp;·&nbsp; <strong style={{ color: "#7BBDE8" }}>{elapsed}</strong></>}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={handleCheckIn} disabled={busy} className="acd-checkin-btn acd-checkin-in">
+      <span className="acd-checkin-dot" />
+      {busy ? "Saving…" : "Check In"}
+    </button>
+  );
+};
+
 // ─── HERO CARD ────────────────────────────────────────────────────────────────
-function HeroCard({ userName }) {
+function HeroCard({ userName, employeeId }) {
   return (
     <div className="acd-hero-card">
       <div className="acd-hero-circle acd-hero-circle-1" aria-hidden="true" />
@@ -67,6 +212,11 @@ function HeroCard({ userName }) {
         <h1 className="acd-hero-name">{userName}</h1>
         <p className="acd-hero-date">{longDate()}</p>
       </div>
+      {employeeId && (
+        <div className="acd-hero-checkin">
+          <CheckInButton employeeId={employeeId} />
+        </div>
+      )}
     </div>
   );
 }
@@ -351,7 +501,7 @@ export default function ArchitectDashboard() {
 
       {/* ── ROW 1: Hero + P1 Incidents + P1 Tasks ── */}
       <div className="acd-row-hero">
-        <HeroCard userName={user.name || "Architect"} />
+        <HeroCard userName={user.name || "Architect"} employeeId={user.id ?? null} />
         <P1Card
           p1Count={p1Incidents.length}
           totalCount={incidents.length}

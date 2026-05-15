@@ -1,97 +1,149 @@
 const pool = require("../config/db");
 
-// ─── Status logic ────────────────────────────────────────────────────────────
+// ─── Status Logic ─────────────────────────────────────────────────────────────
 //
-// Morning check-in:
-//   before 09:30           → Present
-//   09:30 – 09:59          → Late
-//   10:00 and after        → Absent (morning)
+// attendance.employee_id = users.id  (NOT employees.id)
 //
-// If no check-in at all today → Absent
+// Rules:
+//   No check-in at all                          → Absent
+//   Check-in before shift_start                 → Present (on time)
+//   Check-in between shift_start and shift_start+30min → Late  (late_minutes recorded)
+//   Check-in after shift_start+30min            → Absent
+//   Check-in 13:30–14:00 (afternoon only)       → Afternoon Present (Half Day)
+//   Checked in on time/late + checkout < 12:00  → Afternoon Absent  (Half Day)
+//   Checked in on time/late + checkout >= 12:00
+//     but < shift_end                            → Present (partial but acceptable)
+//   Checked in on time/late + checkout >= shift_end → Present (full day)
+//   WFH employee                                → WFH always
 //
-// Afternoon / check-out:
-//   check-out before 12:00 → Afternoon Absent  (status = "Half Day")
-//   check-in 13:30–14:00  (no morning) → Afternoon Present (status = "Half Day")
-//
-// Full day:
-//   checked in morning + checked out at/after shift end (from employees.shift_timing) → Present
-//
-// Late minutes are only calculated for Late arrivals (09:30–10:00).
+// Shift timing is read from employees table via user_id FK.
+// Falls back to 09:00–18:00 if no shift_timing set.
 
-function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
-  const toMinutes = (hhmm) => {
-    const [h, m] = hhmm.split(":").map(Number);
+function parseShiftTimes(shiftTimingStr) {
+  // Handles formats: "9AM-6PM", "9:00 AM - 6:00 PM", "09:00 - 18:00", "9:30 PM - 6:30 AM"
+  const toMin = (hhmm, period) => {
+    const [hStr, mStr] = hhmm.split(":");
+    let h = parseInt(hStr, 10);
+    const m = mStr ? parseInt(mStr, 10) : 0;
+    const p = (period || "").toUpperCase().trim();
+    if (p === "PM" && h !== 12) h += 12;
+    if (p === "AM" && h === 12) h = 0;
     return h * 60 + m;
   };
 
-  // Parse shift end from "HH:MM AM/PM - HH:MM AM/PM" or "09:00 - 18:00"
-  let shiftEndMin = 18 * 60; // default 6 PM
-  if (shiftTimingStr) {
-    const parts = shiftTimingStr.split("-");
-    const endPart = parts[parts.length - 1].trim();
-    const match = endPart.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-    if (match) {
-      let h = parseInt(match[1], 10);
-      const m = parseInt(match[2], 10);
-      const period = (match[3] || "").toUpperCase();
-      if (period === "PM" && h !== 12) h += 12;
-      if (period === "AM" && h === 12) h = 0;
-      shiftEndMin = h * 60 + m;
-    }
+  // Default: 09:00 – 18:00
+  let shiftStartMin = 9 * 60;
+  let shiftEndMin   = 18 * 60;
+
+  if (!shiftTimingStr) return { shiftStartMin, shiftEndMin };
+
+  // Try to extract two time tokens from the string
+  // Matches things like "9AM", "9:30 PM", "09:00"
+  const timeRe = /(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?/gi;
+  const matches = [...shiftTimingStr.matchAll(timeRe)];
+
+  if (matches.length >= 2) {
+    shiftStartMin = toMin(
+      matches[0][2] ? `${matches[0][1]}:${matches[0][2]}` : `${matches[0][1]}:00`,
+      matches[0][3]
+    );
+    shiftEndMin = toMin(
+      matches[1][2] ? `${matches[1][1]}:${matches[1][2]}` : `${matches[1][1]}:00`,
+      matches[1][3]
+    );
   }
 
-  const PRESENT_CUTOFF  = 9 * 60 + 30;  // 09:30
-  const LATE_CUTOFF     = 10 * 60;       // 10:00
-  const NOON            = 12 * 60;       // 12:00
-  const AFT_START       = 13 * 60 + 30; // 13:30
-  const AFT_END         = 14 * 60;      // 14:00
+  return { shiftStartMin, shiftEndMin };
+}
 
-  let lateMinutes = 0;
+function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
+  const toMinutes = (hhmmss) => {
+    const parts = hhmmss.slice(0, 5).split(":").map(Number);
+    return parts[0] * 60 + (parts[1] || 0);
+  };
+
+  const { shiftStartMin, shiftEndMin } = parseShiftTimes(shiftTimingStr);
+
+  // Late cutoff = shift start + 30 minutes
+  const LATE_CUTOFF  = shiftStartMin + 30;
+  const NOON         = 12 * 60;
+  const AFT_START    = 13 * 60 + 30; // 13:30
+  const AFT_END      = 14 * 60;      // 14:00
 
   if (!checkInStr) {
     return { status: "Absent", lateMinutes: 0 };
   }
 
-  const checkInMin = toMinutes(checkInStr.slice(0, 5)); // "HH:MM"
+  const checkInMin = toMinutes(checkInStr);
 
-  // ── Afternoon-only check-in (no morning, arrived 13:30–14:00) ──
+  // ── Afternoon-only check-in (13:30–14:00) ────────────────────────────────
   if (checkInMin >= AFT_START && checkInMin < AFT_END) {
-    return { status: "Half Day", lateMinutes: 0 };
+    return { status: "Half Day", lateMinutes: 0, remarks: "Afternoon Present" };
   }
 
-  // ── Morning check-in rules ──
-  if (checkInMin >= LATE_CUTOFF) {
-    // After 10:00 AM → Absent
+  // ── After late cutoff (shift_start + 30 min) → Absent ────────────────────
+  if (checkInMin > LATE_CUTOFF) {
     return { status: "Absent", lateMinutes: 0 };
   }
 
-  if (checkInMin >= PRESENT_CUTOFF) {
-    // Between 09:30 and 09:59 → Late
-    lateMinutes = checkInMin - (9 * 60); // minutes past 9:00
-    // (or you can count from shift start 9:00)
-    return { status: "Late", lateMinutes };
+  // ── Late (between shift_start and shift_start + 30 min) ──────────────────
+  let lateMinutes = 0;
+  let isLate = false;
+  if (checkInMin > shiftStartMin) {
+    lateMinutes = checkInMin - shiftStartMin;
+    isLate = true;
   }
 
-  // ── On time morning check-in — check checkout ──
+  // ── No checkout yet → still on-site, mark as current status ──────────────
   if (!checkOutStr) {
-    // Still checked in, no checkout yet — mark Present for now
-    return { status: "Present", lateMinutes: 0 };
+    return {
+      status: isLate ? "Late" : "Present",
+      lateMinutes,
+      remarks: isLate ? `Late by ${lateMinutes} min` : "",
+    };
   }
 
-  const checkOutMin = toMinutes(checkOutStr.slice(0, 5));
+  const checkOutMin = toMinutes(checkOutStr);
 
+  // ── Checked out before noon → Afternoon Absent (Half Day) ────────────────
   if (checkOutMin < NOON) {
-    // Left before noon → Afternoon Absent (Half Day)
-    return { status: "Half Day", lateMinutes: 0 };
+    return {
+      status: "Half Day",
+      lateMinutes,
+      remarks: isLate ? `Late + Afternoon Absent` : "Afternoon Absent",
+    };
   }
 
+  // ── Full shift completed ──────────────────────────────────────────────────
   if (checkOutMin >= shiftEndMin) {
-    // Completed full shift
-    return { status: "Present", lateMinutes: 0 };
+    return {
+      status: isLate ? "Late" : "Present",
+      lateMinutes,
+      remarks: isLate ? `Late by ${lateMinutes} min` : "Full Day",
+    };
   }
 
-  // Checked out after noon but before shift end — still Present
-  return { status: "Present", lateMinutes: 0 };
+  // ── Left after noon but before shift end → still Present/Late ────────────
+  return {
+    status: isLate ? "Late" : "Present",
+    lateMinutes,
+    remarks: isLate ? `Late by ${lateMinutes} min` : "Present",
+  };
+}
+
+// ─── Helper: get shift_timing for a user (via users.id → employees.user_id) ──
+async function getShiftAndStatus(userId) {
+  const r = await pool.query(
+    `SELECT e.shift_timing, e.status
+     FROM employees e
+     WHERE e.user_id = $1
+     LIMIT 1`,
+    [userId]
+  );
+  return {
+    shiftTiming: r.rows[0]?.shift_timing || null,
+    empStatus:   (r.rows[0]?.status || "").toLowerCase(),
+  };
 }
 
 // ─── Mark Attendance (Check In) ──────────────────────────────────────────────
@@ -100,48 +152,47 @@ exports.markAttendance = async (req, res) => {
     const { employee_id, date, check_in, shift, remarks } = req.body;
 
     if (!employee_id || !date || !check_in) {
-      return res.status(400).json({ error: "Missing required fields", received: req.body });
+      return res
+        .status(400)
+        .json({ error: "Missing required fields", received: req.body });
     }
 
-    // Fetch shift_timing and employee status from employees table
-    const empResult = await pool.query(
-      "SELECT shift_timing, status FROM employees WHERE id = $1",
-      [employee_id]
-    );
-    const shiftTiming = empResult.rows[0]?.shift_timing || null;
-    const empStatus   = (empResult.rows[0]?.status || "").toLowerCase();
+    // employee_id here is users.id — fetch shift via employees.user_id
+    const { shiftTiming, empStatus } = await getShiftAndStatus(employee_id);
 
-    // WFH employees always get WFH attendance status
-    let finalStatus, lateMinutes;
+    let finalStatus, lateMinutes, finalRemarks;
     if (empStatus === "work_from_home") {
-      finalStatus = "WFH";
-      lateMinutes = 0;
+      finalStatus   = "WFH";
+      lateMinutes   = 0;
+      finalRemarks  = "WFH";
     } else {
       const derived = deriveStatus(check_in, null, shiftTiming);
-      finalStatus  = derived.status;
-      lateMinutes  = derived.lateMinutes;
+      finalStatus   = derived.status;
+      lateMinutes   = derived.lateMinutes;
+      finalRemarks  = derived.remarks || (lateMinutes > 0 ? `Late by ${lateMinutes} min` : "");
     }
 
-    const query = `
-      INSERT INTO attendance (employee_id, date, status, check_in, shift, late_minutes, remarks, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-      RETURNING *
-    `;
-    const values = [
-      employee_id,
-      date,
-      finalStatus,
-      check_in,
-      shift || "Morning",
-      lateMinutes,
-      remarks || (lateMinutes > 0 ? `Late by ${lateMinutes} min` : ""),
-    ];
-
-    const result = await pool.query(query, values);
+    const result = await pool.query(
+      `INSERT INTO attendance
+         (employee_id, date, status, check_in, shift, late_minutes, remarks, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+       RETURNING *`,
+      [
+        employee_id,
+        date,
+        finalStatus,
+        check_in,
+        shift || "Morning",
+        lateMinutes,
+        remarks || finalRemarks,
+      ]
+    );
     return res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("markAttendance error:", err.message);
-    return res.status(500).json({ error: "Failed to mark attendance", details: err.message });
+    return res
+      .status(500)
+      .json({ error: "Failed to mark attendance", details: err.message });
   }
 };
 
@@ -150,14 +201,15 @@ exports.updateAttendance = async (req, res) => {
   const { id } = req.params;
   const { status, check_out } = req.body || {};
 
-  // Check-out only (no status override)
+  // Check-out only path (no manual status override)
   if (check_out && !status) {
     try {
-      // Fetch existing record + employee shift_timing
+      // Fetch existing record; join employees via user_id to get shift_timing
       const existing = await pool.query(
-        `SELECT a.*, e.shift_timing
+        `SELECT a.*,
+                e.shift_timing
          FROM attendance a
-         LEFT JOIN employees e ON a.employee_id = e.id
+         LEFT JOIN employees e ON e.user_id = a.employee_id
          WHERE a.id = $1`,
         [id]
       );
@@ -165,18 +217,17 @@ exports.updateAttendance = async (req, res) => {
         return res.status(404).json({ message: "Attendance record not found" });
       }
       const row = existing.rows[0];
-      const { status: newStatus, lateMinutes } = deriveStatus(
-        row.check_in,
-        check_out,
-        row.shift_timing
-      );
+      const derived = deriveStatus(row.check_in, check_out, row.shift_timing);
 
       const result = await pool.query(
         `UPDATE attendance
-         SET check_out = $1, status = $2, late_minutes = $3
-         WHERE id = $4
+         SET check_out    = $1,
+             status       = $2,
+             late_minutes = $3,
+             remarks      = $4
+         WHERE id = $5
          RETURNING *`,
-        [check_out, newStatus, lateMinutes, id]
+        [check_out, derived.status, derived.lateMinutes, derived.remarks || "", id]
       );
       return res.status(200).json(result.rows[0]);
     } catch (error) {
@@ -185,7 +236,7 @@ exports.updateAttendance = async (req, res) => {
     }
   }
 
-  // HR full status update
+  // HR manual status update
   if (!status) {
     return res.status(400).json({ message: "Status is required" });
   }
@@ -209,9 +260,11 @@ exports.updateAttendance = async (req, res) => {
 };
 
 // ─── Get Today's Attendance (for Check-In button) ────────────────────────────
+// employee_id param = users.id
 exports.getTodayAttendance = async (req, res) => {
   const { employee_id } = req.query;
-  if (!employee_id) return res.status(400).json({ error: "employee_id required" });
+  if (!employee_id)
+    return res.status(400).json({ error: "employee_id required" });
 
   try {
     const today = new Date().toISOString().slice(0, 10);
@@ -219,24 +272,27 @@ exports.getTodayAttendance = async (req, res) => {
       `SELECT * FROM attendance WHERE employee_id = $1 AND date = $2 LIMIT 1`,
       [employee_id, today]
     );
-    if (result.rows.length === 0) return res.status(404).json({ message: "No record for today" });
+    if (result.rows.length === 0)
+      return res.status(404).json({ message: "No record for today" });
     return res.status(200).json(result.rows[0]);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ error: "Failed to fetch today's attendance" });
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch today's attendance" });
   }
 };
 
-// ─── Get All Attendance ───────────────────────────────────────────────────────
+// ─── Get All Attendance (historical list) ────────────────────────────────────
 exports.getAllAttendance = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT
-        attendance.*,
-        COALESCE(employees.name, users.name) AS name
+         attendance.*,
+         COALESCE(e.name, u.name) AS name
        FROM attendance
-       LEFT JOIN employees ON attendance.employee_id = employees.id
-       LEFT JOIN users ON attendance.employee_id = users.id
+       LEFT JOIN users     u ON u.id          = attendance.employee_id
+       LEFT JOIN employees e ON e.user_id     = attendance.employee_id
        ORDER BY date DESC`
     );
     res.status(200).json(result.rows);
@@ -247,63 +303,50 @@ exports.getAllAttendance = async (req, res) => {
 };
 
 // ─── Get All Employees With Today's Attendance Status ────────────────────────
-// Returns every employee from both employees + users tables,
-// merged, with today's attendance record (or Absent if none).
+// Shows every employee in the employees table.
+// attendance is matched via COALESCE(e.user_id, e.id) = users.id based key.
+// Employees with no user account (user_id IS NULL) show as Absent since
+// they cannot log in and punch attendance.
 exports.getTodayAllEmployees = async (req, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
 
+    // Employees who have a linked user account — match attendance via user_id
     const result = await pool.query(
       `SELECT
-        e.id                        AS employee_id,
-        e.name,
-        e.designation,
-        e.department,
-        e.shift_timing,
-        e.email,
-        e.user_id,
-        a.id                        AS attendance_id,
-        a.status,
-        a.check_in,
-        a.check_out,
-        a.shift,
-        a.late_minutes,
-        a.remarks
+         e.user_id                   AS employee_id,
+         e.name,
+         e.designation,
+         e.department,
+         e.shift_timing,
+         e.email,
+         e.user_id,
+         e.status                    AS emp_status,
+         a.id                        AS attendance_id,
+         a.status,
+         a.check_in,
+         a.check_out,
+         a.shift,
+         a.late_minutes,
+         a.remarks
        FROM employees e
-       LEFT JOIN attendance a ON a.employee_id = e.id AND a.date = $1
+       INNER JOIN users u ON u.id = e.user_id
+       LEFT JOIN attendance a
+         ON a.employee_id = e.user_id AND a.date = $1
        ORDER BY e.name ASC`,
       [today]
     );
 
-    // Also pull users NOT in employees (users with no employee record)
-    const usersResult = await pool.query(
-      `SELECT
-        u.id                        AS employee_id,
-        u.name,
-        NULL::text                  AS designation,
-        NULL::text                  AS department,
-        NULL::text                  AS shift_timing,
-        u.email,
-        u.id                        AS user_id,
-        a.id                        AS attendance_id,
-        a.status,
-        a.check_in,
-        a.check_out,
-        a.shift,
-        a.late_minutes,
-        a.remarks
-       FROM users u
-       LEFT JOIN employees e ON e.user_id = u.id
-       LEFT JOIN attendance a ON a.employee_id = u.id AND a.date = $1
-       WHERE e.id IS NULL
-       ORDER BY u.name ASC`,
-      [today]
-    );
-
-    const allRows = [...result.rows, ...usersResult.rows].map((row) => {
-      // If no attendance record at all → Absent
+    const allRows = result.rows.map((row) => {
       if (!row.attendance_id) {
-        return { ...row, status: "Absent", check_in: null, check_out: null, late_minutes: 0 };
+        return {
+          ...row,
+          status:       (row.emp_status || "").toLowerCase() === "work_from_home" ? "WFH" : "Absent",
+          check_in:     null,
+          check_out:    null,
+          late_minutes: 0,
+          remarks:      (row.emp_status || "").toLowerCase() === "work_from_home" ? "WFH" : "",
+        };
       }
       return row;
     });
@@ -311,7 +354,9 @@ exports.getTodayAllEmployees = async (req, res) => {
     res.status(200).json(allRows);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Failed to fetch today employee attendance" });
+    res
+      .status(500)
+      .json({ error: "Failed to fetch today employee attendance" });
   }
 };
 
@@ -348,7 +393,10 @@ exports.getAttendanceByDate = async (req, res) => {
 // ─── Filter by Date Range ─────────────────────────────────────────────────────
 exports.getAttendanceByDateRange = async (req, res) => {
   const { from, to } = req.query;
-  if (!from || !to) return res.status(400).json({ message: "From and To dates are required" });
+  if (!from || !to)
+    return res
+      .status(400)
+      .json({ message: "From and To dates are required" });
 
   try {
     const result = await pool.query(
@@ -363,14 +411,13 @@ exports.getAttendanceByDateRange = async (req, res) => {
 };
 
 // ─── Total Employee Count ─────────────────────────────────────────────────────
+// Only counts employees who have a user account (can actually log in)
 exports.getTotalEmployees = async (req, res) => {
   try {
-    // Count employees + users not already in employees
     const result = await pool.query(
-      `SELECT
-        (SELECT COUNT(*) FROM employees) +
-        (SELECT COUNT(*) FROM users u LEFT JOIN employees e ON e.user_id = u.id WHERE e.id IS NULL)
-       AS total`
+      `SELECT COUNT(*) AS total
+       FROM employees e
+       INNER JOIN users u ON u.id = e.user_id`
     );
     res.status(200).json({ total: parseInt(result.rows[0].total) });
   } catch (error) {
