@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { SENotificationContext }                    from "./SENotificationContext";
+import { SENotificationContext } from "./SENotificationContext";
 import {
   fetchSENotifications,
   markSENotificationRead,
@@ -19,18 +19,28 @@ const POLL_MS = 60_000; // poll every 60 seconds
 
 export function SENotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const timerRef                          = useRef(null);
+  const [loading, setLoading] = useState(true);
+  const timerRef = useRef(null);
 
   // ── Load from backend ──────────────────────────────────────────────────────
   const load = useCallback(async () => {
     try {
+      console.log("📡 [SE NOTIF] Fetching SE notifications..."); // ← Add
       const data = await fetchSENotifications();
-      // data is already filtered to is_read=false by the backend
+
+      console.log("✅ [SE NOTIF] Received:", data.length, "notifications"); // ← Add
+      console.log("🔍 [SE NOTIF] Sample notification:", data[0]); // ← Add
+
+      // Verify all have correct role
+      const wrongRole = data.filter(
+        (n) => n.role && n.role !== "structural_engineer",
+      );
+      if (wrongRole.length > 0) {
+        console.error("❌ [SE NOTIF] FOUND WRONG ROLE:", wrongRole); // ← Add
+      }
+
       setNotifications(Array.isArray(data) ? data : []);
     } catch (err) {
-      // Silently fail — don't crash the layout.
-      // Empty array means bell shows 0, which is accurate when offline.
       console.warn("SE notifications unavailable:", err.message);
       setNotifications([]);
     } finally {
