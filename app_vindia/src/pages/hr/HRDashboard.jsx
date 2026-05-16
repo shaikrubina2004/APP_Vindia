@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-//import "../../styles/HRDashboard.css";
+import "../../styles/HRDashboard.css";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -656,7 +656,8 @@ function HRDashboard() {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
   const [dashboard, setDashboard] = useState(null);
-  const [hrName] = useState("Amanda");
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+   const hrName = user?.name || user?.full_name || user?.username || user?.first_name || "there";
 
   // ── Get employee_id from localStorage (same pattern as ProjectCoordinatorDashboard) ──
   const employeeId =
