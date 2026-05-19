@@ -197,9 +197,13 @@ exports.getRequests = async (req, res) => {
                AND ter.designation NOT IN (${HR_ROLES.map((_, i) => `$${params.length + i + 1}`).join(",")})`;
     params.push(...HR_ROLES);
   } else if (role === "ceo") {
-    // CEO sees HR-submitted requests (pm_status auto-approved) pending final decision
+    // CEO action queue: HR-submitted requests pending final decision
     query += ` AND ter.pm_status = 'Approved' AND ter.status = 'Pending'
                AND ter.designation IN (${HR_ROLES.map((_, i) => `$${params.length + i + 1}`).join(",")})`;
+    params.push(...HR_ROLES);
+  } else if (role === "ceo_all") {
+    // CEO "All Requests" tab: all HR-submitted requests regardless of status
+    query += ` AND ter.designation IN (${HR_ROLES.map((_, i) => `$${params.length + i + 1}`).join(",")})`;
     params.push(...HR_ROLES);
   }
 
