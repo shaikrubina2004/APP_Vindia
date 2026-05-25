@@ -31,6 +31,7 @@ const attendanceRoutes = require("./routes/attendanceRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const rolesRoutes = require("./routes/rolesRoutes");
 const travelExpenseRoutes = require("./routes/travelExpenseRoutes");
+const payrollRoutes = require("./routes/payrollRoutes");
 
 const projectRoutes = require("./routes/projectRoutes");
 const wbsRoutes = require("./routes/wbsRoutes");
@@ -124,6 +125,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/roles", rolesRoutes);
 app.use("/api/travel-expenses", travelExpenseRoutes);
+app.use("/api/payroll", payrollRoutes);
 
 app.use("/api/projects", projectRoutes);
 app.use("/api/wbs", wbsRoutes);

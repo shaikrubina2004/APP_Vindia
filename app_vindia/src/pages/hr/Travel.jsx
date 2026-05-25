@@ -1,230 +1,80 @@
 import React, { useState, useEffect, useContext } from "react";
 import "./Travel.css";
 import {
-  Plane,
-  CheckCircle,
-  Clock,
-  XCircle,
-  Search,
-  Briefcase,
-  CreditCard,
-  Building2,
-  User,
-  MapPin,
-  Navigation,
-  MoveRight,
-  CalendarDays,
-  FileText,
-  ChevronDown,
-  X,
-  AlertCircle,
-  Wallet,
-  BadgeCheck,
-  Hotel,
-  UtensilsCrossed,
-  Train,
-  Plus,
-  Trash2,
-  IndianRupee,
-  Eye,
-  ExternalLink,
+  Plane, CheckCircle, Clock, XCircle, Search, Briefcase,
+  CreditCard, Building2, MapPin, Navigation, MoveRight,
+  CalendarDays, FileText, X, AlertCircle, Wallet,
+  Shield, Plus, Trash2, Receipt, Download, Eye,
 } from "lucide-react";
 import { API } from "../../services/authService";
 import { AuthContext } from "../../context/useAuth";
 
-// ── Status helpers ────────────────────────────────────────────────────────────
+const HR_ROLES = ["hr_manager", "hr", "human_resources", "hr_executive", "hr_officer"];
+const isHRRole = (role = "") =>
+  HR_ROLES.includes(role.toLowerCase().replace(/\s+/g, "_"));
+
+const fmt = (d) =>
+  d
+    ? new Date(d).toLocaleDateString("en-IN", {
+        day: "numeric", month: "short", year: "numeric",
+      })
+    : "—";
+
+const fmtDT = (d) =>
+  d
+    ? new Date(d).toLocaleDateString("en-IN", {
+        day: "numeric", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      })
+    : "—";
+
+const EXPENSE_TYPES = ["Travel", "Food", "Accommodation", "Fuel", "Other"];
+
+const isImage = (name = "") => /\.(jpg|jpeg|png|gif|webp)$/i.test(name);
+
 const statusMeta = {
-  Approved:    { icon: <CheckCircle size={12} />, cls: "approved" },
-  Rejected:    { icon: <XCircle size={12} />,     cls: "rejected" },
-  Cancelled:   { icon: <XCircle size={12} />,     cls: "rejected" },
-  Pending:     { icon: <Clock size={12} />,        cls: "pending"  },
+  Approved:  { icon: <CheckCircle size={11} />, cls: "tv-s-approved", dot: "tv-dot-green" },
+  Rejected:  { icon: <XCircle size={11} />,     cls: "tv-s-rejected", dot: "tv-dot-red"   },
+  Cancelled: { icon: <XCircle size={11} />,     cls: "tv-s-rejected", dot: "tv-dot-red"   },
+  Pending:   { icon: <Clock size={11} />,       cls: "tv-s-pending",  dot: "tv-dot-amber" },
 };
-const getStatusMeta = (s) => statusMeta[s] || statusMeta.Pending;
+const getSM = (s) => statusMeta[s] || statusMeta.Pending;
 
-// ── Tabs config ───────────────────────────────────────────────────────────────
-const TABS = [
-  { key: "pending_hr",  label: "Awaiting HR",  desc: "PM approved, needs your action" },
-  { key: "all",         label: "All Requests",  desc: "Every request in the system"   },
-];
-
-// ── Detail Modal ──────────────────────────────────────────────────────────────
-const DetailModal = ({ request, onClose, onAction }) => {
-  const [note, setNote]         = useState("");
-  const [acting, setActing]     = useState(false);
-  const [confirm, setConfirm]   = useState(null); // "Approved" | "Rejected"
-
-  const handle = async (status) => {
-    setActing(true);
-    await onAction(request.id, status, note);
-    setActing(false);
-    onClose();
-  };
-
-  const fromDate = request.travel_from_date
-    ? new Date(request.travel_from_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-    : "—";
-  const toDate = request.travel_to_date
-    ? new Date(request.travel_to_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-    : "—";
-
-  const canAct = request.status === "Pending" && request.pm_status === "Approved";
+// ── Receipt Preview Lightbox ──────────────────────────────────────────────────
+const Lightbox = ({ receipt, onClose }) => {
+  const url = receipt.file_url;
+  const img = isImage(receipt.file_name);
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-
-        {/* Header */}
-        <div className="modal-head">
-          <div>
-            <h3>{request.trip_title || request.destination}</h3>
-            <p>{request.request_no} · Submitted {new Date(request.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+    <div className="tv-lightbox-bg" onClick={onClose}>
+      <div className="tv-lightbox" onClick={(e) => e.stopPropagation()}>
+        <div className="tv-lightbox-header">
+          <span>{receipt.file_name}</span>
+          <div className="tv-lightbox-actions">
+            <a
+              href={url}
+              download={receipt.file_name}
+              className="tv-lb-btn"
+              title="Download"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Download size={14} />
+            </a>
+            <button className="tv-lb-btn tv-lb-close" onClick={onClose}>
+              <X size={14} />
+            </button>
           </div>
-          <button className="icon-btn" onClick={onClose}><X size={16} /></button>
         </div>
-
-        <div className="modal-body">
-
-          {/* Employee */}
-          <div className="modal-section">
-            <div className="section-label">Employee</div>
-            <div className="employee-row">
-              <div className="avatar-lg">{(request.employee_name || "?").charAt(0).toUpperCase()}</div>
-              <div>
-                <div className="name">{request.employee_name}</div>
-                <div className="dept">{request.designation} · {request.department}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Route + Dates */}
-          <div className="modal-section">
-            <div className="section-label">Trip Details</div>
-            <div className="modal-route">
-              <span><Navigation size={11} /> {request.origin || "—"}</span>
-              <MoveRight size={13} />
-              <span><MapPin size={11} /> {request.destination}</span>
-            </div>
-            <div className="modal-dates">
-              <CalendarDays size={12} /> {fromDate} → {toDate}
-            </div>
-            {request.purpose && (
-              <p className="modal-purpose">{request.purpose}</p>
-            )}
-          </div>
-
-          {/* Budget + Payment */}
-          <div className="modal-section modal-grid-2">
-            <div>
-              <div className="section-label">Budget Type</div>
-              <div className="type-tabs">
-                <div className={`type-tab ${request.budget_type === "company" ? "active company" : ""}`}>
-                  <CreditCard size={13} /> Company
-                </div>
-                <div className={`type-tab ${request.budget_type === "project" ? "active project" : ""}`}>
-                  <Briefcase size={13} /> {request.project_name || "Project"}
-                </div>
-              </div>
-            </div>
-            <div>
-              <div className="section-label">Payment Mode</div>
-              <div className={`payment-mode-banner ${request.payment_mode === "self" ? "mode-self" : "mode-hr"}`}>
-                {request.payment_mode === "self"
-                  ? <><Wallet size={13} /> Self-paid (reimburse)</>
-                  : <><Building2 size={13} /> Company pays</>}
-              </div>
-            </div>
-          </div>
-
-          {/* PM approval badge */}
-          <div className="modal-section">
-            <div className="section-label">Approval Status</div>
-            <div className="approval-trail">
-              <div className={`trail-step ${request.pm_status === "Approved" ? "done" : request.pm_status === "Rejected" ? "rejected" : ""}`}>
-                <BadgeCheck size={14} />
-                <span>PM Review</span>
-                <strong>{request.pm_status || "Pending"}</strong>
-              </div>
-              <div className="trail-arrow">→</div>
-              <div className={`trail-step ${request.status === "Approved" ? "done" : request.status === "Rejected" ? "rejected" : ""}`}>
-                <Building2 size={14} />
-                <span>HR Decision</span>
-                <strong>{request.status === "Pending" ? "Awaiting" : request.status}</strong>
-              </div>
-            </div>
-          </div>
-
-          {/* Notes from employee */}
-          {request.notes && (
-            <div className="modal-section">
-              <div className="section-label">Employee Notes</div>
-              <p className="modal-purpose">{request.notes}</p>
-            </div>
-          )}
-
-          {/* Receipts */}
-          {request.receipts && request.receipts.length > 0 && (
-            <div className="modal-section">
-              <div className="section-label">Receipts ({request.receipts.length})</div>
-              <div className="receipts-list">
-                {request.receipts.map((r, i) => (
-                  <div key={i} className="receipt-item">
-                    <FileText size={13} />
-                    <span className="receipt-name">{r.file_name}</span>
-                    <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{r.file_size_kb} KB</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* HR Action — only if pending and PM-approved */}
-          {canAct && (
-            <div className="modal-section">
-              <div className="section-label">HR Decision</div>
-              <textarea
-                className="hr-note-input"
-                rows={2}
-                placeholder="Add a note (optional)…"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Close</button>
-          {canAct && !confirm && (
-            <div className="action-group">
-              <button className="btn-primary" onClick={() => setConfirm("Approved")} disabled={acting}>
-                <CheckCircle size={13} /> Approve
-              </button>
-              <button className="btn-danger" onClick={() => setConfirm("Rejected")} disabled={acting}>
-                <XCircle size={13} /> Reject
-              </button>
-            </div>
-          )}
-          {canAct && confirm && (
-            <div className="action-group">
-              <span className="confirm-text">
-                <AlertCircle size={13} /> Confirm {confirm}?
-              </span>
-              <button
-                className={confirm === "Approved" ? "btn-primary" : "btn-danger"}
-                onClick={() => handle(confirm)}
-                disabled={acting}
-              >
-                {acting ? "Saving…" : "Yes, confirm"}
-              </button>
-              <button className="btn-secondary" onClick={() => setConfirm(null)}>Cancel</button>
-            </div>
-          )}
-          {!canAct && (
-            <span className={`status-lg ${getStatusMeta(request.status).cls}`}>
-              {getStatusMeta(request.status).icon}
-              {request.status}
-            </span>
+        <div className="tv-lightbox-body">
+          {img ? (
+            <img src={url} alt={receipt.file_name} className="tv-lb-img" />
+          ) : (
+            <iframe
+              src={url}
+              title={receipt.file_name}
+              className="tv-lb-iframe"
+            />
           )}
         </div>
       </div>
@@ -232,94 +82,424 @@ const DetailModal = ({ request, onClose, onAction }) => {
   );
 };
 
-// ── Request Card ──────────────────────────────────────────────────────────────
-const RequestCard = ({ req, onOpen, highlight }) => {
-  const meta     = getStatusMeta(req.status);
-  const fromDate = req.travel_from_date
-    ? new Date(req.travel_from_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-    : "—";
-  const toDate   = req.travel_to_date
-    ? new Date(req.travel_to_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-    : "—";
+// ── Detail Modal (Two-Column Asymmetric Grid Layout) ─────────────────────────
+const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
+  const [note,      setNote]      = useState("");
+  const [acting,    setActing]    = useState(false);
+  const [confirm,   setConfirm]   = useState(null);
+  const [expenses,  setExpenses]  = useState([]);
+  const [receipts,  setReceipts]  = useState([]);   
+  const [loadingData, setLoadingData] = useState(true);
+  const [savingExp, setSavingExp] = useState(false);
+  const [preview,   setPreview]   = useState(null);
+
+  useEffect(() => {
+    if (req?.id) fetchModalData();
+  }, [req?.id]);
+
+  const fetchModalData = async () => {
+    setLoadingData(true);
+    try {
+      const [expRes, recRes] = await Promise.all([
+        API.get(`/travel-expenses/${req.id}/manual-expenses`),
+        API.get(`/travel-expenses/${req.id}/receipts`),   
+      ]);
+      setExpenses(expRes.data || []);
+      setReceipts(recRes.data || []);
+    } catch {
+      setExpenses([]);
+      setReceipts([]);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const addRow = () =>
+    setExpenses((p) => [...p, { id: null, type: "Travel", description: "", amount: "" }]);
+
+  const updRow = (i, f, v) =>
+    setExpenses((p) => p.map((e, idx) => (idx === i ? { ...e, [f]: v } : e)));
+
+  const delRow = async (i) => {
+    const e = expenses[i];
+    if (e.id) {
+      try { await API.delete(`/travel-expenses/${req.id}/manual-expenses/${e.id}`); }
+      catch { /* silent */ }
+    }
+    setExpenses((p) => p.filter((_, idx) => idx !== i));
+  };
+
+  const saveExpenses = async () => {
+    const valid = expenses.filter((e) => parseFloat(e.amount) > 0);
+    if (!valid.length) return;
+    setSavingExp(true);
+    try {
+      await API.post(`/travel-expenses/${req.id}/manual-expenses`, { expenses: valid });
+      await fetchModalData();
+    } catch { /* silent */ }
+    finally { setSavingExp(false); }
+  };
+
+  const totalExp = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+
+  const handle = async (status) => {
+    setActing(true);
+    await onAction(req.id, status, note);
+    setActing(false);
+    onClose();
+  };
+
+  const canAct =
+    req.status === "Pending" &&
+    req.pm_status === "Approved" &&
+    (
+      (viewerRole === "hr_manager" && !isHRRole(req.designation)) ||
+      (viewerRole === "ceo"        &&  isHRRole(req.designation))
+    );
+
+  const canEnterExp =
+    req.payment_mode !== "self" &&
+    req.status === "Approved" &&
+    (viewerRole === "hr_manager" || viewerRole === "ceo");
+
+  const sm   = getSM(req.status);
+  const pmSM = getSM(req.pm_status);
 
   return (
+    <>
+      <div className="tv-modal-backdrop" onClick={onClose}>
+        <div className="tv-modal" onClick={(e) => e.stopPropagation()}>
+
+          {/* Header */}
+          <div className="tv-modal-header" style={{ display: "flex" }}>
+            <div className="tv-modal-header-left">
+              <div className="tv-modal-icon"><Plane size={17} /></div>
+              <div>
+                <h2>{req.trip_title || req.destination}</h2>
+                <p>{req.request_no} · Submitted {fmt(req.created_at)}</p>
+              </div>
+            </div>
+            <div className="tv-modal-header-right">
+              <span className={`tv-status-pill ${sm.cls}`}>{sm.icon}{req.status}</span>
+              <button className="tv-modal-close" onClick={onClose}><X size={15} /></button>
+            </div>
+          </div>
+
+          {/* Two-Column Body */}
+          <div className="tv-modal-body">
+            
+            {/* LEFT COLUMN */}
+            <div className="tv-modal-left">
+              <div className="tv-info-card">
+                <div className="tv-info-card-title">EMPLOYEE</div>
+                <div className="tv-emp-block">
+                  <div className="tv-emp-avatar">
+                    {(req.employee_name || "?").charAt(0).toUpperCase()}
+                  </div>
+                  <div className="tv-emp-details">
+                    <div className="tv-emp-name">{req.employee_name}</div>
+                    <div className="tv-emp-role">{req.designation}</div>
+                    <div className="tv-emp-dept">
+                      <Building2 size={11} /> {req.department || "—"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="tv-info-card">
+                <div className="tv-info-card-title">TRIP DETAILS</div>
+                <div className="tv-detail-row">
+                  <span className="tv-detail-label"><Navigation size={11} />From</span>
+                  <span className="tv-detail-value">{req.origin || "—"}</span>
+                </div>
+                <div className="tv-detail-row">
+                  <span className="tv-detail-label"><MapPin size={11} />To</span>
+                  <span className="tv-detail-value">{req.destination}</span>
+                </div>
+                <div className="tv-detail-row">
+                  <span className="tv-detail-label"><CalendarDays size={11} />Travel Dates</span>
+                  <span className="tv-detail-value">
+                    {fmt(req.travel_from_date)} → {fmt(req.travel_to_date)}
+                  </span>
+                </div>
+                
+                {req.purpose && (
+                  <div className="tv-purpose-block">
+                    <div className="tv-detail-label" style={{ marginBottom: 6 }}>
+                      <FileText size={11} />Purpose
+                    </div>
+                    <p className="tv-purpose-text">{req.purpose}</p>
+                  </div>
+                )}
+                
+                {req.notes && (
+                  <div className="tv-purpose-block" style={{ marginTop: 8 }}>
+                    <div className="tv-detail-label" style={{ marginBottom: 4 }}>Notes</div>
+                    <p className="tv-purpose-text">{req.notes}</p>
+                  </div>
+                )}
+              </div>
+
+              {req.payment_mode === "self" && (
+                <div className="tv-info-card">
+                  <div className="tv-info-card-title">
+                    UPLOADED RECEIPTS
+                    <span className="tv-receipt-count">{receipts.length}</span>
+                  </div>
+
+                  {loadingData ? (
+                    <p className="tv-empty-msg">Loading receipts…</p>
+                  ) : receipts.length === 0 ? (
+                    <p className="tv-empty-msg">No receipts uploaded.</p>
+                  ) : (
+                    <div className="tv-receipt-grid">
+                      {receipts.map((r, i) => {
+                        const img = isImage(r.file_name);
+                        return (
+                          <div key={i} className="tv-receipt-tile">
+                            <div className="tv-receipt-thumb" onClick={() => setPreview(r)}>
+                              {img ? (
+                                <img src={r.file_url} alt={r.file_name} className="tv-thumb-img" onError={(e) => { e.target.style.display = "none"; }} />
+                              ) : (
+                                <div className="tv-thumb-pdf">
+                                  <FileText size={22} />
+                                  <span>PDF</span>
+                                </div>
+                              )}
+                              <div className="tv-thumb-overlay"><Eye size={16} /></div>
+                            </div>
+
+                            <div className="tv-receipt-info">
+                              <span className="tv-receipt-type-badge">{r.expense_type}</span>
+                              <span className="tv-receipt-name" title={r.file_name}>
+                                {r.file_name.length > 22 ? r.file_name.slice(0, 20) + "…" : r.file_name}
+                              </span>
+                              <span className="tv-receipt-size">{r.file_size_kb} KB</span>
+                              <div className="tv-receipt-tile-actions">
+                                <button className="tv-tile-btn" onClick={() => setPreview(r)}><Eye size={11} /></button>
+                                <a href={r.file_url} download={r.file_name} className="tv-tile-btn" target="_blank" rel="noreferrer"><Download size={11} /></a>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div className="tv-modal-right">
+              <div className="tv-info-card">
+                <div className="tv-info-card-title">BUDGET & PAYMENT</div>
+                <div className="tv-detail-row">
+                  <span className="tv-detail-label"><CreditCard size={11} />Budget Type</span>
+                  <span className={`tv-badge ${req.budget_type === "project" ? "tv-badge-project" : "tv-badge-company"}`}>
+                    {req.budget_type === "project" ? <><Briefcase size={10} />Project</> : <><CreditCard size={10} />Company</>}
+                  </span>
+                </div>
+                {req.project_name && (
+                  <div className="tv-detail-row">
+                    <span className="tv-detail-label"><Briefcase size={11} />Project Name</span>
+                    <span className="tv-detail-value">{req.project_name}</span>
+                  </div>
+                )}
+                <div className="tv-detail-row">
+                  <span className="tv-detail-label"><Wallet size={11} />Payment Mode</span>
+                  <span className={`tv-badge ${req.payment_mode === "self" ? "tv-badge-self" : "tv-badge-requested"}`}>
+                    {req.payment_mode === "self" ? <><Wallet size={10} />Self-paid</> : <><Building2 size={10} />Company pays</>}
+                  </span>
+                </div>
+              </div>
+
+              {req.payment_mode !== "self" && expenses.length > 0 && !canEnterExp && (
+                <div className="tv-info-card">
+                  <div className="tv-info-card-title">EXPENSES ALLOCATED</div>
+                  {expenses.map((e, i) => (
+                    <div key={i} className="tv-detail-row">
+                      <span className="tv-detail-label">
+                        <Receipt size={11} />
+                        {e.type}{e.description ? ` — ${e.description}` : ""}
+                      </span>
+                      <span className="tv-detail-value tv-amount">
+                        ₹{parseFloat(e.amount || 0).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="tv-exp-total-row">
+                    <span>Total Cost Summary</span> 
+                    <strong>₹{totalExp.toLocaleString("en-IN")}</strong>
+                  </div>
+                </div>
+              )}
+
+              <div className="tv-info-card">
+                <div className="tv-info-card-title">APPROVAL TRAIL</div>
+                <div className="tv-trail">
+                  <div className={`tv-trail-step ${req.pm_status === "Approved" ? "tv-trail-done" : req.pm_status === "Rejected" ? "tv-trail-reject" : ""}`}>
+                    <div className={`tv-trail-dot ${pmSM.dot}`} />
+                    <div className="tv-trail-content">
+                      <span className="tv-trail-label">{isHRRole(req.designation) ? "Auto-approved (HR staff)" : "Project Manager"}</span>
+                      <span className="tv-trail-status">{req.pm_status || "Pending"}</span>
+                      {req.pm_reviewed_at && <span className="tv-trail-date">{fmtDT(req.pm_reviewed_at)}</span>}
+                      {req.pm_review_note && <span className="tv-trail-note">"{req.pm_review_note}"</span>}
+                    </div>
+                  </div>
+
+                  <div className="tv-trail-line" />
+
+                  <div className={`tv-trail-step ${req.status === "Approved" ? "tv-trail-done" : req.status === "Rejected" ? "tv-trail-reject" : "tv-trail-waiting"}`}>
+                    <div className={`tv-trail-dot ${sm.dot}`} />
+                    <div className="tv-trail-content">
+                      <span className="tv-trail-label">{isHRRole(req.designation) ? "CEO" : "HR Manager"}</span>
+                      <span className="tv-trail-status">{req.status === "Pending" ? "Awaiting decision" : req.status}</span>
+                      {req.reviewed_at && <span className="tv-trail-date">{fmtDT(req.reviewed_at)}</span>}
+                      {req.review_note && <span className="tv-trail-note">"{req.review_note}"</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {canEnterExp && (
+                <div className="tv-info-card tv-expense-entry-card">
+                  <div className="tv-info-card-title tv-title-row">
+                    <span><Receipt size={11} /> EXPENSE ENTRY</span>
+                    <button className="tv-add-exp-btn" onClick={addRow}><Plus size={11} /> Add</button>
+                  </div>
+                  {expenses.length === 0 && <p className="tv-empty-msg">No expenses recorded yet.</p>}
+                  {expenses.map((e, i) => (
+                    <div className="tv-exp-row" key={i}>
+                      <select className="tv-exp-select" value={e.type} onChange={(v) => updRow(i, "type", v.target.value)}>
+                        {EXPENSE_TYPES.map((t) => <option key={t}>{t}</option>)}
+                      </select>
+                      <input className="tv-exp-input" type="text" placeholder="Description" value={e.description} onChange={(v) => updRow(i, "description", v.target.value)} />
+                      <div className="tv-exp-amt-wrap">
+                        <span className="tv-exp-rupee">₹</span>
+                        <input className="tv-exp-input tv-exp-amt" type="number" placeholder="0" min="0" value={e.amount} onChange={(v) => updRow(i, "amount", v.target.value)} />
+                      </div>
+                      <button className="tv-exp-del" onClick={() => delRow(i)}><Trash2 size={12} /></button>
+                    </div>
+                  ))}
+                  {expenses.length > 0 && (
+                    <div className="tv-exp-footer">
+                      <span className="tv-exp-total-label">Total <strong>₹{totalExp.toLocaleString("en-IN")}</strong></span>
+                      <button className="tv-exp-save-btn" onClick={saveExpenses} disabled={savingExp}>{savingExp ? "Saving…" : "Save"}</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {canAct ? (
+                <div className="tv-info-card tv-action-card">
+                  <div className="tv-info-card-title">{isHRRole(req.designation) ? "CEO DECISION" : "HR DECISION"}</div>
+                  <textarea className="tv-note-input" rows={3} placeholder="Add a review note (optional)…" value={note} onChange={(e) => setNote(e.target.value)} />
+                  {!confirm ? (
+                    <div className="tv-action-btns">
+                      <button className="tv-btn-reject" onClick={() => setConfirm("Rejected")} disabled={acting}><XCircle size={13} /> Reject</button>
+                      <button className="tv-btn-approve" onClick={() => setConfirm("Approved")} disabled={acting}><CheckCircle size={13} /> Approve</button>
+                    </div>
+                  ) : (
+                    <div className="tv-confirm-row">
+                      <span className="tv-confirm-label"><AlertCircle size={12} /> Confirm {confirm}?</span>
+                      <button className={confirm === "Approved" ? "tv-btn-approve" : "tv-btn-reject"} onClick={() => handle(confirm)} disabled={acting}>{acting ? "Saving…" : "Yes, confirm"}</button>
+                      <button className="tv-btn-secondary" onClick={() => setConfirm(null)}>Cancel</button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="tv-info-card">
+                  <div className="tv-info-card-title">FINAL STATUS</div>
+                  <div className={`tv-status-pill-lg ${sm.cls}`}>{sm.icon}{req.status}</div>
+                  {req.review_note && <p className="tv-purpose-text" style={{ marginTop: 10 }}>Note: {req.review_note}</p>}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      {preview && <Lightbox receipt={preview} onClose={() => setPreview(null)} />}
+    </>
+  );
+};
+
+// ── Request Box Card Component ───────────────────────────────────────────────
+const RequestRow = ({ req, onOpen }) => {
+  const sm = getSM(req.status);
+  return (
     <div
-      className={`request-card ${highlight ? "card-highlight" : "card-light"}`}
+      className="tv-row-card"
       onClick={() => onOpen(req)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && onOpen(req)}
     >
-      {highlight && <div className="card-badge-action">Action Required</div>}
-
-      <div className="card-top">
-        <Plane size={15} />
-        <span className={`status ${meta.cls}`}>
-          {meta.icon} {req.status}
-        </span>
+      <div className="tv-row-top">
+        <span className="tv-row-no">{req.request_no}</span>
+        <span className={`tv-status-pill ${sm.cls}`}>{sm.icon}{req.status}</span>
       </div>
 
-      <h3 className="card-trip">{req.trip_title || req.destination}</h3>
+      <h3 className="tv-row-title">{req.trip_title || req.destination}</h3>
 
-      <div className="card-route">
-        <span><Navigation size={10} /> {req.origin || "—"}</span>
-        <MoveRight size={10} />
-        <span><MapPin size={10} /> {req.destination}</span>
-      </div>
-
-      <div className="card-dates">
-        <CalendarDays size={11} /> {fromDate} → {toDate}
-      </div>
-
-      <div className="card-employee">
-        <div className="avatar">{(req.employee_name || "?").charAt(0).toUpperCase()}</div>
-        <div>
-          <h4>{req.employee_name}</h4>
-          <p>{req.designation}</p>
+      <div className="tv-row-route">
+        <div className="tv-route-item">
+          <Navigation size={12} />
+          <span>{req.origin || "—"}</span>
+        </div>
+        <MoveRight size={14} className="tv-row-arrow" />
+        <div className="tv-route-item">
+          <MapPin size={12} />
+          <span>{req.destination}</span>
         </div>
       </div>
 
-      <div className="card-footer">
-        <div className="card-pills">
-          <span className={`budget-pill ${req.budget_type === "project" ? "pill-project" : "pill-company"}`}>
-            {req.budget_type === "project" ? <><Briefcase size={9} /> Project</> : <><CreditCard size={9} /> Company</>}
+      <div className="tv-row-footer">
+        <div className="tv-row-dates">
+          <CalendarDays size={12} />
+          <span>{fmt(req.travel_from_date)}</span>
+          <span className="tv-row-datesep">→</span>
+          <span>{fmt(req.travel_to_date)}</span>
+        </div>
+
+        <div className="tv-row-badges">
+          <span className={`tv-badge ${req.budget_type === "project" ? "tv-badge-project" : "tv-badge-company"}`}>
+            {req.budget_type === "project" ? "Project" : "Company"}
           </span>
-          <span className={`budget-pill ${req.payment_mode === "self" ? "pill-self" : "pill-hr"}`}>
-            {req.payment_mode === "self" ? <><Wallet size={9} /> Self-paid</> : <><Building2 size={9} /> Requested</>}
+          <span className={`tv-badge ${req.payment_mode === "self" ? "tv-badge-self" : "tv-badge-requested"}`}>
+            {req.payment_mode === "self" ? "Self-paid" : "Company Paid"}
           </span>
         </div>
-        <span className="card-no">{req.request_no}</span>
       </div>
     </div>
   );
 };
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── Main Dashboard Workspace ──────────────────────────────────────────────────
 const TravelExpenseDashboard = () => {
   const { user } = useContext(AuthContext);
+  const viewerRole = (user?.role || user?.designation || "")
+    .toLowerCase().replace(/\s+/g, "_");
+  const isCEO = viewerRole === "ceo";
 
-  const [tab, setTab]               = useState("pending_hr");
-  const [allRequests, setAll]       = useState([]);
-  const [pmApproved, setPmApproved] = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState("");
-  const [selected, setSelected]     = useState(null);
-  const [toast, setToast]           = useState(null);
+  const [queue,    setQueue]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [search,   setSearch]   = useState("");
+  const [selected, setSelected] = useState(null);
+  const [toast,    setToast]    = useState(null);
+  const [filter,   setFilter]   = useState("All");
 
-  // fetch on mount
-  useEffect(() => { fetchAll(); }, []);
+  // Localized secondary filters
+  const [budgetFilter, setBudgetFilter] = useState("All");
+  const [payFilter, setPayFilter]       = useState("All");
 
-  const fetchAll = async () => {
+  useEffect(() => { fetchQueue(); }, []);
+
+  const fetchQueue = async () => {
     setLoading(true);
     try {
-      const [allRes, pmRes] = await Promise.all([
-        API.get("/travel-expenses"),
-        API.get("/travel-expenses?role=hr_manager"),
-      ]);
-      setAll(allRes.data || []);
-      setPmApproved(pmRes.data || []);
-    } catch (err) {
-      console.error(err);
+      const res = await API.get(`/travel-expenses?role=${isCEO ? "ceo" : "hr_manager"}`);
+      setQueue(res.data || []);
+    } catch {
       showToast("error", "Failed to load travel requests.");
     } finally {
       setLoading(false);
@@ -335,125 +515,157 @@ const TravelExpenseDashboard = () => {
     try {
       await API.put(`/travel-expenses/${id}/status`, {
         status,
-        reviewed_by: user?.id,
-        review_note: note || null,
-        reviewer_role: "hr_manager",
+        reviewed_by:   user?.id,
+        review_note:   note || null,
+        reviewer_role: isCEO ? "ceo" : "hr_manager",
       });
       showToast("success", `Request ${status.toLowerCase()} successfully.`);
-      fetchAll(); // refresh
+      fetchQueue();
     } catch (err) {
-      const msg = err.response?.data?.message || "Action failed.";
-      showToast("error", msg);
-      throw err; // let modal know
+      showToast("error", err.response?.data?.message || "Action failed.");
+      throw err;
     }
   };
 
-  // derived
-  const displayList = tab === "pending_hr" ? pmApproved : allRequests;
+  const counts = {
+    All:      queue.length,
+    Pending:  queue.filter((r) => r.status === "Pending").length,
+    Approved: queue.filter((r) => r.status === "Approved").length,
+    Rejected: queue.filter((r) => r.status === "Rejected").length,
+  };
 
-  const filtered = displayList.filter((r) => {
+  const filtered = queue.filter((r) => {
     const q = search.toLowerCase();
-    return (
+    const matchSearch =
       (r.employee_name || "").toLowerCase().includes(q) ||
-      (r.trip_title || "").toLowerCase().includes(q) ||
-      (r.destination || "").toLowerCase().includes(q) ||
-      (r.request_no || "").toLowerCase().includes(q)
-    );
+      (r.trip_title    || "").toLowerCase().includes(q) ||
+      (r.destination   || "").toLowerCase().includes(q) ||
+      (r.request_no    || "").toLowerCase().includes(q) ||
+      (r.department    || "").toLowerCase().includes(q) ||
+      (r.designation   || "").toLowerCase().includes(q);
+      
+    const matchStatus = filter === "All" || r.status === filter;
+    const matchBudget = budgetFilter === "All" || r.budget_type === budgetFilter;
+    const matchPayment = payFilter === "All" || r.payment_mode === payFilter;
+
+    return matchSearch && matchStatus && matchBudget && matchPayment;
   });
 
-  const stats = [
-    { label: "Total",           value: allRequests.length },
-    { label: "Awaiting HR",     value: pmApproved.length },
-    { label: "Approved",        value: allRequests.filter((r) => r.status === "Approved").length },
-    { label: "Rejected",        value: allRequests.filter((r) => r.status === "Rejected").length },
-  ];
-
   return (
-    <div className="travel-expense-dashboard dashboard-container">
-
-      {/* Toast */}
+    <div className="tv-page">
       {toast && (
-        <div className={`tr-toast tr-toast-${toast.type}`}>
+        <div className={`tv-toast tv-toast-${toast.type}`}>
           {toast.type === "success" ? <CheckCircle size={14} /> : <XCircle size={14} />}
           {toast.msg}
         </div>
       )}
 
-      {/* Top bar */}
-      <div className="top-bar">
-        <div>
-          <h1>Travel Expense Requests</h1>
-          <p>Review and approve employee travel requests</p>
-        </div>
-        <div className="top-actions">
-          <div className="search-box">
-            <Search size={15} />
-            <input
-              type="text"
-              placeholder="Search by name, destination, request no…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+      {/* Top Header Section */}
+      <div className="tv-topbar">
+        <div className="tv-topbar-left">
+          {isCEO && <Shield size={17} className="tv-topbar-icon" />}
+          <div>
+            <h1>{isCEO ? "HR Travel Requests" : "Travel Expense Requests"}</h1>
+            <p>{isCEO ? "Approve or reject travel requests from HR employees" : "Approve or reject PM-approved employee travel requests"}</p>
           </div>
         </div>
+        <div className="tv-search-wrap">
+          <Search size={13} />
+          <input
+            placeholder="Search name, destination, request no…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="stats-grid">
-        {stats.map((s) => (
-          <div className="stat-card" key={s.label}>
-            <span>{s.label}</span>
-            <h2>{s.value}</h2>
+      {/* Integrated Two Column Workspace Layout */}
+      <div className="tv-dashboard-workspace">
+        
+        {/* LEFT COLUMN: Sidebar Filters */}
+        <aside className="tv-workspace-sidebar">
+          <div className="tv-insight-card">
+            <h4 className="tv-insight-title">Active Queue Metrics</h4>
+            <div className="tv-insight-metric">
+              <span className="tv-metric-num">{counts.Pending}</span>
+              <span className="tv-metric-label">Requests awaiting verification</span>
+            </div>
+            <div className="tv-insight-progress-bar">
+              <div className="tv-insight-progress-fill" style={{ width: queue.length ? `${(counts.Pending / queue.length) * 100}%` : '0%' }}></div>
+            </div>
           </div>
-        ))}
+
+          <div className="tv-filter-panel">
+            <h3 className="tv-filter-heading">Advanced Filtering</h3>
+            
+            <div className="tv-filter-group">
+              <label className="tv-filter-label">Coverage Allocation</label>
+              <div className="tv-filter-options">
+                <button className={`tv-filter-btn ${budgetFilter === "All" ? "active" : ""}`} onClick={() => setBudgetFilter("All")}>All Allocations</button>
+                <button className={`tv-filter-btn ${budgetFilter === "company" ? "active" : ""}`} onClick={() => setBudgetFilter("company")}>Company Expense</button>
+                <button className={`tv-filter-btn ${budgetFilter === "project" ? "active" : ""}`} onClick={() => setBudgetFilter("project")}>Project Budget</button>
+              </div>
+            </div>
+
+            <div className="tv-filter-group">
+              <label className="tv-filter-label">Settlement Mode</label>
+              <div className="tv-filter-options">
+                <button className={`tv-filter-btn ${payFilter === "All" ? "active" : ""}`} onClick={() => setPayFilter("All")}>All Modes</button>
+                <button className={`tv-filter-btn ${payFilter === "requested" ? "active" : ""}`} onClick={() => setPayFilter("requested")}>Company Paid</button>
+                <button className={`tv-filter-btn ${payFilter === "self" ? "active" : ""}`} onClick={() => setPayFilter("self")}>Self-paid</button>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* RIGHT COLUMN: Interactive Status Badges & Cards Grid */}
+        <main className="tv-workspace-content">
+          <div className="tv-stats">
+            {["All", "Pending", "Approved", "Rejected"].map((s) => (
+              <div
+                key={s}
+                className={`tv-stat-card ${filter === s ? "tv-stat-active" : ""}`}
+                onClick={() => setFilter(s)}
+              >
+                <span className="tv-stat-label">{s === "All" ? "TOTAL" : s.toUpperCase()}</span>
+                <strong className={`tv-stat-num ${s === "Approved" ? "tv-stat-green" : s === "Rejected" ? "tv-stat-red" : s === "Pending" ? "tv-stat-amber" : ""}`}>
+                  {counts[s]}
+                </strong>
+              </div>
+            ))}
+          </div>
+
+          <div className="tv-list-section-header">
+            <span className="tv-section-caption">Showing data blocks matching core parameters</span>
+          </div>
+
+          {loading ? (
+            <div className="tv-state-box">
+              <Clock size={28} strokeWidth={1.4} className="tv-spin" />
+              <p>Loading requests…</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="tv-state-box">
+              <Plane size={32} strokeWidth={1.4} />
+              <p>{search ? `No parameters match "${search}"` : `No structural records found.`}</p>
+            </div>
+          ) : (
+            <div className="tv-list-grid">
+              {filtered.map((r) => (
+                <RequestRow key={r.id} req={r} onOpen={setSelected} />
+              ))}
+            </div>
+          )}
+        </main>
+
       </div>
 
-      {/* Tabs */}
-      <div className="tv-tabs">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            className={`tv-tab ${tab === t.key ? "active" : ""}`}
-            onClick={() => setTab(t.key)}
-          >
-            {t.label}
-            {t.key === "pending_hr" && pmApproved.length > 0 && (
-              <span className="tv-tab-badge">{pmApproved.length}</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      {loading ? (
-        <div className="tr-loading">
-          <Clock size={28} strokeWidth={1.4} />
-          <p>Loading requests…</p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="tr-empty">
-          <Plane size={32} strokeWidth={1.4} />
-          <p>{tab === "pending_hr" ? "No requests awaiting HR approval." : "No requests found."}</p>
-        </div>
-      ) : (
-        <div className="requests-grid">
-          {filtered.map((r) => (
-            <RequestCard
-              key={r.id}
-              req={r}
-              onOpen={setSelected}
-              highlight={tab === "pending_hr"}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Modal */}
       {selected && (
         <DetailModal
           request={selected}
           onClose={() => setSelected(null)}
           onAction={handleAction}
+          viewerRole={viewerRole}
         />
       )}
     </div>
