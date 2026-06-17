@@ -28,7 +28,14 @@ const fmtDT = (d) =>
       })
     : "—";
 
-const EXPENSE_TYPES = ["Travel", "Food", "Accommodation", "Fuel", "Other"];
+const EXP_CATEGORIES = [
+  { key: "travel",        label: "Travel",        icon: "✈️", types: ["Flight", "Train", "Bus", "Cab / Auto", "Fuel", "Toll", "Other"] },
+  { key: "accommodation", label: "Accommodation",  icon: "🏨", types: ["Hotel", "Guest House", "Service Apt", "Other"] },
+  { key: "food",          label: "Food & Meals",   icon: "🍽️", types: ["Breakfast", "Lunch", "Dinner", "Snacks", "Team Meal", "Other"] },
+  { key: "other",         label: "Other",          icon: "📋", types: ["Printing", "Courier", "Parking", "Visa / Permits", "Misc"] },
+];
+
+const makeRow = (category) => ({ id: null, category, type: EXP_CATEGORIES.find(c => c.key === category).types[0], description: "", amount: "" });
 
 const isImage = (name = "") => /\.(jpg|jpeg|png|gif|webp)$/i.test(name);
 
@@ -84,14 +91,17 @@ const Lightbox = ({ receipt, onClose }) => {
 
 // ── Detail Modal (Two-Column Asymmetric Grid Layout) ─────────────────────────
 const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
-  const [note,      setNote]      = useState("");
-  const [acting,    setActing]    = useState(false);
-  const [confirm,   setConfirm]   = useState(null);
-  const [expenses,  setExpenses]  = useState([]);
-  const [receipts,  setReceipts]  = useState([]);   
+  const [note,        setNote]        = useState("");
+  const [acting,      setActing]      = useState(false);
+  const [confirm,     setConfirm]     = useState(null);
+  const [expenses,    setExpenses]    = useState([]);
+  const [receipts,    setReceipts]    = useState([]);
   const [loadingData, setLoadingData] = useState(true);
-  const [savingExp, setSavingExp] = useState(false);
-  const [preview,   setPreview]   = useState(null);
+  const [savingExp,   setSavingExp]   = useState(false);
+  const [savedOk,     setSavedOk]     = useState(false);
+  const [isEditing,   setIsEditing]   = useState(false);
+  const [preview,     setPreview]     = useState(null);
+  const [activeTab,   setActiveTab]   = useState("travel"); // active expense category tab
 
   useEffect(() => {
     if (req?.id) fetchModalData();
@@ -100,47 +110,44 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
   const fetchModalData = async () => {
     setLoadingData(true);
     try {
-      const [expRes, recRes] = await Promise.all([
-        API.get(`/travel-expenses/${req.id}/manual-expenses`),
-        API.get(`/travel-expenses/${req.id}/receipts`),   
-      ]);
-      setExpenses(expRes.data || []);
-      setReceipts(recRes.data || []);
+      const detailRes = await API.get(`/travel-expenses/${req.id}`);
+      const data = detailRes.data;
+      setReceipts(data?.receipts || []);
+      const loadedExp = data?.manual_expenses || [];
+      setExpenses(loadedExp);
+      // Auto-open edit mode if no expenses saved yet
+      setIsEditing(loadedExp.length === 0);
     } catch {
-      setExpenses([]);
-      setReceipts([]);
+      setExpenses([]); setReceipts([]);
     } finally {
       setLoadingData(false);
     }
   };
 
-  const addRow = () =>
-    setExpenses((p) => [...p, { id: null, type: "Travel", description: "", amount: "" }]);
-
-  const updRow = (i, f, v) =>
-    setExpenses((p) => p.map((e, idx) => (idx === i ? { ...e, [f]: v } : e)));
-
-  const delRow = async (i) => {
-    const e = expenses[i];
-    if (e.id) {
-      try { await API.delete(`/travel-expenses/${req.id}/manual-expenses/${e.id}`); }
-      catch { /* silent */ }
-    }
-    setExpenses((p) => p.filter((_, idx) => idx !== i));
+  // ── Expense row helpers ──────────────────────────────────────────────────
+  const rowsFor    = (cat) => expenses.filter((e) => e.category === cat);
+  const addRow     = (cat) => setExpenses((p) => [...p, makeRow(cat)]);
+  const updRow     = (idx, f, v) => setExpenses((p) => p.map((e, i) => (i === idx ? { ...e, [f]: v } : e)));
+  const delRow     = (idx) => {
+    setExpenses((p) => p.filter((_, i) => i !== idx));
   };
+
+  const totalFor   = (cat) => rowsFor(cat).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const grandTotal = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
 
   const saveExpenses = async () => {
     const valid = expenses.filter((e) => parseFloat(e.amount) > 0);
     if (!valid.length) return;
     setSavingExp(true);
     try {
-      await API.post(`/travel-expenses/${req.id}/manual-expenses`, { expenses: valid });
+      await API.put(`/travel-expenses/${req.id}/manual-expenses`, { expenses: valid });
+      setSavedOk(true);
+      setIsEditing(false);
+      setTimeout(() => setSavedOk(false), 2500);
       await fetchModalData();
     } catch { /* silent */ }
     finally { setSavingExp(false); }
   };
-
-  const totalExp = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
 
   const handle = async (status) => {
     setActing(true);
@@ -159,7 +166,8 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
 
   const canEnterExp =
     req.payment_mode !== "self" &&
-    req.status === "Approved" &&
+    (req.status === "Approved" || req.status === "Pending") &&
+    req.pm_status === "Approved" &&
     (viewerRole === "hr_manager" || viewerRole === "ceo");
 
   const sm   = getSM(req.status);
@@ -199,9 +207,6 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
                   <div className="tv-emp-details">
                     <div className="tv-emp-name">{req.employee_name}</div>
                     <div className="tv-emp-role">{req.designation}</div>
-                    <div className="tv-emp-dept">
-                      <Building2 size={11} /> {req.department || "—"}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -316,20 +321,33 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
               {req.payment_mode !== "self" && expenses.length > 0 && !canEnterExp && (
                 <div className="tv-info-card">
                   <div className="tv-info-card-title">EXPENSES ALLOCATED</div>
-                  {expenses.map((e, i) => (
-                    <div key={i} className="tv-detail-row">
-                      <span className="tv-detail-label">
-                        <Receipt size={11} />
-                        {e.type}{e.description ? ` — ${e.description}` : ""}
-                      </span>
-                      <span className="tv-detail-value tv-amount">
-                        ₹{parseFloat(e.amount || 0).toLocaleString("en-IN")}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="tv-exp-total-row">
-                    <span>Total Cost Summary</span> 
-                    <strong>₹{totalExp.toLocaleString("en-IN")}</strong>
+                  {EXP_CATEGORIES.map((cat) => {
+                    const rows = rowsFor(cat.key);
+                    if (!rows.length) return null;
+                    return (
+                      <div key={cat.key} className="tv-exp-cat-summary">
+                        <div className="tv-exp-cat-label">{cat.icon} {cat.label}</div>
+                        {rows.map((e, i) => (
+                          <div key={i} className="tv-detail-row">
+                            <span className="tv-detail-label">
+                              <Receipt size={11} />
+                              {e.type}{e.description ? ` — ${e.description}` : ""}
+                            </span>
+                            <span className="tv-detail-value tv-amount">
+                              ₹{parseFloat(e.amount || 0).toLocaleString("en-IN")}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="tv-exp-cat-subtotal">
+                          <span>{cat.label} subtotal</span>
+                          <strong>₹{totalFor(cat.key).toLocaleString("en-IN")}</strong>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="tv-exp-total-row tv-exp-grand-total">
+                    <span>Grand Total</span>
+                    <strong>₹{grandTotal.toLocaleString("en-IN")}</strong>
                   </div>
                 </div>
               )}
@@ -365,27 +383,163 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
                 <div className="tv-info-card tv-expense-entry-card">
                   <div className="tv-info-card-title tv-title-row">
                     <span><Receipt size={11} /> EXPENSE ENTRY</span>
-                    <button className="tv-add-exp-btn" onClick={addRow}><Plus size={11} /> Add</button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {grandTotal > 0 && (
+                        <span className="tv-exp-grand-badge">₹{grandTotal.toLocaleString("en-IN")}</span>
+                      )}
+                      {!isEditing && expenses.length > 0 && (
+                        <button className="tv-edit-exp-btn" onClick={() => setIsEditing(true)}>
+                          ✏️ Edit Expenses
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {expenses.length === 0 && <p className="tv-empty-msg">No expenses recorded yet.</p>}
-                  {expenses.map((e, i) => (
-                    <div className="tv-exp-row" key={i}>
-                      <select className="tv-exp-select" value={e.type} onChange={(v) => updRow(i, "type", v.target.value)}>
-                        {EXPENSE_TYPES.map((t) => <option key={t}>{t}</option>)}
-                      </select>
-                      <input className="tv-exp-input" type="text" placeholder="Description" value={e.description} onChange={(v) => updRow(i, "description", v.target.value)} />
-                      <div className="tv-exp-amt-wrap">
-                        <span className="tv-exp-rupee">₹</span>
-                        <input className="tv-exp-input tv-exp-amt" type="number" placeholder="0" min="0" value={e.amount} onChange={(v) => updRow(i, "amount", v.target.value)} />
+
+                  {/* Saved summary view */}
+                  {!isEditing && expenses.length > 0 && (
+                    <div className="tv-exp-saved-summary">
+                      {EXP_CATEGORIES.map((cat) => {
+                        const rows = rowsFor(cat.key);
+                        if (!rows.length) return null;
+                        return (
+                          <div key={cat.key} className="tv-exp-cat-summary">
+                            <div className="tv-exp-cat-label">{cat.icon} {cat.label}</div>
+                            {rows.map((e, i) => (
+                              <div key={i} className="tv-detail-row">
+                                <span className="tv-detail-label">
+                                  <Receipt size={11} />
+                                  {e.type}{e.description ? ` — ${e.description}` : ""}
+                                </span>
+                                <span className="tv-detail-value tv-amount">
+                                  ₹{parseFloat(e.amount || 0).toLocaleString("en-IN")}
+                                </span>
+                              </div>
+                            ))}
+                            <div className="tv-exp-cat-subtotal">
+                              <span>{cat.label} subtotal</span>
+                              <strong>₹{totalFor(cat.key).toLocaleString("en-IN")}</strong>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div className="tv-exp-total-row tv-exp-grand-total">
+                        <span>Grand Total</span>
+                        <strong>₹{grandTotal.toLocaleString("en-IN")}</strong>
                       </div>
-                      <button className="tv-exp-del" onClick={() => delRow(i)}><Trash2 size={12} /></button>
                     </div>
-                  ))}
-                  {expenses.length > 0 && (
-                    <div className="tv-exp-footer">
-                      <span className="tv-exp-total-label">Total <strong>₹{totalExp.toLocaleString("en-IN")}</strong></span>
-                      <button className="tv-exp-save-btn" onClick={saveExpenses} disabled={savingExp}>{savingExp ? "Saving…" : "Save"}</button>
-                    </div>
+                  )}
+
+                  {/* Edit mode */}
+                  {isEditing && (
+                    <>
+                      {/* Category Tabs */}
+                      <div className="tv-exp-tabs">
+                        {EXP_CATEGORIES.map((cat) => (
+                          <button
+                            key={cat.key}
+                            className={`tv-exp-tab ${activeTab === cat.key ? "active" : ""}`}
+                            onClick={() => setActiveTab(cat.key)}
+                          >
+                            <span className="tv-exp-tab-icon">{cat.icon}</span>
+                            <span>{cat.label}</span>
+                            {totalFor(cat.key) > 0 && (
+                              <span className="tv-exp-tab-amt">₹{totalFor(cat.key).toLocaleString("en-IN")}</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Rows for active category */}
+                      {EXP_CATEGORIES.filter((c) => c.key === activeTab).map((cat) => {
+                        const catRows = rowsFor(cat.key);
+                        const catIndexes = expenses.reduce((acc, e, i) => {
+                          if (e.category === cat.key) acc.push(i);
+                          return acc;
+                        }, []);
+                        return (
+                          <div key={cat.key} className="tv-exp-category-body">
+                            {catRows.length === 0 && (
+                              <p className="tv-empty-msg tv-exp-empty">No {cat.label.toLowerCase()} expenses added yet.</p>
+                            )}
+                            {catRows.map((e, ci) => {
+                              const globalIdx = catIndexes[ci];
+                              return (
+                                <div className="tv-exp-row-v2" key={ci}>
+                                  <div className="tv-exp-row-top">
+                                    <select
+                                      className="tv-exp-select"
+                                      value={e.type}
+                                      onChange={(ev) => updRow(globalIdx, "type", ev.target.value)}
+                                    >
+                                      {cat.types.map((t) => <option key={t}>{t}</option>)}
+                                    </select>
+                                    <button className="tv-exp-del" onClick={() => delRow(globalIdx)}>
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                  <input
+                                    className="tv-exp-input tv-exp-desc"
+                                    type="text"
+                                    placeholder="Description (optional)"
+                                    value={e.description}
+                                    onChange={(ev) => updRow(globalIdx, "description", ev.target.value)}
+                                  />
+                                  <div className="tv-exp-amt-wrap">
+                                    <span className="tv-exp-rupee">₹</span>
+                                    <input
+                                      className="tv-exp-input tv-exp-amt"
+                                      type="number"
+                                      placeholder="0.00"
+                                      min="0"
+                                      value={e.amount}
+                                      onChange={(ev) => updRow(globalIdx, "amount", ev.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            <div className="tv-exp-cat-actions">
+                              <button className="tv-add-exp-btn" onClick={() => addRow(cat.key)}>
+                                <Plus size={11} /> Add {cat.label}
+                              </button>
+                              {totalFor(cat.key) > 0 && (
+                                <span className="tv-exp-cat-running">
+                                  Subtotal: <strong>₹{totalFor(cat.key).toLocaleString("en-IN")}</strong>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      <div className="tv-exp-footer">
+                        {grandTotal > 0 && (
+                          <span className="tv-exp-total-label">
+                            Grand Total <strong>₹{grandTotal.toLocaleString("en-IN")}</strong>
+                          </span>
+                        )}
+                        <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                          {expenses.length > 0 && (
+                            <button className="tv-btn-secondary tv-exp-cancel-btn" onClick={() => setIsEditing(false)}>
+                              Cancel
+                            </button>
+                          )}
+                          <button
+                            className="tv-exp-save-btn"
+                            onClick={saveExpenses}
+                            disabled={savingExp || expenses.filter((e) => parseFloat(e.amount) > 0).length === 0}
+                          >
+                            {savingExp ? "Saving…" : "Save Expenses"}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {isEditing && expenses.length === 0 && (
+                    <p className="tv-empty-msg" style={{ textAlign: "center", padding: "8px 0 4px" }}>
+                      Select a category tab above and add expenses.
+                    </p>
                   )}
                 </div>
               )}

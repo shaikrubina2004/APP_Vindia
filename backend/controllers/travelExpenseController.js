@@ -223,7 +223,8 @@ exports.getRequestById = async (req, res) => {
   const { id } = req.params;
   try {
     const reqResult = await pool.query(
-      `SELECT ter.*, p.name AS project_name
+      `SELECT ter.*, p.name AS project_name,
+              COALESCE(ter.manual_expenses, '[]'::jsonb) AS manual_expenses
        FROM travel_expense_requests ter
        LEFT JOIN projects p ON p.id = ter.project_id
        WHERE ter.id = $1`,
@@ -269,6 +270,52 @@ exports.pmUpdateStatus = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update PM status" });
+  }
+};
+
+// ── GET /api/travel-expenses/:id/manual-expenses ─────────────────────────────
+// Returns the manual_expenses JSONB array stored on the request row
+exports.getManualExpenses = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT COALESCE(manual_expenses, '[]'::jsonb) AS manual_expenses
+       FROM travel_expense_requests WHERE id = $1`,
+      [id]
+    );
+    if (!result.rows.length) return res.status(404).json({ message: "Not found" });
+    res.json(result.rows[0].manual_expenses);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch manual expenses" });
+  }
+};
+
+// ── PUT /api/travel-expenses/:id/manual-expenses ─────────────────────────────
+// HR / CEO saves all expense rows at once — stored as JSONB on the request row
+exports.saveManualExpenses = async (req, res) => {
+  const { id } = req.params;
+  const { expenses } = req.body; // [{ category, type, description, amount }]
+
+  if (!Array.isArray(expenses)) {
+    return res.status(400).json({ message: "expenses array required" });
+  }
+
+  const valid = expenses.filter((e) => parseFloat(e.amount) > 0);
+
+  try {
+    const result = await pool.query(
+      `UPDATE travel_expense_requests
+       SET manual_expenses = $1::jsonb, updated_at = NOW()
+       WHERE id = $2
+       RETURNING manual_expenses`,
+      [JSON.stringify(valid), id]
+    );
+    if (!result.rows.length) return res.status(404).json({ message: "Not found" });
+    res.json(result.rows[0].manual_expenses);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to save manual expenses" });
   }
 };
 

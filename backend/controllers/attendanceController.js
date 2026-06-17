@@ -64,42 +64,54 @@ function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
 
   const { shiftStartMin, shiftEndMin } = parseShiftTimes(shiftTimingStr);
 
-  // Late cutoff = shift start + 30 minutes
-  const LATE_CUTOFF  = shiftStartMin + 30;
-  const NOON         = 12 * 60;
-  const AFT_START    = 13 * 60 + 30; // 13:30
-  const AFT_END      = 14 * 60;      // 14:00
+  // ── Thresholds ────────────────────────────────────────────────────────────
+  const LATE_CUTOFF    = shiftStartMin + 30;  // e.g. 9:00 shift → 9:30
+  const ABSENT_CUTOFF  = shiftStartMin + 60;  // e.g. 9:00 shift → 10:00
+  const NOON           = 12 * 60;             // 12:00
+  const AFT_START      = 13 * 60;             // 13:00 — afternoon window start
+  const AFT_END        = 14 * 60;             // 15:00 — afternoon window end
 
+  // ── No check-in → Absent ─────────────────────────────────────────────────
   if (!checkInStr) {
-    return { status: "Absent", lateMinutes: 0 };
+    return { status: "Absent", lateMinutes: 0, remarks: "" };
   }
 
   const checkInMin = toMinutes(checkInStr);
 
-  // ── Afternoon-only check-in (13:30–14:00) ────────────────────────────────
+  // ── Afternoon-only check-in (13:00–15:00) → Half Day / Afternoon Present ─
   if (checkInMin >= AFT_START && checkInMin < AFT_END) {
-    return { status: "Half Day", lateMinutes: 0, remarks: "Afternoon Present" };
+    return {
+      status:      "Half Day",
+      lateMinutes: 0,
+      remarks:     "Afternoon Present",
+    };
   }
 
-  // ── After late cutoff (shift_start + 30 min) → Absent ────────────────────
-  if (checkInMin > LATE_CUTOFF) {
-    return { status: "Absent", lateMinutes: 0 };
+  // ── Check-in after absent cutoff (10:00 for 9:00 shift) → Absent ─────────
+  if (checkInMin >= ABSENT_CUTOFF) {
+    return { status: "Absent", lateMinutes: 0, remarks: "" };
   }
 
-  // ── Late (between shift_start and shift_start + 30 min) ──────────────────
+  // ── Determine if on-time or late ─────────────────────────────────────────
+  //    On time  : check-in <= shift_start           (e.g. before/at 9:00)
+  //    Late     : shift_start < check-in < late_cutoff  (e.g. 9:01–9:29)
+  //    Late edge: check-in == late_cutoff            (9:30 is still "late")
   let lateMinutes = 0;
-  let isLate = false;
-  if (checkInMin > shiftStartMin) {
-    lateMinutes = checkInMin - shiftStartMin;
-    isLate = true;
-  }
+  let isLate      = false;
 
-  // ── No checkout yet → still on-site, mark as current status ──────────────
+  if (checkInMin > shiftStartMin && checkInMin <= LATE_CUTOFF) {
+    // Between 9:00 and 9:30 (inclusive) → Late
+    lateMinutes = checkInMin - shiftStartMin;
+    isLate      = true;
+  }
+  // checkInMin <= shiftStartMin → on time (Present), lateMinutes stays 0
+
+  // ── No checkout yet → employee still on site ─────────────────────────────
   if (!checkOutStr) {
     return {
-      status: isLate ? "Late" : "Present",
+      status:      isLate ? "Late" : "Present",
       lateMinutes,
-      remarks: isLate ? `Late by ${lateMinutes} min` : "",
+      remarks:     isLate ? `Late by ${lateMinutes} min` : "",
     };
   }
 
@@ -108,26 +120,17 @@ function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
   // ── Checked out before noon → Afternoon Absent (Half Day) ────────────────
   if (checkOutMin < NOON) {
     return {
-      status: "Half Day",
+      status:      "Half Day",
       lateMinutes,
-      remarks: isLate ? `Late + Afternoon Absent` : "Afternoon Absent",
+      remarks:     isLate ? "Late + Afternoon Absent" : "Afternoon Absent",
     };
   }
 
-  // ── Full shift completed ──────────────────────────────────────────────────
-  if (checkOutMin >= shiftEndMin) {
-    return {
-      status: isLate ? "Late" : "Present",
-      lateMinutes,
-      remarks: isLate ? `Late by ${lateMinutes} min` : "Full Day",
-    };
-  }
-
-  // ── Left after noon but before shift end → still Present/Late ────────────
+  // ── Stayed till shift end or beyond → full Present / Late ────────────────
   return {
-    status: isLate ? "Late" : "Present",
+    status:      isLate ? "Late" : "Present",
     lateMinutes,
-    remarks: isLate ? `Late by ${lateMinutes} min` : "Present",
+    remarks:     isLate ? `Late by ${lateMinutes} min` : "Full Day",
   };
 }
 

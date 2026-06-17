@@ -139,8 +139,26 @@ exports.getDrawings = async (req, res) => {
          ORDER BY d.created_at DESC`
       );
 
+    } else if (role === "site_engineer") {
+      /*
+       * Site Engineer: only sees drawings that were sent to them (user_id match)
+       * AND where the drawing's project has this user assigned as site_engineer_id.
+       * This prevents drawings from unrelated projects from showing up even if
+       * someone mistakenly inserted a recipient row.
+       */
+      result = await pool.query(
+        `${selectBlock}
+         JOIN architect_drawing_recipients rq
+           ON rq.drawing_id = d.id AND rq.user_id = $1
+         JOIN projects proj ON proj.id = d.project_id
+           AND proj.site_engineer_id = $1
+         GROUP BY d.id, p.name, r.file_url, r.file_name
+         ORDER BY d.created_at DESC`,
+        [userId]
+      );
+
     } else {
-      /* site_engineer, client — scoped by user_id */
+      /* client — scoped by user_id */
       result = await pool.query(
         `${selectBlock}
          JOIN architect_drawing_recipients rq
@@ -161,7 +179,37 @@ exports.getDrawings = async (req, res) => {
 exports.sendDrawing = async (req, res) => {
   await withDb(res, async () => {
     const { drawingId } = req.params;
-    const { user_id, role, sent_by } = req.body;
+    const { role, sent_by } = req.body;
+    let { user_id } = req.body;
+
+    /*
+     * For "Site Engineer": always resolve the correct user_id from the
+     * drawing's project (projects.site_engineer_id).  This enforces the rule
+     * that only the site engineer assigned to the same project as the
+     * architect receives the drawing, regardless of what the frontend sent.
+     */
+    if (role === "Site Engineer") {
+      const projectRow = await pool.query(
+        `SELECT p.site_engineer_id
+         FROM architect_drawings d
+         JOIN projects p ON p.id = d.project_id
+         WHERE d.id = $1`,
+        [drawingId]
+      );
+
+      if (projectRow.rowCount === 0) {
+        return res.status(404).json({ error: "Drawing not found." });
+      }
+
+      const assignedSE = projectRow.rows[0].site_engineer_id;
+      if (!assignedSE) {
+        return res.status(400).json({
+          error: "No site engineer is assigned to this project.",
+        });
+      }
+
+      user_id = assignedSE;
+    }
 
     // Check for duplicate: if user_id provided, check exact match; otherwise check role-only
     let existing;

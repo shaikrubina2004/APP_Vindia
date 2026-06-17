@@ -79,36 +79,29 @@ const CheckInButton = ({ employeeId }) => {
       setLoading(false);
     }
   };
+const handleCheckIn = async () => {
+  setBusy(true);
+  try {
+    const now = new Date();
+    const timeStr = now.toTimeString().slice(0, 8);   // "HH:MM:SS"
+    const dateStr = now.toISOString().slice(0, 10);   // "YYYY-MM-DD"
 
-  const handleCheckIn = async () => {
-    setBusy(true);
-    try {
-      const now = new Date();
-      const timeStr = now.toTimeString().slice(0, 8);
-      const dateStr = now.toISOString().slice(0, 10);
-
-      const shiftStart = new Date();
-      shiftStart.setHours(9, 0, 0, 0);
-      const lateMs = Math.max(0, now - shiftStart);
-      const lateMinutes = Math.floor(lateMs / 60000);
-
-      const res = await axios.post("http://localhost:5000/api/attendance", {
-        employee_id: employeeId,
-        date: dateStr,
-        check_in: timeStr,
-        status: "Present",
-        shift: "morning",
-        late_minutes: lateMinutes,
-        remarks: lateMinutes > 0 ? `Late by ${lateMinutes} min` : "",
-      });
-      setAttendance(res.data);
-    } catch (err) {
-      console.error(err);
-      alert("Check-in failed. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
+    const res = await axios.post("http://localhost:5000/api/attendance", {
+      employee_id: employeeId,
+      date:        dateStr,
+      check_in:    timeStr,
+      shift:       "Morning",
+      // ❌ removed: status, late_minutes, remarks
+      // ✅ backend's deriveStatus() will calculate all of these
+    });
+    setAttendance(res.data);
+  } catch (err) {
+    console.error(err);
+    alert("Check-in failed. Please try again.");
+  } finally {
+    setBusy(false);
+  }
+};
 
   const handleCheckOut = async () => {
     if (!attendance?.id) return;

@@ -1,149 +1,279 @@
 import { API } from "../../services/authService";
-import React from "react";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import "./Leaves.css";
 
+/* ══════════════════════════════════════════════════════════
+   LEAVE BALANCE — calculated from join date
+   ──────────────────────────────────────────────────────────
+   RULES:
+   • CL = 1.0 day/month  (max 12 per calendar year)
+   • SL = 0.5 day/month  (max  6 per calendar year)
+   • Accrual starts from the month the employee was added.
+   • NO carry-forward across calendar years.
+     Every January resets; accrual starts fresh.
+   • Absent days AND approved-leave days both consume balance.
+   • Any consumption beyond balance = LOP (salary deduction).
+   ══════════════════════════════════════════════════════════ */
+function calcLeaveBalance(joinDate, approvedLeaves = []) {
+  const today = new Date();
+  const curY  = today.getFullYear();
+  const curM  = today.getMonth() + 1;
+
+  if (!joinDate) return { accruedCL: 0, accruedSL: 0, usedCL: 0, usedSL: 0, balanceCL: 0, balanceSL: 0, total: 0 };
+
+  const jd    = new Date(joinDate);
+  const joinY = jd.getFullYear();
+  const joinM = jd.getMonth() + 1;
+
+  // Employee hasn't joined yet
+  if (joinY > curY || (joinY === curY && joinM > curM)) {
+    return { accruedCL: 0, accruedSL: 0, usedCL: 0, usedSL: 0, balanceCL: 0, balanceSL: 0, total: 0 };
+  }
+
+  // Accrual starts Jan if joined before this year, else from join month
+  const accrualStart = joinY < curY ? 1 : joinM;
+  const monthsWorked = Math.max(0, curM - accrualStart + 1);
+
+  const accruedCL = Math.min(parseFloat((monthsWorked * 1.0).toFixed(1)), 12);
+  const accruedSL = Math.min(parseFloat((monthsWorked * 0.5).toFixed(1)),  6);
+
+  // Count approved leaves taken this calendar year
+  let usedCL = 0;
+  let usedSL = 0;
+
+  approvedLeaves.forEach((l) => {
+    const from = new Date(l.from_date);
+    // Only count if the leave is within the current calendar year
+    if (from.getFullYear() !== curY) return;
+
+    const to   = new Date(l.to_date);
+    const days = Math.round((to - from) / 86400000) + 1;
+    const type = (l.type || l.reason || "").toLowerCase();
+
+    if (type.includes("sick")) usedSL += days;
+    else                        usedCL += days;
+  });
+
+  const balanceCL = Math.max(0, parseFloat((accruedCL - usedCL).toFixed(1)));
+  const balanceSL = Math.max(0, parseFloat((accruedSL - usedSL).toFixed(1)));
+
+  return {
+    accruedCL,
+    accruedSL,
+    usedCL,
+    usedSL,
+    balanceCL,
+    balanceSL,
+    totalAccrued: parseFloat((accruedCL + accruedSL).toFixed(1)),
+    total: parseFloat((balanceCL + balanceSL).toFixed(1)),
+    monthsWorked,
+  };
+}
+
+/* ══════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ══════════════════════════════════════════════════════════ */
 function Leaves() {
-  const salaryPerDay = 1000;
+  const [leaves,          setLeaves]          = useState([]);
+  const [expandedId,      setExpandedId]      = useState(null);
+  const [summaries,       setSummaries]       = useState({});   // keyed by employee_id
+  const [empDetails,      setEmpDetails]      = useState({});   // join_date per employee_id
+  const [message,         setMessage]         = useState("");
+  const [messageType,     setMessageType]     = useState("success"); // "success" | "error"
+  const [filterStatus,    setFilterStatus]    = useState("all");
+  const [searchQuery,     setSearchQuery]     = useState("");
 
-  const maxTotalLeaves = 18;
-  const maxSickLeaves = 6;
-  const maxCasualLeaves = 12;
+  const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
 
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [selectedIndex, setSelectedIndex] = useState(null);
-  const [message, setMessage] = useState("");
-  const today = new Date().toLocaleDateString("en-CA");
-  const [summaryData, setSummaryData] = useState(null);
-
-  const [leaves, setLeaves] = useState([]);
-
+  /* ── Load all leaves ────────────────────────────────────── */
   useEffect(() => {
-  fetchLeaves();
-}, []);
-
+    fetchLeaves();
+  }, []);
 
   const fetchLeaves = async () => {
-  try {
-    const res = await API.get("/leaves");
+    try {
+      const res       = await API.get("/leaves");
+      const formatted = res.data.map((l) => ({
+        id:          l.id,
+        employee_id: l.employee_id,
+        name:        l.name,
+        type:        l.reason,
+        from_date:   l.from_date,
+        to_date:     l.to_date,
+        status:      l.status,
+        days:        Math.round(
+          (new Date(l.to_date) - new Date(l.from_date)) / 86400000
+        ) + 1,
+      }));
+      setLeaves(formatted);
+    } catch (err) {
+      console.error("fetchLeaves:", err);
+    }
+  };
 
-    console.log("LEAVES:", res.data);
-
-    // map backend → UI format
-    const formatted = res.data.map((l) => ({
-    id: l.id,
-    employee_id: l.employee_id,
-    name: l.name,
-    type: l.reason,
-    from_date: l.from_date,   // ✅ ADD
-    to_date: l.to_date,       // ✅ ADD
-    status: l.status,
-  }));
-
-    setLeaves(formatted);
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-  // ✅ APPROVE / REJECT FUNCTION
+  /* ── Approve / Reject ───────────────────────────────────── */
   const handleAction = async (id, newStatus) => {
-  try {
-    await API.put(`/leaves/${id}/status`, {
-      status: newStatus,
-    });
-
-    fetchLeaves(); // reload from DB
-    setMessage(`Leave ${newStatus} successfully`);
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-const fetchSummary = async (id) => {
-  try {
-    const res = await API.get(`/leaves/summary/${id}`);
-
-    console.log("SUMMARY:", res.data);
-
-    // ✅ convert to numbers
-    const formatted = {
-      total: Number(res.data.total),
-      sick: Number(res.data.sick),
-      casual: Number(res.data.casual),
-    };
-
-    setSummaryData(formatted);
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-
-  // 🔥 MONTHLY FUNCTION
-  const getMonthlyLeaves = (name) => {
-    const monthMap = {};
-
-    leaves.forEach((l) => {
-      if (l.name === name && l.status === "Approved") {
-        const d = new Date(l.date);
-        const key = `${d.toLocaleString("default", {
-          month: "short",
-        })} ${d.getFullYear()}`;
-
-        if (!monthMap[key]) monthMap[key] = { casual: 0, sick: 0 };
-
-        if (l.type === "Casual Leave") monthMap[key].casual++;
-        if (l.type === "Sick Leave") monthMap[key].sick++;
+    try {
+      await API.put(`/leaves/${id}/status`, { status: newStatus });
+      showMessage(`Leave ${newStatus} successfully`, "success");
+      fetchLeaves();
+      // Refresh summary for this employee if expanded
+      const leaf = leaves.find((l) => l.id === id);
+      if (leaf && expandedId === leaf.employee_id) {
+        fetchSummary(leaf.employee_id);
       }
-    });
-
-    return monthMap;
+    } catch (err) {
+      console.error("handleAction:", err);
+      showMessage("Failed to update leave status", "error");
+    }
   };
 
-  // 🔥 SUMMARY FUNCTION
-  const calculateSummary = (name) => {
-    const todayDate = new Date();
+  /* ── Fetch summary for an employee ─────────────────────── */
+  const fetchSummary = async (employeeId) => {
+    try {
+      // Fetch approved leaves for this employee from backend
+      const res = await API.get(`/leaves/summary/${employeeId}`);
 
-    const approved = leaves.filter(
-      (l) =>
-        l.name === name &&
-        l.status === "Approved" &&
-        new Date(l.date) <= todayDate
-    );
+      // Backend returns: { total, sick, casual, leaves: [...] }
+      // "leaves" contains the approved leave records for balance calc
+      const approvedLeaves = res.data.leaves || [];
 
-    const sickTaken = approved.filter((l) => l.type === "Sick Leave").length;
-    const casualTaken = approved.filter(
-      (l) => l.type === "Casual Leave"
-    ).length;
+      // Also fetch join_date if we don't have it yet
+      if (!empDetails[employeeId]) {
+        try {
+          const empRes = await API.get(`/employees/${employeeId}`);
+          const joinDate = empRes.data.join_date || null;
 
-    const totalTaken = sickTaken + casualTaken;
-    const balance = maxTotalLeaves - (summaryData.total || 0);
-    const extraLeaves = Math.max(totalTaken - maxTotalLeaves, 0);
+          setEmpDetails((prev) => ({ ...prev, [employeeId]: joinDate }));
 
-    return {
-      total: totalTaken,
-      sick: sickTaken,
-      casual: casualTaken,
-      balance,
-      cut: extraLeaves * salaryPerDay,
-    };
+          const balance = calcLeaveBalance(joinDate, approvedLeaves);
+          setSummaries((prev) => ({
+            ...prev,
+            [employeeId]: { ...res.data, balance },
+          }));
+        } catch {
+          // Fallback: compute without join_date
+          const balance = calcLeaveBalance(null, approvedLeaves);
+          setSummaries((prev) => ({
+            ...prev,
+            [employeeId]: { ...res.data, balance },
+          }));
+        }
+      } else {
+        const joinDate = empDetails[employeeId];
+        const balance  = calcLeaveBalance(joinDate, approvedLeaves);
+        setSummaries((prev) => ({
+          ...prev,
+          [employeeId]: { ...res.data, balance },
+        }));
+      }
+    } catch (err) {
+      console.error("fetchSummary:", err);
+    }
   };
-console.log("SUMMARY STATE:", summaryData);
 
+  const toggleSummary = (employeeId) => {
+    if (expandedId === employeeId) {
+      setExpandedId(null);
+    } else {
+      setExpandedId(employeeId);
+      if (!summaries[employeeId]) fetchSummary(employeeId);
+    }
+  };
+
+  /* ── Message helper ─────────────────────────────────────── */
+  const showMessage = (text, type = "success") => {
+    setMessage(text);
+    setMessageType(type);
+    setTimeout(() => setMessage(""), 3000);
+  };
+
+  /* ── Filter & search ────────────────────────────────────── */
+  const todayDate  = new Date(today);
+  const filtered   = leaves
+    .filter((l) => {
+      if (filterStatus !== "all" && l.status.toLowerCase() !== filterStatus) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        if (!l.name?.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => new Date(a.from_date) - new Date(b.from_date));
+
+  // Today's active leaves (for the "Today" section)
+  const todayLeaves = leaves.filter((l) => {
+    const from = new Date(l.from_date);
+    const to   = new Date(l.to_date);
+    return todayDate >= from && todayDate <= to;
+  });
+
+  const pending = leaves.filter((l) => l.status === "Pending").length;
 
   return (
     <div className="leave-page">
       <div className="wrap">
-        {message && <div className="popup">{message}</div>}
 
+        {/* ── Flash message ── */}
+        {message && (
+          <div className={`popup ${messageType === "error" ? "popup--error" : ""}`}>
+            {message}
+          </div>
+        )}
+
+        {/* ── Header ── */}
         <div className="header">
-          <h1>HR Leave Dashboard</h1>
-          <span className="date">{today}</span>
+          <div>
+            <h1>HR Leave Dashboard</h1>
+            <p className="header-sub">
+              {todayLeaves.length} on leave today · {pending} pending approval
+            </p>
+          </div>
+          <span className="date">{new Date().toLocaleDateString("en-IN", {
+            weekday: "long", day: "numeric", month: "long", year: "numeric"
+          })}</span>
         </div>
 
+        {/* ── Today's snapshot ── */}
+        {todayLeaves.length > 0 && (
+          <div className="card today-card">
+            <h2>On Leave Today</h2>
+            <div className="today-pills">
+              {todayLeaves.map((l) => (
+                <div key={l.id} className={`today-pill today-pill--${l.status.toLowerCase()}`}>
+                  <span className="today-name">{l.name}</span>
+                  <span className="today-type">{l.type}</span>
+                  <span className={`tag ${l.status.toLowerCase()}`}>{l.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Leave Request Table ── */}
         <div className="card">
-          <h2>Today's Leave Requests</h2>
+          <div className="card-toolbar">
+            <h2>Leave Requests</h2>
+            <div className="toolbar-right">
+              <input
+                className="search-box"
+                type="text"
+                placeholder="Search employee…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <select
+                className="status-filter"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
 
           <table>
             <thead>
@@ -152,139 +282,162 @@ console.log("SUMMARY STATE:", summaryData);
                 <th>Type</th>
                 <th>From</th>
                 <th>To</th>
+                <th>Days</th>
                 <th>Status</th>
                 <th>Action</th>
-                <th>Summary</th>
+                <th>Balance</th>
               </tr>
             </thead>
 
             <tbody>
-  {leaves
-    .sort((a, b) => new Date(a.from_date) - new Date(b.from_date))
-    .filter((l) => {
-      const todayDate = new Date(today);
-      const from = new Date(l.from_date);
-      const to = new Date(l.to_date);
-      return todayDate >= from && todayDate <= to;
-    })
-    .map((l, i) => (
-      <React.Fragment key={l.id}>
-        
-        {/* ✅ MAIN ROW */}
-        <tr>
-          <td className="emp">{l.name}</td>
-          <td>{l.type}</td>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan="8" style={{ textAlign: "center", padding: "30px", color: "#888" }}>
+                    No leave requests found.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((l) => {
+                  const isExpanded = expandedId === l.employee_id;
+                  const summary    = summaries[l.employee_id];
 
-          <td>
-            {new Date(l.from_date).toLocaleDateString("en-IN", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })}
-          </td>
+                  return (
+                    <React.Fragment key={l.id}>
 
-          <td>
-            {new Date(l.to_date).toLocaleDateString("en-IN", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })}
-          </td>
+                      {/* ── Main row ── */}
+                      <tr className={isExpanded ? "row-expanded" : ""}>
+                        <td className="emp">{l.name}</td>
+                        <td>
+                          <span className={`leave-type-badge leave-type-badge--${
+                            (l.type || "").toLowerCase().includes("sick") ? "sl" : "cl"
+                          }`}>
+                            {l.type}
+                          </span>
+                        </td>
 
-          <td>
-            <span className={`tag ${l.status.toLowerCase()}`}>
-              {l.status}
-            </span>
-          </td>
+                        <td>
+                          {new Date(l.from_date).toLocaleDateString("en-IN", {
+                            day: "2-digit", month: "short", year: "numeric",
+                          })}
+                        </td>
 
-          <td>
-            {l.status === "Pending" && (
-              <>
-                <button onClick={() => handleAction(l.id, "Approved")}>
-                  Approve
-                </button>
-                <button onClick={() => handleAction(l.id, "Rejected")}>
-                  Reject
-                </button>
-              </>
-            )}
-          </td>
+                        <td>
+                          {new Date(l.to_date).toLocaleDateString("en-IN", {
+                            day: "2-digit", month: "short", year: "numeric",
+                          })}
+                        </td>
 
-          <td>
-            <button
-              className="view"
-              onClick={() => {
-                if (selectedIndex === i) {
-                  setSelectedIndex(null);
-                  setSelectedEmployee(null);
-                  setSummaryData(null);
-                } else {
-                  setSelectedEmployee(l.name);
-                  setSelectedIndex(i);
-                  setSummaryData(null);
-                  fetchSummary(l.employee_id);
-                }
-              }}
-            >
-              {selectedIndex === i ? "Hide" : "View"}
-            </button>
-          </td>
-        </tr>
+                        <td className="days-col">{l.days}d</td>
 
-        {/* ✅ SUMMARY ROW */}
-        {selectedIndex === i && summaryData !== null && (
-          <tr>
-            <td colSpan="7">  {/* 🔥 IMPORTANT: updated colspan */}
-              <div className="summary">
-                <h3>{selectedEmployee}</h3>
+                        <td>
+                          <span className={`tag ${l.status.toLowerCase()}`}>
+                            {l.status}
+                          </span>
+                        </td>
 
-                <div className="grid">
-                  <div>
-                    <span>Total Leave Taken</span>
-                    <b>{summaryData.total || 0}</b>
-                  </div>
+                        <td>
+                          {l.status === "Pending" && (
+                            <div className="action-btns">
+                              <button
+                                className="btn-approve"
+                                onClick={() => handleAction(l.id, "Approved")}
+                              >
+                                ✓ Approve
+                              </button>
+                              <button
+                                className="btn-reject"
+                                onClick={() => handleAction(l.id, "Rejected")}
+                              >
+                                ✕ Reject
+                              </button>
+                            </div>
+                          )}
+                        </td>
 
-                  <div>
-                    <span>Sick Leave Taken</span>
-                    <b>{summaryData.sick || 0}</b>
-                  </div>
+                        <td>
+                          <button
+                            className="view"
+                            onClick={() => toggleSummary(l.employee_id)}
+                          >
+                            {isExpanded ? "Hide ▲" : "View ▼"}
+                          </button>
+                        </td>
+                      </tr>
 
-                  <div>
-                    <span>Casual Leave Taken</span>
-                    <b>{summaryData.casual || 0}</b>
-                  </div>
+                      {/* ── Expanded summary row ── */}
+                      {isExpanded && (
+                        <tr className="summary-row">
+                          <td colSpan="8">
+                            {!summary ? (
+                              <div className="summary-loading">Loading balance…</div>
+                            ) : (
+                              <div className="summary">
+                                <h3>
+                                  Leave Balance — {l.name}
+                                  <span className="summary-year">
+                                    {" "}({new Date().getFullYear()} · {summary.balance?.monthsWorked || 0} months accrued · no cross-year carry-forward)
+                                  </span>
+                                </h3>
 
-                  <div>
-                    <span>Balance</span>
-                    <b>{maxTotalLeaves - (summaryData.total || 0)}</b>
-                  </div>
+                                {/* Balance cards */}
+                                <div className="balance-cards">
+                                  <div className="balance-card balance-card--cl">
+                                    <span className="bc-label">Casual Leave</span>
+                                    <span className="bc-big">{summary.balance?.balanceCL ?? 0}</span>
+                                    <span className="bc-sub">
+                                      of {summary.balance?.accruedCL ?? 0} accrued · {summary.balance?.usedCL ?? 0} used
+                                    </span>
+                                  </div>
 
-                  <div>
-                    <span>Salary Cut</span>
-                    <b
-                      style={{
-                        color:
-                          (summaryData.total || 0) > maxTotalLeaves
-                            ? "red"
-                            : "green",
-                      }}
-                    >
-                      ₹
-                      {Math.max(
-                        (summaryData.total || 0) - maxTotalLeaves,
-                        0
-                      ) * salaryPerDay}
-                    </b>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-        )}
+                                  <div className="balance-card balance-card--sl">
+                                    <span className="bc-label">Sick Leave</span>
+                                    <span className="bc-big">{summary.balance?.balanceSL ?? 0}</span>
+                                    <span className="bc-sub">
+                                      of {summary.balance?.accruedSL ?? 0} accrued · {summary.balance?.usedSL ?? 0} used
+                                    </span>
+                                  </div>
 
-      </React.Fragment>
-    ))}
-</tbody>
+                                  <div className="balance-card balance-card--total">
+                                    <span className="bc-label">Total Balance</span>
+                                    <span className="bc-big">{summary.balance?.total ?? 0}</span>
+                                    <span className="bc-sub">
+                                      of {summary.balance?.totalAccrued ?? 0} accrued this year
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* LOP warning */}
+                                {(() => {
+                                  const totalUsed = (summary.balance?.usedCL || 0) + (summary.balance?.usedSL || 0);
+                                  const totalAccrued = summary.balance?.totalAccrued || 0;
+                                  const lop = Math.max(0, parseFloat((totalUsed - totalAccrued).toFixed(1)));
+                                  return lop > 0 ? (
+                                    <div className="lop-warning">
+                                      ⚠ <strong>{lop} LOP day{lop !== 1 ? "s" : ""}</strong> — leaves taken exceed accrued balance.
+                                      Salary deduction applies.
+                                    </div>
+                                  ) : (
+                                    <div className="lop-ok">
+                                      ✓ Balance sufficient — no Loss of Pay.
+                                    </div>
+                                  );
+                                })()}
+
+                                {/* Policy reminder */}
+                                <div className="policy-note">
+                                  Policy: 1.0 CL + 0.5 SL per month worked · Resets every January · Absent days also consume balance
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </tbody>
           </table>
         </div>
       </div>

@@ -91,6 +91,11 @@ function AttendanceManagement() {
   const [currentPage, setCurrentPage]       = useState(1);
   const rowsPerPage = 10;
 
+  // ── History Search mode: search by name + status across all dates ─────────
+  const [histSearchName,   setHistSearchName]   = useState("");
+  const [histSearchStatus, setHistSearchStatus] = useState("all");
+  const [histSearchActive, setHistSearchActive] = useState(false);
+
   // Two data sources:
   //   todayRows  — from /attendance/today/all (full employee list with today status)
   //   historyMap — from /attendance (historical, keyed by date)
@@ -207,6 +212,32 @@ function AttendanceManagement() {
     (currentPage - 1) * rowsPerPage,
     currentPage * rowsPerPage
   );
+
+  // ── History search: collect all (date, record) pairs across historyMap ────
+  const historySearchResults = (() => {
+    if (!histSearchActive || !histSearchName.trim()) return [];
+    const nameLower   = histSearchName.trim().toLowerCase();
+    const statusLower = histSearchStatus === "all" ? null : histSearchStatus.toLowerCase();
+    const matches = [];
+    Object.entries(historyMap).forEach(([date, rows]) => {
+      rows.forEach((r) => {
+        const nameMatch   = r.name.toLowerCase().includes(nameLower);
+        const statusMatch = !statusLower || r.status.toLowerCase().trim() === statusLower;
+        if (nameMatch && statusMatch) matches.push({ date, ...r });
+      });
+    });
+    // Also check todayRows
+    todayRows.forEach((r) => {
+      const dateKey     = new Date().toLocaleDateString("en-CA");
+      const nameMatch   = r.name.toLowerCase().includes(nameLower);
+      const statusMatch = !statusLower || r.status.toLowerCase().trim() === statusLower;
+      if (nameMatch && statusMatch) {
+        const alreadyIn = matches.some((m) => m.date === dateKey && m.employee_id === r.employee_id);
+        if (!alreadyIn) matches.push({ date: dateKey, ...r });
+      }
+    });
+    return matches.sort((a, b) => b.date.localeCompare(a.date));
+  })();
 
   // ── Calendar helpers ──────────────────────────────────────────────────────
   const daysInMonth   = new Date(calNav.getFullYear(), calNav.getMonth() + 1, 0).getDate();
@@ -397,6 +428,104 @@ function AttendanceManagement() {
           </button>
         </div>
       </div>
+
+      {/* ── History Search Panel ──────────────────────────────────────── */}
+      <div className="am-hist-search-bar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          style={{ color: "#64748b", flexShrink: 0 }}>
+          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input
+          className="am-hist-name-input"
+          placeholder="Search by employee name…"
+          value={histSearchName}
+          onChange={(e) => { setHistSearchName(e.target.value); setHistSearchActive(false); }}
+          onKeyDown={(e) => { if (e.key === "Enter") setHistSearchActive(true); }}
+        />
+        <select
+          className="am-filter-select"
+          value={histSearchStatus}
+          onChange={(e) => { setHistSearchStatus(e.target.value); setHistSearchActive(false); }}
+        >
+          <option value="all">All Statuses</option>
+          <option value="present">Present</option>
+          <option value="late">Late</option>
+          <option value="absent">Absent</option>
+          <option value="half day">Half Day</option>
+          <option value="wfh">WFH</option>
+        </select>
+        <button
+          className="am-hist-search-btn"
+          onClick={() => { if (histSearchName.trim()) setHistSearchActive(true); }}
+        >
+          Search History
+        </button>
+        {histSearchActive && (
+          <button
+            className="am-hist-clear-btn"
+            onClick={() => { setHistSearchName(""); setHistSearchStatus("all"); setHistSearchActive(false); }}
+          >
+            ✕ Clear
+          </button>
+        )}
+      </div>
+
+      {/* ── History Search Results ─────────────────────────────────────── */}
+      {histSearchActive && histSearchName.trim() && (
+        <div className="am-hist-results">
+          <div className="am-hist-results-header">
+            <span className="am-hist-results-title">
+              History for &ldquo;{histSearchName}&rdquo;
+              {histSearchStatus !== "all" && (
+                <span className={`am-hist-status-tag ${getPillClass(histSearchStatus)}`}>
+                  {getStatusLabel(histSearchStatus)}
+                </span>
+              )}
+            </span>
+            <span className="am-hist-results-count">{historySearchResults.length} record{historySearchResults.length !== 1 ? "s" : ""}</span>
+          </div>
+          {historySearchResults.length === 0 ? (
+            <div className="am-hist-empty">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.3">
+                <circle cx="12" cy="12" r="10" /><line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+              <p>No records found for this name / status combination.</p>
+            </div>
+          ) : (
+            <div className="am-hist-grid">
+              {historySearchResults.map((rec, i) => {
+                const d = new Date(rec.date + "T00:00:00");
+                const dayName  = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+                const dateStr  = `${d.getDate()} ${SHORT_MONTH[d.getMonth()]} ${d.getFullYear()}`;
+                return (
+                  <div key={i} className="am-hist-card">
+                    <div className="am-hist-card-date">
+                      <span className="am-hist-day">{dayName}</span>
+                      <span className="am-hist-date">{dateStr}</span>
+                    </div>
+                    <div className="am-hist-card-body">
+                      <div className="am-hist-card-name">{rec.name}</div>
+                      <span className={getPillClass(rec.status, rec.remarks)}>
+                        {getStatusLabel(rec.status)}
+                      </span>
+                      {getRemarkLabel(rec.remarks) && (
+                        <span className="am-hist-remark">{getRemarkLabel(rec.remarks)}</span>
+                      )}
+                    </div>
+                    <div className="am-hist-card-times">
+                      <span>In: {rec.checkIn || "—"}</span>
+                      <span>Out: {rec.checkOut || "—"}</span>
+                      {rec.lateMinutes > 0 && (
+                        <span className="am-late-tag">{formatLate(rec.lateMinutes)}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Table ─────────────────────────────────────────────────────── */}
       <div className="am-table-wrap">
