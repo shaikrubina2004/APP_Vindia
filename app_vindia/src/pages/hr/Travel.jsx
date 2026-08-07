@@ -40,10 +40,10 @@ const makeRow = (category) => ({ id: null, category, type: EXP_CATEGORIES.find(c
 const isImage = (name = "") => /\.(jpg|jpeg|png|gif|webp)$/i.test(name);
 
 const statusMeta = {
-  Approved:  { icon: <CheckCircle size={11} />, cls: "tv-s-approved", dot: "tv-dot-green" },
-  Rejected:  { icon: <XCircle size={11} />,     cls: "tv-s-rejected", dot: "tv-dot-red"   },
-  Cancelled: { icon: <XCircle size={11} />,     cls: "tv-s-rejected", dot: "tv-dot-red"   },
-  Pending:   { icon: <Clock size={11} />,       cls: "tv-s-pending",  dot: "tv-dot-amber" },
+  Approved:  { icon: <CheckCircle size={11} />, cls: "te-s-approved", card: "st-approved" },
+  Rejected:  { icon: <XCircle size={11} />,     cls: "te-s-rejected", card: "st-rejected" },
+  Cancelled: { icon: <XCircle size={11} />,     cls: "te-s-rejected", card: "st-rejected" },
+  Pending:   { icon: <Clock size={11} />,       cls: "te-s-pending",  card: "st-pending"  },
 };
 const getSM = (s) => statusMeta[s] || statusMeta.Pending;
 
@@ -53,34 +53,34 @@ const Lightbox = ({ receipt, onClose }) => {
   const img = isImage(receipt.file_name);
 
   return (
-    <div className="tv-lightbox-bg" onClick={onClose}>
-      <div className="tv-lightbox" onClick={(e) => e.stopPropagation()}>
-        <div className="tv-lightbox-header">
+    <div className="te-lightbox-bg" onClick={onClose}>
+      <div className="te-lightbox" onClick={(e) => e.stopPropagation()}>
+        <div className="te-lightbox-header">
           <span>{receipt.file_name}</span>
-          <div className="tv-lightbox-actions">
+          <div className="te-lightbox-actions">
             <a
               href={url}
               download={receipt.file_name}
-              className="tv-lb-btn"
+              className="te-lb-btn"
               title="Download"
               target="_blank"
               rel="noreferrer"
             >
               <Download size={14} />
             </a>
-            <button className="tv-lb-btn tv-lb-close" onClick={onClose}>
+            <button className="te-lb-btn te-lb-close" onClick={onClose}>
               <X size={14} />
             </button>
           </div>
         </div>
-        <div className="tv-lightbox-body">
+        <div className="te-lightbox-body">
           {img ? (
-            <img src={url} alt={receipt.file_name} className="tv-lb-img" />
+            <img src={url} alt={receipt.file_name} className="te-lb-img" />
           ) : (
             <iframe
               src={url}
               title={receipt.file_name}
-              className="tv-lb-iframe"
+              className="te-lb-iframe"
             />
           )}
         </div>
@@ -89,7 +89,7 @@ const Lightbox = ({ receipt, onClose }) => {
   );
 };
 
-// ── Detail Modal (Two-Column Asymmetric Grid Layout) ─────────────────────────
+// ── Detail Modal ──────────────────────────────────────────────────────────────
 const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
   const [note,        setNote]        = useState("");
   const [acting,      setActing]      = useState(false);
@@ -101,7 +101,7 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
   const [savedOk,     setSavedOk]     = useState(false);
   const [isEditing,   setIsEditing]   = useState(false);
   const [preview,     setPreview]     = useState(null);
-  const [activeTab,   setActiveTab]   = useState("travel"); // active expense category tab
+  const [activeTab,   setActiveTab]   = useState("travel");
 
   useEffect(() => {
     if (req?.id) fetchModalData();
@@ -115,7 +115,6 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
       setReceipts(data?.receipts || []);
       const loadedExp = data?.manual_expenses || [];
       setExpenses(loadedExp);
-      // Auto-open edit mode if no expenses saved yet
       setIsEditing(loadedExp.length === 0);
     } catch {
       setExpenses([]); setReceipts([]);
@@ -124,13 +123,10 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
     }
   };
 
-  // ── Expense row helpers ──────────────────────────────────────────────────
   const rowsFor    = (cat) => expenses.filter((e) => e.category === cat);
   const addRow     = (cat) => setExpenses((p) => [...p, makeRow(cat)]);
   const updRow     = (idx, f, v) => setExpenses((p) => p.map((e, i) => (i === idx ? { ...e, [f]: v } : e)));
-  const delRow     = (idx) => {
-    setExpenses((p) => p.filter((_, i) => i !== idx));
-  };
+  const delRow     = (idx) => setExpenses((p) => p.filter((_, i) => i !== idx));
 
   const totalFor   = (cat) => rowsFor(cat).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
   const grandTotal = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
@@ -173,116 +169,147 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
   const sm   = getSM(req.status);
   const pmSM = getSM(req.pm_status);
 
+  const renderExpenseSummary = () => (
+    <>
+      {EXP_CATEGORIES.map((cat) => {
+        const rows = rowsFor(cat.key);
+        if (!rows.length) return null;
+        return (
+          <div key={cat.key} className="te-exp-cat-summary">
+            <div className="te-exp-cat-label">{cat.icon} {cat.label}</div>
+            {rows.map((e, i) => (
+              <div key={i} className="te-detail-row">
+                <span className="te-detail-label">
+                  <Receipt size={11} />
+                  {e.type}{e.description ? ` — ${e.description}` : ""}
+                </span>
+                <span className="te-detail-value te-amount">
+                  ₹{parseFloat(e.amount || 0).toLocaleString("en-IN")}
+                </span>
+              </div>
+            ))}
+            <div className="te-exp-cat-subtotal">
+              <span>{cat.label} subtotal</span>
+              <strong>₹{totalFor(cat.key).toLocaleString("en-IN")}</strong>
+            </div>
+          </div>
+        );
+      })}
+      <div className="te-exp-total-row te-exp-grand-total">
+        <span>Grand total</span>
+        <strong>₹{grandTotal.toLocaleString("en-IN")}</strong>
+      </div>
+    </>
+  );
+
   return (
     <>
-      <div className="tv-modal-backdrop" onClick={onClose}>
-        <div className="tv-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="te-modal-backdrop" onClick={onClose}>
+        <div className="te-modal" onClick={(e) => e.stopPropagation()}>
 
-          {/* Header */}
-          <div className="tv-modal-header" style={{ display: "flex" }}>
-            <div className="tv-modal-header-left">
-              <div className="tv-modal-icon"><Plane size={17} /></div>
+          <div className="te-modal-header">
+            <div className="te-modal-header-left">
+              <div className="te-modal-icon"><Plane size={17} /></div>
               <div>
                 <h2>{req.trip_title || req.destination}</h2>
                 <p>{req.request_no} · Submitted {fmt(req.created_at)}</p>
               </div>
             </div>
-            <div className="tv-modal-header-right">
-              <span className={`tv-status-pill ${sm.cls}`}>{sm.icon}{req.status}</span>
-              <button className="tv-modal-close" onClick={onClose}><X size={15} /></button>
+            <div className="te-modal-header-right">
+              <span className={`te-status-pill ${sm.cls}`}>{sm.icon}{req.status}</span>
+              <button className="te-modal-close" onClick={onClose}><X size={15} /></button>
             </div>
           </div>
 
-          {/* Two-Column Body */}
-          <div className="tv-modal-body">
-            
+          <div className="te-modal-body">
+
             {/* LEFT COLUMN */}
-            <div className="tv-modal-left">
-              <div className="tv-info-card">
-                <div className="tv-info-card-title">EMPLOYEE</div>
-                <div className="tv-emp-block">
-                  <div className="tv-emp-avatar">
+            <div className="te-modal-left">
+              <div className="te-info-card">
+                <div className="te-info-card-title">Employee</div>
+                <div className="te-emp-block">
+                  <div className="te-emp-avatar">
                     {(req.employee_name || "?").charAt(0).toUpperCase()}
                   </div>
-                  <div className="tv-emp-details">
-                    <div className="tv-emp-name">{req.employee_name}</div>
-                    <div className="tv-emp-role">{req.designation}</div>
+                  <div>
+                    <div className="te-emp-name">{req.employee_name}</div>
+                    <div className="te-emp-role">{req.designation}</div>
                   </div>
                 </div>
               </div>
 
-              <div className="tv-info-card">
-                <div className="tv-info-card-title">TRIP DETAILS</div>
-                <div className="tv-detail-row">
-                  <span className="tv-detail-label"><Navigation size={11} />From</span>
-                  <span className="tv-detail-value">{req.origin || "—"}</span>
+              <div className="te-info-card">
+                <div className="te-info-card-title">Trip details</div>
+                <div className="te-detail-row">
+                  <span className="te-detail-label"><Navigation size={11} />From</span>
+                  <span className="te-detail-value">{req.origin || "—"}</span>
                 </div>
-                <div className="tv-detail-row">
-                  <span className="tv-detail-label"><MapPin size={11} />To</span>
-                  <span className="tv-detail-value">{req.destination}</span>
+                <div className="te-detail-row">
+                  <span className="te-detail-label"><MapPin size={11} />To</span>
+                  <span className="te-detail-value">{req.destination}</span>
                 </div>
-                <div className="tv-detail-row">
-                  <span className="tv-detail-label"><CalendarDays size={11} />Travel Dates</span>
-                  <span className="tv-detail-value">
+                <div className="te-detail-row">
+                  <span className="te-detail-label"><CalendarDays size={11} />Travel dates</span>
+                  <span className="te-detail-value">
                     {fmt(req.travel_from_date)} → {fmt(req.travel_to_date)}
                   </span>
                 </div>
-                
+
                 {req.purpose && (
-                  <div className="tv-purpose-block">
-                    <div className="tv-detail-label" style={{ marginBottom: 6 }}>
+                  <div className="te-purpose-block">
+                    <div className="te-detail-label" style={{ marginBottom: 6 }}>
                       <FileText size={11} />Purpose
                     </div>
-                    <p className="tv-purpose-text">{req.purpose}</p>
+                    <p className="te-purpose-text">{req.purpose}</p>
                   </div>
                 )}
-                
+
                 {req.notes && (
-                  <div className="tv-purpose-block" style={{ marginTop: 8 }}>
-                    <div className="tv-detail-label" style={{ marginBottom: 4 }}>Notes</div>
-                    <p className="tv-purpose-text">{req.notes}</p>
+                  <div className="te-purpose-block">
+                    <div className="te-detail-label" style={{ marginBottom: 6 }}>Notes</div>
+                    <p className="te-purpose-text">{req.notes}</p>
                   </div>
                 )}
               </div>
 
               {req.payment_mode === "self" && (
-                <div className="tv-info-card">
-                  <div className="tv-info-card-title">
-                    UPLOADED RECEIPTS
-                    <span className="tv-receipt-count">{receipts.length}</span>
+                <div className="te-info-card">
+                  <div className="te-info-card-title">
+                    Uploaded receipts
+                    <span className="te-receipt-count">{receipts.length}</span>
                   </div>
 
                   {loadingData ? (
-                    <p className="tv-empty-msg">Loading receipts…</p>
+                    <p className="te-empty-msg">Loading receipts…</p>
                   ) : receipts.length === 0 ? (
-                    <p className="tv-empty-msg">No receipts uploaded.</p>
+                    <p className="te-empty-msg">No receipts uploaded.</p>
                   ) : (
-                    <div className="tv-receipt-grid">
+                    <div className="te-receipt-grid">
                       {receipts.map((r, i) => {
                         const img = isImage(r.file_name);
                         return (
-                          <div key={i} className="tv-receipt-tile">
-                            <div className="tv-receipt-thumb" onClick={() => setPreview(r)}>
+                          <div key={i} className="te-receipt-tile">
+                            <div className="te-receipt-thumb" onClick={() => setPreview(r)}>
                               {img ? (
-                                <img src={r.file_url} alt={r.file_name} className="tv-thumb-img" onError={(e) => { e.target.style.display = "none"; }} />
+                                <img src={r.file_url} alt={r.file_name} className="te-thumb-img" onError={(e) => { e.target.style.display = "none"; }} />
                               ) : (
-                                <div className="tv-thumb-pdf">
+                                <div className="te-thumb-pdf">
                                   <FileText size={22} />
                                   <span>PDF</span>
                                 </div>
                               )}
-                              <div className="tv-thumb-overlay"><Eye size={16} /></div>
+                              <div className="te-thumb-overlay"><Eye size={16} /></div>
                             </div>
 
-                            <div className="tv-receipt-info">
-                              <span className="tv-receipt-type-badge">{r.expense_type}</span>
-                              <span className="tv-receipt-name" title={r.file_name}>
+                            <div className="te-receipt-info">
+                              <span className="te-receipt-type-badge">{r.expense_type}</span>
+                              <span className="te-receipt-name" title={r.file_name}>
                                 {r.file_name.length > 22 ? r.file_name.slice(0, 20) + "…" : r.file_name}
                               </span>
-                              <span className="tv-receipt-size">{r.file_size_kb} KB</span>
-                              <div className="tv-receipt-tile-actions">
-                                <button className="tv-tile-btn" onClick={() => setPreview(r)}><Eye size={11} /></button>
-                                <a href={r.file_url} download={r.file_name} className="tv-tile-btn" target="_blank" rel="noreferrer"><Download size={11} /></a>
+                              <span className="te-receipt-size">{r.file_size_kb} KB</span>
+                              <div className="te-receipt-tile-actions">
+                                <button className="te-tile-btn" onClick={() => setPreview(r)}><Eye size={11} /></button>
+                                <a href={r.file_url} download={r.file_name} className="te-tile-btn" target="_blank" rel="noreferrer"><Download size={11} /></a>
                               </div>
                             </div>
                           </div>
@@ -295,161 +322,101 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
             </div>
 
             {/* RIGHT COLUMN */}
-            <div className="tv-modal-right">
-              <div className="tv-info-card">
-                <div className="tv-info-card-title">BUDGET & PAYMENT</div>
-                <div className="tv-detail-row">
-                  <span className="tv-detail-label"><CreditCard size={11} />Budget Type</span>
-                  <span className={`tv-badge ${req.budget_type === "project" ? "tv-badge-project" : "tv-badge-company"}`}>
+            <div className="te-modal-right">
+              <div className="te-info-card">
+                <div className="te-info-card-title">Budget &amp; payment</div>
+                <div className="te-detail-row">
+                  <span className="te-detail-label"><CreditCard size={11} />Budget type</span>
+                  <span className={`te-badge ${req.budget_type === "project" ? "te-badge-project" : "te-badge-company"}`}>
                     {req.budget_type === "project" ? <><Briefcase size={10} />Project</> : <><CreditCard size={10} />Company</>}
                   </span>
                 </div>
                 {req.project_name && (
-                  <div className="tv-detail-row">
-                    <span className="tv-detail-label"><Briefcase size={11} />Project Name</span>
-                    <span className="tv-detail-value">{req.project_name}</span>
+                  <div className="te-detail-row">
+                    <span className="te-detail-label"><Briefcase size={11} />Project name</span>
+                    <span className="te-detail-value">{req.project_name}</span>
                   </div>
                 )}
-                <div className="tv-detail-row">
-                  <span className="tv-detail-label"><Wallet size={11} />Payment Mode</span>
-                  <span className={`tv-badge ${req.payment_mode === "self" ? "tv-badge-self" : "tv-badge-requested"}`}>
+                <div className="te-detail-row">
+                  <span className="te-detail-label"><Wallet size={11} />Payment mode</span>
+                  <span className={`te-badge ${req.payment_mode === "self" ? "te-badge-self" : "te-badge-requested"}`}>
                     {req.payment_mode === "self" ? <><Wallet size={10} />Self-paid</> : <><Building2 size={10} />Company pays</>}
                   </span>
                 </div>
               </div>
 
               {req.payment_mode !== "self" && expenses.length > 0 && !canEnterExp && (
-                <div className="tv-info-card">
-                  <div className="tv-info-card-title">EXPENSES ALLOCATED</div>
-                  {EXP_CATEGORIES.map((cat) => {
-                    const rows = rowsFor(cat.key);
-                    if (!rows.length) return null;
-                    return (
-                      <div key={cat.key} className="tv-exp-cat-summary">
-                        <div className="tv-exp-cat-label">{cat.icon} {cat.label}</div>
-                        {rows.map((e, i) => (
-                          <div key={i} className="tv-detail-row">
-                            <span className="tv-detail-label">
-                              <Receipt size={11} />
-                              {e.type}{e.description ? ` — ${e.description}` : ""}
-                            </span>
-                            <span className="tv-detail-value tv-amount">
-                              ₹{parseFloat(e.amount || 0).toLocaleString("en-IN")}
-                            </span>
-                          </div>
-                        ))}
-                        <div className="tv-exp-cat-subtotal">
-                          <span>{cat.label} subtotal</span>
-                          <strong>₹{totalFor(cat.key).toLocaleString("en-IN")}</strong>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div className="tv-exp-total-row tv-exp-grand-total">
-                    <span>Grand Total</span>
-                    <strong>₹{grandTotal.toLocaleString("en-IN")}</strong>
-                  </div>
+                <div className="te-info-card">
+                  <div className="te-info-card-title">Expenses allocated</div>
+                  {renderExpenseSummary()}
                 </div>
               )}
 
-              <div className="tv-info-card">
-                <div className="tv-info-card-title">APPROVAL TRAIL</div>
-                <div className="tv-trail">
-                  <div className={`tv-trail-step ${req.pm_status === "Approved" ? "tv-trail-done" : req.pm_status === "Rejected" ? "tv-trail-reject" : ""}`}>
-                    <div className={`tv-trail-dot ${pmSM.dot}`} />
-                    <div className="tv-trail-content">
-                      <span className="tv-trail-label">{isHRRole(req.designation) ? "Auto-approved (HR staff)" : "Project Manager"}</span>
-                      <span className="tv-trail-status">{req.pm_status || "Pending"}</span>
-                      {req.pm_reviewed_at && <span className="tv-trail-date">{fmtDT(req.pm_reviewed_at)}</span>}
-                      {req.pm_review_note && <span className="tv-trail-note">"{req.pm_review_note}"</span>}
+              <div className="te-info-card">
+                <div className="te-info-card-title">Approval trail</div>
+                <div className="te-trail">
+                  <div className={`te-trail-step ${req.pm_status === "Approved" ? "te-trail-done" : req.pm_status === "Rejected" ? "te-trail-reject" : ""}`}>
+                    <div className="te-trail-dot" />
+                    <div className="te-trail-content">
+                      <span className="te-trail-label">{isHRRole(req.designation) ? "Auto-approved (HR staff)" : "Project Manager"}</span>
+                      <span className="te-trail-status">{req.pm_status || "Pending"}</span>
+                      {req.pm_reviewed_at && <span className="te-trail-date">{fmtDT(req.pm_reviewed_at)}</span>}
+                      {req.pm_review_note && <span className="te-trail-note">"{req.pm_review_note}"</span>}
                     </div>
                   </div>
 
-                  <div className="tv-trail-line" />
+                  <div className="te-trail-line" />
 
-                  <div className={`tv-trail-step ${req.status === "Approved" ? "tv-trail-done" : req.status === "Rejected" ? "tv-trail-reject" : "tv-trail-waiting"}`}>
-                    <div className={`tv-trail-dot ${sm.dot}`} />
-                    <div className="tv-trail-content">
-                      <span className="tv-trail-label">{isHRRole(req.designation) ? "CEO" : "HR Manager"}</span>
-                      <span className="tv-trail-status">{req.status === "Pending" ? "Awaiting decision" : req.status}</span>
-                      {req.reviewed_at && <span className="tv-trail-date">{fmtDT(req.reviewed_at)}</span>}
-                      {req.review_note && <span className="tv-trail-note">"{req.review_note}"</span>}
+                  <div className={`te-trail-step ${req.status === "Approved" ? "te-trail-done" : req.status === "Rejected" ? "te-trail-reject" : "te-trail-waiting"}`}>
+                    <div className="te-trail-dot" />
+                    <div className="te-trail-content">
+                      <span className="te-trail-label">{isHRRole(req.designation) ? "CEO" : "HR Manager"}</span>
+                      <span className="te-trail-status">{req.status === "Pending" ? "Awaiting decision" : req.status}</span>
+                      {req.reviewed_at && <span className="te-trail-date">{fmtDT(req.reviewed_at)}</span>}
+                      {req.review_note && <span className="te-trail-note">"{req.review_note}"</span>}
                     </div>
                   </div>
                 </div>
               </div>
 
               {canEnterExp && (
-                <div className="tv-info-card tv-expense-entry-card">
-                  <div className="tv-info-card-title tv-title-row">
-                    <span><Receipt size={11} /> EXPENSE ENTRY</span>
+                <div className="te-info-card te-expense-entry-card">
+                  <div className="te-info-card-title te-title-row">
+                    <span><Receipt size={11} /> Expense entry</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       {grandTotal > 0 && (
-                        <span className="tv-exp-grand-badge">₹{grandTotal.toLocaleString("en-IN")}</span>
+                        <span className="te-exp-grand-badge">₹{grandTotal.toLocaleString("en-IN")}</span>
                       )}
                       {!isEditing && expenses.length > 0 && (
-                        <button className="tv-edit-exp-btn" onClick={() => setIsEditing(true)}>
-                          ✏️ Edit Expenses
+                        <button className="te-edit-exp-btn" onClick={() => setIsEditing(true)}>
+                          Edit expenses
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Saved summary view */}
                   {!isEditing && expenses.length > 0 && (
-                    <div className="tv-exp-saved-summary">
-                      {EXP_CATEGORIES.map((cat) => {
-                        const rows = rowsFor(cat.key);
-                        if (!rows.length) return null;
-                        return (
-                          <div key={cat.key} className="tv-exp-cat-summary">
-                            <div className="tv-exp-cat-label">{cat.icon} {cat.label}</div>
-                            {rows.map((e, i) => (
-                              <div key={i} className="tv-detail-row">
-                                <span className="tv-detail-label">
-                                  <Receipt size={11} />
-                                  {e.type}{e.description ? ` — ${e.description}` : ""}
-                                </span>
-                                <span className="tv-detail-value tv-amount">
-                                  ₹{parseFloat(e.amount || 0).toLocaleString("en-IN")}
-                                </span>
-                              </div>
-                            ))}
-                            <div className="tv-exp-cat-subtotal">
-                              <span>{cat.label} subtotal</span>
-                              <strong>₹{totalFor(cat.key).toLocaleString("en-IN")}</strong>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <div className="tv-exp-total-row tv-exp-grand-total">
-                        <span>Grand Total</span>
-                        <strong>₹{grandTotal.toLocaleString("en-IN")}</strong>
-                      </div>
-                    </div>
+                    <div className="te-exp-saved-summary">{renderExpenseSummary()}</div>
                   )}
 
-                  {/* Edit mode */}
                   {isEditing && (
                     <>
-                      {/* Category Tabs */}
-                      <div className="tv-exp-tabs">
+                      <div className="te-exp-tabs">
                         {EXP_CATEGORIES.map((cat) => (
                           <button
                             key={cat.key}
-                            className={`tv-exp-tab ${activeTab === cat.key ? "active" : ""}`}
+                            className={`te-exp-tab ${activeTab === cat.key ? "active" : ""}`}
                             onClick={() => setActiveTab(cat.key)}
                           >
-                            <span className="tv-exp-tab-icon">{cat.icon}</span>
+                            <span className="te-exp-tab-icon">{cat.icon}</span>
                             <span>{cat.label}</span>
                             {totalFor(cat.key) > 0 && (
-                              <span className="tv-exp-tab-amt">₹{totalFor(cat.key).toLocaleString("en-IN")}</span>
+                              <span className="te-exp-tab-amt">₹{totalFor(cat.key).toLocaleString("en-IN")}</span>
                             )}
                           </button>
                         ))}
                       </div>
 
-                      {/* Rows for active category */}
                       {EXP_CATEGORIES.filter((c) => c.key === activeTab).map((cat) => {
                         const catRows = rowsFor(cat.key);
                         const catIndexes = expenses.reduce((acc, e, i) => {
@@ -457,37 +424,37 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
                           return acc;
                         }, []);
                         return (
-                          <div key={cat.key} className="tv-exp-category-body">
+                          <div key={cat.key}>
                             {catRows.length === 0 && (
-                              <p className="tv-empty-msg tv-exp-empty">No {cat.label.toLowerCase()} expenses added yet.</p>
+                              <p className="te-empty-msg te-exp-empty">No {cat.label.toLowerCase()} expenses added yet.</p>
                             )}
                             {catRows.map((e, ci) => {
                               const globalIdx = catIndexes[ci];
                               return (
-                                <div className="tv-exp-row-v2" key={ci}>
-                                  <div className="tv-exp-row-top">
+                                <div className="te-exp-row-v2" key={ci}>
+                                  <div className="te-exp-row-top">
                                     <select
-                                      className="tv-exp-select"
+                                      className="te-exp-select"
                                       value={e.type}
                                       onChange={(ev) => updRow(globalIdx, "type", ev.target.value)}
                                     >
                                       {cat.types.map((t) => <option key={t}>{t}</option>)}
                                     </select>
-                                    <button className="tv-exp-del" onClick={() => delRow(globalIdx)}>
+                                    <button className="te-exp-del" onClick={() => delRow(globalIdx)}>
                                       <Trash2 size={12} />
                                     </button>
                                   </div>
                                   <input
-                                    className="tv-exp-input tv-exp-desc"
+                                    className="te-exp-input te-exp-desc"
                                     type="text"
                                     placeholder="Description (optional)"
                                     value={e.description}
                                     onChange={(ev) => updRow(globalIdx, "description", ev.target.value)}
                                   />
-                                  <div className="tv-exp-amt-wrap">
-                                    <span className="tv-exp-rupee">₹</span>
+                                  <div className="te-exp-amt-wrap">
+                                    <span className="te-exp-rupee">₹</span>
                                     <input
-                                      className="tv-exp-input tv-exp-amt"
+                                      className="te-exp-input te-exp-amt"
                                       type="number"
                                       placeholder="0.00"
                                       min="0"
@@ -498,12 +465,12 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
                                 </div>
                               );
                             })}
-                            <div className="tv-exp-cat-actions">
-                              <button className="tv-add-exp-btn" onClick={() => addRow(cat.key)}>
+                            <div className="te-exp-cat-actions">
+                              <button className="te-add-exp-btn" onClick={() => addRow(cat.key)}>
                                 <Plus size={11} /> Add {cat.label}
                               </button>
                               {totalFor(cat.key) > 0 && (
-                                <span className="tv-exp-cat-running">
+                                <span className="te-exp-cat-running">
                                   Subtotal: <strong>₹{totalFor(cat.key).toLocaleString("en-IN")}</strong>
                                 </span>
                               )}
@@ -512,24 +479,24 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
                         );
                       })}
 
-                      <div className="tv-exp-footer">
+                      <div className="te-exp-footer">
                         {grandTotal > 0 && (
-                          <span className="tv-exp-total-label">
-                            Grand Total <strong>₹{grandTotal.toLocaleString("en-IN")}</strong>
+                          <span className="te-exp-total-label">
+                            Grand total <strong>₹{grandTotal.toLocaleString("en-IN")}</strong>
                           </span>
                         )}
                         <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
                           {expenses.length > 0 && (
-                            <button className="tv-btn-secondary tv-exp-cancel-btn" onClick={() => setIsEditing(false)}>
+                            <button className="te-btn-secondary te-exp-cancel-btn" onClick={() => setIsEditing(false)}>
                               Cancel
                             </button>
                           )}
                           <button
-                            className="tv-exp-save-btn"
+                            className="te-exp-save-btn"
                             onClick={saveExpenses}
                             disabled={savingExp || expenses.filter((e) => parseFloat(e.amount) > 0).length === 0}
                           >
-                            {savingExp ? "Saving…" : "Save Expenses"}
+                            {savingExp ? "Saving…" : "Save expenses"}
                           </button>
                         </div>
                       </div>
@@ -537,7 +504,7 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
                   )}
 
                   {isEditing && expenses.length === 0 && (
-                    <p className="tv-empty-msg" style={{ textAlign: "center", padding: "8px 0 4px" }}>
+                    <p className="te-empty-msg" style={{ textAlign: "center", padding: "8px 0 4px" }}>
                       Select a category tab above and add expenses.
                     </p>
                   )}
@@ -545,27 +512,27 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
               )}
 
               {canAct ? (
-                <div className="tv-info-card tv-action-card">
-                  <div className="tv-info-card-title">{isHRRole(req.designation) ? "CEO DECISION" : "HR DECISION"}</div>
-                  <textarea className="tv-note-input" rows={3} placeholder="Add a review note (optional)…" value={note} onChange={(e) => setNote(e.target.value)} />
+                <div className="te-info-card te-action-card">
+                  <div className="te-info-card-title">{isHRRole(req.designation) ? "CEO decision" : "HR decision"}</div>
+                  <textarea className="te-note-input" rows={3} placeholder="Add a review note (optional)…" value={note} onChange={(e) => setNote(e.target.value)} />
                   {!confirm ? (
-                    <div className="tv-action-btns">
-                      <button className="tv-btn-reject" onClick={() => setConfirm("Rejected")} disabled={acting}><XCircle size={13} /> Reject</button>
-                      <button className="tv-btn-approve" onClick={() => setConfirm("Approved")} disabled={acting}><CheckCircle size={13} /> Approve</button>
+                    <div className="te-action-btns">
+                      <button className="te-btn-reject" onClick={() => setConfirm("Rejected")} disabled={acting}><XCircle size={13} /> Reject</button>
+                      <button className="te-btn-approve" onClick={() => setConfirm("Approved")} disabled={acting}><CheckCircle size={13} /> Approve</button>
                     </div>
                   ) : (
-                    <div className="tv-confirm-row">
-                      <span className="tv-confirm-label"><AlertCircle size={12} /> Confirm {confirm}?</span>
-                      <button className={confirm === "Approved" ? "tv-btn-approve" : "tv-btn-reject"} onClick={() => handle(confirm)} disabled={acting}>{acting ? "Saving…" : "Yes, confirm"}</button>
-                      <button className="tv-btn-secondary" onClick={() => setConfirm(null)}>Cancel</button>
+                    <div className="te-confirm-row">
+                      <span className="te-confirm-label"><AlertCircle size={12} /> Confirm {confirm}?</span>
+                      <button className={confirm === "Approved" ? "te-btn-approve" : "te-btn-reject"} onClick={() => handle(confirm)} disabled={acting}>{acting ? "Saving…" : "Yes, confirm"}</button>
+                      <button className="te-btn-secondary" onClick={() => setConfirm(null)}>Cancel</button>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="tv-info-card">
-                  <div className="tv-info-card-title">FINAL STATUS</div>
-                  <div className={`tv-status-pill-lg ${sm.cls}`}>{sm.icon}{req.status}</div>
-                  {req.review_note && <p className="tv-purpose-text" style={{ marginTop: 10 }}>Note: {req.review_note}</p>}
+                <div className="te-info-card">
+                  <div className="te-info-card-title">Final status</div>
+                  <div className={`te-status-pill-lg ${sm.cls}`}>{sm.icon}{req.status}</div>
+                  {req.review_note && <p className="te-purpose-text" style={{ marginTop: 10 }}>Note: {req.review_note}</p>}
                 </div>
               )}
             </div>
@@ -577,50 +544,57 @@ const DetailModal = ({ request: req, onClose, onAction, viewerRole }) => {
   );
 };
 
-// ── Request Box Card Component ───────────────────────────────────────────────
+// ── Request Row Card ──────────────────────────────────────────────────────────
 const RequestRow = ({ req, onOpen }) => {
   const sm = getSM(req.status);
   return (
     <div
-      className="tv-row-card"
+      className={`te-row-card ${sm.card}`}
       onClick={() => onOpen(req)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && onOpen(req)}
     >
-      <div className="tv-row-top">
-        <span className="tv-row-no">{req.request_no}</span>
-        <span className={`tv-status-pill ${sm.cls}`}>{sm.icon}{req.status}</span>
+      <div className="te-row-top">
+        <span className="te-row-no">{req.request_no}</span>
+        <span className={`te-status-pill ${sm.cls}`}>{sm.icon}{req.status}</span>
       </div>
 
-      <h3 className="tv-row-title">{req.trip_title || req.destination}</h3>
+      <h3 className="te-row-title">{req.trip_title || req.destination}</h3>
 
-      <div className="tv-row-route">
-        <div className="tv-route-item">
+      <div className="te-row-employee">
+        <span className="te-row-employee-name">{req.employee_name}</span>
+        <span className="te-row-employee-sep">·</span>
+        <Building2 size={11} />
+        <span>{req.department || "—"}</span>
+      </div>
+
+      <div className="te-row-route">
+        <div className="te-route-item">
           <Navigation size={12} />
           <span>{req.origin || "—"}</span>
         </div>
-        <MoveRight size={14} className="tv-row-arrow" />
-        <div className="tv-route-item">
+        <MoveRight size={14} className="te-row-arrow" />
+        <div className="te-route-item">
           <MapPin size={12} />
           <span>{req.destination}</span>
         </div>
       </div>
 
-      <div className="tv-row-footer">
-        <div className="tv-row-dates">
+      <div className="te-row-footer">
+        <div className="te-row-dates">
           <CalendarDays size={12} />
           <span>{fmt(req.travel_from_date)}</span>
-          <span className="tv-row-datesep">→</span>
+          <span className="te-row-datesep">→</span>
           <span>{fmt(req.travel_to_date)}</span>
         </div>
 
-        <div className="tv-row-badges">
-          <span className={`tv-badge ${req.budget_type === "project" ? "tv-badge-project" : "tv-badge-company"}`}>
+        <div className="te-row-badges">
+          <span className={`te-badge ${req.budget_type === "project" ? "te-badge-project" : "te-badge-company"}`}>
             {req.budget_type === "project" ? "Project" : "Company"}
           </span>
-          <span className={`tv-badge ${req.payment_mode === "self" ? "tv-badge-self" : "tv-badge-requested"}`}>
-            {req.payment_mode === "self" ? "Self-paid" : "Company Paid"}
+          <span className={`te-badge ${req.payment_mode === "self" ? "te-badge-self" : "te-badge-requested"}`}>
+            {req.payment_mode === "self" ? "Self-paid" : "Company paid"}
           </span>
         </div>
       </div>
@@ -628,7 +602,7 @@ const RequestRow = ({ req, onOpen }) => {
   );
 };
 
-// ── Main Dashboard Workspace ──────────────────────────────────────────────────
+// ── Main Dashboard ─────────────────────────────────────────────────────────────
 const TravelExpenseDashboard = () => {
   const { user } = useContext(AuthContext);
   const viewerRole = (user?.role || user?.designation || "")
@@ -642,7 +616,6 @@ const TravelExpenseDashboard = () => {
   const [toast,    setToast]    = useState(null);
   const [filter,   setFilter]   = useState("All");
 
-  // Localized secondary filters
   const [budgetFilter, setBudgetFilter] = useState("All");
   const [payFilter, setPayFilter]       = useState("All");
 
@@ -697,33 +670,37 @@ const TravelExpenseDashboard = () => {
       (r.request_no    || "").toLowerCase().includes(q) ||
       (r.department    || "").toLowerCase().includes(q) ||
       (r.designation   || "").toLowerCase().includes(q);
-      
-    const matchStatus = filter === "All" || r.status === filter;
-    const matchBudget = budgetFilter === "All" || r.budget_type === budgetFilter;
+
+    const matchStatus  = filter === "All" || r.status === filter;
+    const matchBudget  = budgetFilter === "All" || r.budget_type === budgetFilter;
     const matchPayment = payFilter === "All" || r.payment_mode === payFilter;
 
     return matchSearch && matchStatus && matchBudget && matchPayment;
   });
 
+  const statNumClass = (s) =>
+    s === "Approved" ? "green" : s === "Rejected" ? "red" : s === "Pending" ? "amber" : "";
+
   return (
-    <div className="tv-page">
+    <div className="te-page">
       {toast && (
-        <div className={`tv-toast tv-toast-${toast.type}`}>
+        <div className={`te-toast te-toast-${toast.type}`}>
           {toast.type === "success" ? <CheckCircle size={14} /> : <XCircle size={14} />}
           {toast.msg}
         </div>
       )}
 
-      {/* Top Header Section */}
-      <div className="tv-topbar">
-        <div className="tv-topbar-left">
-          {isCEO && <Shield size={17} className="tv-topbar-icon" />}
+      <div className="te-topbar">
+        <div className="te-topbar-left">
+          <div className="te-topbar-icon-box">
+            {isCEO ? <Shield size={18} /> : <Plane size={18} />}
+          </div>
           <div>
             <h1>{isCEO ? "HR Travel Requests" : "Travel Expense Requests"}</h1>
             <p>{isCEO ? "Approve or reject travel requests from HR employees" : "Approve or reject PM-approved employee travel requests"}</p>
           </div>
         </div>
-        <div className="tv-search-wrap">
+        <div className="te-search-wrap">
           <Search size={13} />
           <input
             placeholder="Search name, destination, request no…"
@@ -733,78 +710,73 @@ const TravelExpenseDashboard = () => {
         </div>
       </div>
 
-      {/* Integrated Two Column Workspace Layout */}
-      <div className="tv-dashboard-workspace">
-        
-        {/* LEFT COLUMN: Sidebar Filters */}
-        <aside className="tv-workspace-sidebar">
-          <div className="tv-insight-card">
-            <h4 className="tv-insight-title">Active Queue Metrics</h4>
-            <div className="tv-insight-metric">
-              <span className="tv-metric-num">{counts.Pending}</span>
-              <span className="tv-metric-label">Requests awaiting verification</span>
+      <div className="te-workspace">
+
+        <aside className="te-sidebar">
+          <div className="te-metric-card">
+            <div className="te-metric-title">Active queue</div>
+            <div className="te-metric-value">
+              <span className="te-metric-num">{counts.Pending}</span>
+              <span className="te-metric-label">requests awaiting verification</span>
             </div>
-            <div className="tv-insight-progress-bar">
-              <div className="tv-insight-progress-fill" style={{ width: queue.length ? `${(counts.Pending / queue.length) * 100}%` : '0%' }}></div>
+            <div className="te-metric-bar">
+              <div className="te-metric-bar-fill" style={{ width: queue.length ? `${(counts.Pending / queue.length) * 100}%` : "0%" }} />
             </div>
           </div>
 
-          <div className="tv-filter-panel">
-            <h3 className="tv-filter-heading">Advanced Filtering</h3>
-            
-            <div className="tv-filter-group">
-              <label className="tv-filter-label">Coverage Allocation</label>
-              <div className="tv-filter-options">
-                <button className={`tv-filter-btn ${budgetFilter === "All" ? "active" : ""}`} onClick={() => setBudgetFilter("All")}>All Allocations</button>
-                <button className={`tv-filter-btn ${budgetFilter === "company" ? "active" : ""}`} onClick={() => setBudgetFilter("company")}>Company Expense</button>
-                <button className={`tv-filter-btn ${budgetFilter === "project" ? "active" : ""}`} onClick={() => setBudgetFilter("project")}>Project Budget</button>
+          <div className="te-filter-panel">
+            <h3 className="te-filter-heading">Filters</h3>
+
+            <div className="te-filter-group">
+              <label className="te-filter-label">Coverage allocation</label>
+              <div className="te-filter-options">
+                <button className={`te-filter-btn ${budgetFilter === "All" ? "active" : ""}`} onClick={() => setBudgetFilter("All")}>All allocations</button>
+                <button className={`te-filter-btn ${budgetFilter === "company" ? "active" : ""}`} onClick={() => setBudgetFilter("company")}>Company expense</button>
+                <button className={`te-filter-btn ${budgetFilter === "project" ? "active" : ""}`} onClick={() => setBudgetFilter("project")}>Project budget</button>
               </div>
             </div>
 
-            <div className="tv-filter-group">
-              <label className="tv-filter-label">Settlement Mode</label>
-              <div className="tv-filter-options">
-                <button className={`tv-filter-btn ${payFilter === "All" ? "active" : ""}`} onClick={() => setPayFilter("All")}>All Modes</button>
-                <button className={`tv-filter-btn ${payFilter === "requested" ? "active" : ""}`} onClick={() => setPayFilter("requested")}>Company Paid</button>
-                <button className={`tv-filter-btn ${payFilter === "self" ? "active" : ""}`} onClick={() => setPayFilter("self")}>Self-paid</button>
+            <div className="te-filter-group">
+              <label className="te-filter-label">Settlement mode</label>
+              <div className="te-filter-options">
+                <button className={`te-filter-btn ${payFilter === "All" ? "active" : ""}`} onClick={() => setPayFilter("All")}>All modes</button>
+                <button className={`te-filter-btn ${payFilter === "requested" ? "active" : ""}`} onClick={() => setPayFilter("requested")}>Company paid</button>
+                <button className={`te-filter-btn ${payFilter === "self" ? "active" : ""}`} onClick={() => setPayFilter("self")}>Self-paid</button>
               </div>
             </div>
           </div>
         </aside>
 
-        {/* RIGHT COLUMN: Interactive Status Badges & Cards Grid */}
-        <main className="tv-workspace-content">
-          <div className="tv-stats">
+        <main className="te-content">
+          <div className="te-stats">
             {["All", "Pending", "Approved", "Rejected"].map((s) => (
               <div
                 key={s}
-                className={`tv-stat-card ${filter === s ? "tv-stat-active" : ""}`}
+                className={`te-stat-card ${filter === s ? "active" : ""}`}
                 onClick={() => setFilter(s)}
               >
-                <span className="tv-stat-label">{s === "All" ? "TOTAL" : s.toUpperCase()}</span>
-                <strong className={`tv-stat-num ${s === "Approved" ? "tv-stat-green" : s === "Rejected" ? "tv-stat-red" : s === "Pending" ? "tv-stat-amber" : ""}`}>
-                  {counts[s]}
-                </strong>
+                <span className="te-stat-label">{s === "All" ? "Total" : s}</span>
+                <strong className={`te-stat-num ${statNumClass(s)}`}>{counts[s]}</strong>
               </div>
             ))}
           </div>
 
-          <div className="tv-list-section-header">
-            <span className="tv-section-caption">Showing data blocks matching core parameters</span>
-          </div>
+          <span className="te-section-caption">
+            Showing {filtered.length} of {queue.length} requests
+          </span>
 
           {loading ? (
-            <div className="tv-state-box">
-              <Clock size={28} strokeWidth={1.4} className="tv-spin" />
+            <div className="te-state-box">
+              <Clock size={26} strokeWidth={1.4} className="te-spin" />
               <p>Loading requests…</p>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="tv-state-box">
-              <Plane size={32} strokeWidth={1.4} />
-              <p>{search ? `No parameters match "${search}"` : `No structural records found.`}</p>
+            <div className="te-state-box">
+              <Plane size={30} strokeWidth={1.4} />
+              <p>{search ? `No requests match "${search}"` : "No requests found."}</p>
             </div>
           ) : (
-            <div className="tv-list-grid">
+            <div className="te-list-grid">
               {filtered.map((r) => (
                 <RequestRow key={r.id} req={r} onOpen={setSelected} />
               ))}

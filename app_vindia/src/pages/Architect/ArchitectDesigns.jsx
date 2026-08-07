@@ -59,8 +59,9 @@ const DMS_ROLE_TO_CODE = {
 const PROJECT_SCOPED_ROLES = new Set(["Site Engineer", "Client"]);
 const CAN_REQUEST_ROLES    = new Set(["Site Engineer", "Client"]);
 
-const DEFAULT_REQUEST_NOTE =
-  "Hi, I am formally requesting access to the planning drawing for this project. Please share the latest revision at your earliest convenience.";
+// Note field for the visualizer's "Request Planning Drawing" flow starts blank —
+// the visualizer writes their own message rather than editing a canned one.
+const DEFAULT_REQUEST_NOTE = "";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function nextRevision(current) {
@@ -144,6 +145,7 @@ function normalise3DSubmission(row) {
   return {
     id:              row.id,
     drawingId:       row.drawing_id,
+    projectId:       row.project_id != null ? String(row.project_id) : null,
     drawingName:     row.drawing_name     || "—",
     projectName:     row.project_name     || "—",
     submittedBy:     row.submitted_by,
@@ -255,6 +257,51 @@ function DrawingTypeTag({ type }) {
   else if (type === "Detail Drawing") { cls += " dms-tag-blue"; label = "Detail"; }
   else if (type === "Planning") { cls += " dms-tag-purple"; label = "Planning"; }
   return <span className={cls}>{label}</span>;
+}
+
+// ─── Compact Submission Card ──────────────────────────────────────────────
+// Same visual shape as .dms-plan-card (colored top bar, tag/rev row, title,
+// project line, divider, field + button row), just smaller via the
+// `dms-plan-card-compact` modifier — used for both the 3D Visualizer's "My
+// Submissions" list and the Architect's "Approvals" list so both stay
+// visually consistent with the Planning-drawing cards. Nothing from the
+// original row layout is dropped: status, revision, filename, submitted
+// date, and (in the modal opened via View/Review) review notes/approval
+// date are all still reachable.
+function SubmissionCard({ sub, showSubmitter, onView }) {
+  const statusClass =
+    sub.status === "Approved" ? "dms-plan-card-approved"
+    : sub.status === "Rejected" ? "dms-plan-card-rejected"
+    : "dms-plan-card-pending";
+
+  return (
+    <article className={`dms-plan-card dms-plan-card-compact ${statusClass}`}>
+      <div className="dms-plan-card-top">
+        <span className={badgeClass(sub.status)}>{sub.status}</span>
+        <span className="dms-plan-card-rev">{sub.drawingRevision || "R1"}</span>
+      </div>
+
+      <h3 className="dms-plan-card-name">{sub.drawingName}</h3>
+      <div className="dms-plan-card-project">
+        {sub.projectName}
+        {showSubmitter && sub.submitterName ? <> · {sub.submitterName}</> : null}
+      </div>
+
+      <div className="dms-plan-card-sent">
+        <span className="dms-mini-chip" title={sub.fileName}>{sub.fileName || "file"}</span>
+      </div>
+
+      <div className="dms-plan-card-block">
+        <div className="dms-plan-card-field">
+          <span className="dms-plan-card-field-label">Submitted</span>
+          <span className="dms-plan-card-field-value">{fmt(sub.submittedAt)}</span>
+        </div>
+        <button className="dms-btn dms-btn-ghost dms-plan-card-btn" onClick={() => onView(sub)}>
+          {sub.status === "Pending" ? "Review →" : "View →"}
+        </button>
+      </div>
+    </article>
+  );
 }
 
 function FilePreview({ fileUrl, fileName, maxHeight = 340 }) {
@@ -438,7 +485,7 @@ function UploadModal({ uf, setUf, projects, fileRef, handleFileChange, handleUpl
 }
 
 // ─── 3D Submission Review Modal (Architect) ───────────────────────────────────
-function SubmissionReviewModal({ sub, currentUserId, onReview, onClose }) {
+function SubmissionReviewModal({ sub, currentUserId, onReview, onClose, readOnly }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -476,7 +523,7 @@ function SubmissionReviewModal({ sub, currentUserId, onReview, onClose }) {
       wide
       onClose={onClose}
       footer={
-        sub.status === "Pending" ? (
+        !readOnly && sub.status === "Pending" ? (
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button className="dms-btn dms-btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
             <button className="dms-btn dms-btn-danger" onClick={() => handleReview("Rejected")} disabled={busy}>✕ Reject</button>
@@ -513,7 +560,7 @@ function SubmissionReviewModal({ sub, currentUserId, onReview, onClose }) {
           </div>
           {sub.status !== "Pending" && sub.reviewNote && (
             <div className="dms-form-field">
-              <div className="dms-label">Review Note</div>
+              <div className="dms-label">{readOnly ? "Architect Feedback" : "Review Note"}</div>
               <pre className="dms-note-pre" style={{ fontSize: 12 }}>{sub.reviewNote}</pre>
             </div>
           )}
@@ -523,7 +570,7 @@ function SubmissionReviewModal({ sub, currentUserId, onReview, onClose }) {
               <pre className="dms-note-pre" style={{ fontSize: 12 }}>{sub.notes}</pre>
             </div>
           )}
-          {sub.status === "Pending" && (
+          {!readOnly && sub.status === "Pending" && (
             <div className="dms-form-field">
               <div className="dms-label">Review Note (optional)</div>
               <textarea className="dms-input" style={{ minHeight: 80 }}
@@ -531,9 +578,14 @@ function SubmissionReviewModal({ sub, currentUserId, onReview, onClose }) {
                 value={note} onChange={(e) => setNote(e.target.value)} />
             </div>
           )}
+          {readOnly && sub.status === "Pending" && (
+            <div className="dms-info-box dms-info-box-gold" style={{ fontSize: 12 }}>
+              ⏳ Waiting on the Architect to review this submission.
+            </div>
+          )}
         </div>
         <div>
-          <div className="dms-label">Render File</div>
+          <div className="dms-label" style={{ marginBottom: 8 }}>Render File</div>
           <div className="dms-file-preview-box" style={{ minHeight: 300 }}>
             {sub.fileUrl && isImg && (
               <img src={sub.fileUrl} alt="3D render"
@@ -586,10 +638,8 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
   const addRevFileRef = useRef(null);
   const newRevLabel = nextRevision(d.revision);
 
-  // ── FIX 1: previewRevision defaults null; set from loaded revisions OR drawing file
   const [previewRevision, setPreviewRevision] = useState(null);
 
-  // Load 3D submissions
   useEffect(() => {
     (async () => {
       try {
@@ -604,7 +654,6 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
     })();
   }, [d.id]);
 
-  // ── FIX 2: Load revision history with robust fallback
   useEffect(() => {
     (async () => {
       try {
@@ -612,16 +661,13 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         const list = (json?.data || json || []).map(normaliseRevision);
-        // Sort newest first
         list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setRevisions(list);
 
-        // Default preview = latest revision that has a file
         const withFile = list.find((r) => r.fileUrl);
         if (withFile) {
           setPreviewRevision(withFile);
         } else {
-          // Fallback: use the drawing's own file if no revision history files
           if (d.fileUrl) {
             setPreviewRevision({ revision: d.revision, fileUrl: d.fileUrl, fileName: d.fileName });
           }
@@ -629,7 +675,6 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
       } catch (e) {
         console.error("Revision history load failed:", e);
         setRevisions([]);
-        // ── FIX 2b: always fall back to drawing's own file for preview
         if (d.fileUrl) {
           setPreviewRevision({ revision: d.revision, fileUrl: d.fileUrl, fileName: d.fileName });
         }
@@ -685,12 +730,10 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
         }),
       });
 
-      // ── FIX 3: tell parent to update the drawing's revision in state
       await onRevisionIncrement(d.id, newRevLabel, fileUrl, addRevFile.name);
 
       setToast3D({ type: "success", message: `Revision ${newRevLabel} uploaded.` });
 
-      // ── FIX 1b: Build new revision entry and immediately set as preview
       const newRev = {
         id:        uid(),
         revision:  newRevLabel,
@@ -699,7 +742,7 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
         createdAt: new Date().toISOString(),
       };
       setRevisions((prev) => [newRev, ...prev]);
-      setPreviewRevision(newRev);          // <-- immediate preview update
+      setPreviewRevision(newRev);
       setShowAddRevPanel(false);
       setAddRevFile(null);
       setAddRevFileName("");
@@ -727,10 +770,8 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
       <Modal title={`🏗️ ${d.drawingName}`} wide onClose={onClose}>
         <div className="dms-planning-detail-grid">
 
-          {/* ── LEFT COLUMN ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
 
-            {/* Meta card */}
             <div className="dms-detail-info-card">
               <div className="dms-grid-2" style={{ gap: "12px 20px" }}>
                 <div>
@@ -752,7 +793,6 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
               </div>
             </div>
 
-            {/* Send to 3D Visualizer */}
             <div style={{ marginBottom: 12 }}>
               <div className="dms-info-box dms-info-box-purple" style={{ marginBottom: 10 }}>
                 🏗️ <strong>Planning drawings</strong> are exclusively for the <strong>3D Visualizer</strong>.
@@ -772,7 +812,6 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
               )}
             </div>
 
-            {/* Add New Revision */}
             <hr className="dms-divider" />
             {!showAddRevPanel ? (
               <button
@@ -820,7 +859,6 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
               </div>
             )}
 
-            {/* 3D Render Submissions */}
             <hr className="dms-divider" style={{ margin: "4px 0 14px" }} />
             <div className="dms-label" style={{ marginBottom: 8 }}>
               3D Render Submissions
@@ -867,10 +905,8 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
             )}
           </div>
 
-          {/* ── RIGHT COLUMN ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-            {/* File Preview — shows selected revision */}
             <div>
               <div className="dms-label" style={{ marginBottom: 8 }}>
                 File Preview
@@ -880,7 +916,6 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
                   </span>
                 )}
               </div>
-              {/* ── FIX 1c: always render FilePreview; it shows "Preview unavailable" if no src */}
               <FilePreview
                 fileUrl={previewRevision?.fileUrl || ""}
                 fileName={previewRevision?.fileName || ""}
@@ -888,7 +923,6 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
               />
             </div>
 
-            {/* Revision History */}
             <div>
               <div className="dms-label" style={{ marginBottom: 8 }}>
                 Revision History ({loadingRevs ? "…" : revisions.length})
@@ -1183,15 +1217,47 @@ function RecipientDetailModal({ d, role, onClose }) {
   );
 }
 
-// ─── 3D Visualizer Submit Render Modal ──────────────────────────────────────
-function Submit3DModal({ drawing, currentUserId, onSubmitted, onClose }) {
-  const [file,     setFile]     = useState(null);
-  const [fileName, setFileName] = useState("");
-  const [notes,    setNotes]    = useState("");
-  const [busy,     setBusy]     = useState(false);
+// ─── Visualizer Send-to-Architect Modal (a.k.a. "Upload Drawing" for the 3D Visualizer) ─────
+// Lets the 3D Visualizer send a file straight to the architect assigned to a
+// project — no prior drawing/send from the architect required. Also serves as the
+// single entry point for submitting renders: revision is auto-computed per project.
+function SendToArchitectModal({ projects, currentUserId, mySubmissions, onSubmitted, onClose }) {
+  const [projectId, setProjectId] = useState("");
+  const [file,      setFile]      = useState(null);
+  const [fileName,  setFileName]  = useState("");
+  const [notes,     setNotes]     = useState("");
+  const [busy,      setBusy]      = useState(false);
   const fileRef = useRef(null);
 
-  const submittingRevision = drawing.revision;
+  const assignableProjects = projects.filter((p) => p.architectId);
+  const selectedProject = projects.find((p) => String(p.id) === String(projectId));
+
+  // Auto-increment revision based on prior submissions to this same project.
+  // Matched by project ID (not name) so casing/formatting differences between
+  // `project.name` and the submission's `project_name` field can't cause a
+  // false "no prior submissions" result — that bug was resetting every
+  // resubmission back to R1 regardless of actual history.
+  const autoRevision = React.useMemo(() => {
+    if (!selectedProject) return null;
+    const priorForProject = (mySubmissions || []).filter(
+      (s) => String(s.projectId) === String(selectedProject.id)
+    );
+    if (priorForProject.length === 0) return null;
+
+    const revisions = priorForProject.map((s) => s.drawingRevision).filter(Boolean);
+    if (revisions.length === 0) {
+      return { current: null, next: `R${priorForProject.length + 1}` };
+    }
+    const sorted = [...revisions].sort((a, b) => {
+      const na = parseInt((a.match(/\d+/) || ["0"])[0], 10);
+      const nb = parseInt((b.match(/\d+/) || ["0"])[0], 10);
+      return nb - na;
+    });
+    const latest = sorted[0];
+    return { current: latest, next: nextRevision(latest) };
+  }, [selectedProject, mySubmissions]);
+
+  const revisionToSend = autoRevision ? autoRevision.next : "R1";
 
   const handleFileChange = (e) => {
     const f = e.target.files?.[0];
@@ -1202,7 +1268,8 @@ function Submit3DModal({ drawing, currentUserId, onSubmitted, onClose }) {
   };
 
   const handleSubmit = async () => {
-    if (!file) return alert("Please choose a file to submit.");
+    if (!projectId) return alert("Please select a project.");
+    if (!file) return alert("Please choose a file to send.");
     setBusy(true);
 
     let uploadedUrl  = "";
@@ -1221,18 +1288,28 @@ function Submit3DModal({ drawing, currentUserId, onSubmitted, onClose }) {
     }
 
     try {
-      await submit3DRender(drawing.id, {
-        submitted_by:      currentUserId,
-        file_url:          uploadedUrl,
-        file_name:         uploadedName,
-        notes:             notes.trim(),
-        drawing_revision:  submittingRevision,
+      await fetch("/api/architect-designs/submit-to-architect", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id:       parseInt(projectId, 10),
+          submitted_by:     currentUserId,
+          file_url:         uploadedUrl,
+          file_name:        uploadedName,
+          notes:            notes.trim(),
+          drawing_revision: revisionToSend,
+        }),
+      }).then(async (r) => {
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          throw new Error(data.error || "Request failed");
+        }
       });
       onSubmitted();
       onClose();
     } catch (err) {
       console.error(err);
-      alert("Failed to submit render. Please try again.");
+      alert(err?.message || "Failed to send to architect. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -1240,32 +1317,39 @@ function Submit3DModal({ drawing, currentUserId, onSubmitted, onClose }) {
 
   return (
     <Modal
-      title={`Submit 3D Render — ${drawing.drawingName}`}
+      title="Upload Drawing"
       onClose={onClose}
       footer={
         <>
           <button className="dms-btn dms-btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
           <button className="dms-btn dms-btn-purple" onClick={handleSubmit} disabled={busy}>
-            {busy ? "Submitting…" : "Submit Render"}
+            {busy ? "Sending…" : "Send to Architect"}
           </button>
         </>
       }
     >
-      <div className="dms-submit-meta">
-        <span style={{ color: "var(--ink-muted)" }}>Project:</span>
-        <strong style={{ color: "var(--amber)" }}>{drawing.projectName}</strong>
-        <span style={{ margin: "0 4px", color: "var(--ink-faint)" }}>·</span>
-        <span style={{ color: "var(--ink-muted)" }}>Submitting for revision:</span>
-        <span className="dms-revision dms-revision-purple">{submittingRevision}</span>
-      </div>
-
-      <div className="dms-info-box dms-info-box-purple" style={{ marginBottom: 20 }}>
-        🏗️ Upload your 3D visualisation for revision <strong>{submittingRevision}</strong>.
-        The Architect will review and approve or reject your submission.
+      <div className="dms-form-field">
+        <label className="dms-label">
+          Project *
+          {selectedProject && (
+            <span style={{ marginLeft: 8, fontSize: 11, color: "var(--purple)" }}>
+              → Revision <strong>{revisionToSend}</strong>
+            </span>
+          )}
+        </label>
+        <select className="dms-input" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+          <option value="">Select a project…</option>
+          {assignableProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        {assignableProjects.length === 0 && (
+          <div className="dms-info-box dms-info-box-red" style={{ marginTop: 10, fontSize: 12 }}>
+            No projects currently have an architect assigned. Ask your coordinator to assign one first.
+          </div>
+        )}
       </div>
 
       <div className="dms-form-field">
-        <label className="dms-label">Render File *</label>
+        <label className="dms-label">File *</label>
         <input ref={fileRef} type="file" accept="*/*" style={{ display: "none" }}
           onChange={handleFileChange} />
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -1273,9 +1357,6 @@ function Submit3DModal({ drawing, currentUserId, onSubmitted, onClose }) {
             Choose File
           </button>
           {fileName && <span style={{ fontSize: 12, color: "var(--ink-muted)" }}>{fileName}</span>}
-        </div>
-        <div className="dms-info-box dms-info-box-blue" style={{ marginTop: 10, fontSize: 12 }}>
-          Accepted: images, PDFs, videos, or any format.
         </div>
       </div>
 
@@ -1306,7 +1387,7 @@ function VisualizerRequestModal({ projects, currentUserId, onSent, onClose }) {
         description:  note.trim(),
         due_date:     new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
       });
-      onSent();
+      onSent({ projectId, note: note.trim() });
       onClose();
     } catch (err) {
       console.error(err);
@@ -1326,9 +1407,6 @@ function VisualizerRequestModal({ projects, currentUserId, onSent, onClose }) {
           </button>
         </>
       }>
-      <div className="dms-info-box dms-info-box-purple" style={{ marginBottom: 20 }}>
-        🏗️ This request will be sent to the <strong>Architect</strong> to provide you with the planning drawing.
-      </div>
       <div className="dms-form-field">
         <label className="dms-label">Project *</label>
         <select className="dms-input" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
@@ -1339,6 +1417,7 @@ function VisualizerRequestModal({ projects, currentUserId, onSent, onClose }) {
       <div className="dms-form-field">
         <label className="dms-label">Note (optional)</label>
         <textarea className="dms-input" style={{ minHeight: 120 }}
+          placeholder="e.g. Requesting the latest revision of the planning drawing for this project…"
           value={note} onChange={(e) => setNote(e.target.value)} />
       </div>
     </Modal>
@@ -1346,15 +1425,15 @@ function VisualizerRequestModal({ projects, currentUserId, onSent, onClose }) {
 }
 
 // ─── Request Detail Modal ────────────────────────────────────────────────────
-function RequestDetailModal({ req, setRequests, onClose }) {
+function RequestDetailModal({ req, onMarkSeen, onClose }) {
   if (!req) return null;
   return (
     <Modal title="Drawing Request Details" onClose={onClose}
       footer={
         <div className="dms-modal-foot-spread">
           {!req.seen && (
-            <button className="dms-btn dms-btn-success" onClick={() => {
-              setRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, seen: true } : r));
+            <button className="dms-btn dms-btn-success" onClick={async () => {
+              await onMarkSeen(req.id);
               onClose();
             }}>
               Mark Seen
@@ -1403,6 +1482,31 @@ function RequestDetailModal({ req, setRequests, onClose }) {
   );
 }
 
+// ─── Delete Drawing Confirm Modal ────────────────────────────────────────────
+function DeleteDrawingModal({ drawing, busy, onConfirm, onClose }) {
+  if (!drawing) return null;
+  const wasSent = drawing.sentTo && drawing.sentTo.length > 0;
+  return (
+    <Modal title="Delete Drawing" onClose={onClose}
+      footer={
+        <>
+          <button className="dms-btn dms-btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="dms-btn dms-btn-danger" onClick={onConfirm} disabled={busy}>
+            {busy ? "Deleting…" : "Delete Permanently"}
+          </button>
+        </>
+      }>
+      <div className="dms-info-box dms-info-box-red">
+        ⚠️ You're about to permanently delete <strong>{drawing.drawingName}</strong>{" "}
+        (<strong>{drawing.revision}</strong>). This cannot be undone.
+        {wasSent && (
+          <> It has already been sent to {drawing.sentTo.length} recipient{drawing.sentTo.length > 1 ? "s" : ""}, who will lose access to it.</>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1424,7 +1528,6 @@ export default function DrawingManagementSystem() {
   const [modal,          setModal]          = useState(null);
   const [selectedDrawing, setSelectedDrawing] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [hoveredRow,     setHoveredRow]     = useState(null);
   const [fileBlobs,      setFileBlobs]      = useState({});
   const fileRef = useRef(null);
 
@@ -1434,9 +1537,24 @@ export default function DrawingManagementSystem() {
   });
 
   const [architectViewAs, setArchitectViewAs] = useState("Architect");
+  const [architectSection, setArchitectSection] = useState("Drawings");
+  const [visualizerSection, setVisualizerSection] = useState("Drawings");
+  // Requests sent this session — no "list my sent requests" endpoint exists yet,
+  // so this is tracked client-side. It resets on page reload. If you want it to
+  // persist, add a GET endpoint (e.g. /api/architect-designs/requests/mine) and
+  // fetch it the same way `loadRequests` does for the architect side.
+  const [myRequestsSent, setMyRequestsSent] = useState([]);
+  const [drawingTypeFilter, setDrawingTypeFilter] = useState("All");
+  const [drawingProjectFilter, setDrawingProjectFilter] = useState("");
+  const [drawingSearch, setDrawingSearch] = useState("");
+  const [showPreviewPicker, setShowPreviewPicker] = useState(false);
+
+  // Delete-drawing flow
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteBusy,   setDeleteBusy]   = useState(false);
 
   const viewRole           = activeRole === "Architect" ? architectViewAs : activeRole;
-  const isArchitectPreview = activeRole === "Architect";
+  const isArchitectPreview = activeRole === "Architect" && architectViewAs !== "Architect";
 
   const showToast  = useCallback((type, message) => setToast({ type, message }), []);
   const closeModal = useCallback(() => { setModal(null); setSelectedRequest(null); }, []);
@@ -1461,6 +1579,7 @@ export default function DrawingManagementSystem() {
             clientUserId:   p.client_user_id   != null ? Number(p.client_user_id)   : null,
             siteEngineerId: p.site_engineer_id != null ? Number(p.site_engineer_id) : null,
             coordinatorId:  p.coordinator_id   != null ? Number(p.coordinator_id)   : null,
+            architectId:    p.architect_id     != null ? Number(p.architect_id)     : null,
           }))
         );
       } catch (err) {
@@ -1504,15 +1623,15 @@ export default function DrawingManagementSystem() {
 
   // ── Load requests ──────────────────────────────────────────────────────────
   const loadRequests = useCallback(async () => {
-    if (activeRole !== "Architect") return;
+    if (activeRole !== "Architect" || !currentUser?.id) return;
     try {
-      const res  = await getRequests();
+      const res  = await getRequests(currentUser.id);
       const rows = res?.data || res || [];
       setRequests(rows.map(normaliseRequest));
     } catch (err) {
       console.error(err);
     }
-  }, [activeRole]);
+  }, [activeRole, currentUser?.id]);
 
   useEffect(() => { loadRequests(); }, [loadRequests]);
 
@@ -1542,6 +1661,47 @@ export default function DrawingManagementSystem() {
   }, [activeRole, currentUser.id]);
 
   useEffect(() => { loadAllSubmissions(); }, [loadAllSubmissions]);
+
+  // ── Mark a drawing request as seen (persisted) ────────────────────────────
+  const markRequestSeen = useCallback(async (reqId) => {
+    // Optimistic update so the UI feels instant…
+    setRequests((prev) => prev.map((r) => (r.id === reqId ? { ...r, seen: true } : r)));
+    try {
+      const res = await fetch(`/api/architect-designs/requests/${reqId}/seen`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seen_by: currentUser.id }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      console.error("Failed to persist seen status:", err);
+      showToast("error", "Marked seen locally, but the server didn't confirm it — it may reappear as unseen.");
+    }
+  }, [currentUser.id, showToast]);
+
+  // ── Delete a drawing (persisted) ──────────────────────────────────────────
+  const requestDeleteDrawing = useCallback((drawing) => {
+    setDeleteTarget(drawing);
+  }, []);
+
+  const confirmDeleteDrawing = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      const res = await fetch(`/api/architect-designs/${deleteTarget.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setDrawings((prev) => prev.filter((d) => String(d.id) !== String(deleteTarget.id)));
+      setSelectedDrawing((prev) => (prev && String(prev.id) === String(deleteTarget.id) ? null : prev));
+      showToast("success", `"${deleteTarget.drawingName}" deleted.`);
+      setDeleteTarget(null);
+      setModal((m) => (m === "detail" || m === "planningDetail" ? null : m));
+    } catch (err) {
+      console.error(err);
+      showToast("error", "Failed to delete drawing.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [deleteTarget, showToast]);
 
   // ── File pick ──────────────────────────────────────────────────────────────
   const handleFileChange = (e) => {
@@ -1670,11 +1830,8 @@ export default function DrawingManagementSystem() {
     }
   }, [drawings, projects, currentUser.id, showToast]);
 
-  // ── FIX 3: Increment Planning revision — also update fileUrl/fileName in state
-  //    so the 3D Visualizer sees the latest file when they next load drawings
   const handleRevisionIncrement = useCallback(async (drawingId, newRevision, newFileUrl, newFileName) => {
     try {
-      // PATCH already done in modal, just sync local state
       setDrawings((prev) =>
         prev.map((d) => String(d.id) === String(drawingId)
           ? { ...d, revision: newRevision, fileUrl: newFileUrl || d.fileUrl, fileName: newFileName || d.fileName }
@@ -1716,279 +1873,244 @@ export default function DrawingManagementSystem() {
   // ─── Architect View ───────────────────────────────────────────────────────
   const ArchitectView = () => {
     const unseenRequests  = requests.filter((r) => !r.seen);
+    const pendingRenderCount = allSubmissions.filter((s) => s.status === "Pending").length;
     const workingDrawings = drawings.filter((d) => d.drawingType === "Working Drawing");
     const detailDrawings  = drawings.filter((d) => d.drawingType === "Detail Drawing");
     const planningDrawings = drawings.filter((d) => d.drawingType === "Planning");
 
-    const DrawingTable = ({ list, emptyMsg }) => {
+    const filteredDrawings = drawings.filter((d) => {
+      if (drawingTypeFilter !== "All" && d.drawingType !== drawingTypeFilter) return false;
+      if (drawingProjectFilter && String(d.projectId) !== String(drawingProjectFilter)) return false;
+      if (drawingSearch.trim() && !d.drawingName.toLowerCase().includes(drawingSearch.trim().toLowerCase())) return false;
+      return true;
+    });
+
+
+    const SECTION_TABS = [
+      { key: "Drawings",  label: `Drawings (${drawings.length})` },
+      { key: "Requests",  label: "Requests", count: unseenRequests.length },
+      { key: "Approvals", label: "Approvals", count: pendingRenderCount },
+    ];
+
+    const cardTypeClass = (type) =>
+      type === "Working Drawing" ? "dms-plan-card-working"
+      : type === "Detail Drawing" ? "dms-plan-card-detail"
+      : "dms-plan-card-planning";
+
+    const DrawingCards = ({ list, emptyMsg }) => {
       if (list.length === 0) {
-        return <div className="dms-empty-box" style={{ padding: "24px 16px" }}>{emptyMsg}</div>;
+        return <div className="dms-empty-box">{emptyMsg}</div>;
       }
       return (
-        <table className="dms-table">
-          <thead>
-            <tr>
-              {["Drawing Name", "Project", "Type", "Rev", "Uploaded", "Sent To", ""].map((h, i) => (
-                <th key={i}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((d) => (
-              <tr key={d.id} className={hoveredRow === d.id ? "hovered" : ""}
-                onMouseEnter={() => setHoveredRow(d.id)}
-                onMouseLeave={() => setHoveredRow(null)}>
-                <td>
-                  <strong style={{ color: "var(--ink)", fontSize: 13 }}>{d.drawingName}</strong>
-                </td>
-                <td>
-                  <span style={{ color: "var(--ink-3)", fontSize: 12 }}>{d.projectName}</span>
-                </td>
-                <td><DrawingTypeTag type={d.drawingType} /></td>
-                <td>
-                  <span className={`dms-revision${d.drawingType === "Planning" ? " dms-revision-purple" : ""}`}>
-                    {d.revision}
-                  </span>
-                </td>
-                <td>
-                  <span style={{ fontSize: 11, color: "var(--ink-muted)" }}>{fmt(d.uploadedAt)}</span>
-                </td>
-                <td>
-                  {d.drawingType === "Planning" ? (
-                    d.sentTo.some((s) => s.role === "3D Visualizer") ? (
-                      <span className="dms-badge dms-badge-sent">Sent</span>
-                    ) : (
-                      <span style={{ color: "var(--ink-faint)", fontSize: 11 }}>Not sent</span>
-                    )
-                  ) : d.sentTo.length === 0 ? (
-                    <span style={{ color: "var(--ink-faint)", fontSize: 11 }}>—</span>
+        <div className="dms-card-grid">
+          {list.map((d) => (
+            <article key={d.id} className={`dms-plan-card ${cardTypeClass(d.drawingType)}`}>
+              <div className="dms-plan-card-top">
+                <DrawingTypeTag type={d.drawingType} />
+                <span className="dms-plan-card-rev">{d.revision}</span>
+              </div>
+
+              <h3 className="dms-plan-card-name">{d.drawingName}</h3>
+              <div className="dms-plan-card-project">{d.projectName}</div>
+
+              <div className="dms-plan-card-sent">
+                {d.drawingType === "Planning" ? (
+                  d.sentTo.some((s) => s.role === "3D Visualizer") ? (
+                    <span className="dms-mini-chip">Sent · 3D Visualizer</span>
                   ) : (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-                      {d.sentTo.map((s) => (
-                        <span key={s.role} className={badgeClass("Sent")} title={s.role}>
-                          {s.role === "3D Visualizer" ? "3D" : s.role.split(" ").map((w) => w[0]).join("")}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </td>
-                <td>
-                  <button className="dms-btn dms-btn-ghost"
-                    onClick={() => {
-                      setSelectedDrawing(d);
-                      setModal(d.drawingType === "Planning" ? "planningDetail" : "detail");
-                    }}>
-                    View
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    <span className="dms-plan-card-notsent">Not yet sent</span>
+                  )
+                ) : d.sentTo.length === 0 ? (
+                  <span className="dms-plan-card-notsent">Not yet sent</span>
+                ) : (
+                  d.sentTo.map((s) => (
+                    <span key={s.role} className="dms-mini-chip" title={s.role}>
+                      {s.role === "3D Visualizer" ? "3D" : s.role.split(" ").map((w) => w[0]).join("")}
+                    </span>
+                  ))
+                )}
+              </div>
+
+              <div className="dms-plan-card-block">
+                <div className="dms-plan-card-field">
+                  <span className="dms-plan-card-field-label">Uploaded</span>
+                  <span className="dms-plan-card-field-value">{fmt(d.uploadedAt)}</span>
+                </div>
+              </div>
+
+              <div className="dms-plan-card-actions">
+                <button className="dms-btn dms-btn-ghost dms-plan-card-btn"
+                  onClick={() => {
+                    setSelectedDrawing(d);
+                    setModal(d.drawingType === "Planning" ? "planningDetail" : "detail");
+                  }}>
+                  View →
+                </button>
+                <button
+                  className="dms-btn dms-btn-danger-ghost dms-plan-card-btn-icon"
+                  title="Delete drawing"
+                  onClick={(e) => { e.stopPropagation(); requestDeleteDrawing(d); }}
+                >
+                  🗑
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
       );
     };
 
     return (
       <div>
-        {/* Stat cards — dashboard overview */}
-        <div className="dms-stat-row">
-          <div className="dms-stat-card">
-            <div className="dms-stat-icon dms-stat-icon-blue">🗂️</div>
-            <div>
-              <div className="dms-stat-value">{drawings.length}</div>
-              <div className="dms-stat-label">Total Drawings</div>
-            </div>
-          </div>
-          <div className="dms-stat-card">
-            <div className="dms-stat-icon dms-stat-icon-amber">📐</div>
-            <div>
-              <div className="dms-stat-value">{workingDrawings.length}</div>
-              <div className="dms-stat-label">Working Drawings</div>
-            </div>
-          </div>
-          <div className="dms-stat-card">
-            <div className="dms-stat-icon dms-stat-icon-purple">🏗️</div>
-            <div>
-              <div className="dms-stat-value">{planningDrawings.length}</div>
-              <div className="dms-stat-label">Planning Drawings</div>
-            </div>
-          </div>
-          <div className="dms-stat-card">
-            <div className="dms-stat-icon dms-stat-icon-green">🎨</div>
-            <div>
-              <div className="dms-stat-value">{allSubmissions.filter((s) => s.status === "Pending").length}</div>
-              <div className="dms-stat-label">Renders Pending</div>
-            </div>
-          </div>
+        {/* Section tabs replace the old role-switcher tab bar */}
+        <div className="dms-role-bar">
+          {SECTION_TABS.map((s) => (
+            <button key={s.key}
+              className={`dms-role-btn${architectSection === s.key ? " active" : ""}`}
+              onClick={() => setArchitectSection(s.key)}>
+              {s.label}
+              {!!s.count && <span className="dms-notif-badge" style={{ marginLeft: 6 }}>{s.count}</span>}
+            </button>
+          ))}
         </div>
 
-        <div className="dms-top-bar">
-          <div className="dms-section-title">My Drawings ({drawings.length})</div>
-          <button className="dms-btn dms-btn-primary" onClick={() => setModal("upload")}>
-            + Upload Drawing
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="dms-card dms-empty-box"><div className="dms-spinner" />Loading drawings…</div>
-        ) : (
-          <>
-            <div className="dms-section-subtitle" style={{ marginTop: 16, marginBottom: 8 }}>
-              <span className="dms-tag dms-tag-gold">Working</span>
-              Working Drawings ({workingDrawings.length})
-            </div>
-            <div className="dms-card" style={{ padding: 0 }}>
-              <DrawingTable list={workingDrawings} emptyMsg="No working drawings uploaded yet." />
-            </div>
-
-            <div className="dms-section-subtitle" style={{ marginTop: 20, marginBottom: 8 }}>
-              <span className="dms-tag dms-tag-blue">Detail</span>
-              Detail Drawings ({detailDrawings.length})
-            </div>
-            <div className="dms-card" style={{ padding: 0 }}>
-              <DrawingTable list={detailDrawings} emptyMsg="No detail drawings uploaded yet." />
+        {architectSection === "Drawings" && (
+          <div>
+            <div className="dms-stat-strip">
+              <div className="dms-stat-block">
+                <span className="dms-stat-number">{drawings.length}</span>
+                <span className="dms-stat-caption">Total drawings</span>
+              </div>
+              <div className="dms-stat-block">
+                <span className="dms-stat-number">{workingDrawings.length}</span>
+                <span className="dms-stat-caption">Working drawings</span>
+              </div>
+              <div className="dms-stat-block">
+                <span className="dms-stat-number">{planningDrawings.length}</span>
+                <span className="dms-stat-caption">Planning drawings</span>
+              </div>
+              <div className={`dms-stat-block${pendingRenderCount > 0 ? " dms-stat-block-alert" : ""}`}>
+                <span className="dms-stat-number">{pendingRenderCount}</span>
+                <span className="dms-stat-caption">Renders pending</span>
+              </div>
             </div>
 
-            <div className="dms-section-subtitle" style={{ marginTop: 20, marginBottom: 8 }}>
-              <span className="dms-tag dms-tag-purple">Planning</span>
-              Planning Drawings — 3D Visualizer Exclusive ({planningDrawings.length})
+            <div className="dms-section-heading">
+              <h2 className="dms-section-heading-title">
+                Drawings <span className="dms-count-chip">{filteredDrawings.length}</span>
+              </h2>
+              <button className="dms-btn dms-btn-primary" onClick={() => setModal("upload")}>
+                + Upload Drawing
+              </button>
             </div>
-            <div className="dms-card" style={{ padding: 0 }}>
-              <DrawingTable list={planningDrawings} emptyMsg="No planning drawings uploaded yet." />
+
+            <div className="dms-toolbar">
+              <div className="dms-chip-group">
+                <button className={`dms-chip${drawingTypeFilter === "All" ? " active" : ""}`}
+                  onClick={() => setDrawingTypeFilter("All")}>All</button>
+                {DRAWING_TYPES.map((t) => (
+                  <button key={t} className={`dms-chip${drawingTypeFilter === t ? " active" : ""}`}
+                    onClick={() => setDrawingTypeFilter(t)}>{t}</button>
+                ))}
+              </div>
+              <select className="dms-input dms-toolbar-select"
+                value={drawingProjectFilter} onChange={(e) => setDrawingProjectFilter(e.target.value)}>
+                <option value="">All projects</option>
+                {projects.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+              </select>
+              <input className="dms-input dms-toolbar-search"
+                placeholder="Search drawing name…"
+                value={drawingSearch} onChange={(e) => setDrawingSearch(e.target.value)} />
             </div>
-          </>
+
+            {loading ? (
+              <div className="dms-empty-box"><div className="dms-spinner" />Loading drawings…</div>
+            ) : (
+              <DrawingCards list={filteredDrawings} emptyMsg="No drawings match these filters." />
+            )}
+
+          </div>
         )}
 
-        {/* Incoming Requests */}
-        {requests.length > 0 && (
-          <>
-            <div className="dms-section-title" style={{ marginTop: 32, marginBottom: 12 }}>
-              Incoming Requests
-              {unseenRequests.length > 0 && (
-                <span className="dms-notif-badge">{unseenRequests.length}</span>
-              )}
+        {architectSection === "Requests" && (
+          <div>
+            <div className="dms-section-heading">
+              <h2 className="dms-section-heading-title">
+                Incoming Requests
+                {unseenRequests.length > 0 && (
+                  <span className="dms-count-chip dms-count-chip-alert">{unseenRequests.length}</span>
+                )}
+              </h2>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {requests.map((req) => (
-                <div key={req.id} className={`dms-req-card${req.seen ? " seen" : ""}`}
-                  onClick={() => { setSelectedRequest(req); setModal("requestDetail"); }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, color: "var(--ink)", fontSize: 13, marginBottom: 4 }}>
-                      <span style={{ color: "var(--blue-mid)" }}>{req.from}</span>
-                      {" "}
-                      <span style={{ fontSize: 11, color: "var(--ink-muted)", fontWeight: 400 }}>({req.fromRole})</span>
-                      {" "}
-                      <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>requested a planning drawing</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
-                      Project: <span style={{ color: "var(--amber)", fontWeight: 600 }}>{req.projectName || "—"}</span>
-                    </div>
-                    {req.note && (
-                      <div style={{ fontSize: 12, color: "var(--ink-muted)", marginTop: 4, fontStyle: "italic" }}>
-                        "{req.note.slice(0, 80)}{req.note.length > 80 ? "…" : ""}"
+            {requests.length === 0 ? (
+              <div className="dms-empty-box">No requests yet.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {requests.map((req) => (
+                  <div key={req.id} className={`dms-req-card${req.seen ? " seen" : ""}`}
+                    onClick={() => { setSelectedRequest(req); setModal("requestDetail"); }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, color: "var(--ink)", fontSize: 13, marginBottom: 4 }}>
+                        <span style={{ color: "var(--blue-mid)" }}>{req.from}</span>
+                        {" "}
+                        <span style={{ fontSize: 11, color: "var(--ink-muted)", fontWeight: 400 }}>({req.fromRole})</span>
+                        {" "}
+                        <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>requested a planning drawing</span>
                       </div>
-                    )}
-                    <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 4 }}>{fmt(req.sentAt)}</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-                    <button className="dms-btn dms-btn-info"
-                      onClick={(e) => { e.stopPropagation(); setSelectedRequest(req); setModal("requestDetail"); }}>
-                      View
-                    </button>
-                    {!req.seen && (
-                      <button className="dms-btn dms-btn-success"
-                        onClick={(e) => { e.stopPropagation(); setRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, seen: true } : r)); }}>
-                        Mark Seen
+                      <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+                        Project: <span style={{ color: "var(--amber)", fontWeight: 600 }}>{req.projectName || "—"}</span>
+                      </div>
+                      {req.note && (
+                        <div style={{ fontSize: 12, color: "var(--ink-muted)", marginTop: 4, fontStyle: "italic" }}>
+                          "{req.note.slice(0, 80)}{req.note.length > 80 ? "…" : ""}"
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 4 }}>{fmt(req.sentAt)}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                      <button className="dms-btn dms-btn-info"
+                        onClick={(e) => { e.stopPropagation(); setSelectedRequest(req); setModal("requestDetail"); }}>
+                        View
                       </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* 3D Render Submissions */}
-        {allSubmissions.length > 0 && (
-          <>
-            <div className="dms-section-title" style={{ marginTop: 32, marginBottom: 12 }}>
-              🎨 3D Render Submissions
-              {allSubmissions.filter((s) => s.status === "Pending").length > 0 && (
-                <span className="dms-notif-badge" style={{ marginLeft: 8 }}>
-                  {allSubmissions.filter((s) => s.status === "Pending").length} pending
-                </span>
-              )}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {allSubmissions.map((sub) => (
-                <div key={sub.id} className={`dms-req-card${sub.status === "Approved" ? " seen" : ""}`}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 4 }}>
-                      {sub.drawingName}
-                      <span className={badgeClass(sub.status)} style={{ marginLeft: 8 }}>{sub.status}</span>
-                      {sub.drawingRevision && (
-                        <span className="dms-revision dms-revision-purple" style={{ marginLeft: 8, fontSize: 11, height: 20, minWidth: 28 }}>
-                          {sub.drawingRevision}
-                        </span>
+                      {!req.seen && (
+                        <button className="dms-btn dms-btn-success"
+                          onClick={(e) => { e.stopPropagation(); markRequestSeen(req.id); }}>
+                          Mark Seen
+                        </button>
                       )}
                     </div>
-                    <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
-                      Project: <span style={{ color: "var(--amber)", fontWeight: 600 }}>{sub.projectName}</span>
-                      {" · "}By: <span style={{ color: "var(--blue-mid)" }}>{sub.submitterName}</span>
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--ink-muted)", marginTop: 4 }}>
-                      {sub.fileName && <><strong>File:</strong> {sub.fileName} · </>}
-                      Submitted {fmt(sub.submittedAt)}
-                    </div>
-                    {sub.status !== "Pending" && sub.reviewNote && (
-                      <div className="dms-info-box dms-info-box-gold" style={{ marginTop: 8, fontSize: 12 }}>
-                        <strong>Your note:</strong> {sub.reviewNote}
-                      </div>
-                    )}
                   </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, flexDirection: "column" }}>
-                    {sub.fileUrl && (
-                      <a href={sub.fileUrl} target="_blank" rel="noreferrer"
-                        className="dms-btn dms-btn-ghost" style={{ fontSize: 12 }}>
-                        ↓ Download
-                      </a>
-                    )}
-                    {sub.status === "Pending" && (
-                      <>
-                        <button className="dms-btn dms-btn-success" style={{ fontSize: 12 }}
-                          onClick={async () => {
-                            const note = window.prompt("Approval note (optional):") ?? "Approved.";
-                            try {
-                              await review3DSubmission(sub.id, { status: "Approved", reviewed_by: currentUser.id, review_note: note || "Approved." });
-                              setAllSubmissions((prev) =>
-                                prev.map((s) => s.id === sub.id ? { ...s, status: "Approved", reviewNote: note } : s)
-                              );
-                              showToast("success", "Submission approved!");
-                            } catch { showToast("error", "Failed to approve."); }
-                          }}>
-                          ✓ Approve
-                        </button>
-                        <button className="dms-btn dms-btn-danger" style={{ fontSize: 12 }}
-                          onClick={async () => {
-                            const note = window.prompt("Rejection reason (required):");
-                            if (!note?.trim()) return;
-                            try {
-                              await review3DSubmission(sub.id, { status: "Rejected", reviewed_by: currentUser.id, review_note: note });
-                              setAllSubmissions((prev) =>
-                                prev.map((s) => s.id === sub.id ? { ...s, status: "Rejected", reviewNote: note } : s)
-                              );
-                              showToast("info", "Submission rejected.");
-                            } catch { showToast("error", "Failed to reject."); }
-                          }}>
-                          ✗ Reject
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {architectSection === "Approvals" && (
+          <div>
+            <div className="dms-section-heading">
+              <h2 className="dms-section-heading-title">
+                3D Render Submissions
+                {pendingRenderCount > 0 && (
+                  <span className="dms-count-chip dms-count-chip-alert">{pendingRenderCount} pending</span>
+                )}
+              </h2>
             </div>
-          </>
+            {allSubmissions.length === 0 ? (
+              <div className="dms-empty-box">No renders submitted yet.</div>
+            ) : (
+              <div className="dms-card-grid">
+                {allSubmissions.map((sub) => (
+                  <SubmissionCard
+                    key={sub.id}
+                    sub={sub}
+                    showSubmitter={true}
+                    onView={(s) => { setModal("reviewSubmission"); setSelectedRequest(null); setReviewTarget(s); }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     );
@@ -2003,42 +2125,53 @@ export default function DrawingManagementSystem() {
       (d) => d.drawingType !== "Planning"
     );
     const pendingCount = mySubmissions.filter((s) => s.status === "Pending").length;
+    const totalDrawings = planningMine.length + detailMine.length;
+
+    const SECTION_TABS = [
+      { key: "Drawings",    label: `Drawings (${totalDrawings})` },
+      { key: "Requests",    label: "Requests", count: myRequestsSent.length },
+      { key: "Submissions", label: "Submissions", count: pendingCount },
+    ];
 
     return (
       <div>
-        <div className="dms-top-bar">
-          <div className="dms-section-title">
-            🏗️ Planning Drawings ({planningMine.length})
-          </div>
-          <button className="dms-btn dms-btn-purple" onClick={() => setModal("visualizerRequest")}>
-            + Request Planning Drawing
-          </button>
+        <div className="dms-role-bar">
+          {SECTION_TABS.map((s) => (
+            <button key={s.key}
+              className={`dms-role-btn${visualizerSection === s.key ? " active" : ""}`}
+              onClick={() => setVisualizerSection(s.key)}>
+              {s.label}
+              {!!s.count && <span className="dms-notif-badge" style={{ marginLeft: 6 }}>{s.count}</span>}
+            </button>
+          ))}
         </div>
 
-        <div className="dms-info-box dms-info-box-purple" style={{ marginBottom: 16 }}>
-          Planning drawings are exclusively for you. View them and submit your 3D renders for Architect approval.
-        </div>
+        {visualizerSection === "Drawings" && (
+          <div>
+            <div className="dms-section-heading">
+              <h2 className="dms-section-heading-title">
+                Planning Drawings <span className="dms-count-chip">{planningMine.length}</span>
+              </h2>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="dms-btn dms-btn-ghost" onClick={() => setModal("visualizerRequest")}>
+                  + Request Planning Drawing
+                </button>
+                <button className="dms-btn dms-btn-purple" onClick={() => setModal("sendToArchitect")}>
+                  Upload Drawing
+                </button>
+              </div>
+            </div>
 
-        {loading ? (
-          <div className="dms-card dms-empty-box">Loading drawings…</div>
-        ) : planningMine.length === 0 ? (
-          <div className="dms-card dms-empty-box">
-            No planning drawings assigned yet. Use <strong>+ Request Planning Drawing</strong> to request one.
-          </div>
-        ) : (
-          <div className="dms-card">
-            <table className="dms-table">
-              <thead>
-                <tr>
-                  {["Drawing Name", "Project", "Revision", "Received", ""].map((h, i) => (
-                    <th key={i}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
+            {loading ? (
+              <div className="dms-empty-box">Loading drawings…</div>
+            ) : planningMine.length === 0 ? (
+              <div className="dms-empty-box">
+                No planning drawings assigned yet. Use <strong>+ Request Planning Drawing</strong> to request one.
+              </div>
+            ) : (
+              <div className="dms-card-grid">
                 {planningMine.map((d) => {
                   const sentInfo  = d.sentTo.find((s) => s.role === "3D Visualizer");
-                  // ── FIX 3b: revision shown is always d.revision (updated via handleRevisionIncrement)
                   const subs = mySubmissions
                     .filter((s) => String(s.drawingId) === String(d.id))
                     .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
@@ -2046,66 +2179,50 @@ export default function DrawingManagementSystem() {
                   const hasPending  = latestSub?.status === "Pending";
                   const hasApproved = latestSub?.status === "Approved";
                   const hasRejected = latestSub?.status === "Rejected";
-                  const nextSubmitRevision = d.revision; // always current
 
                   return (
-                    <tr key={d.id} className={hoveredRow === d.id ? "hovered" : ""}
-                      onMouseEnter={() => setHoveredRow(d.id)}
-                      onMouseLeave={() => setHoveredRow(null)}>
-                      <td>
-                        <strong style={{ color: "var(--ink)" }}>{d.drawingName}</strong>
-                        <div style={{ fontSize: 11, color: "var(--ink-muted)", marginTop: 2 }}>Planning</div>
-                      </td>
-                      <td><span style={{ color: "var(--ink-3)" }}>{d.projectName}</span></td>
-                      <td>
-                        {/* ── FIX 3c: badge updates as soon as architect increments */}
-                        <span className="dms-revision dms-revision-purple">{d.revision}</span>
-                      </td>
-                      <td>
-                        <span style={{ fontSize: 11, color: "var(--ink-muted)" }}>{fmt(sentInfo?.sentAt)}</span>
-                      </td>
-                      <td>
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <button className="dms-btn dms-btn-ghost"
-                            onClick={() => { setSelectedDrawing(d); setModal("recipientDetail"); }}>
-                            View
-                          </button>
-                          {hasApproved ? (
-                            <span className="dms-badge dms-badge-approved">✓ Approved</span>
-                          ) : hasPending ? (
-                            <span className="dms-badge dms-badge-pending">⏳ Under Review</span>
-                          ) : (
-                            <button className="dms-btn dms-btn-purple"
-                              onClick={() => { setSelectedDrawing(d); setModal("submit3D"); }}
-                              title={hasRejected ? `Resubmit for ${nextSubmitRevision}` : `Submit for ${nextSubmitRevision}`}>
-                              {hasRejected ? `🔁 Resubmit (${nextSubmitRevision})` : `🎨 Submit Render (${nextSubmitRevision})`}
-                            </button>
-                          )}
+                    <article key={d.id} className="dms-plan-card dms-plan-card-planning">
+                      <div className="dms-plan-card-top">
+                        <DrawingTypeTag type="Planning" />
+                        <span className="dms-plan-card-rev">{d.revision}</span>
+                      </div>
+                      <h3 className="dms-plan-card-name">{d.drawingName}</h3>
+                      <div className="dms-plan-card-project">{d.projectName}</div>
+                      <div className="dms-plan-card-sent">
+                        {hasApproved ? (
+                          <span className="dms-badge dms-badge-approved">✓ Approved</span>
+                        ) : hasPending ? (
+                          <span className="dms-badge dms-badge-pending">⏳ Under review</span>
+                        ) : hasRejected ? (
+                          <span className="dms-badge dms-badge-rejected">Rejected — resubmit via Upload Drawing</span>
+                        ) : (
+                          <span className="dms-plan-card-notsent">No render submitted</span>
+                        )}
+                      </div>
+                      <div className="dms-plan-card-block">
+                        <div className="dms-plan-card-field">
+                          <span className="dms-plan-card-field-label">Received</span>
+                          <span className="dms-plan-card-field-value">{fmt(sentInfo?.sentAt)}</span>
                         </div>
-                      </td>
-                    </tr>
+                        <button className="dms-btn dms-btn-ghost dms-plan-card-btn"
+                          onClick={() => { setSelectedDrawing(d); setModal("recipientDetail"); }}>
+                          View →
+                        </button>
+                      </div>
+                    </article>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* Detail Drawings */}
-        {detailMine.length > 0 && (
-          <>
-            <div className="dms-section-subtitle" style={{ marginTop: 24, marginBottom: 8 }}>
-              <span className="dms-tag dms-tag-blue">Detail</span>
-              Detail Drawings Sent to Me ({detailMine.length})
-            </div>
-            <div className="dms-card">
-              <table className="dms-table">
-                <thead>
-                  <tr>
-                    {["Drawing Name", "Project", "Revision", "Received", ""].map((h, i) => <th key={i}>{h}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
+            {detailMine.length > 0 && (
+              <>
+                <div className="dms-section-heading" style={{ marginTop: 40 }}>
+                  <h2 className="dms-section-heading-title">
+                    Detail Drawings Sent to Me <span className="dms-count-chip">{detailMine.length}</span>
+                  </h2>
+                </div>
+                <div className="dms-card-grid">
                   {detailMine.map((d) => {
                     const sentInfo    = d.sentTo.find((s) => s.role === "3D Visualizer");
                     const subs        = mySubmissions
@@ -2116,80 +2233,108 @@ export default function DrawingManagementSystem() {
                     const hasApproved = latestSub?.status === "Approved";
                     const hasRejected = latestSub?.status === "Rejected";
                     return (
-                      <tr key={d.id} className={hoveredRow === d.id ? "hovered" : ""}
-                        onMouseEnter={() => setHoveredRow(d.id)}
-                        onMouseLeave={() => setHoveredRow(null)}>
-                        <td><strong style={{ color: "var(--ink)" }}>{d.drawingName}</strong></td>
-                        <td><span style={{ color: "var(--ink-3)" }}>{d.projectName}</span></td>
-                        <td><span className="dms-revision">{d.revision}</span></td>
-                        <td><span style={{ fontSize: 11, color: "var(--ink-muted)" }}>{fmt(sentInfo?.sentAt)}</span></td>
-                        <td>
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                            <button className="dms-btn dms-btn-ghost"
-                              onClick={() => { setSelectedDrawing(d); setModal("recipientDetail"); }}>
-                              View
-                            </button>
-                            {hasApproved ? (
-                              <span className="dms-badge dms-badge-approved">✓ Approved</span>
-                            ) : hasPending ? (
-                              <span className="dms-badge dms-badge-pending">⏳ Under Review</span>
-                            ) : (
-                              <button className="dms-btn dms-btn-purple"
-                                onClick={() => { setSelectedDrawing(d); setModal("submit3D"); }}>
-                                {hasRejected ? "🔁 Resubmit" : "🎨 Submit Render"}
-                              </button>
-                            )}
+                      <article key={d.id} className="dms-plan-card dms-plan-card-detail">
+                        <div className="dms-plan-card-top">
+                          <DrawingTypeTag type="Detail Drawing" />
+                          <span className="dms-plan-card-rev">{d.revision}</span>
+                        </div>
+                        <h3 className="dms-plan-card-name">{d.drawingName}</h3>
+                        <div className="dms-plan-card-project">{d.projectName}</div>
+                        <div className="dms-plan-card-sent">
+                          {hasApproved ? (
+                            <span className="dms-badge dms-badge-approved">✓ Approved</span>
+                          ) : hasPending ? (
+                            <span className="dms-badge dms-badge-pending">⏳ Under review</span>
+                          ) : hasRejected ? (
+                            <span className="dms-badge dms-badge-rejected">Rejected — resubmit via Upload Drawing</span>
+                          ) : (
+                            <span className="dms-plan-card-notsent">No render submitted</span>
+                          )}
+                        </div>
+                        <div className="dms-plan-card-block">
+                          <div className="dms-plan-card-field">
+                            <span className="dms-plan-card-field-label">Received</span>
+                            <span className="dms-plan-card-field-value">{fmt(sentInfo?.sentAt)}</span>
                           </div>
-                        </td>
-                      </tr>
+                          <button className="dms-btn dms-btn-ghost dms-plan-card-btn"
+                            onClick={() => { setSelectedDrawing(d); setModal("recipientDetail"); }}>
+                            View →
+                          </button>
+                        </div>
+                      </article>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-          </>
+                </div>
+              </>
+            )}
+          </div>
         )}
 
-        {/* Submission History */}
-        <div className="dms-section-title" style={{ marginTop: 32, marginBottom: 12 }}>
-          My Submissions
-          {pendingCount > 0 && <span className="dms-notif-badge" style={{ marginLeft: 8 }}>{pendingCount} awaiting review</span>}
-        </div>
-        {mySubmissions.length === 0 ? (
-          <div className="dms-card dms-empty-box" style={{ marginTop: 0 }}>No renders submitted yet.</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {mySubmissions.map((sub) => (
-              <div key={sub.id} className={`dms-req-card${sub.status === "Approved" ? " seen" : ""}`}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 4 }}>
-                    {sub.drawingName}
-                    <span className={badgeClass(sub.status)} style={{ marginLeft: 8 }}>{sub.status}</span>
-                    {sub.drawingRevision && (
-                      <span className="dms-revision dms-revision-purple" style={{ marginLeft: 8, fontSize: 11, height: 20, minWidth: 28 }}>
-                        {sub.drawingRevision}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
-                    Project: <span style={{ color: "var(--amber)", fontWeight: 600 }}>{sub.projectName}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--ink-muted)", marginTop: 4 }}>
-                    {sub.fileName} · Submitted {fmt(sub.submittedAt)}
-                  </div>
-                  {sub.status === "Rejected" && sub.reviewNote && (
-                    <div className="dms-info-box dms-info-box-red" style={{ marginTop: 8, fontSize: 12 }}>
-                      <strong>Feedback:</strong> {sub.reviewNote}
-                    </div>
-                  )}
-                  {sub.status === "Approved" && (
-                    <div className="dms-info-box dms-info-box-green" style={{ marginTop: 8, fontSize: 12 }}>
-                      ✓ Approved by Architect {sub.reviewedAt ? `on ${fmt(sub.reviewedAt)}` : ""}
-                    </div>
-                  )}
-                </div>
+        {visualizerSection === "Requests" && (
+          <div>
+            <div className="dms-section-heading">
+              <h2 className="dms-section-heading-title">
+                My Requests <span className="dms-count-chip">{myRequestsSent.length}</span>
+              </h2>
+              <button className="dms-btn dms-btn-purple" onClick={() => setModal("visualizerRequest")}>
+                + Request Planning Drawing
+              </button>
+            </div>
+            {myRequestsSent.length === 0 ? (
+              <div className="dms-empty-box">
+                You haven't requested any planning drawings this session. Use <strong>+ Request Planning Drawing</strong> above.
               </div>
-            ))}
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {myRequestsSent.map((r) => (
+                  <div key={r.id} className="dms-req-card">
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 4 }}>
+                        Request sent to Architect
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+                        Project: <span style={{ color: "var(--amber)", fontWeight: 600 }}>{r.projectName || "—"}</span>
+                      </div>
+                      {r.note && (
+                        <div style={{ fontSize: 12, color: "var(--ink-muted)", marginTop: 4, fontStyle: "italic" }}>
+                          "{r.note.slice(0, 80)}{r.note.length > 80 ? "…" : ""}"
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 4 }}>{fmt(r.sentAt)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {visualizerSection === "Submissions" && (
+          <div>
+            <div className="dms-section-heading">
+              <h2 className="dms-section-heading-title">
+                My Submissions
+                {pendingCount > 0 && <span className="dms-count-chip dms-count-chip-alert">{pendingCount} awaiting review</span>}
+              </h2>
+              <button className="dms-btn dms-btn-primary" onClick={() => setModal("sendToArchitect")}>
+                🎨 Upload Drawing
+              </button>
+            </div>
+
+            {mySubmissions.length === 0 ? (
+              <div className="dms-empty-box">No renders submitted yet.</div>
+            ) : (
+              <div className="dms-card-grid">
+                {mySubmissions.map((sub) => (
+                  <SubmissionCard
+                    key={sub.id}
+                    sub={sub}
+                    showSubmitter={false}
+                    onView={(s) => { setModal("viewMySubmission"); setSelectedRequest(null); setReviewTarget(s); }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -2204,10 +2349,11 @@ export default function DrawingManagementSystem() {
     );
     return (
       <div>
-        <div className="dms-top-bar">
-          <div className="dms-section-title">
-            {isArchitectPreview ? `All drawings sent to ${role} (${mine.length})` : `Drawings Sent to Me (${mine.length})`}
-          </div>
+        <div className="dms-section-heading">
+          <h2 className="dms-section-heading-title">
+            {isArchitectPreview ? `All Drawings Sent to ${role}` : "Drawings Sent to Me"}
+            <span className="dms-count-chip">{mine.length}</span>
+          </h2>
           {canRequest && !isArchitectPreview && (
             <button className="dms-btn dms-btn-ghost" onClick={() => setModal("request")}>
               + Request Detail Drawing
@@ -2215,46 +2361,39 @@ export default function DrawingManagementSystem() {
           )}
         </div>
         {loading ? (
-          <div className="dms-card dms-empty-box">Loading drawings…</div>
+          <div className="dms-empty-box">Loading drawings…</div>
         ) : mine.length === 0 ? (
-          <div className="dms-card dms-empty-box">
+          <div className="dms-empty-box">
             {isArchitectPreview ? `No drawings sent to ${role} yet.` : "No drawings have been sent to you yet."}
           </div>
         ) : (
-          <div className="dms-card">
-            <table className="dms-table">
-              <thead>
-                <tr>
-                  {["Drawing Name", "Project", "Type", "Revision", "Received", ""].map((h, i) => (
-                    <th key={i}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {mine.map((d) => {
-                  const sentInfo = d.sentTo.find((s) => s.role === role);
-                  return (
-                    <tr key={d.id} className={hoveredRow === d.id ? "hovered" : ""}
-                      onMouseEnter={() => setHoveredRow(d.id)}
-                      onMouseLeave={() => setHoveredRow(null)}>
-                      <td>
-                        <strong style={{ color: "var(--ink)" }}>{d.drawingName}</strong>
-                      </td>
-                      <td><span style={{ color: "var(--ink-3)" }}>{d.projectName}</span></td>
-                      <td><DrawingTypeTag type={d.drawingType} /></td>
-                      <td><span className="dms-revision">{d.revision}</span></td>
-                      <td><span style={{ fontSize: 11, color: "var(--ink-muted)" }}>{fmt(sentInfo?.sentAt)}</span></td>
-                      <td>
-                        <button className="dms-btn dms-btn-ghost"
-                          onClick={() => { setSelectedDrawing(d); setModal("recipientDetail"); }}>
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="dms-card-grid">
+            {mine.map((d) => {
+              const sentInfo = d.sentTo.find((s) => s.role === role);
+              return (
+                <article key={d.id} className={`dms-plan-card ${
+                  d.drawingType === "Working Drawing" ? "dms-plan-card-working"
+                  : d.drawingType === "Detail Drawing" ? "dms-plan-card-detail"
+                  : "dms-plan-card-planning"}`}>
+                  <div className="dms-plan-card-top">
+                    <DrawingTypeTag type={d.drawingType} />
+                    <span className="dms-plan-card-rev">{d.revision}</span>
+                  </div>
+                  <h3 className="dms-plan-card-name">{d.drawingName}</h3>
+                  <div className="dms-plan-card-project">{d.projectName}</div>
+                  <div className="dms-plan-card-block">
+                    <div className="dms-plan-card-field">
+                      <span className="dms-plan-card-field-label">Received</span>
+                      <span className="dms-plan-card-field-value">{fmt(sentInfo?.sentAt)}</span>
+                    </div>
+                    <button className="dms-btn dms-btn-ghost dms-plan-card-btn"
+                      onClick={() => { setSelectedDrawing(d); setModal("recipientDetail"); }}>
+                      View →
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>
@@ -2273,6 +2412,18 @@ export default function DrawingManagementSystem() {
 
   const ALL_VIEWS = ["Architect","Quantity Surveyor","Site Engineer","Program Coordinator","Client","3D Visualizer"];
 
+  const [reviewTarget, setReviewTarget] = useState(null);
+
+  const handleApprovalReview = async (subId, status, note) => {
+    try {
+      await review3DSubmission(subId, { status, reviewed_by: currentUser.id, review_note: note });
+      setAllSubmissions((prev) => prev.map((s) => s.id === subId ? { ...s, status, reviewNote: note, reviewedAt: new Date().toISOString() } : s));
+      showToast("success", `Submission ${status}.`);
+    } catch {
+      showToast("error", "Failed to update submission.");
+    }
+  };
+
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2283,29 +2434,47 @@ export default function DrawingManagementSystem() {
       <header className="dms-header">
         <h1 className="dms-header-title">Drawing Management System</h1>
         {activeRole && (
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, position: "relative" }}>
             <span style={{ fontSize: 13, color: "var(--ink-muted)" }}>{currentUser.name}</span>
             <RolePill role={activeRole} />
+
+            {/* "View as" preview is now a secondary control, not the primary nav */}
+            {activeRole === "Architect" && (
+              <div style={{ position: "relative" }}>
+                <button
+                  className="dms-btn dms-btn-ghost"
+                  style={{ fontSize: 12, padding: "6px 10px" }}
+                  onClick={() => setShowPreviewPicker((v) => !v)}
+                  title="Preview this system as another role"
+                >
+                  Preview as {architectViewAs !== "Architect" ? architectViewAs : "…"}
+                </button>
+                {showPreviewPicker && (
+                  <div className="dms-card" style={{
+                    position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 20,
+                    padding: 6, display: "flex", flexDirection: "column", gap: 2, minWidth: 190,
+                  }}>
+                    {ALL_VIEWS.map((role) => (
+                      <button key={role}
+                        className={`dms-role-btn${architectViewAs === role ? " active" : ""}`}
+                        style={{ textAlign: "left", justifyContent: "flex-start" }}
+                        onClick={() => {
+                          setArchitectViewAs(role);
+                          setSelectedDrawing(null);
+                          setSelectedRequest(null);
+                          setModal(null);
+                          setShowPreviewPicker(false);
+                        }}>
+                        {role}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </header>
-
-      {activeRole === "Architect" && (
-        <div className="dms-role-bar">
-          {ALL_VIEWS.map((role) => (
-            <button key={role}
-              className={`dms-role-btn${architectViewAs === role ? " active" : ""}`}
-              onClick={() => {
-                setArchitectViewAs(role);
-                setSelectedDrawing(null);
-                setSelectedRequest(null);
-                setModal(null);
-              }}>
-              {role}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="dms-content">
         {!activeRole                        && <NoAccessView />}
@@ -2328,12 +2497,30 @@ export default function DrawingManagementSystem() {
 
       {modal === "visualizerRequest" && (
         <VisualizerRequestModal projects={projects} currentUserId={currentUser.id}
-          onSent={() => showToast("success", "Request sent to Architect.")}
+          onSent={(payload) => {
+            showToast("success", "Request sent to Architect.");
+            setMyRequestsSent((prev) => [
+              {
+                id: uid(),
+                projectName: projects.find((p) => String(p.id) === String(payload?.projectId))?.name,
+                note: payload?.note,
+                sentAt: new Date().toISOString(),
+              },
+              ...prev,
+            ]);
+          }}
+          onClose={closeModal} />
+      )}
+
+      {modal === "sendToArchitect" && (
+        <SendToArchitectModal projects={projects} currentUserId={currentUser.id}
+          mySubmissions={mySubmissions}
+          onSubmitted={() => { showToast("success", "Sent to Architect!"); loadMySubmissions(); }}
           onClose={closeModal} />
       )}
 
       {modal === "requestDetail" && selectedRequest && (
-        <RequestDetailModal req={selectedRequest} setRequests={setRequests} onClose={closeModal} />
+        <RequestDetailModal req={selectedRequest} onMarkSeen={markRequestSeen} onClose={closeModal} />
       )}
 
       {modal === "planningDetail" && selectedDrawing && (
@@ -2355,10 +2542,32 @@ export default function DrawingManagementSystem() {
         <RecipientDetailModal d={selectedDrawing} role={viewRole} onClose={closeModal} />
       )}
 
-      {modal === "submit3D" && selectedDrawing && (
-        <Submit3DModal drawing={selectedDrawing} currentUserId={currentUser.id}
-          onSubmitted={() => { showToast("success", "Render submitted!"); loadMySubmissions(); }}
-          onClose={closeModal} />
+      {modal === "reviewSubmission" && reviewTarget && (
+        <SubmissionReviewModal
+          sub={reviewTarget}
+          currentUserId={currentUser.id}
+          onReview={handleApprovalReview}
+          onClose={() => { setModal(null); setReviewTarget(null); }}
+        />
+      )}
+
+      {modal === "viewMySubmission" && reviewTarget && (
+        <SubmissionReviewModal
+          sub={reviewTarget}
+          currentUserId={currentUser.id}
+          onReview={() => {}}
+          readOnly
+          onClose={() => { setModal(null); setReviewTarget(null); }}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteDrawingModal
+          drawing={deleteTarget}
+          busy={deleteBusy}
+          onConfirm={confirmDeleteDrawing}
+          onClose={() => !deleteBusy && setDeleteTarget(null)}
+        />
       )}
     </div>
   );

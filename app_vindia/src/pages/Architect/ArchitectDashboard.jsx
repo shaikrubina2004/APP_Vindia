@@ -1,13 +1,26 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import {
+  ChevronLeft, ChevronRight, MoreVertical, Plus,
+  Check, Droplet, Flag, Sparkles, Briefcase, AlertTriangle, ListChecks,
+} from "lucide-react";
 import { getArchitectProjects } from "../../services/architectprojectService";
 import { getDailyLog } from "../../services/architectDailyLogService";
 import { API } from "../../services/authService";
 import { getDrawings } from "../../services/architectDesignService";
 import "./ArchitectDashboard.css";
 
-// ─── UTILITY ─────────────────────────────────────────────────────────────────
+/* ════════════════════════════════════════════════════════════════════════
+   Same data wiring as before. Visual/layout pass: full-bleed layout (no
+   centered max-width), removed the project-switcher dropdown and the
+   bell / overflow icons from the incidents panel, moved the task
+   pipeline out of the hero and into the bottom card (replacing the old
+   "task completion" area chart), and restricted every color to the
+   fixed brand palette — urgency is now shown via shade depth, not hue.
+   ════════════════════════════════════════════════════════════════════════ */
+
+// ─── UTILITY ─────────────────────────────────────────────────────────────
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const longDate = () =>
@@ -20,7 +33,7 @@ function getGreeting() {
   if (h < 12) return "Good morning";
   if (h < 17) return "Good afternoon";
   return "Good evening";
-} 
+}
 
 function normaliseTask(t) {
   return {
@@ -50,14 +63,6 @@ function normaliseIncident(inc) {
   };
 }
 
-// ─── STATUS BADGE ─────────────────────────────────────────────────────────────
-function StatusBadge({ status }) {
-  const s = (status || "").toLowerCase().replace(/\s/g, "-");
-  return <span className={`acd-status-badge acd-status-${s}`}>{status}</span>;
-}
-
-
-// ─── CHECK IN / OUT BUTTON ────────────────────────────────────────────────────
 const fmtTime = (t) => {
   if (!t) return "—";
   const [h, m] = t.split(":");
@@ -65,6 +70,14 @@ const fmtTime = (t) => {
   return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
 };
 
+// Days between now and a deadline (negative = overdue)
+const daysUntil = (date) => {
+  if (!date) return null;
+  const ms = date.setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0);
+  return Math.round(ms / 86400000);
+};
+
+// ─── CHECK IN / OUT (lives inside the hero) ───────────────────────────────
 const CheckInButton = ({ employeeId }) => {
   const [attendance, setAttendance] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -158,18 +171,20 @@ const CheckInButton = ({ employeeId }) => {
 
   if (loading) {
     return (
-      <button disabled className="acd-checkin-btn acd-checkin-loading">
-        <span className="acd-checkin-dot" /> Loading…
-      </button>
+      <div className="acd-search-pill">
+        <span className="acd-checkin-dot" />
+        <span className="acd-checkin-label">Loading…</span>
+      </div>
     );
   }
 
   if (isCheckedOut) {
     return (
       <div className="acd-checkin-wrap">
-        <button disabled className="acd-checkin-btn acd-checkin-done">
-          <span className="acd-checkin-dot acd-checkin-dot-green" /> ✓ Done for Today
-        </button>
+        <div className="acd-search-pill acd-search-pill-done">
+          <span className="acd-checkin-dot acd-checkin-dot-green" />
+          <span className="acd-checkin-label">Done for today</span>
+        </div>
         <span className="acd-checkin-sub">
           {fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}
         </span>
@@ -180,241 +195,148 @@ const CheckInButton = ({ employeeId }) => {
   if (isCheckedIn) {
     return (
       <div className="acd-checkin-wrap">
-        <button onClick={handleCheckOut} disabled={busy} className="acd-checkin-btn acd-checkin-out">
+        <button className="acd-search-pill acd-search-pill-btn acd-search-pill-out" onClick={handleCheckOut} disabled={busy}>
           <span className="acd-checkin-dot acd-checkin-dot-pulse" />
-          {busy ? "Saving…" : "Check Out"}
+          <span className="acd-checkin-label">{busy ? "Saving…" : "Check out"}</span>
         </button>
         <span className="acd-checkin-sub">
           In: {fmtTime(attendance.check_in)}
-          {elapsed && <> &nbsp;·&nbsp; <strong style={{ color: "#7BBDE8" }}>{elapsed}</strong></>}
+          {elapsed && <> &nbsp;·&nbsp; <strong>{elapsed}</strong></>}
         </span>
       </div>
     );
   }
 
   return (
-    <button onClick={handleCheckIn} disabled={busy} className="acd-checkin-btn acd-checkin-in">
+    <button className="acd-search-pill acd-search-pill-btn acd-search-pill-in" onClick={handleCheckIn} disabled={busy}>
       <span className="acd-checkin-dot" />
-      {busy ? "Saving…" : "Check In"}
+      <span className="acd-checkin-label">{busy ? "Saving…" : "Check in"}</span>
     </button>
   );
 };
 
-// ─── HERO CARD ────────────────────────────────────────────────────────────────
-function HeroCard({ userName, employeeId }) {
+// ─── STAT CARD (top row) ───────────────────────────────────────────────────
+function StatCard({ tone, icon: Icon, label, value, sub, loading, onClick }) {
   return (
-    <div className="acd-hero-card">
-      <div className="acd-hero-circle acd-hero-circle-1" aria-hidden="true" />
-      <div className="acd-hero-circle acd-hero-circle-2" aria-hidden="true" />
-      <div className="acd-hero-circle acd-hero-circle-3" aria-hidden="true" />
-      <div className="acd-hero-body">
-        <p className="acd-hero-greeting">{getGreeting()},</p>
-        <h1 className="acd-hero-name">{userName}</h1>
-        <p className="acd-hero-date">{longDate()}</p>
+    <button className="acd-stat-card" onClick={onClick} type="button">
+      <span className={`acd-stat-badge acd-tone-${tone}`}>
+        <Icon size={16} strokeWidth={2.25} />
+      </span>
+      <div className="acd-stat-blank">
+        {loading ? (
+          <div className="acd-stat-skel" />
+        ) : (
+          <>
+            <div className="acd-stat-value">{value}</div>
+            <div className="acd-stat-sub">{sub}</div>
+          </>
+        )}
       </div>
-      {employeeId && (
-        <div className="acd-hero-checkin">
-          <CheckInButton employeeId={employeeId} />
+      <div className="acd-stat-footer">
+        <span className="acd-stat-footer-label">{label}</span>
+      </div>
+    </button>
+  );
+}
+
+// ─── INFO ROW (bottom-left) ────────────────────────────────────────────────
+function InfoRow({ tone, icon: Icon, label, value, loading, onClick }) {
+  return (
+    <button className="acd-info-card" onClick={onClick} type="button">
+      <span className={`acd-info-icon acd-tone-${tone}-soft`}>
+        <Icon size={15} />
+      </span>
+      <span className="acd-info-text">
+        <span className="acd-info-label">{label}</span>
+        <span className="acd-info-value">{loading ? "…" : value}</span>
+      </span>
+    </button>
+  );
+}
+
+// ─── TASK PIPELINE CARD ─────────────────────────────────────────────────────
+// Replaces the old "task completion" area chart. Four labeled bars with the
+// count printed above each one, so the value reads correctly even when a
+// bar is short — the earlier version relied on bar height alone, which
+// looked broken whenever counts were small or uneven.
+function TaskPipelineCard({ tasks, p1Count, loading }) {
+  const counts = { "To do": 0, "In progress": 0, Done: 0 };
+  tasks.forEach((t) => {
+    if (t.status === "Done") counts.Done++;
+    else if (t.status === "In Progress") counts["In progress"]++;
+    else counts["To do"]++;
+  });
+  const bars = [
+    { label: "To do",      value: counts["To do"],      color: "var(--blue-100)" },
+    { label: "In progress",value: counts["In progress"],color: "var(--blue-400)" },
+    { label: "Done",       value: counts.Done,          color: "var(--blue-600)" },
+    { label: "P1",         value: p1Count,               color: "var(--navy-800)" },
+  ];
+  const barMax = Math.max(1, ...bars.map((b) => b.value));
+
+  return (
+    <div className="acd-chart-card">
+      <div className="acd-chart-head">
+        <span className="acd-chart-title">Task pipeline</span>
+        <span className="acd-chart-pct">{loading ? "…" : `${tasks.length} total`}</span>
+      </div>
+      {loading ? (
+        <div className="acd-stat-skel" style={{ height: 90 }} />
+      ) : (
+        <div className="acd-pipeline-bars">
+          {bars.map((b) => (
+            <div className="acd-pipeline-col" key={b.label}>
+              <span className="acd-pipeline-count">{b.value}</span>
+              <span
+                className="acd-pipeline-bar"
+                style={{ height: `${10 + (b.value / barMax) * 74}px`, background: b.color }}
+              />
+              <span className="acd-pipeline-label">{b.label}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-// ─── P1 INCIDENTS COUNT CARD ──────────────────────────────────────────────────
-function P1Card({ p1Count, totalCount, loading, onClick }) {
-  return (
-    <div className="acd-p1-card" onClick={onClick} role="button" tabIndex={0}>
-      <div className="acd-p1-label"> Critical Incidents</div>
-      {loading ? (
-        <div className="acd-skeleton" style={{ height: 44, width: 80, marginTop: 8 }} />
-      ) : (
-        <>
-          <div className="acd-p1-number">{p1Count}</div>
-          <div className={`acd-p1-sub${p1Count === 0 ? " acd-p1-clear" : ""}`}>
-            {p1Count > 0 ? "Needs immediate attention" : "All clear — no critical issues"}
-          </div>
-          {p1Count > 0 && <span className="acd-p1-badge">{p1Count} critical open</span>}
-        </>
-      )}
-      <div className="acd-p1-total">Total incidents: {totalCount}</div>
-    </div>
-  );
+// ─── TIMELINE ROW (right panel — critical incidents) ───────────────────────
+// Icon tone reflects real urgency (days to deadline) via shade depth only —
+// darkest = most urgent — rather than an unrelated icon rotating by index.
+function urgencyOf(inc) {
+  const d = inc.deadlineAt ? daysUntil(new Date(inc.deadlineAt)) : null;
+  if (d === null) return { tone: "sky", label: "No deadline set" };
+  if (d < 0) return { tone: "navy", label: `${Math.abs(d)}d overdue` };
+  if (d <= 2) return { tone: "navy2", label: d === 0 ? "Due today" : `Due in ${d}d` };
+  return { tone: "blue", label: `Due in ${d}d` };
 }
 
-// ─── P1 TASKS COUNT CARD ────────────────────────────────────────────────────
-function P1TasksCard({ p1TaskCount, totalTaskCount, pendingCount, loading, onClick }) {
-  return (
-    <div className="acd-p1tasks-card" onClick={onClick} role="button" tabIndex={0}>
-      <div className="acd-p1-label">Critical Tasks</div>
-      {loading ? (
-        <div className="acd-skeleton" style={{ height: 44, width: 80, marginTop: 8 }} />
-      ) : (
-        <>
-          <div className="acd-p1tasks-number">{p1TaskCount}</div>
-          <div className={`acd-p1-sub${p1TaskCount === 0 ? " acd-p1-clear" : ""}`}>
-            {p1TaskCount > 0 ? `${pendingCount} pending · needs action` : "No P1 tasks assigned"}
-          </div>
-          {p1TaskCount > 0 && (
-            <span className="acd-p1tasks-badge">{pendingCount} not done</span>
-          )}
-        </>
-      )}
-      <div className="acd-p1-total">Total tasks: {totalTaskCount}</div>
-    </div>
-  );
-}
-
-// ─── ACTION CHIPS ─────────────────────────────────────────────────────────────
-function ActionChips({
-  logStatus, loadingLog,
-  drawingCount, loadingDrawings,
-  projectCount, loadingProjects,
-  incidentCount, loadingIncidents,
-  onLogClick, onDrawingClick, onProjectClick, onIncidentClick, onSnagClick, // ← added onSnagClick
-}) {
-  const submitted = logStatus === "Submitted";
-
-  const chips = [
-    {
-      color: submitted ? "green" : "amber",
-      icon: submitted ? "✓" : "○",
-      label: "Log Status",
-      value: loadingLog ? "…" : submitted ? "Submitted" : "Pending",
-      onClick: onLogClick,
-    },
-    {
-      color: "blue",
-      icon: "⬜",
-      label: "Drawings",
-      value: loadingDrawings ? "…" : `${drawingCount ?? 0} total`,
-      onClick: onDrawingClick,
-    },
-    {
-      color: "navy",
-      icon: "📁",
-      label: "Projects",
-      value: loadingProjects ? "…" : `${projectCount} assigned`,
-      onClick: onProjectClick,
-    },
-    {
-      color: "teal",
-      icon: "⚠",
-      label: "Incidents",
-      value: loadingIncidents ? "…" : `${incidentCount} total`,
-      onClick: onIncidentClick,
-    },
-    // ── NEW: Snag List chip ──
-    {
-      color: "indigo",
-      icon: "📋",
-      label: "Snag List",
-      value: "View all",
-      onClick: onSnagClick,
-    },
-  ];
-
-  return (
-    <div className="acd-chips-row">
-      {chips.map((c) => (
-        <button key={c.label} className="acd-chip" onClick={c.onClick}>
-          <span className={`acd-chip-icon acd-chip-icon-${c.color}`}>{c.icon}</span>
-          <span className="acd-chip-text">
-            <span className="acd-chip-label">{c.label}</span>
-            <span className="acd-chip-val">{c.value}</span>
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── P1 INCIDENT ROW ─────────────────────────────────────────────────────────
-const AVATAR_BG = ["#BDD8E9", "#7BBDE8", "#6EA2B3", "#4E8EA2", "#49769F"];
-
-function IncidentRow({ inc, index }) {
+function TimelineRow({ inc, onClick }) {
+  const urgency = urgencyOf(inc);
   const dateLabel = (inc.deadlineAt ?? inc.updatedAt).toLocaleDateString("en-GB", {
     day: "2-digit", month: "short",
   });
-  const words = (inc.assignedName || inc.title || "?").trim().split(/\s+/);
-  const abbr = words.length >= 2
-    ? (words[0][0] + words[words.length - 1][0]).toUpperCase()
-    : words[0].slice(0, 2).toUpperCase();
 
   return (
-    <div className="acd-inc-row">
-      <div className="acd-avatar" style={{ background: AVATAR_BG[index % AVATAR_BG.length], color: "#001D39" }}>
-        {abbr}
-      </div>
-      <div className="acd-inc-info">
-        <div className="acd-inc-title">{inc.title}</div>
-        <div className="acd-inc-meta">
-          #{inc.incidentNo}
-          {inc.assignedName ? ` · ${inc.assignedName}` : ""}
-          {inc.taskCount > 0 ? ` · ${inc.taskCount} tasks` : ""}
-        </div>
-      </div>
-      <div className="acd-inc-right">
-        <div className="acd-inc-date">{dateLabel}</div>
-        <span className="acd-p1-chip">P1</span>
+    <div className="acd-tl-item">
+      <span className="acd-tl-node" />
+      <div className="acd-tl-row" onClick={onClick} role="button" tabIndex={0}>
+        <span className={`acd-tl-icon acd-tone-${urgency.tone}`}>
+          <AlertTriangle size={16} />
+        </span>
+        <span className="acd-tl-info">
+          <span className="acd-tl-title">{inc.title}</span>
+          <span className="acd-tl-meta">
+            #{inc.incidentNo}{inc.assignedName ? ` · ${inc.assignedName}` : ""} · {urgency.label} ({dateLabel})
+          </span>
+        </span>
+        <span className="acd-tl-more"><MoreVertical size={16} /></span>
       </div>
     </div>
   );
 }
 
-// ─── TASK DONUT ───────────────────────────────────────────────────────────────
-function TaskDonut({ tasks }) {
-  const counts = { Done: 0, "In Progress": 0, "To Do": 0 };
-  tasks.forEach((t) => {
-    if (t.status === "Done") counts.Done++;
-    else if (t.status === "In Progress") counts["In Progress"]++;
-    else counts["To Do"]++;
-  });
-
-  const total = tasks.length || 1;
-  const colors = { Done: "#0A4174", "In Progress": "#4E8EA2", "To Do": "#BDD8E9" };
-
-  const R = 38, cx = 50, cy = 50;
-  const circ = 2 * Math.PI * R;
-  let offset = 0;
-  const slices = Object.entries(counts).map(([label, count]) => {
-    const dash = (count / total) * circ;
-    const s = { label, count, dash, offset, color: colors[label] };
-    offset += dash;
-    return s;
-  });
-
-  const donePct = Math.round((counts.Done / total) * 100);
-
-  return (
-    <div className="acd-donut-wrap">
-      <svg width="100" height="100" viewBox="0 0 100 100" role="img" aria-label={`${donePct}% tasks done`}>
-        <circle cx={cx} cy={cy} r={R} fill="none" stroke="#e2ecf4" strokeWidth="11" />
-        {slices.map((s) => (
-          <circle key={s.label} cx={cx} cy={cy} r={R}
-            fill="none" stroke={s.color} strokeWidth="11"
-            strokeDasharray={`${s.dash} ${circ - s.dash}`}
-            strokeDashoffset={-s.offset}
-            transform={`rotate(-90 ${cx} ${cy})`}
-          />
-        ))}
-        <text x={cx} y={cy - 6} textAnchor="middle" fontSize="15" fontWeight="700" fill="#001D39">{donePct}%</text>
-        <text x={cx} y={cy + 10} textAnchor="middle" fontSize="10" fill="#49769F">Done</text>
-      </svg>
-      <div className="acd-donut-legend">
-        {slices.map((s) => (
-          <div key={s.label} className="acd-leg-row">
-            <span className="acd-leg-dot" style={{ background: s.color }} />
-            <span className="acd-leg-label">{s.label}</span>
-            <span className="acd-leg-count">{s.count}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── MAIN ─────────────────────────────────────────────────────────────────────
+// ─── MAIN ───────────────────────────────────────────────────────────────────
 export default function ArchitectDashboard() {
   const navigate = useNavigate();
   const [user] = useState(() => {
@@ -427,6 +349,7 @@ export default function ArchitectDashboard() {
   const [myTasks,   setMyTasks]   = useState([]);
   const [logStatus, setLogStatus] = useState(null);
   const [drawings,  setDrawings]  = useState([]);
+  const [tlPage, setTlPage] = useState(0);
   const [loading, setLoading] = useState({
     projects: true, incidents: true, tasks: true, log: true, drawings: true,
   });
@@ -490,112 +413,180 @@ export default function ArchitectDashboard() {
   }, []);
 
   const p1Incidents = incidents.filter((i) => i.priority === "P1");
-
-  const p1Tasks = myTasks.filter(
-    (t) => (t.priority || t.incidentPriority) === "P1"
-  );
+  const p1Tasks = myTasks.filter((t) => (t.priority || t.incidentPriority) === "P1");
   const pendingP1Tasks = p1Tasks.filter((t) => t.status !== "Done");
+  const submitted = logStatus === "Submitted";
+
+  const topCriticalTask = pendingP1Tasks[0] || p1Tasks[0] || null;
+  const moreCriticalTasks = Math.max(0, p1Tasks.length - 1);
+
+  const PAGE_SIZE = 6;
+  const tlPages = Math.max(1, Math.ceil(p1Incidents.length / PAGE_SIZE));
+  const pageSafe = Math.min(tlPage, tlPages - 1);
+  const pageItems = useMemo(
+    () => p1Incidents.slice(pageSafe * PAGE_SIZE, pageSafe * PAGE_SIZE + PAGE_SIZE),
+    [p1Incidents, pageSafe]
+  );
 
   return (
-    <div className="acd-dashboard">
+    <div className="acd-page">
+      <div className="acd-layout">
 
-      {/* ── ROW 1: Hero + P1 Incidents + P1 Tasks ── */}
-      <div className="acd-row-hero">
-        <HeroCard userName={user.name || "Architect"} employeeId={user.id ?? null} />
-        <P1Card
-          p1Count={p1Incidents.length}
-          totalCount={incidents.length}
-          loading={loading.incidents}
-          onClick={() => navigate("/architect/incidents")}
-        />
-        <P1TasksCard
-          p1TaskCount={p1Tasks.length}
-          totalTaskCount={myTasks.length}
-          pendingCount={pendingP1Tasks.length}
-          loading={loading.tasks}
-          onClick={() => navigate("/architect/incidents?page=tasks")}
-        />
-      </div>
+        {/* ══════════════════════ LEFT PANEL ══════════════════════ */}
+        <section className="acd-left">
 
-      {/* ── ROW 2: Action chips ── */}
-      <ActionChips
-        logStatus={logStatus}          loadingLog={loading.log}
-        drawingCount={drawings.length} loadingDrawings={loading.drawings}
-        projectCount={projects.length} loadingProjects={loading.projects}
-        incidentCount={incidents.length} loadingIncidents={loading.incidents}
-        onLogClick={() => navigate("/architect/logs")}
-        onDrawingClick={() => navigate("/architect/designs")}
-        onProjectClick={() => navigate("/architect/projects")}
-        onIncidentClick={() => navigate("/architect/incidents")}
-        onSnagClick={() => navigate("/architect/snags")} 
-      />
-
-      {/* ── ROW 3: Narrower incidents list + wider analytics ── */}
-      <div className="acd-row-main">
-
-        <div className="acd-card acd-card-incidents">
-          <div className="acd-section-head">
-            <div className="acd-section-title"> Critical Incidents</div>
-            <button className="acd-section-link" onClick={() => navigate("/architect/incidents")}>
-              View all →
-            </button>
-          </div>
-          {loading.incidents ? (
-            <div className="acd-skeleton-list">
-              {[1, 2, 3].map((i) => <div key={i} className="acd-skeleton-row" />)}
+          <div className="acd-hero">
+            <div className="acd-hero-greeting-block">
+              <p className="acd-hero-greeting">{getGreeting()}</p>
+              <h1 className="acd-hero-name">{user.name || "Architect"}</h1>
+              <p className="acd-hero-date">{longDate()}</p>
             </div>
-          ) : p1Incidents.length === 0 ? (
-            <div className="acd-empty-state">
-              <span className="acd-empty-icon">✓</span>
-              <div>No P1 incidents — all clear</div>
-            </div>
-          ) : (
-            <div className="acd-inc-list">
-              {p1Incidents.slice(0, 6).map((inc, idx) => (
-                <IncidentRow key={inc.id} inc={inc} index={idx} />
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Wider analytics panel */}
-        <div className="acd-card acd-card-analytics">
-          <div className="acd-analytics-section">
-            <div className="acd-section-title">Task completion</div>
-            {loading.tasks ? (
-              <div className="acd-skeleton" style={{ height: 120 }} />
-            ) : (
-              <TaskDonut tasks={myTasks} />
-            )}
+            <div className="acd-hero-right">
+              {user.id && <CheckInButton employeeId={user.id} />}
+
+              <div className="acd-hero-buttons">
+                <button className="acd-btn-dark" onClick={() => navigate("/architect/incidents")}>
+                  Incidents
+                </button>
+                <button className="acd-btn-light" onClick={() => navigate("/architect/incidents?page=tasks")}>
+                  Tasks
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="acd-card-divider" />
+          <div className="acd-stat-row">
+            <StatCard
+              tone="navy"
+              icon={Check}
+              label="Log status"
+              value={submitted ? "Submitted" : "Pending"}
+              sub={loading.log ? "" : (submitted ? "Today's log is in" : "Not submitted yet")}
+              loading={loading.log}
+              onClick={() => navigate("/architect/logs")}
+            />
+            <StatCard
+              tone="blue"
+              icon={Droplet}
+              label="Drawings"
+              value={drawings.length}
+              sub="Total uploaded"
+              loading={loading.drawings}
+              onClick={() => navigate("/architect/designs")}
+            />
+            <StatCard
+              tone="navy2"
+              icon={Flag}
+              label="Critical incidents"
+              value={p1Incidents.length}
+              sub={p1Incidents.length > 0 ? "Needs attention" : "All clear"}
+              loading={loading.incidents}
+              onClick={() => navigate("/architect/incidents")}
+            />
+            <StatCard
+              tone="teal"
+              icon={Sparkles}
+              label="Snag list"
+              value="Review"
+              sub="Open snags to close out"
+              loading={false}
+              onClick={() => navigate("/architect/snags")}
+            />
+          </div>
 
-          <div className="acd-analytics-section">
-            <div className="acd-section-title">Projects</div>
-            {loading.projects ? (
-              <div className="acd-skeleton" style={{ height: 80 }} />
+          <div className="acd-bottom-row">
+            <div className="acd-info-grid">
+              <InfoRow
+                tone="blue"
+                icon={Briefcase}
+                label="Projects"
+                value={`${projects.length} assigned`}
+                loading={loading.projects}
+                onClick={() => navigate("/architect/projects")}
+              />
+              <InfoRow
+                tone="grey"
+                icon={AlertTriangle}
+                label="Total incidents"
+                value={`${incidents.length} total`}
+                loading={loading.incidents}
+                onClick={() => navigate("/architect/incidents")}
+              />
+              <InfoRow
+                tone="grey"
+                icon={Flag}
+                label="Critical task"
+                value={topCriticalTask ? topCriticalTask.title + (moreCriticalTasks > 0 ? ` (+${moreCriticalTasks} more)` : "") : "None assigned"}
+                loading={loading.tasks}
+                onClick={() => navigate("/architect/incidents?page=tasks")}
+              />
+              <InfoRow
+                tone="grey"
+                icon={ListChecks}
+                label="Total tasks"
+                value={`${myTasks.length} total`}
+                loading={loading.tasks}
+                onClick={() => navigate("/architect/incidents?page=tasks")}
+              />
+            </div>
+
+            <TaskPipelineCard tasks={myTasks} p1Count={p1Incidents.length} loading={loading.tasks} />
+          </div>
+        </section>
+
+        {/* ══════════════════════ RIGHT PANEL ══════════════════════ */}
+        <section className="acd-right">
+
+          <div className="acd-right-topbar">
+            <span>
+              <span className="acd-right-heading">Critical incidents</span>
+              <br />
+              <span className="acd-right-sub">
+                {p1Incidents.length} open · P1
+              </span>
+            </span>
+            <div className="acd-toggle-group">
+              <button
+                className="acd-chev-btn"
+                disabled={pageSafe === 0}
+                onClick={() => setTlPage((p) => Math.max(0, p - 1))}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                className="acd-chev-btn"
+                disabled={pageSafe >= tlPages - 1}
+                onClick={() => setTlPage((p) => Math.min(tlPages - 1, p + 1))}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="acd-timeline">
+            {loading.incidents ? (
+              <div className="acd-tl-track">
+                {[1, 2, 3, 4].map((i) => <div key={i} className="acd-tl-skel-row" />)}
+              </div>
+            ) : p1Incidents.length === 0 ? (
+              <div className="acd-tl-empty">
+                <Check size={26} />
+                <div>No P1 incidents — all clear</div>
+              </div>
             ) : (
-              <div className="acd-projects-summary">
-                {projects.slice(0, 5).map((p) => (
-                  <div key={p.id} className="acd-project-mini-row">
-                    <span className="acd-project-mini-name">{p.name}</span>
-                    <StatusBadge status={p.status} />
-                  </div>
+              <div className="acd-tl-track">
+                {pageItems.map((inc) => (
+                  <TimelineRow key={inc.id} inc={inc} onClick={() => navigate("/architect/incidents")} />
                 ))}
-                {projects.length > 5 && (
-                  <button
-                    className="acd-section-link"
-                    onClick={() => navigate("/architect/projects")}
-                    style={{ marginTop: 8 }}
-                  >
-                    +{projects.length - 5} more →
-                  </button>
-                )}
               </div>
             )}
           </div>
-        </div>
+
+          <button className="acd-fab" onClick={() => navigate("/architect/incidents")} title="View all incidents">
+            <Plus size={22} />
+          </button>
+        </section>
 
       </div>
     </div>

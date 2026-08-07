@@ -1,9 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../../styles/HRDashboard.css";
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -11,6 +9,27 @@ function getGreeting() {
   if (h < 17) return "Good Afternoon";
   return "Good Evening";
 }
+
+const fmtTime = (t) => {
+  if (!t) return "—";
+  const [h, m] = t.split(":");
+  const hh = parseInt(h, 10);
+  return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
+};
+
+const fmtDate = (d) => {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
 function getDaysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
@@ -21,14 +40,33 @@ function getFirstDayOfMonth(year, month) {
   return (d + 6) % 7;
 }
 
-const fmtTime = (t) => {
-  if (!t) return "—";
-  const [h, m] = t.split(":");
-  const hh = parseInt(h, 10);
-  return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
-};
+function SectionCard({ title, subtitle, action, children, className = "" }) {
+  return (
+    <div className={`hd-card ${className}`}>
+      <div className="hd-card-head">
+        <div>
+          <h3 className="hd-card-title">{title}</h3>
+          <p className="hd-card-subtitle">{subtitle}</p>
+        </div>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
 
-// ─── Check In / Out Button ───────────────────────────────────────────────────
+function StatCard({ label, value, tone, sub }) {
+  return (
+    <div className="hd-kpi-card">
+      <div className={`hd-kpi-strip hd-${tone}`} />
+      <div className="hd-kpi-body">
+        <div className="hd-kpi-label">{label}</div>
+        <div className="hd-kpi-value">{value ?? "—"}</div>
+        <div className="hd-kpi-sub">{sub}</div>
+      </div>
+    </div>
+  );
+}
 
 const CheckInButton = ({ employeeId }) => {
   const [attendance, setAttendance] = useState(null);
@@ -51,10 +89,7 @@ const CheckInButton = ({ employeeId }) => {
         const nowMs = new Date() - new Date().setHours(0, 0, 0, 0);
         const diff = Math.max(0, nowMs - inMs);
         const th = String(Math.floor(diff / 3600000)).padStart(2, "0");
-        const tm = String(Math.floor((diff % 3600000) / 60000)).padStart(
-          2,
-          "0",
-        );
+        const tm = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
         const ts = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
         setElapsed(`${th}:${tm}:${ts}`);
       };
@@ -69,7 +104,7 @@ const CheckInButton = ({ employeeId }) => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `http://localhost:5000/api/attendance/today?employee_id=${employeeId}`,
+        `http://localhost:5000/api/attendance/today?employee_id=${employeeId}`
       );
       setAttendance(res.data || null);
     } catch (err) {
@@ -79,29 +114,27 @@ const CheckInButton = ({ employeeId }) => {
       setLoading(false);
     }
   };
-const handleCheckIn = async () => {
-  setBusy(true);
-  try {
-    const now = new Date();
-    const timeStr = now.toTimeString().slice(0, 8);   // "HH:MM:SS"
-    const dateStr = now.toISOString().slice(0, 10);   // "YYYY-MM-DD"
 
-    const res = await axios.post("http://localhost:5000/api/attendance", {
-      employee_id: employeeId,
-      date:        dateStr,
-      check_in:    timeStr,
-      shift:       "Morning",
-      // ❌ removed: status, late_minutes, remarks
-      // ✅ backend's deriveStatus() will calculate all of these
-    });
-    setAttendance(res.data);
-  } catch (err) {
-    console.error(err);
-    alert("Check-in failed. Please try again.");
-  } finally {
-    setBusy(false);
-  }
-};
+  const handleCheckIn = async () => {
+    setBusy(true);
+    try {
+      const now = new Date();
+      const timeStr = now.toTimeString().slice(0, 8);
+      const dateStr = now.toISOString().slice(0, 10);
+      const res = await axios.post("http://localhost:5000/api/attendance", {
+        employee_id: employeeId,
+        date: dateStr,
+        check_in: timeStr,
+        shift: "Morning",
+      });
+      setAttendance(res.data);
+    } catch (err) {
+      console.error(err);
+      alert("Check-in failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleCheckOut = async () => {
     if (!attendance?.id) return;
@@ -109,10 +142,9 @@ const handleCheckIn = async () => {
     try {
       const now = new Date();
       const timeStr = now.toTimeString().slice(0, 8);
-
       const res = await axios.put(
         `http://localhost:5000/api/attendance/${attendance.id}`,
-        { check_out: timeStr },
+        { check_out: timeStr }
       );
       setAttendance(res.data);
       clearInterval(timerRef.current);
@@ -127,548 +159,256 @@ const handleCheckIn = async () => {
   const isCheckedIn = attendance?.check_in && !attendance?.check_out;
   const isCheckedOut = attendance?.check_in && attendance?.check_out;
 
-  if (loading) {
-    return (
-      <button
-        disabled
-        style={{
-          padding: "8px 18px",
-          borderRadius: 10,
-          border: "1.5px solid #e2e8f0",
-          background: "#f8fafc",
-          color: "#94a3b8",
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: "not-allowed",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: "#cbd5e1",
-            display: "inline-block",
-          }}
-        />
-        Loading…
-      </button>
-    );
-  }
+  if (loading) return <button className="hd-action-btn hd-loading" disabled>Loading…</button>;
 
   if (isCheckedOut) {
     return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          gap: 2,
-        }}
-      >
-        <button
-          disabled
-          style={{
-            padding: "8px 18px",
-            borderRadius: 10,
-            border: "1.5px solid #86efac",
-            background: "#f0fdf4",
-            color: "#16a34a",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "not-allowed",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: "#16a34a",
-              display: "inline-block",
-            }}
-          />
-          ✓ Done for Today
-        </button>
-        <span style={{ fontSize: 10, color: "#64748b" }}>
-          {fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}
-        </span>
+      <div className="hd-check-wrap">
+        <button className="hd-action-btn hd-done" disabled>Done for Today</button>
+        <span className="hd-check-sub">{fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}</span>
       </div>
     );
   }
 
   if (isCheckedIn) {
     return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          gap: 2,
-        }}
-      >
-        <button
-          onClick={handleCheckOut}
-          disabled={busy}
-          style={{
-            padding: "8px 18px",
-            borderRadius: 10,
-            border: "none",
-            background: busy ? "#fca5a5" : "#dc2626",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: busy ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            transition: "all .2s",
-            boxShadow: "0 2px 8px rgba(220,38,38,0.3)",
-          }}
-        >
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: "#fff",
-              display: "inline-block",
-              animation: "pulse 1.2s ease-in-out infinite",
-            }}
-          />
+      <div className="hd-check-wrap">
+        <button className="hd-action-btn hd-out" onClick={handleCheckOut} disabled={busy}>
           {busy ? "Saving…" : "Check Out"}
         </button>
-        <span
-          style={{
-            fontSize: 10,
-            color: "#64748b",
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          In: {fmtTime(attendance.check_in)}
-          {elapsed && (
-            <>
-              {" "}
-              &nbsp;·&nbsp;{" "}
-              <strong style={{ color: "#2563eb" }}>{elapsed}</strong>
-            </>
-          )}
+        <span className="hd-check-sub">
+          In: {fmtTime(attendance.check_in)} {elapsed ? <strong>{elapsed}</strong> : null}
         </span>
       </div>
     );
   }
 
   return (
-    <button
-      onClick={handleCheckIn}
-      disabled={busy}
-      style={{
-        padding: "8px 18px",
-        borderRadius: 10,
-        border: "none",
-        background: busy ? "#86efac" : "#16a34a",
-        color: "#fff",
-        fontSize: 13,
-        fontWeight: 700,
-        cursor: busy ? "not-allowed" : "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        transition: "all .2s",
-        boxShadow: "0 2px 8px rgba(22,163,74,0.3)",
-      }}
-    >
-      <span
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: "#fff",
-          display: "inline-block",
-        }}
-      />
+    <button className="hd-action-btn hd-in" onClick={handleCheckIn} disabled={busy}>
       {busy ? "Saving…" : "Check In"}
     </button>
   );
 };
 
-// ─── Stat Card ───────────────────────────────────────────────────────────────
-
-const STAT_GRADIENTS = {
-  navy: "linear-gradient(135deg, #001D39 0%, #0A4174 100%)",
-  teal: "linear-gradient(135deg, #093d2e 0%, #0d5c42 100%)",
-  blue: "linear-gradient(135deg, #0A4174 0%, #49769F 100%)",
-  sky: "linear-gradient(135deg, #4E8EA2 0%, #7BBDE8 100%)",
-};
-
-function StatCard({ label, value, icon, colorKey }) {
+function AttendanceRing({ present, absent, leave }) {
+  const total = present + absent + leave || 1;
+  const p = Math.round((present / total) * 100);
+  const a = Math.round((absent / total) * 100);
   return (
-    <div className="stat-card" style={{ background: STAT_GRADIENTS[colorKey] }}>
-      <div className="stat-card-icon">{icon}</div>
-      <div className="stat-card-value">{value ?? "—"}</div>
-      <div className="stat-card-label">{label}</div>
+    <div className="hd-att-wrap">
+      <div
+        className="hd-ring"
+        style={{
+          background: `conic-gradient(#7BBDE8 0 ${p}%, #0A4174 ${p}% ${p + a}%, #BDD8E9 ${p + a}% 100%)`,
+        }}
+      >
+        <div className="hd-ring-center">
+          <div className="hd-ring-number">{total}</div>
+          <div className="hd-ring-label">Total</div>
+        </div>
+      </div>
+      <div className="hd-legend">
+        <div><span className="dot present" />Present <strong>{present}</strong></div>
+        <div><span className="dot absent" />Absent <strong>{absent}</strong></div>
+        <div><span className="dot leave" />On Leave <strong>{leave}</strong></div>
+      </div>
     </div>
   );
 }
 
-// ─── Calendar ────────────────────────────────────────────────────────────────
+function BarChart({ data = [] }) {
+  const max = Math.max(...data.map((d) => d.value), 1);
+  return (
+    <div className="hd-bars">
+      {data.map((d) => (
+        <div key={d.label} className="hd-bar-col">
+          <div className="hd-bar-value">{d.value}</div>
+          <div className="hd-bar-track">
+            <div className="hd-bar-fill" style={{ height: `${(d.value / max) * 100}%` }} />
+          </div>
+          <div className="hd-bar-label">{d.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-function TrainingCalendar({ employees }) {
+function SmallCalendar({ employees }) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [notes, setNotes] = useState({});
+  const [events, setEvents] = useState({});
   const [selected, setSelected] = useState(null);
-  const [noteInput, setNoteInput] = useState("");
+  const [eventText, setEventText] = useState("");
+  const [eventType, setEventType] = useState("note");
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
 
-  const birthdayDays = {};
+  const birthdays = {};
   (employees || []).forEach((emp) => {
     if (!emp.dob) return;
     const bd = new Date(emp.dob);
     if (bd.getMonth() === month) {
       const day = bd.getDate();
-      if (!birthdayDays[day]) birthdayDays[day] = [];
-      birthdayDays[day].push(emp.name);
+      if (!birthdays[day]) birthdays[day] = [];
+      birthdays[day].push(emp.name);
     }
   });
 
-  function prevMonth() {
-    if (month === 0) {
-      setMonth(11);
-      setYear((y) => y - 1);
-    } else setMonth((m) => m - 1);
-    setSelected(null);
-  }
-  function nextMonth() {
-    if (month === 11) {
-      setMonth(0);
-      setYear((y) => y + 1);
-    } else setMonth((m) => m + 1);
-    setSelected(null);
-  }
+  const monthKey = (day) => `${year}-${month}-${day}`;
 
-  function selectMonth(m) {
-    setMonth(m);
-    setDropdownOpen(false);
-    setSelected(null);
-  }
-
-  function handleDayClick(day) {
+  const handleDayClick = (day) => {
     setSelected(day);
-    setNoteInput(notes[`${year}-${month}-${day}`] || "");
-  }
+    const existing = events[monthKey(day)];
+    setEventText(existing?.text || "");
+    setEventType(existing?.type || "note");
+  };
 
-  function saveNote() {
-    if (selected) {
-      setNotes((prev) => ({
-        ...prev,
-        [`${year}-${month}-${selected}`]: noteInput,
-      }));
-      setSelected(null);
-    }
-  }
+  const saveEvent = () => {
+    if (!selected || !eventText.trim()) return;
+    setEvents((prev) => ({
+      ...prev,
+      [monthKey(selected)]: { text: eventText.trim(), type: eventType },
+    }));
+    setSelected(null);
+    setEventText("");
+    setEventType("note");
+  };
 
-  const dayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+  const deleteEvent = () => {
+    if (!selected) return;
+    setEvents((prev) => {
+      const copy = { ...prev };
+      delete copy[monthKey(selected)];
+      return copy;
+    });
+    setSelected(null);
+    setEventText("");
+    setEventType("note");
+  };
+
+  const labels = ["M", "T", "W", "T", "F", "S", "S"];
 
   return (
-    <div className="calendar-card">
-      <div className="calendar-header">
-        <div className="calendar-month-selector">
-          <button className="cal-nav-btn" onClick={prevMonth}>
-            ‹
+    <SectionCard title="Calendar" subtitle="Birthdays and reminders">
+      <div className="cal-mini-head">
+        <button className="cal-nav-btn" onClick={() => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); setSelected(null); }}>‹</button>
+        <div className="month-dropdown-wrap">
+          <button className="month-dropdown-trigger" onClick={() => setDropdownOpen((o) => !o)}>
+            {MONTH_NAMES[month]} {year} <span>{dropdownOpen ? "▲" : "▼"}</span>
           </button>
-          <div className="month-dropdown-wrap">
-            <button
-              className="month-dropdown-trigger"
-              onClick={() => setDropdownOpen((o) => !o)}
-            >
-              {MONTH_NAMES[month]} {year}
-              <span className="dropdown-arrow">{dropdownOpen ? "▲" : "▼"}</span>
-            </button>
-            {dropdownOpen && (
-              <div className="month-dropdown-menu">
-                {MONTH_NAMES.map((name, i) => (
-                  <button
-                    key={i}
-                    className={`month-option ${i === month ? "month-option--active" : ""}`}
-                    onClick={() => selectMonth(i)}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button className="cal-nav-btn" onClick={nextMonth}>
-            ›
-          </button>
+          {dropdownOpen && (
+            <div className="month-dropdown-menu">
+              {MONTH_NAMES.map((name, i) => (
+                <button
+                  key={i}
+                  className={`month-option ${i === month ? "month-option--active" : ""}`}
+                  onClick={() => { setMonth(i); setDropdownOpen(false); setSelected(null); }}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+        <button className="cal-nav-btn" onClick={() => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); setSelected(null); }}>›</button>
       </div>
 
-      <div className="calendar-grid">
-        {dayLabels.map((d, i) => (
-          <div key={i} className="cal-day-label">
-            {d}
-          </div>
-        ))}
-        {Array.from({ length: firstDay }).map((_, i) => (
-          <div key={`e${i}`} />
-        ))}
+      <div className="calendar-grid calendar-grid-small">
+        {labels.map((d, i) => <div key={i} className="cal-day-label">{d}</div>)}
+        {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1;
-          const isToday =
-            day === today.getDate() &&
-            month === today.getMonth() &&
-            year === today.getFullYear();
-          const hasNote = !!notes[`${year}-${month}-${day}`];
-          const hasBirthday = !!birthdayDays[day];
+          const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+          const dayKey = monthKey(day);
+          const event = events[dayKey];
+          const hasBirthday = !!birthdays[day];
           const isSelected = selected === day;
-
           return (
             <div
               key={day}
               className={[
                 "cal-day",
                 isToday ? "cal-today" : "",
-                hasNote ? "cal-has-note" : "",
+                event ? `cal-${event.type}` : "",
                 hasBirthday ? "cal-birthday" : "",
                 isSelected ? "cal-selected" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
+              ].filter(Boolean).join(" ")}
               onClick={() => handleDayClick(day)}
-              title={hasBirthday ? `🎂 ${birthdayDays[day].join(", ")}` : ""}
+              title={[
+                hasBirthday ? `Birthday: ${birthdays[day].join(", ")}` : "",
+                event?.text ? event.text : "",
+              ].filter(Boolean).join(" • ")}
             >
               {day}
-              {hasBirthday && <span className="birthday-dot" />}
+              {(hasBirthday || event) && <span className="day-badge" />}
             </div>
           );
         })}
       </div>
 
-      <div className="cal-legend">
-        <span>
-          <span className="legend-dot today-dot" /> Today
-        </span>
-        <span>
-          <span className="legend-dot note-dot" /> Reminder
-        </span>
-        <span>
-          <span className="legend-dot bday-dot" /> Birthday
-        </span>
+      <div className="cal-legend cal-legend-small">
+        <span><span className="legend-dot today-dot" /> Today</span>
+        <span><span className="legend-dot note-dot" /> Note</span>
+        <span><span className="legend-dot bday-dot" /> Birthday</span>
       </div>
 
       {selected && (
-        <div className="note-editor">
-          <p className="note-editor-title">
-            {MONTH_NAMES[month]} {selected}
-          </p>
-          {birthdayDays[selected] && (
-            <p className="birthday-notice">
-              🎂 {birthdayDays[selected].join(", ")}
-            </p>
+        <div className="note-editor note-editor-small">
+          <div className="note-editor-title">{MONTH_NAMES[month]} {selected}</div>
+          {birthdays[selected] && (
+            <div className="birthday-notice">Birthday: {birthdays[selected].join(", ")}</div>
           )}
+          <select value={eventType} onChange={(e) => setEventType(e.target.value)} className="event-select">
+            <option value="note">Important note</option>
+            <option value="birthday">Birthday</option>
+            <option value="holiday">Holiday</option>
+          </select>
           <textarea
-            value={noteInput}
-            onChange={(e) => setNoteInput(e.target.value)}
-            placeholder="Add a reminder…"
-            rows={2}
+            value={eventText}
+            onChange={(e) => setEventText(e.target.value)}
+            placeholder="Add a birthday, reminder, or important event…"
+            rows={3}
           />
           <div className="note-actions">
-            <button onClick={saveNote} className="note-save">
-              Save
-            </button>
-            <button onClick={() => setSelected(null)} className="note-cancel">
-              Cancel
-            </button>
+            <button onClick={saveEvent} className="note-save">Save</button>
+            <button onClick={deleteEvent} className="note-cancel">Delete</button>
           </div>
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }
 
-// ─── Attendance Donut ────────────────────────────────────────────────────────
-
-function AttendanceDonut({ present, absent, onLeave, total }) {
-  const r = 48;
-  const circ = 2 * Math.PI * r;
-  const pPresent = total ? present / total : 0;
-  const pAbsent = total ? absent / total : 0;
-  const pLeave = total ? onLeave / total : 0;
-  const seg1 = pPresent * circ;
-  const seg2 = pAbsent * circ;
-  const seg3 = pLeave * circ;
-
-  return (
-    <div className="attendance-donut-wrap">
-      <svg viewBox="0 0 110 110" width="110" height="110">
-        <circle
-          cx="55"
-          cy="55"
-          r={r}
-          fill="none"
-          stroke="#e8f0f7"
-          strokeWidth="10"
-        />
-        <circle
-          cx="55"
-          cy="55"
-          r={r}
-          fill="none"
-          stroke="#7BBDE8"
-          strokeWidth="10"
-          strokeDasharray={`${seg1} ${circ - seg1}`}
-          strokeDashoffset={circ / 4}
-          strokeLinecap="butt"
-        />
-        <circle
-          cx="55"
-          cy="55"
-          r={r}
-          fill="none"
-          stroke="#0A4174"
-          strokeWidth="10"
-          strokeDasharray={`${seg2} ${circ - seg2}`}
-          strokeDashoffset={circ / 4 - seg1}
-          strokeLinecap="butt"
-        />
-        <circle
-          cx="55"
-          cy="55"
-          r={r}
-          fill="none"
-          stroke="#BDD8E9"
-          strokeWidth="10"
-          strokeDasharray={`${seg3} ${circ - seg3}`}
-          strokeDashoffset={circ / 4 - seg1 - seg2}
-          strokeLinecap="butt"
-        />
-        <text
-          x="55"
-          y="51"
-          textAnchor="middle"
-          fontSize="14"
-          fontWeight="700"
-          fill="#001D39"
-        >
-          {total}
-        </text>
-        <text x="55" y="64" textAnchor="middle" fontSize="8" fill="#6EA2B3">
-          Total
-        </text>
-      </svg>
-      <div className="donut-legend">
-        <span>
-          <span className="legend-dot" style={{ background: "#7BBDE8" }} />{" "}
-          Present <strong>{present}</strong>
-        </span>
-        <span>
-          <span className="legend-dot" style={{ background: "#0A4174" }} />{" "}
-          Absent <strong>{absent}</strong>
-        </span>
-        <span>
-          <span className="legend-dot" style={{ background: "#BDD8E9" }} /> On
-          Leave <strong>{onLeave}</strong>
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ─── New Joiners Bar Chart ───────────────────────────────────────────────────
-
-function NewJoinersChart({ employees }) {
-  const monthCounts = {};
-  const monthLabels = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    const label = d.toLocaleString("default", { month: "short" });
-    monthCounts[key] = 0;
-    monthLabels.push({ key, label });
-  }
-  (employees || []).forEach((emp) => {
-    if (!emp.join_date) return;
-    const d = new Date(emp.join_date);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    if (key in monthCounts) monthCounts[key]++;
-  });
-  const values = monthLabels.map((m) => monthCounts[m.key]);
-  const max = Math.max(...values, 1);
-
-  return (
-    <div className="joiners-chart">
-      <div className="chart-bars">
-        {monthLabels.map((m, i) => (
-          <div key={m.key} className="bar-col">
-            <span className="bar-val">{values[i]}</span>
-            <div className="bar-track">
-              <div
-                className="bar-fill"
-                style={{ height: `${(values[i] / max) * 100}%` }}
-              />
-            </div>
-            <span className="bar-label">{m.label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Dashboard ──────────────────────────────────────────────────────────
-
-function HRDashboard() {
+export default function HRDashboard() {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
   const [dashboard, setDashboard] = useState(null);
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-   const hrName = user?.name || user?.full_name || user?.username || user?.first_name || "there";
+  const [attendanceRows, setAttendanceRows] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // ── Get employee_id from localStorage (same pattern as ProjectCoordinatorDashboard) ──
-  const employeeId =
-    JSON.parse(localStorage.getItem("user") || "{}")?.employee_id ||
-    JSON.parse(localStorage.getItem("user") || "{}")?.id ||
-    null;
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const hrName = user?.name || user?.full_name || user?.username || user?.first_name || "there";
+  const employeeId = user?.employee_id || user?.id || null;
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
-        const [empRes, dashRes] = await Promise.all([
+        const [empRes, dashRes, attRes] = await Promise.all([
           axios.get("http://localhost:5000/api/employees"),
           axios.get("http://localhost:5000/api/dashboard"),
+          axios.get("http://localhost:5000/api/attendance"),
         ]);
-        setEmployees(empRes.data);
-        setDashboard(dashRes.data);
+        setEmployees(empRes.data || []);
+        setDashboard(dashRes.data || null);
+        setAttendanceRows(attRes.data || []);
       } catch (err) {
         console.error("Dashboard error:", err);
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
@@ -681,146 +421,114 @@ function HRDashboard() {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const newJoiners = employees.filter(
-    (e) => e.join_date && new Date(e.join_date) >= thirtyDaysAgo,
-  ).length;
-
-  const pendingLeaves = (dashboard?.pending || []).filter(
-    (r) => r.status === "pending",
+    (e) => e.join_date && new Date(e.join_date) >= thirtyDaysAgo
   ).length;
 
   const present = dashboard?.attendance?.present ?? Math.round(active * 0.85);
   const absent = dashboard?.attendance?.absent ?? Math.round(active * 0.1);
   const attendanceOnLeave = dashboard?.attendance?.on_leave ?? onLeave;
 
-  const statCards = [
-    { label: "Total Employees", value: total, icon: "👥", colorKey: "navy" },
-    { label: "Active Employees", value: active, icon: "✅", colorKey: "teal" },
-    { label: "New Joiners", value: newJoiners, icon: "🌟", colorKey: "blue" },
-    { label: "On Leave", value: onLeave, icon: "🗓️", colorKey: "sky" },
+  const recentJoiners = [...employees]
+    .filter((e) => e.join_date)
+    .sort((a, b) => new Date(b.join_date) - new Date(a.join_date))
+    .slice(0, 5);
+
+  const departmentMap = employees.reduce((acc, e) => {
+    const key = e.department || "Unassigned";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const departmentData = Object.entries(departmentMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([label, value]) => ({ label, value }));
+
+  const attendanceTrend = useMemo(() => {
+    const counts = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      counts[d.toLocaleString("default", { month: "short" })] = 0;
+    }
+    attendanceRows.forEach((r) => {
+      if (!r.date) return;
+      const month = new Date(r.date).toLocaleString("default", { month: "short" });
+      if (month in counts && String(r.status).toLowerCase() === "present") counts[month]++;
+    });
+    return Object.entries(counts).map(([label, value]) => ({ label, value }));
+  }, [attendanceRows]);
+
+  const kpis = [
+    { label: "Total Employees", value: total, sub: "Company headcount", tone: "navy" },
+    { label: "Active Employees", value: active, sub: "Currently employed", tone: "teal" },
+    { label: "Present Today", value: present, sub: "Checked in today", tone: "blue" },
+    { label: "New Joiners", value: newJoiners, sub: "Last 30 days", tone: "sky" },
   ];
 
-  const pendingRequests = (dashboard?.pending || [])
-    .filter((r) => r.status === "pending")
-    .slice(0, 4);
-
   return (
-    <div className="hr-dashboard-v2">
-      {/* ── Top Bar ── */}
-      <div className="top-bar">
-        <div className="greeting-block">
-          <h1 className="greeting-name">
-            {getGreeting()}, {hrName}!
-          </h1>
-          <p className="greeting-sub">
-            Here's what's happening in your organization today
-          </p>
+    <div className="hd-page">
+      <div className="hd-top">
+        <div>
+          <div className="hd-greet">{getGreeting()}, {hrName}!</div>
+          <div className="hd-greet-sub">Operational HR overview for your team.</div>
         </div>
-        <div className="top-actions">
-          <div className="search-box">
-            <span className="search-icon">🔍</span>
+
+        <div className="hd-top-actions">
+          <div className="hd-search">
+            <span className="hd-search-icon">Search</span>
             <input placeholder="Search employees…" />
           </div>
-
-          {/* ── CHECK IN / OUT — same as ProjectCoordinatorDashboard ── */}
           {employeeId && <CheckInButton employeeId={employeeId} />}
-
-          <button
-            className="upgrade-btn"
-            onClick={() => navigate("/hr/employees")}
-          >
+          <button className="hd-secondary-btn" onClick={() => navigate("/hr/employees")}>
             All Employees
           </button>
         </div>
       </div>
 
-      {/* ── Row 1 ── */}
-      <div className="row-1">
-        <div className="employee-stats-card">
-          <div className="card-header-line">
-            <span className="card-title">Employee Overview</span>
-            <span className="card-subtitle">Today</span>
-          </div>
-          <div className="stat-cards-grid">
-            {statCards.map((c, i) => (
-              <StatCard key={i} {...c} />
-            ))}
-          </div>
-        </div>
-
-        <TrainingCalendar employees={employees} />
+      <div className="hd-kpi-grid">
+        {kpis.map((k) => <StatCard key={k.label} {...k} />)}
       </div>
 
-      {/* ── Row 2 ── */}
-      <div className="row-2">
-        {/* Attendance */}
-        <div className="bottom-card attendance-card">
-          <div className="card-header-line">
-            <span className="card-title">Attendance Today</span>
-          </div>
-          <AttendanceDonut
-            present={present}
-            absent={absent}
-            onLeave={attendanceOnLeave}
-            total={present + absent + attendanceOnLeave || total}
-          />
-        </div>
+      <div className="hd-grid-top">
+        <SectionCard title="Attendance Today" subtitle="Present, absent, and on leave">
+          <AttendanceRing present={present} absent={absent} leave={attendanceOnLeave} />
+        </SectionCard>
 
-        {/* Pending Leaves */}
-        <div className="bottom-card pending-leaves-card">
-          <div className="card-header-line">
-            <span className="card-title">Pending Leave Requests</span>
-            <button
-              className="add-new-btn"
-              onClick={() => navigate("/hr/leaves")}
-            >
-              View All <span>→</span>
-            </button>
-          </div>
-          <div className="leaves-scroll">
-            {pendingRequests.length === 0 && (
-              <p className="empty-msg">No pending requests 🎉</p>
+        <SectionCard title="Department Mix" subtitle="Employees by department">
+          {departmentData.length === 0
+            ? <div className="hd-empty">No department data available.</div>
+            : <BarChart data={departmentData} />}
+        </SectionCard>
+
+        <SmallCalendar employees={employees} />
+      </div>
+
+      <div className="hd-grid-bottom">
+        <SectionCard title="Recent Joiners" subtitle="Newest employees in the company">
+          <div className="hd-list">
+            {recentJoiners.length === 0 ? (
+              <div className="hd-empty">No recent joiners.</div>
+            ) : (
+              recentJoiners.map((emp) => (
+                <div className="hd-row" key={emp.id || emp.employee_id}>
+                  <div className="hd-avatar hd-soft">{(emp.name || "E")[0].toUpperCase()}</div>
+                  <div className="hd-row-body">
+                    <div className="hd-row-title">{emp.name || "Employee"}</div>
+                    <div className="hd-row-sub">{emp.department || "—"} · Joined {fmtDate(emp.join_date)}</div>
+                  </div>
+                  <div className="hd-tag">New</div>
+                </div>
+              ))
             )}
-            {pendingRequests.map((req, i) => (
-              <div key={i} className="leave-row">
-                <div className="leave-avatar">
-                  {(req.employee_name || req.name || "?")[0].toUpperCase()}
-                </div>
-                <div className="leave-info">
-                  <p className="leave-name">{req.employee_name || req.name}</p>
-                  <p className="leave-meta">
-                    {req.leave_type || "Leave"} ·{" "}
-                    {req.from_date || req.start_date} →{" "}
-                    {req.to_date || req.end_date}
-                  </p>
-                </div>
-                <button
-                  className="approve-btn"
-                  onClick={() => navigate("/hr/leaves")}
-                >
-                  Approve
-                </button>
-              </div>
-            ))}
           </div>
-          {pendingLeaves > 0 && (
-            <div className="pending-summary">
-              <span className="pending-badge">{pendingLeaves}</span>
-              <span className="pending-label">total pending requests</span>
-            </div>
-          )}
-        </div>
+        </SectionCard>
 
-        {/* New Joiners */}
-        <div className="bottom-card joiners-card">
-          <div className="card-header-line">
-            <span className="card-title">New Joiners</span>
-            <span className="card-badge">{newJoiners} this month</span>
-          </div>
-          <NewJoinersChart employees={employees} />
-        </div>
+        <SectionCard title="Attendance Trend" subtitle="Present count over the last 6 months">
+          {attendanceTrend.some((x) => x.value > 0)
+            ? <BarChart data={attendanceTrend} />
+            : <div className="hd-empty">No attendance trend data available.</div>}
+        </SectionCard>
       </div>
     </div>
   );
 }
-
-export default HRDashboard;

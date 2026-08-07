@@ -17,6 +17,11 @@ router.get("/",     controller.getDrawings);
 /* ── Drawing requests (SE / Client → Architect) ────────────── */
 router.post("/request",  controller.requestDrawing);
 router.get("/requests",  controller.getRequests);
+router.patch("/requests/:reqId/seen", controller.markRequestSeen);
+
+/* ── 3D: 3D Visualizer sends a file straight to the architect
+       assigned to a project (no prior drawing/send required) ── */
+router.post("/submit-to-architect", controller.submitToArchitect);
 
 /* ── 3D: 3D Visualizer's own submission history ────────────── */
 router.get("/my-3d-submissions", controller.getMy3DSubmissions);
@@ -42,5 +47,8 @@ router.get("/:drawingId/3d-submissions", controller.get3DSubmissions);
 
 /* ── Architect increments Planning drawing revision ─────────── */
 router.patch("/:drawingId/revision", controller.incrementRevision);
+
+/* ── Architect permanently deletes a drawing ───────────────── */
+router.delete("/:drawingId", controller.deleteDrawing);
 
 module.exports = router;
