@@ -5,6 +5,19 @@ import "../../styles/HRDashboard.css";
 
 const API_URL = "http://localhost:5000/api";
 
+// ✅ Authenticated axios instance — attaches the token from localStorage to
+// every request. Plain `axios.get(...)` never sent the auth token, which
+// worked only because of an unauthenticated duplicate route on the backend;
+// now that the backend correctly requires auth, every call in this file
+// must go through this instance instead of the bare `axios` import.
+const authAxios = axios.create();
+
+authAxios.interceptors.request.use((req) => {
+  const token = localStorage.getItem("token");
+  if (token) req.headers.Authorization = `Bearer ${token}`;
+  return req;
+});
+
 const MONTH_NAMES = [
   "January",
   "February",
@@ -330,7 +343,7 @@ function CheckInButton({ employeeId }) {
     try {
       setLoading(true);
 
-      const response = await axios.get(
+      const response = await authAxios.get(
         `${API_URL}/attendance/today`,
         {
           params: {
@@ -360,7 +373,7 @@ function CheckInButton({ employeeId }) {
 
       const now = new Date();
 
-      const response = await axios.post(
+      const response = await authAxios.post(
         `${API_URL}/attendance`,
         {
           employee_id: employeeId,
@@ -387,7 +400,7 @@ function CheckInButton({ employeeId }) {
 
       const now = new Date();
 
-      const response = await axios.put(
+      const response = await authAxios.put(
         `${API_URL}/attendance/${attendance.id}`,
         {
           check_out: now.toTimeString().slice(0, 8),
@@ -470,7 +483,11 @@ function CheckInButton({ employeeId }) {
    Department distribution
    ========================================================================== */
 
-function DepartmentDistribution({ data }) {
+function DepartmentDistribution({
+  data,
+  remainderDepartments = 0,
+  remainderCount = 0,
+}) {
   if (!data.length) {
     return (
       <div className="hrd-empty-state">
@@ -497,12 +514,15 @@ function DepartmentDistribution({ data }) {
 
           <div className="hrd-department-content">
             <div className="hrd-department-heading">
-              <span>{item.label}</span>
+              <span className="hrd-department-name">
+                {item.label}
+              </span>
               <strong>{item.value}</strong>
             </div>
 
             <div className="hrd-department-track">
               <span
+                className="hrd-department-fill"
                 style={{
                   width: `${(item.value / max) * 100}%`,
                 }}
@@ -511,6 +531,15 @@ function DepartmentDistribution({ data }) {
           </div>
         </div>
       ))}
+
+      {remainderDepartments > 0 && (
+        <div className="hrd-department-remainder">
+          +{remainderDepartments} more department
+          {remainderDepartments === 1 ? "" : "s"} ·{" "}
+          {remainderCount} employee
+          {remainderCount === 1 ? "" : "s"}
+        </div>
+      )}
     </div>
   );
 }
@@ -611,7 +640,7 @@ function RecentJoiners({ employees }) {
    Calendar
    ========================================================================== */
 
-function CalendarCard({ employees }) {
+function CalendarCard() {
   const today = new Date();
 
   const [year, setYear] = useState(
@@ -623,36 +652,81 @@ function CalendarCard({ employees }) {
   );
 
   const [selectedDay, setSelectedDay] = useState(null);
-  const [events, setEvents] = useState({});
 
+  // The calendar fetches its own birthday data instead of relying on the
+  // dashboard's `employees` list, which is capped at 100 rows server-side
+  // and also carries a lot of PII (salary, bank details, gov ID) that
+  // this component has no reason to hold in memory.
+  const [birthdayEmployees, setBirthdayEmployees] = useState([]);
+  const [loadingBirthdays, setLoadingBirthdays] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchBirthdays() {
+      try {
+        setLoadingBirthdays(true);
+
+        const response = await authAxios.get(
+          `${API_URL}/employees/birthdays`
+        );
+
+        if (!cancelled) {
+          setBirthdayEmployees(response.data || []);
+        }
+      } catch (error) {
+        console.error("Unable to fetch birthdays:", error);
+
+        if (!cancelled) {
+          setBirthdayEmployees([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingBirthdays(false);
+        }
+      }
+    }
+
+    fetchBirthdays();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Group birthdays by day-of-month for the currently viewed month.
+  // Parses the date string directly (instead of `new Date(dob)`) so the
+  // day can't shift because of the browser's local timezone. The backend
+  // also sends dob as plain text (dob::text) for the same reason, since
+  // node-postgres otherwise converts DATE columns to JS Date objects
+  // using the server's local timezone.
   const birthdays = useMemo(() => {
     const result = {};
 
-    employees.forEach((employee) => {
+    birthdayEmployees.forEach((employee) => {
       if (!employee.dob) return;
 
-      const birthday = new Date(employee.dob);
+      const datePart = String(employee.dob).slice(0, 10);
+      const parts = datePart.split("-").map(Number);
 
-      if (birthday.getMonth() !== month) return;
+      if (parts.length !== 3 || parts.some(Number.isNaN)) return;
 
-      const day = birthday.getDate();
+      const [, birthMonth, birthDay] = parts;
 
-      if (!result[day]) {
-        result[day] = [];
+      if (birthMonth - 1 !== month) return;
+
+      if (!result[birthDay]) {
+        result[birthDay] = [];
       }
 
-      result[day].push(employee.name);
+      result[birthDay].push(employee.name);
     });
 
     return result;
-  }, [employees, month]);
+  }, [birthdayEmployees, month]);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
-
-  function getEventKey(day) {
-    return `${year}-${month + 1}-${day}`;
-  }
 
   function changeMonth(direction) {
     setSelectedDay(null);
@@ -676,47 +750,10 @@ function CalendarCard({ employees }) {
     }
   }
 
-  function addReminder() {
-    if (!selectedDay) {
-      window.alert("Select a calendar date first.");
-      return;
-    }
-
-    const title = window.prompt("Enter reminder title");
-
-    if (!title?.trim()) return;
-
-    setEvents((current) => ({
-      ...current,
-      [getEventKey(selectedDay)]: title.trim(),
-    }));
-  }
-
-  function deleteReminder() {
-    if (!selectedDay) return;
-
-    setEvents((current) => {
-      const copy = { ...current };
-
-      delete copy[getEventKey(selectedDay)];
-
-      return copy;
-    });
-  }
-
   return (
     <Card
       title="Calendar"
-      subtitle="Birthdays and reminders"
-      action={
-        <button
-          type="button"
-          className="hrd-text-button"
-          onClick={addReminder}
-        >
-          Add reminder
-        </button>
-      }
+      subtitle="Employee birthdays"
     >
       <div className="hrd-calendar-header">
         <button
@@ -766,15 +803,14 @@ function CalendarCard({ employees }) {
         {Array.from({ length: daysInMonth }).map(
           (_, index) => {
             const day = index + 1;
-            const eventKey = getEventKey(day);
 
             const isToday =
               day === today.getDate() &&
               month === today.getMonth() &&
               year === today.getFullYear();
 
-            const hasBirthday = Boolean(birthdays[day]);
-            const hasReminder = Boolean(events[eventKey]);
+            const dayBirthdays = birthdays[day];
+            const hasBirthday = Boolean(dayBirthdays);
 
             return (
               <button
@@ -786,21 +822,16 @@ function CalendarCard({ employees }) {
                   selectedDay === day
                     ? "hrd-calendar-selected"
                     : "",
-                  hasBirthday || hasReminder
-                    ? "hrd-calendar-event"
-                    : "",
+                  hasBirthday ? "hrd-day-birthday" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
                 onClick={() => setSelectedDay(day)}
-                title={[
+                title={
                   hasBirthday
-                    ? `Birthday: ${birthdays[day].join(", ")}`
-                    : "",
-                  hasReminder ? events[eventKey] : "",
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
+                    ? `Birthday: ${dayBirthdays.join(", ")}`
+                    : ""
+                }
               >
                 {day}
               </button>
@@ -809,36 +840,18 @@ function CalendarCard({ employees }) {
         )}
       </div>
 
-      {selectedDay && (
+      {selectedDay && birthdays[selectedDay] && (
         <div className="hrd-calendar-selection">
           <div>
             <strong>
               {MONTH_NAMES[month]} {selectedDay}
             </strong>
 
-            {birthdays[selectedDay] && (
-              <span>
-                Birthday:{" "}
-                {birthdays[selectedDay].join(", ")}
-              </span>
-            )}
-
-            {events[getEventKey(selectedDay)] && (
-              <span>
-                {events[getEventKey(selectedDay)]}
-              </span>
-            )}
+            <span>
+              Birthday:{" "}
+              {birthdays[selectedDay].join(", ")}
+            </span>
           </div>
-
-          {events[getEventKey(selectedDay)] && (
-            <button
-              type="button"
-              className="hrd-text-button hrd-text-danger"
-              onClick={deleteReminder}
-            >
-              Remove
-            </button>
-          )}
         </div>
       )}
     </Card>
@@ -941,9 +954,9 @@ export default function HRDashboard() {
           dashboardResponse,
           attendanceResponse,
         ] = await Promise.all([
-          axios.get(`${API_URL}/employees`),
-          axios.get(`${API_URL}/dashboard`),
-          axios.get(`${API_URL}/attendance`),
+          authAxios.get(`${API_URL}/employees`),
+          authAxios.get(`${API_URL}/dashboard`),
+          authAxios.get(`${API_URL}/attendance`),
         ]);
 
         setEmployees(employeesResponse.data || []);
@@ -999,20 +1012,34 @@ export default function HRDashboard() {
     const departmentMap = {};
 
     employees.forEach((employee) => {
+      // Trim so stray whitespace (e.g. " Finance" vs "Finance") doesn't
+      // silently split one department into two separate buckets.
       const department =
-        employee.department || "Unassigned";
+        employee.department?.trim() || "Unassigned";
 
       departmentMap[department] =
         (departmentMap[department] || 0) + 1;
     });
 
-    return Object.entries(departmentMap)
-      .sort((first, second) => second[1] - first[1])
+    const sorted = Object.entries(departmentMap).sort(
+      (first, second) => second[1] - first[1]
+    );
+
+    const top = sorted
       .slice(0, 6)
-      .map(([label, value]) => ({
-        label,
-        value,
-      }));
+      .map(([label, value]) => ({ label, value }));
+
+    const remainder = sorted.slice(6);
+    const remainderCount = remainder.reduce(
+      (sum, [, value]) => sum + value,
+      0
+    );
+
+    return {
+      top,
+      remainderDepartments: remainder.length,
+      remainderCount,
+    };
   }, [employees]);
 
   const recentJoiners = useMemo(() => {
@@ -1151,7 +1178,11 @@ export default function HRDashboard() {
               subtitle="Employee headcount by department"
             >
               <DepartmentDistribution
-                data={departmentData}
+                data={departmentData.top}
+                remainderDepartments={
+                  departmentData.remainderDepartments
+                }
+                remainderCount={departmentData.remainderCount}
               />
             </Card>
 
@@ -1185,7 +1216,7 @@ export default function HRDashboard() {
         </div>
 
         <aside className="hrd-sidebar">
-          <CalendarCard employees={employees} />
+          <CalendarCard />
           <QuickActions navigate={navigate} />
         </aside>
       </div>

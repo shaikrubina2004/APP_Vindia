@@ -9,9 +9,9 @@ const LOGO_ICON_PATH = path.join(__dirname, "..", "assets", "logo-icon.png");
 
 const COMPANY_NAME = "VIndia Infrasec Pvt Ltd";
 
-// Palette lifted from the invoice template
-const BLUE = "#4a5da0"; // header / total box / footer
-const BLUE_DARK = "#3a4a86"; // diagonal overlay accent
+// Palette lifted from the logo (blue map-icon + wordmark)
+const BLUE = "#3E6FB0"; // header / total box / footer
+const BLUE_DARK = "#2C4E82"; // diagonal overlay accent
 const INK = "#26282d";
 const MUTED = "#9195a0";
 const LINE = "#e2e4ea";
@@ -67,21 +67,21 @@ function drawWatermark(doc) {
 
   // The "white part" of the page — everything between the blue header
   // and the blue footer banner.
-  const areaTop = 118; // matches headerH below
+  const areaTop = 134; // matches headerH below
   const areaBottom = pageH - 48; // matches footer position below
   const areaLeft = 0;
   const areaRight = pageW;
 
-  const tileW = 110; // bigger icon size (was 72)
+  const tileW = 260; // big icon size
   const tileH = natural.height * (tileW / natural.width);
-  const gapX = 40;
-  const gapY = 34;
+  const gapX = 60;
+  const gapY = 50;
   const stepX = tileW + gapX;
   const stepY = tileH + gapY;
 
   doc.save();
   doc.rect(areaLeft, areaTop, areaRight - areaLeft, areaBottom - areaTop).clip();
-  doc.opacity(0.22); // more visible (was 0.13)
+  doc.opacity(0.1); // kept subtle even though icon is much bigger now
 
   let row = 0;
   for (let y = areaTop - stepY / 2; y < areaBottom + stepY; y += stepY) {
@@ -169,7 +169,7 @@ function streamPayslipPdf(res, payload) {
      HEADER — diagonal two-tone blue banner (template styling),
      simple single-row content (matches the plain layout)
      ══════════════════════════════════════════════════════════ */
-  const headerH = 118;
+  const headerH = 134;
 
   doc.save();
   doc.rect(0, 0, doc.page.width, headerH).fill(BLUE);
@@ -183,25 +183,25 @@ function streamPayslipPdf(res, payload) {
     .fill(BLUE_DARK);
   doc.restore();
 
-  // Bigger, clearer logo box, icon only (no wordmark)
-  const LOGO_BOX = 64;
-  const LOGO_BOX_Y = 20;
+  // Bigger, clearer logo box, icon only (no wordmark) — sized for print visibility
+  const LOGO_BOX = 118;
+  const LOGO_BOX_Y = 8;
   const iconPath = resolveIconPath();
   if (fs.existsSync(iconPath)) {
     doc.save();
-    roundedPath(doc, left, LOGO_BOX_Y, LOGO_BOX, LOGO_BOX, 12);
+    roundedPath(doc, left, LOGO_BOX_Y, LOGO_BOX, LOGO_BOX, 16);
     doc.fillColor("#ffffff").fill();
     doc.restore();
 
-    const pad = 8;
+    const pad = 4;
     drawIcon(doc, iconPath, left + pad, LOGO_BOX_Y + pad, LOGO_BOX - pad * 2, LOGO_BOX - pad * 2);
   }
 
   const textX = left + LOGO_BOX + 14;
   doc.font("Helvetica-Bold").fontSize(15).fillColor("#ffffff");
-  doc.text(COMPANY_NAME.toUpperCase(), textX, 30, { width: right - textX });
+  doc.text(COMPANY_NAME.toUpperCase(), textX, 45, { width: right - textX });
   doc.font("Helvetica").fontSize(8.5).fillColor(HEADER_TEXT_DIM);
-  doc.text(`Payslip · ${monthLabel}`, textX, 49);
+  doc.text(`Payslip · ${monthLabel}`, textX, 64);
 
   let y = headerH + 40;
   const rowH = 24;
