@@ -2,14 +2,19 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Search,
   Calendar,
-  User,
-  BarChart3,
-  TrendingUp,
+  Sparkles,
   CheckCircle2,
   AlertTriangle,
   Loader2,
   ChevronDown,
   ChevronUp,
+  Pencil,
+  Wallet,
+  ArrowRight,
+  X,
+  User,
+  TrendingUp,
+  BarChart3,
 } from "lucide-react";
 import "./Payroll.css";
 
@@ -35,69 +40,31 @@ const monthLabel = (m) => {
   });
 };
 
+const dateLabel = (d) => {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return String(d).slice(0, 10);
+  return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
 let toastId = 0;
 
-function SkeletonLine({ w = "100%" }) {
-  return <div className="sk-line" style={{ width: w }} />;
-}
-
-function SkeletonBlock({ className = "" }) {
-  return <div className={`sk-block ${className}`} />;
-}
-
-function EmployeeSkeleton() {
+/* ─── small reusable boxed field ─── */
+function Field({ label, value, muted }) {
   return (
-    <div className="pr-card">
-      <div className="pr-section-header">
-        <User size={16} />
-        <h2>Employee</h2>
-      </div>
-
-      <div className="pr-emp-grid">
-        <div className="pr-emp-col">
-          <SkeletonLine w="65%" />
-          <SkeletonLine w="82%" />
-          <SkeletonLine w="72%" />
-          <SkeletonLine w="58%" />
-          <SkeletonLine w="76%" />
-        </div>
-
-        <div className="pr-emp-col">
-          <SkeletonLine w="70%" />
-          <SkeletonLine w="88%" />
-          <SkeletonLine w="62%" />
-          <SkeletonLine w="74%" />
-          <SkeletonLine w="68%" />
-        </div>
-      </div>
-
-      <div className="pr-section-header mt-24">
-        <BarChart3 size={16} />
-        <h2>Attendance Summary</h2>
-      </div>
-
-      <div className="pr-att-stats">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <SkeletonBlock key={i} className="sk-stat" />
-        ))}
-      </div>
-
-      <div className="pr-att-summary">
-        {[1, 2, 3].map((i) => (
-          <SkeletonBlock key={i} className="sk-pill" />
-        ))}
-      </div>
-
-      <div className="pr-more-panel">
-        <SkeletonLine w="40%" />
-        <SkeletonLine w="60%" />
-      </div>
+    <div className="pr-field">
+      <span className="pr-field-label">{label}</span>
+      <span className={`pr-field-value${muted ? " pr-field-value--muted" : ""}`}>
+        {value || "—"}
+      </span>
     </div>
   );
 }
 
-function PayslipBlock({
+function SalaryPanel({
+  emp,
   sal,
+  att,
   month,
   monthLabel,
   adjustedNet,
@@ -105,71 +72,135 @@ function PayslipBlock({
   onApprove,
   lopDays,
   lopDeduction,
+  disabled,
+  onSaveDetails,
+  savingDetails,
 }) {
+  const [editing, setEditing] = useState(false);
+  const [band, setBand] = useState("");
+  const [level, setLevel] = useState("");
+  const [pfNo, setPfNo] = useState("");
+
+  useEffect(() => {
+    if (editing) {
+      setBand(emp.band && emp.band !== "—" ? emp.band : "");
+      setLevel(emp.level && emp.level !== "—" ? emp.level : "");
+      setPfNo(emp.pfNo && emp.pfNo !== "—" ? emp.pfNo : "");
+    }
+  }, [editing, emp.band, emp.level, emp.pfNo]);
+
+  const workingDays = att.workingDays ?? 0;
+  const daysPayable = att.daysPayable ?? workingDays;
+  const totalDeductionsAll = (sal.totalDeductions || 0) + (lopDeduction || 0);
+
   return (
-    <>
+    <div className="payslip-doc">
       <div className="pr-section-header">
-        <TrendingUp size={16} />
-        <h2>Salary</h2>
-      </div>
-
-      <div className="pr-payslip-banner">{monthLabel(month)}</div>
-
-      <div className="pr-ed-grid">
-        <div className="pr-ed-block">
-          <div className="pr-ed-head pr-ed-head--earn">Earnings</div>
-          <div className="pr-ed-body">
-            {[
-              ["Basic", sal.basic],
-              ["HRA", sal.hra],
-              ["Special Allowance", sal.specialAllow],
-              ["Variable Pay", sal.variablePay],
-            ].map(([label, val], i) => (
-              <div className="pr-ed-row" key={i}>
-                <span>{label}</span>
-                <span className="pr-ed-amt">{val ? `₹${fmt(val)}` : "—"}</span>
-              </div>
-            ))}
-            <div className="pr-ed-row pr-ed-row--total">
-              <strong>Gross Pay</strong>
-              <strong>₹{fmt(sal.totalEarnings)}</strong>
-            </div>
-          </div>
+        <div className="pr-section-header-left">
+          <TrendingUp size={16} />
+          <h2>Salary</h2>
         </div>
+        <button type="button" className="pr-edit-link" onClick={() => setEditing((v) => !v)}>
+          {editing ? <X size={13} /> : <Pencil size={13} />}
+          {editing ? "Close" : "Edit details"}
+        </button>
+      </div>
 
-        <div className="pr-ed-block">
-          <div className="pr-ed-head pr-ed-head--deduct">Deductions</div>
-          <div className="pr-ed-body">
-            {[
-              ["PF", sal.pf],
-              ["Professional Tax", sal.profTax],
-              ["Income Tax", sal.incomeTax],
-              ...(lopDays > 0 ? [["LOP", lopDeduction]] : []),
-            ].map(([label, val], i) => (
-              <div className="pr-ed-row" key={i}>
-                <span>{label}</span>
-                <span className="pr-ed-amt pr-ed-amt--deduct">{val ? `₹${fmt(val)}` : "—"}</span>
-              </div>
-            ))}
-            <div className="pr-ed-row pr-ed-row--total">
-              <strong>Total Deductions</strong>
-              <strong className="pr-ed-amt--deduct">
-                ₹{fmt((sal.totalDeductions || 0) + lopDeduction)}
-              </strong>
-            </div>
+      {editing && (
+        <div className="pr-edit-panel">
+          <div className="pr-edit-field">
+            <label htmlFor="ps-band">Band</label>
+            <input id="ps-band" value={band} onChange={(e) => setBand(e.target.value)} placeholder="e.g. Band 4" />
           </div>
+          <div className="pr-edit-field">
+            <label htmlFor="ps-level">Level</label>
+            <input id="ps-level" value={level} onChange={(e) => setLevel(e.target.value)} placeholder="e.g. Level 6" />
+          </div>
+          <div className="pr-edit-field pr-edit-field--wide">
+            <label htmlFor="ps-pfno">PF No.</label>
+            <input
+              id="ps-pfno"
+              value={pfNo}
+              onChange={(e) => setPfNo(e.target.value)}
+              placeholder="e.g. PYBOM00165730000096306"
+            />
+          </div>
+          <button
+            type="button"
+            className="pr-edit-save"
+            disabled={savingDetails}
+            onClick={() => onSaveDetails({ band, level, pf_no: pfNo }).then(() => setEditing(false))}
+          >
+            {savingDetails ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      )}
+
+      <div className="pr-banner pr-banner--month">{monthLabel(month)}</div>
+
+      <div className="pr-banner pr-banner--earn">Earnings</div>
+      <div className="pr-row-list">
+        <div className="pr-row">
+          <span>Basic</span>
+          <span className="pr-row-amt">{fmt(sal.basic)}</span>
+        </div>
+        <div className="pr-row">
+          <span>HRA</span>
+          <span className="pr-row-amt">{fmt(sal.hra)}</span>
+        </div>
+        <div className="pr-row">
+          <span>Special Allowance</span>
+          <span className="pr-row-amt">{fmt(sal.specialAllow)}</span>
+        </div>
+        <div className="pr-row">
+          <span>Variable Pay</span>
+          <span className="pr-row-amt">{fmt(sal.exGratia)}</span>
+        </div>
+        <div className="pr-row pr-row--total">
+          <span>Gross Pay</span>
+          <span className="pr-row-amt">₹{fmt(sal.totalEarnings)}</span>
         </div>
       </div>
 
-      <div className="pr-net-bar">
-        <span>Net Pay</span>
-        <span className="pr-net-amount">₹{fmt(adjustedNet)}</span>
+      <div className="pr-banner pr-banner--ded">Deductions</div>
+      <div className="pr-row-list">
+        <div className="pr-row">
+          <span>PF</span>
+          <span className="pr-row-amt">{fmt(sal.pf)}</span>
+        </div>
+        <div className="pr-row">
+          <span>Professional Tax</span>
+          <span className="pr-row-amt">{fmt(sal.profTax)}</span>
+        </div>
+        <div className="pr-row">
+          <span>Income Tax</span>
+          <span className="pr-row-amt">{fmt(sal.incomeTax)}</span>
+        </div>
+        {lopDays > 0 && (
+          <div className="pr-row">
+            <span>Loss of Pay</span>
+            <span className="pr-row-amt">{fmt(lopDeduction)}</span>
+          </div>
+        )}
+        <div className="pr-row pr-row--total">
+          <span>Total Deductions</span>
+          <span className="pr-row-amt">₹{fmt(totalDeductionsAll)}</span>
+        </div>
       </div>
 
-      <button className="pr-approve-btn" onClick={onApprove}>
-        Approve & Send Payslip
+      <div className="payslip-net-row">
+        <span>
+          Net salary payable · {daysPayable}/{workingDays} days paid
+          {lopDays > 0 ? ` · −${lopDays} LOP` : ""}
+        </span>
+        <strong>₹{fmt(adjustedNet)}</strong>
+      </div>
+
+      <button className="pr-approve-btn" onClick={onApprove} disabled={disabled}>
+        Approve &amp; Send Payslip
+        <ArrowRight size={16} />
       </button>
-    </>
+    </div>
   );
 }
 
@@ -189,6 +220,7 @@ export default function Payroll() {
   const [approving, setApproving] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
   const pickingRef = useRef(false);
 
   const pushToast = useCallback((message, kind = "success") => {
@@ -306,6 +338,9 @@ export default function Payroll() {
           workingDays: 26,
           counts: {},
           dailyMap: {},
+          holidayCount: 0,
+          lopFromAbsent: 0,
+          lopFromLeave: 0,
           leaveBalance: null,
         });
       } else {
@@ -323,6 +358,7 @@ export default function Payroll() {
   const sal = empData?.salary || {};
   const att = attData || {};
   const workingDays = att.workingDays || 26;
+  const daysPayable = att.daysPayable ?? workingDays;
   const counts = att.counts || {};
   const totalPresent = (counts.present || 0) + (counts.wfh || 0);
   const totalLeave = counts.leave || 0;
@@ -330,14 +366,130 @@ export default function Payroll() {
   const totalLate = counts.late || 0;
   const totalHalf = counts.halfday || 0;
   const lopDays = att.lop || 0;
+  const lopFromAbsent = att.lopFromAbsent || 0;
+  const lopFromLeave = att.lopFromLeave || 0;
   const lopDeduction = att.lopDeduction || 0;
+  const holidayCount = att.holidayCount || 0;
+  const leaveBal = att.leaveBalance || {};
+  const leavesTakenYTD = (leaveBal.usedCL || 0) + (leaveBal.usedSL || 0);
+  const leaveBalanceRemaining = leaveBal.totalBalance ?? 0;
   const adjustedNet = Math.max(0, (sal.netSalary || 0) - lopDeduction);
-  const showSkeleton = !empData && !loading;
+  const hasData = Boolean(empData);
+  const bankLine = [emp.bankName, emp.ifsc].filter((v) => v && v !== "—").join(" · ") || "—";
+
+  const status = !hasData
+    ? { label: "Awaiting details", tone: "pending" }
+    : attFetchFailed
+    ? { label: "Needs review", tone: "review" }
+    : lopDays > 0
+    ? { label: "Adjusted for LOP", tone: "adjusted" }
+    : { label: "Ready to approve", tone: "ready" };
+
+  const handleSaveDetails = useCallback(
+    async ({ band, level, pf_no }) => {
+      if (!emp.id && !emp.employee_code) return;
+      const idForUrl = emp.employee_code || emp.id;
+      setSavingDetails(true);
+      try {
+        const res = await fetch(
+          `${API}/api/payroll/employee/${encodeURIComponent(idForUrl)}/payslip-details`,
+          {
+            method: "PATCH",
+            headers: hdrs(),
+            body: JSON.stringify({
+              band: band?.trim() || null,
+              level: level?.trim() || null,
+              pf_no: pf_no?.trim() || null,
+            }),
+          }
+        );
+        if (!res.ok) throw new Error("Save failed");
+        const updated = await res.json();
+        setEmpData((prev) =>
+          prev
+            ? {
+                ...prev,
+                employee: {
+                  ...prev.employee,
+                  band: updated.band || "—",
+                  level: updated.level || "—",
+                  pfNo: updated.pf_no || "—",
+                },
+              }
+            : prev
+        );
+        pushToast("Payslip details saved", "success");
+      } catch {
+        pushToast("Could not save payslip details — please try again", "error");
+      } finally {
+        setSavingDetails(false);
+      }
+    },
+    [emp.id, emp.employee_code, pushToast]
+  );
 
   const handleApproveConfirmed = async () => {
     setApproving(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
+      const idForUrl = emp.employee_code || emp.id;
+      const totalDeductionsAll = (sal.totalDeductions || 0) + (lopDeduction || 0);
+
+      const payload = {
+        monthLabel: monthLabel(month),
+        employee: {
+          name: emp.name,
+          employeeCode: emp.employee_code,
+          pan: emp.pan,
+          workingDays,
+          designation: emp.designation,
+          daysPayable,
+          band: emp.band,
+          pfNo: emp.pfNo,
+          level: emp.level,
+          lopDays,
+          location: emp.location,
+          lopPrevMonth: 0,
+          bankName: bankLine,
+          bankAccNo: emp.bankAccNo,
+        },
+        earnings: [
+          { label: "Basic", amount: sal.basic },
+          { label: "HRA", amount: sal.hra },
+          { label: "Special Allowance", amount: sal.specialAllow },
+          { label: "Variable Pay", amount: sal.exGratia },
+        ],
+        deductions: [
+          { label: "PF", amount: sal.pf },
+          { label: "Professional Tax", amount: sal.profTax },
+          { label: "Income Tax", amount: sal.incomeTax },
+          ...(lopDays > 0 ? [{ label: "Loss of Pay", amount: lopDeduction }] : []),
+        ],
+        totalEarnings: sal.totalEarnings,
+        totalDeductions: totalDeductionsAll,
+        netPay: adjustedNet,
+      };
+
+      const res = await fetch(
+        `${API}/api/payroll/employee/${encodeURIComponent(idForUrl)}/payslip-pdf`,
+        {
+          method: "POST",
+          headers: hdrs(),
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) throw new Error("Failed to generate payslip");
+
+      // Download the generated PDF
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Payslip-${(emp.name || "employee").replace(/[^a-z0-9]+/gi, "_")}-${monthLabel(month).replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
       pushToast(`Payslip for ${emp.name} approved and sent`, "success");
     } catch {
       pushToast("Could not send payslip — please try again", "error");
@@ -347,26 +499,31 @@ export default function Payroll() {
     }
   };
 
+  const stats = [
+    ["Present", totalPresent, false],
+    ["Late", totalLate, false],
+    ["Half Day", totalHalf, false],
+    ["Leave", totalLeave, false],
+    ["Absent", totalAbsent, false],
+    ["Working Days", workingDays, true],
+  ];
+
   return (
     <div className="pr-wrapper">
       <div className="pr-container">
         <div className="pr-page-header">
-          <div>
-            <h1>Payroll</h1>
-            <p>Review and approve employee payslips</p>
-          </div>
+          <h1>Payroll</h1>
+          <p>Review and approve employee payslips</p>
         </div>
 
         <div className="pr-search-card">
           <div className="pr-search-row">
             <div className="pr-input-wrap pr-input-wrap--search">
-              <span className="pr-input-icon">
-                <Search size={16} />
-              </span>
+              <Search size={16} className="pr-input-icon" />
               <input
-                type="text"
                 className="pr-input"
-                placeholder="Employee name or code"
+                type="text"
+                placeholder="Search employee by name or code"
                 value={query}
                 autoComplete="off"
                 role="combobox"
@@ -407,152 +564,164 @@ export default function Payroll() {
               )}
             </div>
 
-            <div className="pr-input-wrap pr-input-wrap--month">
-              <span className="pr-input-icon">
-                <Calendar size={16} />
-              </span>
+            <div className="pr-input-wrap">
+              <Calendar size={16} className="pr-input-icon" />
               <input
-                type="month"
                 className="pr-input"
+                type="month"
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
               />
             </div>
 
             <button className="pr-btn" onClick={generate} disabled={loading}>
-              {loading ? <Loader2 size={16} className="pr-spinner" style={{ border: "none" }} /> : null}
-              {loading ? "Loading…" : "Generate"}
+              {loading ? <Loader2 size={16} className="pr-spinner" /> : <Sparkles size={16} />}
+              {loading ? "Generating…" : "Generate"}
             </button>
           </div>
 
           {error && (
             <div className="pr-error">
-              <AlertTriangle size={16} /> {error}
+              <AlertTriangle size={15} /> {error}
+            </div>
+          )}
+
+          {hasData && attFetchFailed && (
+            <div className="pr-fetch-error-banner">
+              <AlertTriangle size={15} />
+              <span>Attendance could not be loaded. Showing fallback payroll values.</span>
             </div>
           )}
         </div>
 
-        {empData && attFetchFailed && (
-          <div className="pr-fetch-error-banner">
-            <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-            <span>Attendance could not be loaded. Showing fallback payroll values.</span>
-          </div>
-        )}
-
+        {/*
+          Layout is always rendered — before Generate is clicked (or while
+          a request is in flight) emp/sal/att are empty objects, so Field
+          / fmt() naturally fall back to "—" / ₹0 placeholders. Once real
+          data arrives, the same DOM re-fills with values.
+        */}
         <div className="pr-dashboard">
-          {showSkeleton ? (
-            <EmployeeSkeleton />
-          ) : empData ? (
-            <>
-              <div className="pr-card">
-                <div className="pr-section-header">
-                  <User size={16} />
-                  <h2>Employee</h2>
+          <div className="pr-card">
+            <div className="pr-section-header">
+              <div className="pr-section-header-left">
+                <User size={16} />
+                <h2>Employee</h2>
+              </div>
+            </div>
+
+            <div className="pr-field-grid">
+              <Field label="Name" value={emp.name} />
+              <Field label="Location" value={emp.location} />
+              <Field label="Employee No" value={emp.employee_code} />
+              <Field label="Department" value={emp.department} />
+              <Field label="Designation" value={emp.designation} />
+              <Field label="Bank" value={bankLine} />
+              <Field label="IFSC" value={emp.ifsc} />
+              <Field label="Bank A/C No." value={emp.bankAccNo} />
+              <Field label="PAN" value={emp.pan} />
+              <Field label="Monthly Salary" value={hasData ? `₹${fmt(sal.totalEarnings)}` : null} />
+              <Field label="Band / Level" value={hasData ? `${emp.band || "—"} / ${emp.level || "—"}` : null} />
+              <Field label="PF No." value={emp.pfNo} />
+            </div>
+
+            <div className="pr-section-header pr-section-header--sub">
+              <div className="pr-section-header-left">
+                <BarChart3 size={14} />
+                <h2>Attendance Summary</h2>
+              </div>
+            </div>
+
+            <div className="pr-stat-grid">
+              {stats.map(([label, count, highlight]) => (
+                <div className={`pr-stat${highlight ? " pr-stat--highlight" : ""}`} key={label}>
+                  <span className="pr-stat-count">{hasData ? count : "—"}</span>
+                  <span className="pr-stat-label">{label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="pr-field-grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", marginTop: 10 }}>
+              <div className="pr-field">
+                <span className="pr-field-label">Net Pay Status</span>
+                <span className={`pr-field-value pr-status-text pr-status-text--${status.tone}`}>
+                  {hasData ? status.label : "—"}
+                </span>
+              </div>
+              <div className="pr-field">
+                <span className="pr-field-label">LOP Days</span>
+                <span className="pr-field-value">{hasData ? lopDays : "—"}</span>
+              </div>
+              <div className="pr-field">
+                <span className="pr-field-label">LOP Deduction</span>
+                <span className="pr-field-value">{hasData ? `₹${fmt(lopDeduction)}` : "—"}</span>
+              </div>
+            </div>
+
+            <button className="pr-more-btn" onClick={() => setMoreOpen((v) => !v)}>
+              {moreOpen ? "Hide details" : "More details"}
+              {moreOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+
+            {moreOpen && (
+              <div className="pr-more-panel">
+                <div className="pr-more-row">
+                  <span>Holidays this month</span>
+                  <strong>{holidayCount}</strong>
+                </div>
+                <div className="pr-more-row">
+                  <span>Leave balance remaining</span>
+                  <strong>{fmt(leaveBalanceRemaining)} days</strong>
+                </div>
+                <div className="pr-more-row">
+                  <span>Leaves taken this year</span>
+                  <strong>{leavesTakenYTD}</strong>
+                </div>
+                <div className="pr-more-row">
+                  <span>Casual Leave</span>
+                  <strong>{fmt(leaveBal.usedCL || 0)} / {fmt(leaveBal.accruedCL || 0)}</strong>
+                </div>
+                <div className="pr-more-row">
+                  <span>Sick Leave</span>
+                  <strong>{fmt(leaveBal.usedSL || 0)} / {fmt(leaveBal.accruedSL || 0)}</strong>
                 </div>
 
-                <div className="pr-emp-grid">
-                  <div className="pr-emp-col">
-                    {[
-                      ["Name", emp.name],
-                      ["Employee No", emp.employee_code],
-                      ["Designation", emp.designation],
-                      ["Department", emp.department],
-                    ].map(([label, val]) => (
-                      <div className="pr-emp-row" key={label}>
-                        <span className="pr-emp-label">{label}</span>
-                        <span className="pr-emp-val">{val || "—"}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="pr-emp-col">
-                    {[
-                      ["Location", emp.location],
-                      ["Bank", emp.bankName],
-                      ["IFSC", emp.ifsc],
-                      ["Monthly Salary", `₹${fmt(emp.monthlySalary)}`],
-                    ].map(([label, val]) => (
-                      <div className="pr-emp-row" key={label}>
-                        <span className="pr-emp-label">{label}</span>
-                        <span className="pr-emp-val">{val || "—"}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pr-section-header mt-24">
-                  <BarChart3 size={16} />
-                  <h2>Attendance Summary</h2>
-                </div>
-
-                <div className="pr-att-stats">
-                  {[
-                    ["present", "Present", totalPresent],
-                    ["late", "Late", totalLate],
-                    ["halfday", "Half Day", totalHalf],
-                    ["leave", "Leave", totalLeave],
-                    ["absent", "Absent", totalAbsent],
-                    ["working", "Working Days", workingDays],
-                  ].map(([key, label, count]) => (
-                    <div key={key} className={`pr-stat pr-stat--${key}`}>
-                      <span className="pr-stat-count">{count}</span>
-                      <span className="pr-stat-label">{label}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="pr-att-summary">
-                  <div className="pr-att-pill pr-att-pill--info">
-                    <span className="pill-label">Net Pay Status</span>
-                    <span className="pill-val">{lopDays > 0 ? "Adjusted" : "Ready"}</span>
-                  </div>
-                  <div className="pr-att-pill pr-att-pill--info">
-                    <span className="pill-label">LOP Days</span>
-                    <span className="pill-val">{lopDays}</span>
-                  </div>
-                  <div className="pr-att-pill pr-att-pill--info">
-                    <span className="pill-label">LOP Deduction</span>
-                    <span className="pill-val">₹{fmt(lopDeduction)}</span>
-                  </div>
-                </div>
-
-                <button className="pr-more-btn" onClick={() => setMoreOpen((v) => !v)}>
-                  {moreOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  {moreOpen ? "Hide details" : "More details"}
-                </button>
-
-                {moreOpen && (
-                  <div className="pr-more-panel">
-                    <div className="pr-more-row">
-                      <span>Monthly Salary</span>
-                      <strong>₹{fmt(emp.monthlySalary)}</strong>
-                    </div>
-                    <div className="pr-more-row">
-                      <span>LOP Deduction</span>
-                      <strong>₹{fmt(lopDeduction)}</strong>
-                    </div>
-                    <div className="pr-more-row">
-                      <span>Approval Note</span>
-                      <strong>{attFetchFailed ? "Review required" : "Ready for approval"}</strong>
+                {(leaveBal.approvedLeaves || []).length > 0 && (
+                  <div className="pr-more-row pr-more-row--stack">
+                    <span>Approved Leaves (This Year)</span>
+                    <div className="pr-leave-list">
+                      {leaveBal.approvedLeaves.map((lv, i) => (
+                        <div className="pr-leave-list-row" key={i}>
+                          <span>
+                            {lv.type} — {dateLabel(lv.from_date)}
+                            {lv.from_date !== lv.to_date ? ` to ${dateLabel(lv.to_date)}` : ""}
+                          </span>
+                          <strong>{lv.days}d</strong>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
+            )}
+          </div>
 
-              <div className="pr-card pr-card--right">
-                <PayslipBlock
-                  sal={sal}
-                  month={month}
-                  monthLabel={monthLabel}
-                  adjustedNet={adjustedNet}
-                  fmt={fmt}
-                  onApprove={() => setConfirmOpen(true)}
-                  lopDays={lopDays}
-                  lopDeduction={lopDeduction}
-                />
-              </div>
-            </>
-          ) : null}
+          <div className="pr-card pr-card--right">
+            <SalaryPanel
+              emp={emp}
+              sal={sal}
+              att={att}
+              month={month}
+              monthLabel={monthLabel}
+              adjustedNet={adjustedNet}
+              fmt={fmt}
+              onApprove={() => setConfirmOpen(true)}
+              lopDays={lopDays}
+              lopDeduction={lopDeduction}
+              disabled={!hasData}
+              onSaveDetails={handleSaveDetails}
+              savingDetails={savingDetails}
+            />
+          </div>
         </div>
       </div>
 
@@ -564,6 +733,9 @@ export default function Payroll() {
           }}
         >
           <div className="pr-modal" role="dialog" aria-modal="true" aria-labelledby="pr-modal-title">
+            <div className="pr-modal-icon">
+              <Wallet size={20} />
+            </div>
             <h3 id="pr-modal-title">Approve payslip?</h3>
             <p>
               This sends the {monthLabel(month)} payslip to <strong>{emp.name}</strong> for ₹{fmt(adjustedNet)} net pay.

@@ -420,7 +420,8 @@
 .am-pill-wfh,
 .am-pill-half-day,
 .am-pill-afternoon-present,
-.am-pill-afternoon-absent {
+.am-pill-afternoon-absent,
+.am-pill-holiday {
   display: inline-flex;
   align-items: center;
   width: fit-content;
@@ -449,6 +450,11 @@
 .am-pill-wfh {
   background: #ddebf4;
   color: var(--navy);
+}
+
+.am-pill-holiday {
+  background: #f2ecdf;
+  color: #8a6d1d;
 }
 
 .am-pill-half-day {

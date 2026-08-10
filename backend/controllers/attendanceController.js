@@ -1,5 +1,26 @@
 const pool = require("../config/db");
 
+/* ══════════════════════════════════════════════════════════
+   PUBLIC HOLIDAYS
+   (keep in sync with backend/controllers/payrollController.js
+   and app_vindia/src/pages/hr/Attendance.jsx)
+   ══════════════════════════════════════════════════════════ */
+const HOLIDAYS = new Set([
+  "2024-01-26","2024-08-15","2024-10-02","2024-12-25",
+  "2025-01-01","2025-01-14","2025-01-26","2025-03-17",
+  "2025-04-14","2025-05-01","2025-08-15","2025-10-02","2025-12-25",
+  "2026-01-01","2026-01-15","2026-01-26","2026-03-19",
+  "2026-04-15","2026-05-01","2026-08-26","2026-09-14",
+  "2026-10-20","2026-12-25",
+]);
+
+// Sunday or a listed public holiday = not a working day.
+function isNonWorkingDay(dateStr) {
+  if (HOLIDAYS.has(dateStr)) return true;
+  const dow = new Date(`${dateStr}T00:00:00`).getDay();
+  return dow === 0; // Sunday
+}
+
 // ─── Status Logic ─────────────────────────────────────────────────────────────
 //
 // attendance.employee_id = users.id  (NOT employees.id)
@@ -340,15 +361,32 @@ exports.getTodayAllEmployees = async (req, res) => {
       [today]
     );
 
+    const todayIsNonWorking = isNonWorkingDay(today);
+
     const allRows = result.rows.map((row) => {
       if (!row.attendance_id) {
+        const isWfh = (row.emp_status || "").toLowerCase() === "work_from_home";
+
+        // Sundays / public holidays are not working days — don't mark
+        // employees "Absent" just because there's no attendance record.
+        if (todayIsNonWorking && !isWfh) {
+          return {
+            ...row,
+            status:       "Holiday",
+            check_in:     null,
+            check_out:    null,
+            late_minutes: 0,
+            remarks:      HOLIDAYS.has(today) ? "Holiday" : "Week Off",
+          };
+        }
+
         return {
           ...row,
-          status:       (row.emp_status || "").toLowerCase() === "work_from_home" ? "WFH" : "Absent",
+          status:       isWfh ? "WFH" : "Absent",
           check_in:     null,
           check_out:    null,
           late_minutes: 0,
-          remarks:      (row.emp_status || "").toLowerCase() === "work_from_home" ? "WFH" : "",
+          remarks:      isWfh ? "WFH" : "",
         };
       }
       return row;

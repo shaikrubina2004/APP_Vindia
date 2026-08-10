@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from "react";
 import "./Travel.css";
 import {
   Plane, CheckCircle, Clock, XCircle, Search, Briefcase,
-  CreditCard, Building2, MapPin, Navigation, MoveRight,
+  CreditCard, Building2, MapPin, Navigation,
   CalendarDays, FileText, X, AlertCircle, Wallet,
   Shield, Plus, Trash2, Receipt, Download, Eye,
 } from "lucide-react";
@@ -549,46 +549,46 @@ const RequestRow = ({ req, onOpen }) => {
   const sm = getSM(req.status);
   return (
     <div
-      className={`te-row-card ${sm.card}`}
+      className={`te-doc-card ${sm.card}`}
       onClick={() => onOpen(req)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && onOpen(req)}
     >
-      <div className="te-row-top">
-        <span className="te-row-no">{req.request_no}</span>
+      <div className="te-doc-header">
+        <div className="te-doc-icon">
+          <Plane size={18} />
+        </div>
+        <span className="te-doc-no">{req.request_no}</span>
+      </div>
+
+      <div className="te-doc-content">
+        <h3>{req.trip_title || req.destination}</h3>
+        <p className="te-doc-subtitle">
+          {req.employee_name}
+          {req.department ? ` · ${req.department}` : ""}
+        </p>
+      </div>
+
+      <div className="te-doc-meta">
+        <div className="te-meta-item">
+          <span className="te-meta-label">From</span>
+          <span className="te-meta-value" title={req.origin || "—"}>{req.origin || "—"}</span>
+        </div>
+        <div className="te-meta-item">
+          <span className="te-meta-label">To</span>
+          <span className="te-meta-value" title={req.destination}>{req.destination}</span>
+        </div>
+        <div className="te-meta-item">
+          <span className="te-meta-label">Dates</span>
+          <span className="te-meta-value">
+            {fmt(req.travel_from_date)} → {fmt(req.travel_to_date)}
+          </span>
+        </div>
+      </div>
+
+      <div className="te-doc-status-row">
         <span className={`te-status-pill ${sm.cls}`}>{sm.icon}{req.status}</span>
-      </div>
-
-      <h3 className="te-row-title">{req.trip_title || req.destination}</h3>
-
-      <div className="te-row-employee">
-        <span className="te-row-employee-name">{req.employee_name}</span>
-        <span className="te-row-employee-sep">·</span>
-        <Building2 size={11} />
-        <span>{req.department || "—"}</span>
-      </div>
-
-      <div className="te-row-route">
-        <div className="te-route-item">
-          <Navigation size={12} />
-          <span>{req.origin || "—"}</span>
-        </div>
-        <MoveRight size={14} className="te-row-arrow" />
-        <div className="te-route-item">
-          <MapPin size={12} />
-          <span>{req.destination}</span>
-        </div>
-      </div>
-
-      <div className="te-row-footer">
-        <div className="te-row-dates">
-          <CalendarDays size={12} />
-          <span>{fmt(req.travel_from_date)}</span>
-          <span className="te-row-datesep">→</span>
-          <span>{fmt(req.travel_to_date)}</span>
-        </div>
-
         <div className="te-row-badges">
           <span className={`te-badge ${req.budget_type === "project" ? "te-badge-project" : "te-badge-company"}`}>
             {req.budget_type === "project" ? "Project" : "Company"}
@@ -597,6 +597,16 @@ const RequestRow = ({ req, onOpen }) => {
             {req.payment_mode === "self" ? "Self-paid" : "Company paid"}
           </span>
         </div>
+      </div>
+
+      <div className="te-doc-actions">
+        <button
+          className="te-doc-action-btn"
+          onClick={(e) => { e.stopPropagation(); onOpen(req); }}
+          title="View details"
+        >
+          <Eye size={15} />
+        </button>
       </div>
     </div>
   );

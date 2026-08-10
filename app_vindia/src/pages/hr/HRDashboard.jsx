@@ -3,72 +3,262 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../../styles/HRDashboard.css";
 
+const API_URL = "http://localhost:5000/api";
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/* ==========================================================================
+   Utility functions
+   ========================================================================== */
+
 function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good Morning";
-  if (h < 17) return "Good Afternoon";
-  return "Good Evening";
+  const hour = new Date().getHours();
+
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+
+  return "Good evening";
 }
 
-const fmtTime = (t) => {
-  if (!t) return "—";
-  const [h, m] = t.split(":");
-  const hh = parseInt(h, 10);
-  return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
-};
+function getTodayString() {
+  const date = new Date();
 
-const fmtDate = (d) => {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-GB", {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
-};
+}
 
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+function formatTime(value) {
+  if (!value) return "—";
+
+  const [hours, minutes] = value.split(":");
+  const hour = Number(hours);
+
+  if (Number.isNaN(hour)) {
+    return value;
+  }
+
+  return `${hour % 12 || 12}:${minutes || "00"} ${
+    hour >= 12 ? "PM" : "AM"
+  }`;
+}
+
+function getInitials(name = "Employee") {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toUpperCase();
+}
 
 function getDaysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
 
 function getFirstDayOfMonth(year, month) {
-  const d = new Date(year, month, 1).getDay();
-  return (d + 6) % 7;
+  const day = new Date(year, month, 1).getDay();
+
+  return (day + 6) % 7;
 }
 
-function SectionCard({ title, subtitle, action, children, className = "" }) {
+/* ==========================================================================
+   Icons
+   ========================================================================== */
+
+function IconSearch() {
   return (
-    <div className={`hd-card ${className}`}>
-      <div className="hd-card-head">
-        <div>
-          <h3 className="hd-card-title">{title}</h3>
-          <p className="hd-card-subtitle">{subtitle}</p>
-        </div>
-        {action}
-      </div>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
+    </svg>
+  );
+}
+
+function IconUsers() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m5 12 4 4L19 6" />
+    </svg>
+  );
+}
+
+function IconClock() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 3" />
+    </svg>
+  );
+}
+
+function IconUserPlus() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M15 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="8" cy="7" r="4" />
+      <path d="M19 8v6" />
+      <path d="M22 11h-6" />
+    </svg>
+  );
+}
+
+function IconCalendar() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
+
+/* ==========================================================================
+   Shared components
+   ========================================================================== */
+
+function Button({
+  children,
+  variant = "secondary",
+  className = "",
+  ...props
+}) {
+  return (
+    <button
+      type="button"
+      className={`hrd-button hrd-button-${variant} ${className}`}
+      {...props}
+    >
       {children}
-    </div>
+    </button>
   );
 }
 
-function StatCard({ label, value, tone, sub }) {
+function Card({
+  title,
+  subtitle,
+  action,
+  children,
+  className = "",
+}) {
   return (
-    <div className="hd-kpi-card">
-      <div className={`hd-kpi-strip hd-${tone}`} />
-      <div className="hd-kpi-body">
-        <div className="hd-kpi-label">{label}</div>
-        <div className="hd-kpi-value">{value ?? "—"}</div>
-        <div className="hd-kpi-sub">{sub}</div>
+    <section className={`hrd-card ${className}`}>
+      <div className="hrd-card-header">
+        <div>
+          <h2 className="hrd-card-title">{title}</h2>
+
+          {subtitle && (
+            <p className="hrd-card-subtitle">{subtitle}</p>
+          )}
+        </div>
+
+        {action && <div>{action}</div>}
       </div>
-    </div>
+
+      {children}
+    </section>
   );
 }
 
-const CheckInButton = ({ employeeId }) => {
+function MetricCard({
+  label,
+  value,
+  description,
+  tone,
+  icon: Icon,
+}) {
+  return (
+    <article className={`hrd-metric-card hrd-metric-${tone}`}>
+      <div className="hrd-metric-top">
+        <span className="hrd-metric-label">{label}</span>
+
+        <span className="hrd-metric-icon">
+          <Icon />
+        </span>
+      </div>
+
+      <div className="hrd-metric-value">
+        {value ?? "—"}
+      </div>
+
+      <div className="hrd-metric-description">
+        {description}
+      </div>
+    </article>
+  );
+}
+
+function LoadingDashboard() {
+  return (
+    <main className="hrd-page">
+      <div className="hrd-loading-header">
+        <div className="hrd-loading-small" />
+        <div className="hrd-loading-title" />
+        <div className="hrd-loading-description" />
+      </div>
+
+      <div className="hrd-loading-metrics">
+        <div />
+        <div />
+        <div />
+        <div />
+      </div>
+
+      <div className="hrd-loading-layout">
+        <div />
+        <div />
+      </div>
+    </main>
+  );
+}
+
+/* ==========================================================================
+   Check-in
+   ========================================================================== */
+
+function CheckInButton({ employeeId }) {
   const [attendance, setAttendance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -76,459 +266,929 @@ const CheckInButton = ({ employeeId }) => {
   const timerRef = useRef(null);
 
   useEffect(() => {
+    if (!employeeId) {
+      setLoading(false);
+      return undefined;
+    }
+
     fetchTodayAttendance();
-    return () => clearInterval(timerRef.current);
-  }, []);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [employeeId]);
 
   useEffect(() => {
-    clearInterval(timerRef.current);
-    if (attendance?.check_in && !attendance?.check_out) {
-      const tick = () => {
-        const [h, m, s] = attendance.check_in.split(":").map(Number);
-        const inMs = (h * 3600 + m * 60 + s) * 1000;
-        const nowMs = new Date() - new Date().setHours(0, 0, 0, 0);
-        const diff = Math.max(0, nowMs - inMs);
-        const th = String(Math.floor(diff / 3600000)).padStart(2, "0");
-        const tm = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
-        const ts = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
-        setElapsed(`${th}:${tm}:${ts}`);
-      };
-      tick();
-      timerRef.current = setInterval(tick, 1000);
-    } else {
-      setElapsed("");
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
     }
+
+    if (!attendance?.check_in || attendance?.check_out) {
+      setElapsed("");
+      return undefined;
+    }
+
+    function updateElapsed() {
+      const [hours, minutes, seconds] = attendance.check_in
+        .split(":")
+        .map(Number);
+
+      const start = new Date();
+
+      start.setHours(hours, minutes, seconds || 0, 0);
+
+      const difference = Math.max(
+        0,
+        Date.now() - start.getTime()
+      );
+
+      const hh = String(
+        Math.floor(difference / 3600000)
+      ).padStart(2, "0");
+
+      const mm = String(
+        Math.floor((difference % 3600000) / 60000)
+      ).padStart(2, "0");
+
+      const ss = String(
+        Math.floor((difference % 60000) / 1000)
+      ).padStart(2, "0");
+
+      setElapsed(`${hh}:${mm}:${ss}`);
+    }
+
+    updateElapsed();
+
+    timerRef.current = setInterval(updateElapsed, 1000);
+
+    return () => clearInterval(timerRef.current);
   }, [attendance]);
 
-  const fetchTodayAttendance = async () => {
-    setLoading(true);
+  async function fetchTodayAttendance() {
     try {
-      const res = await axios.get(
-        `http://localhost:5000/api/attendance/today?employee_id=${employeeId}`
+      setLoading(true);
+
+      const response = await axios.get(
+        `${API_URL}/attendance/today`,
+        {
+          params: {
+            employee_id: employeeId,
+          },
+        }
       );
-      setAttendance(res.data || null);
-    } catch (err) {
-      if (err.response?.status !== 404) console.error(err);
+
+      setAttendance(response.data || null);
+    } catch (error) {
+      if (error.response?.status !== 404) {
+        console.error(
+          "Unable to fetch attendance:",
+          error
+        );
+      }
+
       setAttendance(null);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleCheckIn = async () => {
-    setBusy(true);
+  async function handleCheckIn() {
     try {
-      const now = new Date();
-      const timeStr = now.toTimeString().slice(0, 8);
-      const dateStr = now.toISOString().slice(0, 10);
-      const res = await axios.post("http://localhost:5000/api/attendance", {
-        employee_id: employeeId,
-        date: dateStr,
-        check_in: timeStr,
-        shift: "Morning",
-      });
-      setAttendance(res.data);
-    } catch (err) {
-      console.error(err);
-      alert("Check-in failed. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
+      setBusy(true);
 
-  const handleCheckOut = async () => {
-    if (!attendance?.id) return;
-    setBusy(true);
-    try {
       const now = new Date();
-      const timeStr = now.toTimeString().slice(0, 8);
-      const res = await axios.put(
-        `http://localhost:5000/api/attendance/${attendance.id}`,
-        { check_out: timeStr }
+
+      const response = await axios.post(
+        `${API_URL}/attendance`,
+        {
+          employee_id: employeeId,
+          date: getTodayString(),
+          check_in: now.toTimeString().slice(0, 8),
+          shift: "Morning",
+        }
       );
-      setAttendance(res.data);
-      clearInterval(timerRef.current);
-    } catch (err) {
-      console.error(err);
-      alert("Check-out failed. Please try again.");
+
+      setAttendance(response.data);
+    } catch (error) {
+      console.error("Check-in failed:", error);
+      window.alert("Check-in failed. Please try again.");
     } finally {
       setBusy(false);
     }
-  };
+  }
 
-  const isCheckedIn = attendance?.check_in && !attendance?.check_out;
-  const isCheckedOut = attendance?.check_in && attendance?.check_out;
+  async function handleCheckOut() {
+    if (!attendance?.id) return;
 
-  if (loading) return <button className="hd-action-btn hd-loading" disabled>Loading…</button>;
+    try {
+      setBusy(true);
 
-  if (isCheckedOut) {
+      const now = new Date();
+
+      const response = await axios.put(
+        `${API_URL}/attendance/${attendance.id}`,
+        {
+          check_out: now.toTimeString().slice(0, 8),
+        }
+      );
+
+      setAttendance(response.data);
+    } catch (error) {
+      console.error("Check-out failed:", error);
+      window.alert("Check-out failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) {
     return (
-      <div className="hd-check-wrap">
-        <button className="hd-action-btn hd-done" disabled>Done for Today</button>
-        <span className="hd-check-sub">{fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}</span>
-      </div>
+      <Button disabled variant="secondary">
+        Loading
+      </Button>
     );
   }
 
-  if (isCheckedIn) {
+  if (attendance?.check_in && attendance?.check_out) {
     return (
-      <div className="hd-check-wrap">
-        <button className="hd-action-btn hd-out" onClick={handleCheckOut} disabled={busy}>
-          {busy ? "Saving…" : "Check Out"}
-        </button>
-        <span className="hd-check-sub">
-          In: {fmtTime(attendance.check_in)} {elapsed ? <strong>{elapsed}</strong> : null}
-        </span>
-      </div>
-    );
-  }
+      <div className="hrd-attendance-status">
+        <span className="hrd-status-dot hrd-status-success" />
 
-  return (
-    <button className="hd-action-btn hd-in" onClick={handleCheckIn} disabled={busy}>
-      {busy ? "Saving…" : "Check In"}
-    </button>
-  );
-};
+        <div>
+          <strong>Completed</strong>
 
-function AttendanceRing({ present, absent, leave }) {
-  const total = present + absent + leave || 1;
-  const p = Math.round((present / total) * 100);
-  const a = Math.round((absent / total) * 100);
-  return (
-    <div className="hd-att-wrap">
-      <div
-        className="hd-ring"
-        style={{
-          background: `conic-gradient(#7BBDE8 0 ${p}%, #0A4174 ${p}% ${p + a}%, #BDD8E9 ${p + a}% 100%)`,
-        }}
-      >
-        <div className="hd-ring-center">
-          <div className="hd-ring-number">{total}</div>
-          <div className="hd-ring-label">Total</div>
+          <small>
+            {formatTime(attendance.check_in)} –{" "}
+            {formatTime(attendance.check_out)}
+          </small>
         </div>
       </div>
-      <div className="hd-legend">
-        <div><span className="dot present" />Present <strong>{present}</strong></div>
-        <div><span className="dot absent" />Absent <strong>{absent}</strong></div>
-        <div><span className="dot leave" />On Leave <strong>{leave}</strong></div>
+    );
+  }
+
+  if (attendance?.check_in && !attendance?.check_out) {
+    return (
+      <div className="hrd-checkin-group">
+        <div className="hrd-attendance-status">
+          <span className="hrd-status-dot hrd-status-warning" />
+
+          <div>
+            <strong>Working</strong>
+
+            <small>
+              In at {formatTime(attendance.check_in)}
+              {elapsed ? ` · ${elapsed}` : ""}
+            </small>
+          </div>
+        </div>
+
+        <Button
+          variant="danger"
+          onClick={handleCheckOut}
+          disabled={busy}
+        >
+          {busy ? "Saving..." : "Check out"}
+        </Button>
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <Button
+      variant="primary"
+      onClick={handleCheckIn}
+      disabled={busy}
+    >
+      {busy ? "Saving..." : "Check in"}
+    </Button>
   );
 }
 
-function BarChart({ data = [] }) {
-  const max = Math.max(...data.map((d) => d.value), 1);
+/* ==========================================================================
+   Department distribution
+   ========================================================================== */
+
+function DepartmentDistribution({ data }) {
+  if (!data.length) {
+    return (
+      <div className="hrd-empty-state">
+        No department data available.
+      </div>
+    );
+  }
+
+  const max = Math.max(
+    ...data.map((item) => item.value),
+    1
+  );
+
   return (
-    <div className="hd-bars">
-      {data.map((d) => (
-        <div key={d.label} className="hd-bar-col">
-          <div className="hd-bar-value">{d.value}</div>
-          <div className="hd-bar-track">
-            <div className="hd-bar-fill" style={{ height: `${(d.value / max) * 100}%` }} />
+    <div className="hrd-department-list">
+      {data.map((item, index) => (
+        <div
+          className="hrd-department-row"
+          key={item.label}
+        >
+          <span className="hrd-department-index">
+            {String(index + 1).padStart(2, "0")}
+          </span>
+
+          <div className="hrd-department-content">
+            <div className="hrd-department-heading">
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </div>
+
+            <div className="hrd-department-track">
+              <span
+                style={{
+                  width: `${(item.value / max) * 100}%`,
+                }}
+              />
+            </div>
           </div>
-          <div className="hd-bar-label">{d.label}</div>
         </div>
       ))}
     </div>
   );
 }
 
-function SmallCalendar({ employees }) {
+/* ==========================================================================
+   Attendance trend
+   ========================================================================== */
+
+function AttendanceTrend({ data }) {
+  if (!data.some((item) => item.value > 0)) {
+    return (
+      <div className="hrd-empty-state">
+        No attendance trend available.
+      </div>
+    );
+  }
+
+  const max = Math.max(
+    ...data.map((item) => item.value),
+    1
+  );
+
+  return (
+    <div className="hrd-trend-chart">
+      {data.map((item) => (
+        <div
+          className="hrd-trend-column"
+          key={item.key}
+        >
+          <span className="hrd-trend-value">
+            {item.value}
+          </span>
+
+          <div className="hrd-trend-bar-area">
+            <span
+              className="hrd-trend-bar"
+              style={{
+                height: `${Math.max(
+                  (item.value / max) * 100,
+                  5
+                )}%`,
+              }}
+            />
+          </div>
+
+          <span className="hrd-trend-label">
+            {item.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ==========================================================================
+   Recent joiners
+   ========================================================================== */
+
+function RecentJoiners({ employees }) {
+  if (!employees.length) {
+    return (
+      <div className="hrd-empty-state">
+        No recent joiners available.
+      </div>
+    );
+  }
+
+  return (
+    <div className="hrd-joiners-list">
+      {employees.map((employee) => (
+        <div
+          className="hrd-joiner-row"
+          key={employee.id || employee.employee_id}
+        >
+          <div className="hrd-employee-avatar">
+            {getInitials(employee.name)}
+          </div>
+
+          <div className="hrd-joiner-info">
+            <strong>
+              {employee.name || "Employee"}
+            </strong>
+
+            <span>
+              {employee.department || "Unassigned"} · Joined{" "}
+              {formatDate(employee.join_date)}
+            </span>
+          </div>
+
+          <span className="hrd-new-badge">New</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ==========================================================================
+   Calendar
+   ========================================================================== */
+
+function CalendarCard({ employees }) {
   const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth());
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const [year, setYear] = useState(
+    today.getFullYear()
+  );
+
+  const [month, setMonth] = useState(
+    today.getMonth()
+  );
+
+  const [selectedDay, setSelectedDay] = useState(null);
   const [events, setEvents] = useState({});
-  const [selected, setSelected] = useState(null);
-  const [eventText, setEventText] = useState("");
-  const [eventType, setEventType] = useState("note");
+
+  const birthdays = useMemo(() => {
+    const result = {};
+
+    employees.forEach((employee) => {
+      if (!employee.dob) return;
+
+      const birthday = new Date(employee.dob);
+
+      if (birthday.getMonth() !== month) return;
+
+      const day = birthday.getDate();
+
+      if (!result[day]) {
+        result[day] = [];
+      }
+
+      result[day].push(employee.name);
+    });
+
+    return result;
+  }, [employees, month]);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
 
-  const birthdays = {};
-  (employees || []).forEach((emp) => {
-    if (!emp.dob) return;
-    const bd = new Date(emp.dob);
-    if (bd.getMonth() === month) {
-      const day = bd.getDate();
-      if (!birthdays[day]) birthdays[day] = [];
-      birthdays[day].push(emp.name);
+  function getEventKey(day) {
+    return `${year}-${month + 1}-${day}`;
+  }
+
+  function changeMonth(direction) {
+    setSelectedDay(null);
+
+    if (direction === "previous") {
+      if (month === 0) {
+        setMonth(11);
+        setYear((currentYear) => currentYear - 1);
+      } else {
+        setMonth((currentMonth) => currentMonth - 1);
+      }
     }
-  });
 
-  const monthKey = (day) => `${year}-${month}-${day}`;
+    if (direction === "next") {
+      if (month === 11) {
+        setMonth(0);
+        setYear((currentYear) => currentYear + 1);
+      } else {
+        setMonth((currentMonth) => currentMonth + 1);
+      }
+    }
+  }
 
-  const handleDayClick = (day) => {
-    setSelected(day);
-    const existing = events[monthKey(day)];
-    setEventText(existing?.text || "");
-    setEventType(existing?.type || "note");
-  };
+  function addReminder() {
+    if (!selectedDay) {
+      window.alert("Select a calendar date first.");
+      return;
+    }
 
-  const saveEvent = () => {
-    if (!selected || !eventText.trim()) return;
-    setEvents((prev) => ({
-      ...prev,
-      [monthKey(selected)]: { text: eventText.trim(), type: eventType },
+    const title = window.prompt("Enter reminder title");
+
+    if (!title?.trim()) return;
+
+    setEvents((current) => ({
+      ...current,
+      [getEventKey(selectedDay)]: title.trim(),
     }));
-    setSelected(null);
-    setEventText("");
-    setEventType("note");
-  };
+  }
 
-  const deleteEvent = () => {
-    if (!selected) return;
-    setEvents((prev) => {
-      const copy = { ...prev };
-      delete copy[monthKey(selected)];
+  function deleteReminder() {
+    if (!selectedDay) return;
+
+    setEvents((current) => {
+      const copy = { ...current };
+
+      delete copy[getEventKey(selectedDay)];
+
       return copy;
     });
-    setSelected(null);
-    setEventText("");
-    setEventType("note");
-  };
-
-  const labels = ["M", "T", "W", "T", "F", "S", "S"];
+  }
 
   return (
-    <SectionCard title="Calendar" subtitle="Birthdays and reminders">
-      <div className="cal-mini-head">
-        <button className="cal-nav-btn" onClick={() => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); setSelected(null); }}>‹</button>
-        <div className="month-dropdown-wrap">
-          <button className="month-dropdown-trigger" onClick={() => setDropdownOpen((o) => !o)}>
-            {MONTH_NAMES[month]} {year} <span>{dropdownOpen ? "▲" : "▼"}</span>
-          </button>
-          {dropdownOpen && (
-            <div className="month-dropdown-menu">
-              {MONTH_NAMES.map((name, i) => (
-                <button
-                  key={i}
-                  className={`month-option ${i === month ? "month-option--active" : ""}`}
-                  onClick={() => { setMonth(i); setDropdownOpen(false); setSelected(null); }}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <button className="cal-nav-btn" onClick={() => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); setSelected(null); }}>›</button>
+    <Card
+      title="Calendar"
+      subtitle="Birthdays and reminders"
+      action={
+        <button
+          type="button"
+          className="hrd-text-button"
+          onClick={addReminder}
+        >
+          Add reminder
+        </button>
+      }
+    >
+      <div className="hrd-calendar-header">
+        <button
+          type="button"
+          className="hrd-calendar-nav"
+          onClick={() => changeMonth("previous")}
+          aria-label="Previous month"
+        >
+          ‹
+        </button>
+
+        <strong>
+          {MONTH_NAMES[month]} {year}
+        </strong>
+
+        <button
+          type="button"
+          className="hrd-calendar-nav"
+          onClick={() => changeMonth("next")}
+          aria-label="Next month"
+        >
+          ›
+        </button>
       </div>
 
-      <div className="calendar-grid calendar-grid-small">
-        {labels.map((d, i) => <div key={i} className="cal-day-label">{d}</div>)}
-        {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
-        {Array.from({ length: daysInMonth }).map((_, i) => {
-          const day = i + 1;
-          const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-          const dayKey = monthKey(day);
-          const event = events[dayKey];
-          const hasBirthday = !!birthdays[day];
-          const isSelected = selected === day;
-          return (
-            <div
-              key={day}
-              className={[
-                "cal-day",
-                isToday ? "cal-today" : "",
-                event ? `cal-${event.type}` : "",
-                hasBirthday ? "cal-birthday" : "",
-                isSelected ? "cal-selected" : "",
-              ].filter(Boolean).join(" ")}
-              onClick={() => handleDayClick(day)}
-              title={[
-                hasBirthday ? `Birthday: ${birthdays[day].join(", ")}` : "",
-                event?.text ? event.text : "",
-              ].filter(Boolean).join(" • ")}
+      <div className="hrd-calendar-grid">
+        {["M", "T", "W", "T", "F", "S", "S"].map(
+          (day, index) => (
+            <span
+              className="hrd-calendar-weekday"
+              key={`${day}-${index}`}
             >
               {day}
-              {(hasBirthday || event) && <span className="day-badge" />}
-            </div>
-          );
-        })}
+            </span>
+          )
+        )}
+
+        {Array.from({ length: firstDay }).map(
+          (_, index) => (
+            <span
+              className="hrd-calendar-empty"
+              key={`empty-${index}`}
+            />
+          )
+        )}
+
+        {Array.from({ length: daysInMonth }).map(
+          (_, index) => {
+            const day = index + 1;
+            const eventKey = getEventKey(day);
+
+            const isToday =
+              day === today.getDate() &&
+              month === today.getMonth() &&
+              year === today.getFullYear();
+
+            const hasBirthday = Boolean(birthdays[day]);
+            const hasReminder = Boolean(events[eventKey]);
+
+            return (
+              <button
+                type="button"
+                key={day}
+                className={[
+                  "hrd-calendar-day",
+                  isToday ? "hrd-calendar-today" : "",
+                  selectedDay === day
+                    ? "hrd-calendar-selected"
+                    : "",
+                  hasBirthday || hasReminder
+                    ? "hrd-calendar-event"
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => setSelectedDay(day)}
+                title={[
+                  hasBirthday
+                    ? `Birthday: ${birthdays[day].join(", ")}`
+                    : "",
+                  hasReminder ? events[eventKey] : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              >
+                {day}
+              </button>
+            );
+          }
+        )}
       </div>
 
-      <div className="cal-legend cal-legend-small">
-        <span><span className="legend-dot today-dot" /> Today</span>
-        <span><span className="legend-dot note-dot" /> Note</span>
-        <span><span className="legend-dot bday-dot" /> Birthday</span>
-      </div>
+      {selectedDay && (
+        <div className="hrd-calendar-selection">
+          <div>
+            <strong>
+              {MONTH_NAMES[month]} {selectedDay}
+            </strong>
 
-      {selected && (
-        <div className="note-editor note-editor-small">
-          <div className="note-editor-title">{MONTH_NAMES[month]} {selected}</div>
-          {birthdays[selected] && (
-            <div className="birthday-notice">Birthday: {birthdays[selected].join(", ")}</div>
-          )}
-          <select value={eventType} onChange={(e) => setEventType(e.target.value)} className="event-select">
-            <option value="note">Important note</option>
-            <option value="birthday">Birthday</option>
-            <option value="holiday">Holiday</option>
-          </select>
-          <textarea
-            value={eventText}
-            onChange={(e) => setEventText(e.target.value)}
-            placeholder="Add a birthday, reminder, or important event…"
-            rows={3}
-          />
-          <div className="note-actions">
-            <button onClick={saveEvent} className="note-save">Save</button>
-            <button onClick={deleteEvent} className="note-cancel">Delete</button>
+            {birthdays[selectedDay] && (
+              <span>
+                Birthday:{" "}
+                {birthdays[selectedDay].join(", ")}
+              </span>
+            )}
+
+            {events[getEventKey(selectedDay)] && (
+              <span>
+                {events[getEventKey(selectedDay)]}
+              </span>
+            )}
           </div>
+
+          {events[getEventKey(selectedDay)] && (
+            <button
+              type="button"
+              className="hrd-text-button hrd-text-danger"
+              onClick={deleteReminder}
+            >
+              Remove
+            </button>
+          )}
         </div>
       )}
-    </SectionCard>
+    </Card>
   );
 }
 
+/* ==========================================================================
+   Quick actions
+   ========================================================================== */
+
+function QuickActions({ navigate }) {
+  return (
+    <Card
+      title="Quick actions"
+      subtitle="Frequently used HR operations"
+    >
+      <div className="hrd-quick-actions">
+        <button
+          type="button"
+          className="hrd-quick-action"
+          onClick={() => navigate("/hr/employees")}
+        >
+          <span className="hrd-quick-icon">+</span>
+
+          <span className="hrd-quick-content">
+            <strong>Add employee</strong>
+            <small>Create a new employee record</small>
+          </span>
+
+          <span className="hrd-quick-arrow">›</span>
+        </button>
+
+        <button
+          type="button"
+          className="hrd-quick-action"
+          onClick={() => navigate("/hr/leave")}
+        >
+          <span className="hrd-quick-icon">✓</span>
+
+          <span className="hrd-quick-content">
+            <strong>Review leave</strong>
+            <small>Manage pending requests</small>
+          </span>
+
+          <span className="hrd-quick-arrow">›</span>
+        </button>
+
+        <button
+          type="button"
+          className="hrd-quick-action"
+          onClick={() => navigate("/hr/payroll")}
+        >
+          <span className="hrd-quick-icon">₹</span>
+
+          <span className="hrd-quick-content">
+            <strong>Open payroll</strong>
+            <small>View payroll operations</small>
+          </span>
+
+          <span className="hrd-quick-arrow">›</span>
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+/* ==========================================================================
+   Main dashboard
+   ========================================================================== */
+
 export default function HRDashboard() {
   const navigate = useNavigate();
+
   const [employees, setEmployees] = useState([]);
   const [dashboard, setDashboard] = useState(null);
   const [attendanceRows, setAttendanceRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const hrName = user?.name || user?.full_name || user?.username || user?.first_name || "there";
-  const employeeId = user?.employee_id || user?.id || null;
+  const user = JSON.parse(
+    localStorage.getItem("user") || "{}"
+  );
+
+  const hrName =
+    user?.name ||
+    user?.full_name ||
+    user?.username ||
+    user?.first_name ||
+    "HR Manager";
+
+  const employeeId =
+    user?.employee_id || user?.id || null;
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
+    async function fetchDashboardData() {
       try {
-        const [empRes, dashRes, attRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/employees"),
-          axios.get("http://localhost:5000/api/dashboard"),
-          axios.get("http://localhost:5000/api/attendance"),
+        setLoading(true);
+
+        const [
+          employeesResponse,
+          dashboardResponse,
+          attendanceResponse,
+        ] = await Promise.all([
+          axios.get(`${API_URL}/employees`),
+          axios.get(`${API_URL}/dashboard`),
+          axios.get(`${API_URL}/attendance`),
         ]);
-        setEmployees(empRes.data || []);
-        setDashboard(dashRes.data || null);
-        setAttendanceRows(attRes.data || []);
-      } catch (err) {
-        console.error("Dashboard error:", err);
+
+        setEmployees(employeesResponse.data || []);
+        setDashboard(dashboardResponse.data || null);
+        setAttendanceRows(attendanceResponse.data || []);
+      } catch (fetchError) {
+        console.error("Dashboard error:", fetchError);
+
+        setEmployees([]);
+        setDashboard(null);
+        setAttendanceRows([]);
       } finally {
         setLoading(false);
       }
-    };
-    fetchData();
+    }
+
+    fetchDashboardData();
   }, []);
 
-  const total = employees.length;
-  const active = employees.filter((e) => e.status === "active").length;
-  const onLeave = employees.filter((e) => e.status === "on_leave").length;
+  const totalEmployees = employees.length;
 
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const newJoiners = employees.filter(
-    (e) => e.join_date && new Date(e.join_date) >= thirtyDaysAgo
+  const employeesOnLeave = employees.filter(
+    (employee) => employee.status === "on_leave"
   ).length;
 
-  const present = dashboard?.attendance?.present ?? Math.round(active * 0.85);
-  const absent = dashboard?.attendance?.absent ?? Math.round(active * 0.1);
-  const attendanceOnLeave = dashboard?.attendance?.on_leave ?? onLeave;
+  const newJoiners = employees.filter((employee) => {
+    if (!employee.join_date) return false;
 
-  const recentJoiners = [...employees]
-    .filter((e) => e.join_date)
-    .sort((a, b) => new Date(b.join_date) - new Date(a.join_date))
-    .slice(0, 5);
+    const joinedDate = new Date(employee.join_date);
+    const thirtyDaysAgo = new Date();
 
-  const departmentMap = employees.reduce((acc, e) => {
-    const key = e.department || "Unassigned";
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-  const departmentData = Object.entries(departmentMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([label, value]) => ({ label, value }));
+    thirtyDaysAgo.setDate(
+      thirtyDaysAgo.getDate() - 30
+    );
+
+    return joinedDate >= thirtyDaysAgo;
+  }).length;
+
+  const present =
+    dashboard?.attendance?.present ??
+    attendanceRows.filter((row) => {
+      return (
+        row.date === getTodayString() &&
+        String(row.status).toLowerCase() === "present"
+      );
+    }).length;
+
+  const onLeave =
+    dashboard?.attendance?.on_leave ??
+    employeesOnLeave;
+
+  const departmentData = useMemo(() => {
+    const departmentMap = {};
+
+    employees.forEach((employee) => {
+      const department =
+        employee.department || "Unassigned";
+
+      departmentMap[department] =
+        (departmentMap[department] || 0) + 1;
+    });
+
+    return Object.entries(departmentMap)
+      .sort((first, second) => second[1] - first[1])
+      .slice(0, 6)
+      .map(([label, value]) => ({
+        label,
+        value,
+      }));
+  }, [employees]);
+
+  const recentJoiners = useMemo(() => {
+    return [...employees]
+      .filter((employee) => employee.join_date)
+      .sort(
+        (first, second) =>
+          new Date(second.join_date) -
+          new Date(first.join_date)
+      )
+      .slice(0, 5);
+  }, [employees]);
 
   const attendanceTrend = useMemo(() => {
-    const counts = {};
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      counts[d.toLocaleString("default", { month: "short" })] = 0;
+    const months = [];
+
+    for (let index = 5; index >= 0; index -= 1) {
+      const date = new Date();
+
+      date.setDate(1);
+      date.setMonth(date.getMonth() - index);
+
+      months.push({
+        key: `${date.getFullYear()}-${date.getMonth()}`,
+        label: date.toLocaleString("en-US", {
+          month: "short",
+        }),
+        value: 0,
+      });
     }
-    attendanceRows.forEach((r) => {
-      if (!r.date) return;
-      const month = new Date(r.date).toLocaleString("default", { month: "short" });
-      if (month in counts && String(r.status).toLowerCase() === "present") counts[month]++;
+
+    attendanceRows.forEach((row) => {
+      if (!row.date) return;
+
+      const date = new Date(row.date);
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+
+      const matchingMonth = months.find(
+        (month) => month.key === key
+      );
+
+      if (
+        matchingMonth &&
+        String(row.status).toLowerCase() === "present"
+      ) {
+        matchingMonth.value += 1;
+      }
     });
-    return Object.entries(counts).map(([label, value]) => ({ label, value }));
+
+    return months;
   }, [attendanceRows]);
 
-  const kpis = [
-    { label: "Total Employees", value: total, sub: "Company headcount", tone: "navy" },
-    { label: "Active Employees", value: active, sub: "Currently employed", tone: "teal" },
-    { label: "Present Today", value: present, sub: "Checked in today", tone: "blue" },
-    { label: "New Joiners", value: newJoiners, sub: "Last 30 days", tone: "sky" },
-  ];
+  const todayLabel = new Date().toLocaleDateString(
+    "en-US",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }
+  );
+
+  if (loading) {
+    return <LoadingDashboard />;
+  }
 
   return (
-    <div className="hd-page">
-      <div className="hd-top">
-        <div>
-          <div className="hd-greet">{getGreeting()}, {hrName}!</div>
-          <div className="hd-greet-sub">Operational HR overview for your team.</div>
+    <main className="hrd-page">
+      <header className="hrd-header">
+        <div className="hrd-header-content">
+          <h1>
+            {getGreeting()}, {hrName}
+          </h1>
         </div>
 
-        <div className="hd-top-actions">
-          <div className="hd-search">
-            <span className="hd-search-icon">Search</span>
-            <input placeholder="Search employees…" />
-          </div>
-          {employeeId && <CheckInButton employeeId={employeeId} />}
-          <button className="hd-secondary-btn" onClick={() => navigate("/hr/employees")}>
-            All Employees
-          </button>
+        <div className="hrd-header-actions">
+          {employeeId && (
+            <CheckInButton employeeId={employeeId} />
+          )}
+
+          <Button
+            variant="secondary"
+            onClick={() => navigate("/hr/employees")}
+          >
+            View employees
+          </Button>
         </div>
-      </div>
+      </header>
 
-      <div className="hd-kpi-grid">
-        {kpis.map((k) => <StatCard key={k.label} {...k} />)}
-      </div>
+      <section className="hrd-toolbar hrd-date-toolbar">
+        <div className="hrd-date">
+          <IconCalendar />
+          <span>{todayLabel}</span>
+        </div>
+      </section>
 
-      <div className="hd-grid-top">
-        <SectionCard title="Attendance Today" subtitle="Present, absent, and on leave">
-          <AttendanceRing present={present} absent={absent} leave={attendanceOnLeave} />
-        </SectionCard>
+      <section className="hrd-metrics">
+        <MetricCard
+          label="Total employees"
+          value={totalEmployees}
+          description="Current headcount"
+          tone="brand"
+          icon={IconUsers}
+        />
 
-        <SectionCard title="Department Mix" subtitle="Employees by department">
-          {departmentData.length === 0
-            ? <div className="hd-empty">No department data available.</div>
-            : <BarChart data={departmentData} />}
-        </SectionCard>
+        <MetricCard
+          label="Present today"
+          value={present}
+          description="Attendance recorded"
+          tone="success"
+          icon={IconCheck}
+        />
 
-        <SmallCalendar employees={employees} />
-      </div>
+        <MetricCard
+          label="On leave"
+          value={onLeave}
+          description="Approved leave"
+          tone="warning"
+          icon={IconClock}
+        />
 
-      <div className="hd-grid-bottom">
-        <SectionCard title="Recent Joiners" subtitle="Newest employees in the company">
-          <div className="hd-list">
-            {recentJoiners.length === 0 ? (
-              <div className="hd-empty">No recent joiners.</div>
-            ) : (
-              recentJoiners.map((emp) => (
-                <div className="hd-row" key={emp.id || emp.employee_id}>
-                  <div className="hd-avatar hd-soft">{(emp.name || "E")[0].toUpperCase()}</div>
-                  <div className="hd-row-body">
-                    <div className="hd-row-title">{emp.name || "Employee"}</div>
-                    <div className="hd-row-sub">{emp.department || "—"} · Joined {fmtDate(emp.join_date)}</div>
-                  </div>
-                  <div className="hd-tag">New</div>
-                </div>
-              ))
-            )}
+        <MetricCard
+          label="New joiners"
+          value={newJoiners}
+          description="Joined in the last 30 days"
+          tone="neutral"
+          icon={IconUserPlus}
+        />
+      </section>
+
+      <div className="hrd-layout">
+        <div className="hrd-main-column">
+          <div className="hrd-two-column hrd-primary-grid">
+            <Card
+              title="Department distribution"
+              subtitle="Employee headcount by department"
+            >
+              <DepartmentDistribution
+                data={departmentData}
+              />
+            </Card>
+
+            <Card
+              title="Attendance trend"
+              subtitle="Present count over the last six months"
+            >
+              <AttendanceTrend
+                data={attendanceTrend}
+              />
+            </Card>
           </div>
-        </SectionCard>
 
-        <SectionCard title="Attendance Trend" subtitle="Present count over the last 6 months">
-          {attendanceTrend.some((x) => x.value > 0)
-            ? <BarChart data={attendanceTrend} />
-            : <div className="hd-empty">No attendance trend data available.</div>}
-        </SectionCard>
+          <Card
+            title="Recent joiners"
+            subtitle="Newest employees in the company"
+            action={
+              <button
+                type="button"
+                className="hrd-text-button"
+                onClick={() =>
+                  navigate("/hr/employees")
+                }
+              >
+                View all
+              </button>
+            }
+          >
+            <RecentJoiners employees={recentJoiners} />
+          </Card>
+        </div>
+
+        <aside className="hrd-sidebar">
+          <CalendarCard employees={employees} />
+          <QuickActions navigate={navigate} />
+        </aside>
       </div>
-    </div>
+    </main>
   );
 }
