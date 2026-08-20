@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../../../context/useAuth";
 import "./BDAFollowUp.css";
 
 const API = "http://localhost:5000/api";
@@ -223,6 +224,12 @@ const LeadCard = ({ lead, badge, onFollowUp }) => (
 ════════════════════════════════════════ */
 const BDAFollowUp = () => {
   const navigate = useNavigate();
+
+  // ✅ Same pattern as BDALeads — role/name needed to filter data per-user
+  const { user } = useAuth();
+  const role = user?.role || null;   // role CODE, e.g. "bda"
+  const name = user?.name || null;
+
   const [loading, setLoading]   = useState(true);
   const [allLeads, setAllLeads] = useState([]);
   const [followUps, setFollowUps] = useState([]); // records from followups table
@@ -236,9 +243,9 @@ const BDAFollowUp = () => {
     setLoading(true);
     try {
       const [leadsRes, todayRes, pendingRes] = await Promise.all([
-        axios.get(`${API}/leads`),
-        axios.get(`${API}/leads/follow-ups/today`),
-        axios.get(`${API}/leads/follow-ups/pending`),
+        axios.get(`${API}/leads`, { params: { role, name } }),
+        axios.get(`${API}/leads/follow-ups/today`, { params: { role, name } }),
+        axios.get(`${API}/leads/follow-ups/pending`, { params: { role, name } }),
       ]);
       setAllLeads(leadsRes.data.leads || []);
       setFollowUps([

@@ -24,7 +24,7 @@ export const ROLES = {
   QC_ENGINEER: "qc_engineer",
 
   // Business Development
-  BDA: "business_development_analyst",
+  BDA: "bda",
   BD_MANAGER: "bd_manager",
   SALES_EXECUTIVE: "sales_executive",
   DIGITAL_MARKETING: "digital_marketing",

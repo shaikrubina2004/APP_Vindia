@@ -337,6 +337,12 @@ const synthesizeAbsentRow = (employee, dateKey) => ({
   lateMinutes: 0,
   remarks: "No attendance record",
   date: dateKey,
+  checkInLat: null,
+  checkInLng: null,
+  checkInAddress: null,
+  checkOutLat: null,
+  checkOutLng: null,
+  checkOutAddress: null,
 });
 
 const expandEmployeeFullRange = (rows, employee) => {
@@ -368,40 +374,35 @@ const expandEmployeeFullRange = (rows, employee) => {
   return [...otherRows, ...expandedForEmployee];
 };
 
-const expandAllEmployeesForDate = (
-  rows,
-  employees,
-  selectedDate
-) => {
-  const dateKey = toDateKey(selectedDate);
+// Fills in "Absent" rows for every employee across every working day in
+// [fromDate, toDate], so the range filter and CSV download reflect a
+// complete picture even for days nobody checked in.
+const expandAllEmployeesForRange = (rows, employees, fromDate, toDate) => {
+  const dateKeys = dateRange(fromDate, toDate).filter(
+    (key) => !isNonWorkingDay(key)
+  );
 
-  // Sundays / public holidays are not working days — don't synthesize
-  // "Absent" rows for every employee on those dates.
-  if (isNonWorkingDay(dateKey)) {
-    return rows;
-  }
-
-  const existingForDate = new Set(
-    rows
-      .filter((row) => row.date === dateKey)
-      .map((row) => row.employee_id)
+  const existingKeys = new Set(
+    rows.map((row) => `${row.employee_id}-${row.date}`)
   );
 
   const additions = [];
 
-  employees.forEach((employee) => {
-    if (
-      employee.join_date &&
-      new Date(employee.join_date) > new Date(dateKey)
-    ) {
-      return;
-    }
+  dateKeys.forEach((dateKey) => {
+    employees.forEach((employee) => {
+      if (
+        employee.join_date &&
+        new Date(employee.join_date) > new Date(dateKey)
+      ) {
+        return;
+      }
 
-    if (!existingForDate.has(employee.id)) {
-      additions.push(
-        synthesizeAbsentRow(employee, dateKey)
-      );
-    }
+      const key = `${employee.id}-${dateKey}`;
+      if (!existingKeys.has(key)) {
+        additions.push(synthesizeAbsentRow(employee, dateKey));
+        existingKeys.add(key);
+      }
+    });
   });
 
   return [...rows, ...additions];
@@ -411,8 +412,12 @@ function AttendanceManagement() {
   const calendarRef = useRef(null);
 
   const [calNav, setCalNav] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(null);
+  // Date-range selection for filtering + CSV download. First click sets
+  // dateFrom, second click sets dateTo (or swaps if it's earlier).
+  const [dateFrom, setDateFrom] = useState(null);
+  const [dateTo, setDateTo] = useState(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const [searchName, setSearchName] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -424,6 +429,16 @@ function AttendanceManagement() {
   const [historyMap, setHistoryMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState([]);
+
+  // Whoever is viewing THIS page (HR / CEO / etc) — used only to decide
+  // whether raw check-in/check-out coordinates should be requested and
+  // whether the map pin icon renders. The backend independently strips
+  // coordinates for any viewer who isn't declared CEO, so hiding the
+  // icon here is a UI nicety, not the actual enforcement point.
+  const viewer = JSON.parse(localStorage.getItem("user") || "{}");
+  const viewerDesignation = viewer?.designation || viewer?.role || "";
+  const isCEOViewer =
+    viewerDesignation.trim().toLowerCase() === "ceo";
 
   useEffect(() => {
     loadAll();
@@ -459,8 +474,12 @@ function AttendanceManagement() {
 
     try {
       const [todayResponse, historyResponse] = await Promise.all([
-        API.get("/attendance/today/all"),
-        API.get("/attendance"),
+        API.get("/attendance/today/all", {
+          params: { viewer_designation: viewerDesignation },
+        }),
+        API.get("/attendance", {
+          params: { viewer_designation: viewerDesignation },
+        }),
       ]);
 
       const mappedToday = (todayResponse.data || []).map((row) => {
@@ -498,6 +517,13 @@ function AttendanceManagement() {
 
           hasRecord: !!row.attendance_id,
           date: toDateKey(new Date()),
+
+          checkInLat: row.check_in_lat ?? null,
+          checkInLng: row.check_in_lng ?? null,
+          checkInAddress: row.check_in_address ?? null,
+          checkOutLat: row.check_out_lat ?? null,
+          checkOutLng: row.check_out_lng ?? null,
+          checkOutAddress: row.check_out_address ?? null,
         };
       });
 
@@ -540,6 +566,13 @@ function AttendanceManagement() {
           remarks: attendance.remarks,
 
           date: dateKey,
+
+          checkInLat: row.check_in_lat ?? null,
+          checkInLng: row.check_in_lng ?? null,
+          checkInAddress: row.check_in_address ?? null,
+          checkOutLat: row.check_out_lat ?? null,
+          checkOutLng: row.check_out_lng ?? null,
+          checkOutAddress: row.check_out_address ?? null,
         });
       });
 
@@ -599,11 +632,13 @@ function AttendanceManagement() {
       }
     }
 
-    if (selectedDate) {
-      rows = expandAllEmployeesForDate(
+    if (dateFrom) {
+      const rangeEnd = dateTo || dateFrom;
+      rows = expandAllEmployeesForRange(
         rows,
         employees,
-        selectedDate
+        dateFrom,
+        rangeEnd
       );
     }
 
@@ -612,15 +647,15 @@ function AttendanceManagement() {
     allRows,
     employees,
     searchName,
-    selectedDate,
+    dateFrom,
+    dateTo,
   ]);
 
   const filtered = useMemo(() => {
     const nameQuery = searchName.trim().toLowerCase();
     const statusQuery = selectedStatus.trim().toLowerCase();
-    const dateQuery = selectedDate
-      ? toDateKey(selectedDate)
-      : "";
+    const fromKey = dateFrom ? toDateKey(dateFrom) : "";
+    const toKey = dateTo ? toDateKey(dateTo) : "";
 
     const rows = effectiveRows.filter((row) => {
       const name = (row.name || "").toLowerCase();
@@ -639,8 +674,12 @@ function AttendanceManagement() {
         statusQuery === "all" ||
         status === statusQuery;
 
-      const dateMatch =
-        !dateQuery || rowDate === dateQuery;
+      let dateMatch = true;
+      if (fromKey && toKey) {
+        dateMatch = rowDate >= fromKey && rowDate <= toKey;
+      } else if (fromKey) {
+        dateMatch = rowDate === fromKey;
+      }
 
       return nameMatch && statusMatch && dateMatch;
     });
@@ -656,7 +695,8 @@ function AttendanceManagement() {
     effectiveRows,
     searchName,
     selectedStatus,
-    selectedDate,
+    dateFrom,
+    dateTo,
   ]);
 
   const activeFilterChips = useMemo(() => {
@@ -669,10 +709,15 @@ function AttendanceManagement() {
       });
     }
 
-    if (selectedDate) {
+    if (dateFrom) {
+      const sameDay =
+        !dateTo || toDateKey(dateTo) === toDateKey(dateFrom);
+
       chips.push({
         key: "date",
-        label: `Date: ${fmtFilterDate(selectedDate)}`,
+        label: sameDay
+          ? `Date: ${fmtFilterDate(dateFrom)}`
+          : `Date: ${fmtFilterDate(dateFrom)} – ${fmtFilterDate(dateTo)}`,
       });
     }
 
@@ -692,7 +737,8 @@ function AttendanceManagement() {
   }, [
     searchName,
     selectedStatus,
-    selectedDate,
+    dateFrom,
+    dateTo,
   ]);
 
   const hasActiveFilters =
@@ -701,7 +747,8 @@ function AttendanceManagement() {
   const clearFilters = () => {
     setSearchName("");
     setSelectedStatus("all");
-    setSelectedDate(null);
+    setDateFrom(null);
+    setDateTo(null);
     setCurrentPage(1);
   };
 
@@ -778,7 +825,8 @@ function AttendanceManagement() {
   }, [
     searchName,
     selectedStatus,
-    selectedDate,
+    dateFrom,
+    dateTo,
   ]);
 
   const daysInMonth = new Date(
@@ -803,6 +851,8 @@ function AttendanceManagement() {
     monthDays.push(day);
   }
 
+  // First click starts a fresh range. Second click completes it — if the
+  // second date is earlier than the first, they're swapped automatically.
   const handleDateClick = (day) => {
     if (!day) return;
 
@@ -812,15 +862,62 @@ function AttendanceManagement() {
       day
     );
 
-    setSelectedDate(pickedDate);
+    if (!dateFrom || (dateFrom && dateTo)) {
+      setDateFrom(pickedDate);
+      setDateTo(null);
+      return;
+    }
+
+    if (pickedDate < dateFrom) {
+      setDateTo(dateFrom);
+      setDateFrom(pickedDate);
+    } else {
+      setDateTo(pickedDate);
+    }
+
     setCalendarOpen(false);
   };
 
-  const clearDate = () => {
-    setSelectedDate(null);
+  const clearRange = () => {
+    setDateFrom(null);
+    setDateTo(null);
+  };
+
+  // CSV download for the selected range — only enabled once both a
+  // from-date and to-date are picked.
+  const handleDownload = async () => {
+    if (!dateFrom || !dateTo) return;
+
+    setDownloading(true);
+
+    try {
+      const from = toDateKey(dateFrom);
+      const to = toDateKey(dateTo);
+
+      const response = await API.get("/attendance/export/range", {
+        params: { from, to },
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `attendance_${from}_to_${to}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to download attendance:", error);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const today = new Date();
+
+  const mapLink = (lat, lng) =>
+    `https://www.google.com/maps?q=${lat},${lng}`;
 
   return (
     <div className="am-page">
@@ -1062,20 +1159,29 @@ function AttendanceManagement() {
                 />
               </svg>
 
-              {selectedDate ? (
+              {dateFrom && dateTo ? (
                 <>
-                  {selectedDate.getDate()}{" "}
-                  {SHORT_MONTH[
-                    selectedDate.getMonth()
-                  ]}{" "}
-                  {selectedDate.getFullYear()}
+                  {dateFrom.getDate()}{" "}
+                  {SHORT_MONTH[dateFrom.getMonth()]}
+                  {" – "}
+                  {dateTo.getDate()}{" "}
+                  {SHORT_MONTH[dateTo.getMonth()]}{" "}
+                  {dateTo.getFullYear()}
+                </>
+              ) : dateFrom ? (
+                <>
+                  {dateFrom.getDate()}{" "}
+                  {SHORT_MONTH[dateFrom.getMonth()]}{" "}
+                  {dateFrom.getFullYear()}
+                  {" – …"}
                 </>
               ) : (
-                <>Select Date</>
+                <>Select Date Range</>
               )}
 
-              {selectedDate &&
-                isToday(selectedDate) && (
+              {dateFrom &&
+                !dateTo &&
+                isToday(dateFrom) && (
                   <span className="am-today-badge">
                     Today
                   </span>
@@ -1140,6 +1246,14 @@ function AttendanceManagement() {
                   </button>
                 </div>
 
+                <div className="am-cal-hint">
+                  {!dateFrom
+                    ? "Pick a start date"
+                    : !dateTo
+                    ? "Pick an end date"
+                    : "Range selected"}
+                </div>
+
                 <div className="am-cal-grid">
                   {[
                     "Su",
@@ -1159,6 +1273,23 @@ function AttendanceManagement() {
                   ))}
 
                   {monthDays.map((day, index) => {
+                    const cellDate = day
+                      ? new Date(
+                          calNav.getFullYear(),
+                          calNav.getMonth(),
+                          day
+                        )
+                      : null;
+                    const cellKey = cellDate
+                      ? toDateKey(cellDate)
+                      : "";
+                    const fromKey = dateFrom
+                      ? toDateKey(dateFrom)
+                      : "";
+                    const toKey = dateTo
+                      ? toDateKey(dateTo)
+                      : "";
+
                     const isTodayDate =
                       day &&
                       today.getFullYear() ===
@@ -1167,14 +1298,16 @@ function AttendanceManagement() {
                         calNav.getMonth() &&
                       today.getDate() === day;
 
-                    const isSelectedDate =
+                    const isStart =
+                      day && cellKey === fromKey;
+                    const isEnd =
+                      day && toKey && cellKey === toKey;
+                    const isInRange =
                       day &&
-                      selectedDate &&
-                      selectedDate.getFullYear() ===
-                        calNav.getFullYear() &&
-                      selectedDate.getMonth() ===
-                        calNav.getMonth() &&
-                      selectedDate.getDate() === day;
+                      fromKey &&
+                      toKey &&
+                      cellKey > fromKey &&
+                      cellKey < toKey;
 
                     return (
                       <div
@@ -1186,8 +1319,12 @@ function AttendanceManagement() {
                             ? " is-today"
                             : ""
                         }${
-                          isSelectedDate
+                          isStart || isEnd
                             ? " is-selected"
+                            : ""
+                        }${
+                          isInRange
+                            ? " is-in-range"
                             : ""
                         }`}
                         onClick={() =>
@@ -1202,13 +1339,38 @@ function AttendanceManagement() {
 
                 <button
                   className="am-clear-date-btn"
-                  onClick={clearDate}
+                  onClick={clearRange}
                 >
-                  Clear Date
+                  Clear Dates
                 </button>
               </div>
             )}
           </div>
+
+          <button
+            className="am-download-btn"
+            disabled={!dateFrom || !dateTo || downloading}
+            onClick={handleDownload}
+            title={
+              !dateFrom || !dateTo
+                ? "Select a from and to date to enable download"
+                : "Download attendance for the selected range"
+            }
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M12 3v12" />
+              <path d="M7 10l5 5 5-5" />
+              <path d="M5 21h14" />
+            </svg>
+            {downloading ? "Preparing…" : "Download"}
+          </button>
         </div>
       </div>
 
@@ -1279,6 +1441,7 @@ function AttendanceManagement() {
               <th className="am-th">Shift</th>
               <th className="am-th">Late By</th>
               <th className="am-th">Status</th>
+              <th className="am-th">Location</th>
             </tr>
           </thead>
 
@@ -1286,7 +1449,7 @@ function AttendanceManagement() {
             {loading ? (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={10}
                   className="am-empty-cell"
                 >
                   <div className="am-empty-inner">
@@ -1427,12 +1590,86 @@ function AttendanceManagement() {
                       )}
                     </div>
                   </td>
+
+                  <td className="am-td">
+                    <div className="am-location-cell">
+                      <div className="am-location-row">
+                        <span className="am-location-text">
+                          {record.checkInAddress
+                            ? `In · ${record.checkInAddress}`
+                            : "In · —"}
+                        </span>
+
+                        {isCEOViewer &&
+                          record.checkInLat != null &&
+                          record.checkInLng != null && (
+                            <a
+                              href={mapLink(
+                                record.checkInLat,
+                                record.checkInLng
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="am-map-icon"
+                              title="View check-in location"
+                            >
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              >
+                                <path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0Z" />
+                                <circle cx="12" cy="10" r="3" />
+                              </svg>
+                            </a>
+                          )}
+                      </div>
+
+                      <div className="am-location-row">
+                        <span className="am-location-text">
+                          {record.checkOutAddress
+                            ? `Out · ${record.checkOutAddress}`
+                            : "Out · —"}
+                        </span>
+
+                        {isCEOViewer &&
+                          record.checkOutLat != null &&
+                          record.checkOutLng != null && (
+                            <a
+                              href={mapLink(
+                                record.checkOutLat,
+                                record.checkOutLng
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="am-map-icon"
+                              title="View check-out location"
+                            >
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              >
+                                <path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0Z" />
+                                <circle cx="12" cy="10" r="3" />
+                              </svg>
+                            </a>
+                          )}
+                      </div>
+                    </div>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={10}
                   className="am-empty-cell"
                 >
                   <div className="am-empty-inner">

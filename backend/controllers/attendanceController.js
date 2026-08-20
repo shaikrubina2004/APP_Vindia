@@ -39,6 +39,21 @@ function isNonWorkingDay(dateStr) {
 //
 // Shift timing is read from employees table via user_id FK.
 // Falls back to 09:00–18:00 if no shift_timing set.
+//
+// Location:
+//   check_in_lat/lng and check_out_lat/lng are captured client-side at
+//   the moment of check-in / check-out, along with a short reverse-
+//   geocoded address (check_in_address / check_out_address — landmark/
+//   locality, district, state). CEOs are exempt from capture entirely
+//   — enforced here, server-side, regardless of what the client sends.
+//
+//   On READ, raw lat/lng are only returned to a viewer who declares
+//   themselves CEO (see viewer_designation below) — everyone else only
+//   gets the short address text. This mirrors the same client-declared
+//   role pattern the rest of this app already uses (see leads endpoints
+//   taking `role`/`name` as query params) rather than a hardened,
+//   server-verified session — if/when real auth is added, this check
+//   should move there instead.
 
 function parseShiftTimes(shiftTimingStr) {
   // Handles formats: "9AM-6PM", "9:00 AM - 6:00 PM", "09:00 - 18:00", "9:30 PM - 6:30 AM"
@@ -155,10 +170,11 @@ function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
   };
 }
 
-// ─── Helper: get shift_timing for a user (via users.id → employees.user_id) ──
+// ─── Helper: get shift_timing / status / designation for a user ──────────────
+// (via users.id → employees.user_id)
 async function getShiftAndStatus(userId) {
   const r = await pool.query(
-    `SELECT e.shift_timing, e.status
+    `SELECT e.shift_timing, e.status, e.designation
      FROM employees e
      WHERE e.user_id = $1
      LIMIT 1`,
@@ -167,13 +183,41 @@ async function getShiftAndStatus(userId) {
   return {
     shiftTiming: r.rows[0]?.shift_timing || null,
     empStatus:   (r.rows[0]?.status || "").toLowerCase(),
+    designation: r.rows[0]?.designation || "",
+  };
+}
+
+const isCeoDesignation = (designation = "") =>
+  (designation || "").trim().toLowerCase() === "ceo";
+
+// Strips raw coordinates from a row unless the requesting viewer is the
+// CEO. The short address text (check_in_address / check_out_address)
+// is left untouched for everyone — it's coarse by design (see
+// reverseGeocodeShort on the frontend).
+function sanitizeLocationForViewer(row, isViewerCEO) {
+  if (isViewerCEO) return row;
+  return {
+    ...row,
+    check_in_lat: null,
+    check_in_lng: null,
+    check_out_lat: null,
+    check_out_lng: null,
   };
 }
 
 // ─── Mark Attendance (Check In) ──────────────────────────────────────────────
 exports.markAttendance = async (req, res) => {
   try {
-    const { employee_id, date, check_in, shift, remarks } = req.body;
+    const {
+      employee_id,
+      date,
+      check_in,
+      shift,
+      remarks,
+      check_in_lat,
+      check_in_lng,
+      check_in_address,
+    } = req.body;
 
     if (!employee_id || !date || !check_in) {
       return res
@@ -181,8 +225,12 @@ exports.markAttendance = async (req, res) => {
         .json({ error: "Missing required fields", received: req.body });
     }
 
-    // employee_id here is users.id — fetch shift via employees.user_id
-    const { shiftTiming, empStatus } = await getShiftAndStatus(employee_id);
+    // employee_id here is users.id — fetch shift/designation via employees.user_id
+    const { shiftTiming, empStatus, designation } = await getShiftAndStatus(employee_id);
+
+    // CEOs are exempt from location capture — enforced here regardless
+    // of what the client sent.
+    const skipLocation = isCeoDesignation(designation);
 
     let finalStatus, lateMinutes, finalRemarks;
     if (empStatus === "work_from_home") {
@@ -198,8 +246,9 @@ exports.markAttendance = async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO attendance
-         (employee_id, date, status, check_in, shift, late_minutes, remarks, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+         (employee_id, date, status, check_in, shift, late_minutes, remarks,
+          check_in_lat, check_in_lng, check_in_address, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
        RETURNING *`,
       [
         employee_id,
@@ -209,6 +258,9 @@ exports.markAttendance = async (req, res) => {
         shift || "Morning",
         lateMinutes,
         remarks || finalRemarks,
+        skipLocation ? null : check_in_lat ?? null,
+        skipLocation ? null : check_in_lng ?? null,
+        skipLocation ? null : check_in_address ?? null,
       ]
     );
     return res.status(201).json(result.rows[0]);
@@ -223,15 +275,23 @@ exports.markAttendance = async (req, res) => {
 // ─── Update Attendance (Check Out) ───────────────────────────────────────────
 exports.updateAttendance = async (req, res) => {
   const { id } = req.params;
-  const { status, check_out } = req.body || {};
+  const {
+    status,
+    check_out,
+    check_out_lat,
+    check_out_lng,
+    check_out_address,
+  } = req.body || {};
 
   // Check-out only path (no manual status override)
   if (check_out && !status) {
     try {
-      // Fetch existing record; join employees via user_id to get shift_timing
+      // Fetch existing record; join employees via user_id to get
+      // shift_timing and designation (for the CEO location exemption).
       const existing = await pool.query(
         `SELECT a.*,
-                e.shift_timing
+                e.shift_timing,
+                e.designation
          FROM attendance a
          LEFT JOIN employees e ON e.user_id = a.employee_id
          WHERE a.id = $1`,
@@ -242,16 +302,29 @@ exports.updateAttendance = async (req, res) => {
       }
       const row = existing.rows[0];
       const derived = deriveStatus(row.check_in, check_out, row.shift_timing);
+      const skipLocation = isCeoDesignation(row.designation);
 
       const result = await pool.query(
         `UPDATE attendance
-         SET check_out    = $1,
-             status       = $2,
-             late_minutes = $3,
-             remarks      = $4
-         WHERE id = $5
+         SET check_out          = $1,
+             status             = $2,
+             late_minutes       = $3,
+             remarks            = $4,
+             check_out_lat      = $5,
+             check_out_lng      = $6,
+             check_out_address  = $7
+         WHERE id = $8
          RETURNING *`,
-        [check_out, derived.status, derived.lateMinutes, derived.remarks || "", id]
+        [
+          check_out,
+          derived.status,
+          derived.lateMinutes,
+          derived.remarks || "",
+          skipLocation ? null : check_out_lat ?? null,
+          skipLocation ? null : check_out_lng ?? null,
+          skipLocation ? null : check_out_address ?? null,
+          id,
+        ]
       );
       return res.status(200).json(result.rows[0]);
     } catch (error) {
@@ -308,8 +381,11 @@ exports.getTodayAttendance = async (req, res) => {
 };
 
 // ─── Get All Attendance (historical list) ────────────────────────────────────
+// Accepts ?viewer_designation=ceo — only that viewer gets raw lat/lng.
 exports.getAllAttendance = async (req, res) => {
   try {
+    const isViewerCEO = isCeoDesignation(req.query.viewer_designation);
+
     const result = await pool.query(
       `SELECT
          attendance.*,
@@ -319,7 +395,12 @@ exports.getAllAttendance = async (req, res) => {
        LEFT JOIN employees e ON e.user_id     = attendance.employee_id
        ORDER BY date DESC`
     );
-    res.status(200).json(result.rows);
+
+    const rows = result.rows.map((row) =>
+      sanitizeLocationForViewer(row, isViewerCEO)
+    );
+
+    res.status(200).json(rows);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch attendance" });
@@ -331,8 +412,10 @@ exports.getAllAttendance = async (req, res) => {
 // attendance is matched via COALESCE(e.user_id, e.id) = users.id based key.
 // Employees with no user account (user_id IS NULL) show as Absent since
 // they cannot log in and punch attendance.
+// Accepts ?viewer_designation=ceo — only that viewer gets raw lat/lng.
 exports.getTodayAllEmployees = async (req, res) => {
   try {
+    const isViewerCEO = isCeoDesignation(req.query.viewer_designation);
     const today = new Date().toISOString().slice(0, 10);
 
     // Employees who have a linked user account — match attendance via user_id
@@ -352,7 +435,13 @@ exports.getTodayAllEmployees = async (req, res) => {
          a.check_out,
          a.shift,
          a.late_minutes,
-         a.remarks
+         a.remarks,
+         a.check_in_lat,
+         a.check_in_lng,
+         a.check_in_address,
+         a.check_out_lat,
+         a.check_out_lng,
+         a.check_out_address
        FROM employees e
        INNER JOIN users u ON u.id = e.user_id
        LEFT JOIN attendance a
@@ -367,8 +456,8 @@ exports.getTodayAllEmployees = async (req, res) => {
       if (!row.attendance_id) {
         const isWfh = (row.emp_status || "").toLowerCase() === "work_from_home";
 
-        // Sundays / public holidays are not working days — don't mark
-        // employees "Absent" just because there's no attendance record.
+        // Sundays / public holidays are not working days — don't
+        // mark employees "Absent" just because there's no attendance record.
         if (todayIsNonWorking && !isWfh) {
           return {
             ...row,
@@ -392,7 +481,11 @@ exports.getTodayAllEmployees = async (req, res) => {
       return row;
     });
 
-    res.status(200).json(allRows);
+    const sanitized = allRows.map((row) =>
+      sanitizeLocationForViewer(row, isViewerCEO)
+    );
+
+    res.status(200).json(sanitized);
   } catch (error) {
     console.error(error);
     res
@@ -448,6 +541,82 @@ exports.getAttendanceByDateRange = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to filter attendance" });
+  }
+};
+
+// ─── Export Attendance by Date Range as CSV (for CEO "Download") ────────────
+// This endpoint is reached only via the CEO-only Download button on the
+// Attendance page, so raw coordinates are included unconditionally.
+exports.exportAttendanceByDateRange = async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) {
+    return res
+      .status(400)
+      .json({ message: "From and To dates are required" });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT
+         a.date,
+         COALESCE(e.name, u.name)   AS name,
+         e.designation,
+         e.department,
+         a.status,
+         a.check_in,
+         a.check_out,
+         a.shift,
+         a.late_minutes,
+         a.remarks,
+         a.check_in_lat,
+         a.check_in_lng,
+         a.check_in_address,
+         a.check_out_lat,
+         a.check_out_lng,
+         a.check_out_address
+       FROM attendance a
+       LEFT JOIN users     u ON u.id      = a.employee_id
+       LEFT JOIN employees e ON e.user_id = a.employee_id
+       WHERE a.date BETWEEN $1 AND $2
+       ORDER BY a.date ASC, name ASC`,
+      [from, to]
+    );
+
+    const headers = [
+      "Date", "Name", "Designation", "Department", "Status",
+      "Check In", "Check Out", "Shift", "Late Minutes", "Remarks",
+      "Check In Lat", "Check In Lng", "Check In Address",
+      "Check Out Lat", "Check Out Lng", "Check Out Address",
+    ];
+
+    const escapeCsv = (value) => {
+      if (value === null || value === undefined) return "";
+      const str = String(value);
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+
+    const rows = result.rows.map((r) =>
+      [
+        r.date, r.name, r.designation, r.department, r.status,
+        r.check_in, r.check_out, r.shift, r.late_minutes, r.remarks,
+        r.check_in_lat, r.check_in_lng, r.check_in_address,
+        r.check_out_lat, r.check_out_lng, r.check_out_address,
+      ]
+        .map(escapeCsv)
+        .join(",")
+    );
+
+    const csv = [headers.join(","), ...rows].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="attendance_${from}_to_${to}.csv"`
+    );
+    res.status(200).send(csv);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to export attendance" });
   }
 };
 

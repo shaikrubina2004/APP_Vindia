@@ -15,17 +15,9 @@ const createUser = async ({ name, email, password, role_id, status }) => {
 /* GET USER BY EMAIL */
 const getUserByEmail = async (email) => {
   const result = await pool.query(
-    `SELECT 
-        u.id,
-        u.name,
-        u.email,
-        u.password,
-        u.status,
-        u.role_id,
-        r.name AS role
-     FROM users u
-     LEFT JOIN roles r ON r.id = u.role_id
-     WHERE u.email = $1`,
+    `SELECT u.*, r.code AS role
+    FROM users u LEFT JOIN roles r ON r.id = u.role_id
+    WHERE u.email = $1`,
     [email]
   );
 
