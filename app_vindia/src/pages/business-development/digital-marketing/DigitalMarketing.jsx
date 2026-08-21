@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
+import CheckInButton from "../../../SharedResourse/CheckInButton";
+// ^ This import assumes DigitalMarketing.jsx sits alongside BDADashboard.jsx
+// at src/pages/business-development/digital-marketing/DigitalMarketing.jsx
+// (3 folders under src/). If Vite complains the file doesn't exist,
+// recount the folders to src/ and adjust the "../".
 import "./DigitalMarketing.css";
 
 const API = "http://localhost:5000/api";
@@ -172,6 +177,11 @@ const DigitalMarketing = () => {
   const [tab,       setTab]       = useState("overview");
   const [refreshed, setRefreshed] = useState(new Date());
 
+  // ── Current user, for the check-in button ──────────────────
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const employeeId  = currentUser?.employee_id || currentUser?.id || null;
+  const designation = currentUser?.designation || currentUser?.role || null;
+
   const loadData = async () => {
     setLoading(true); setError(null);
     try {
@@ -247,6 +257,9 @@ const DigitalMarketing = () => {
           <h1 className="dm-title">Dashboard</h1>
         </div>
         <div className="dm-topbar-right">
+          {employeeId && (
+            <CheckInButton employeeId={employeeId} designation={designation} />
+          )}
           <span className="dm-updated">
             <i className="ti ti-clock" style={{ fontSize: 13 }} />
             Updated {refreshed.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}

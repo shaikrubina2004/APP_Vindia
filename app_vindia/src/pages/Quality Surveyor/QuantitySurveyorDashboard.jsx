@@ -4,6 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState, useCallback } from "react";
 import axios from "axios";
 import { Chart, registerables } from "chart.js";
+import CheckInButton from "../../SharedResourse/CheckInButton";
+// ^ This import assumes QuantitySurveyorDashboard.jsx is 2 folders under
+// src/ (e.g. src/pages/QuantitySurveyor/QuantitySurveyorDashboard.jsx),
+// matching the other dashboards at that depth. If Vite complains the
+// file doesn't exist, recount the folders to src/ and adjust the "../".
 Chart.register(...registerables);
 
 const API = "http://localhost:5000";
@@ -55,6 +60,11 @@ export default function QuantitySurveyorDashboard() {
   const [tasks,           setTasks]           = useState([]);
   const [incidents,       setIncidents]       = useState([]);
   const [loading,         setLoading]         = useState(true);
+
+  // ── Current user, for the check-in button ──────────────────
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const employeeId  = currentUser?.employee_id || currentUser?.id || null;
+  const designation = currentUser?.designation || currentUser?.role || null;
 
   // ── Fetch all data ──────────────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -214,6 +224,9 @@ export default function QuantitySurveyorDashboard() {
           </div>
         </div>
         <div className="tb-right">
+          {employeeId && (
+            <CheckInButton employeeId={employeeId} designation={designation} />
+          )}
           <div className="tb-stat">
             <div className="tb-stat-val">{totalProjects}</div>
             <div className="tb-stat-label">Total Projects</div>
