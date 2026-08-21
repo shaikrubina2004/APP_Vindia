@@ -94,6 +94,11 @@ const pmReportRoutes = require("./routes/pmReportRoutes");
 const metaRoutes = require("./routes/metaRoutes");
 const bdaNotifRoutes = require("./routes/bdaNotificationRoutes");
 
+/* ✅ Finance Manager */
+const financeRoutes = require("./routes/financeRoutes");
+const financeDailyUpdateRoutes = require("./routes/financeDailyUpdateRoutes");
+
+const { errorHandler } = require("./middleware/errorHandler");
 /* ═════════ APP SETUP ═════════ */
 
 const app = express();
@@ -186,19 +191,12 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/pm-reports", pmReportRoutes);
 app.use("/api/meta", metaRoutes);
 app.use("/api/bda-notifications", bdaNotifRoutes);
-
+/* ✅ Finance Manager */
+app.use("/api/finance", financeRoutes);
+app.use("/api/finance-daily-updates", financeDailyUpdateRoutes);
 /* ═════════ ERROR HANDLING ═════════ */
 
-app.use((_req, res) =>
-  res.status(404).json({ success: false, message: "Route not found" })
-);
-
-app.use((err, _req, res, _next) => {
-  res.status(500).json({
-    success: false,
-    message: err.message || "Internal server error",
-  });
-});
+app.use(errorHandler);
 
 /* ═════════ START ═════════ */
 

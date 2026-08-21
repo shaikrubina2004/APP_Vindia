@@ -1,65 +1,77 @@
-// ===== FILE: APP_Vindia/app_vindia/src/api/financeService.js =====
+// ===== FILE: APP_Vindia/app_vindia/src/services/financeService.js =====
+import api from "./api";
 
-import axios from 'axios';
-
-// eslint-disable-next-line no-undef
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const FINANCE_API = `${API_BASE_URL}/api/finance`;
-
-// Get authorization header
-const getAuthHeader = () => ({
-  headers: {
-    Authorization: `Bearer ${localStorage.getItem('token')}`
-  }
-});
+// api.js already sets baseURL "http://localhost:5000/api" and attaches
+// the Bearer token automatically — so every call below is relative to /api
+const F = "/finance";
 
 const financeService = {
-  // Dashboard
-  getFinanceDashboard: (projectId) => {
-    return axios.get(`${FINANCE_API}/dashboard?projectId=${projectId}`, getAuthHeader());
-  },
+  /* ── Dashboard ─────────────────────────────────────── */
+  getDashboard: (projectId) =>
+    api.get(`${F}/dashboard`, { params: { projectId } }),
 
-  // Invoices
-  getAllInvoices: (filters = {}) => {
-    const params = new URLSearchParams(filters);
-    return axios.get(`${FINANCE_API}/invoices?${params}`, getAuthHeader());
-  },
+  /* ── Cost Reporting ────────────────────────────────── */
+  getCostReport: (projectId) =>
+    api.get(`${F}/cost-report`, { params: { projectId } }),
 
-  createInvoice: (invoiceData) => {
-    return axios.post(`${FINANCE_API}/invoices/create`, invoiceData, getAuthHeader());
-  },
+  /* ── Budgets ───────────────────────────────────────── */
+  getAllBudgets: (filters = {}) =>
+    api.get(`${F}/budgets`, { params: filters }),
+  getBudgetsByProject: (projectId) =>
+    api.get(`${F}/budgets/project/${projectId}`),
+  getBudgetById: (id) => api.get(`${F}/budgets/${id}`),
+  createBudget: (data) => api.post(`${F}/budgets`, data),
+  updateBudget: (id, data) => api.put(`${F}/budgets/${id}`, data),
+  deleteBudget: (id) => api.delete(`${F}/budgets/${id}`),
 
-  updateInvoiceStatus: (invoiceId, status) => {
-    return axios.put(`${FINANCE_API}/invoices/${invoiceId}/status`, { status }, getAuthHeader());
-  },
+  /* ── Expenses ──────────────────────────────────────── */
+  getAllExpenses: (filters = {}) =>
+    api.get(`${F}/expenses`, { params: filters }),
+  getExpenseSummary: (projectId) =>
+    api.get(`${F}/expenses/summary`, { params: { projectId } }),
+  getExpenseById: (id) => api.get(`${F}/expenses/${id}`),
+  createExpense: (data) => api.post(`${F}/expenses`, data),
+  updateExpense: (id, data) => api.put(`${F}/expenses/${id}`, data),
+  deleteExpense: (id) => api.delete(`${F}/expenses/${id}`),
 
-  deleteInvoice: (invoiceId) => {
-    return axios.delete(`${FINANCE_API}/invoices/${invoiceId}`, getAuthHeader());
-  },
+  /* ── Invoices ──────────────────────────────────────── */
+  getAllInvoices: (filters = {}) =>
+    api.get(`${F}/invoices`, { params: filters }),
+  createInvoice: (data) => api.post(`${F}/invoices`, data),
+  updateInvoice: (id, data) => api.put(`${F}/invoices/${id}`, data),
+  updateInvoiceStatus: (id, status) =>
+    api.put(`${F}/invoices/${id}/status`, { status }),
+  deleteInvoice: (id) => api.delete(`${F}/invoices/${id}`),
 
-  // Budget
-  createBudget: (budgetData) => {
-    return axios.post(`${FINANCE_API}/budgets/create`, budgetData, getAuthHeader());
-  },
+  /* ── Payments ──────────────────────────────────────── */
+  getAllPayments: (filters = {}) =>
+    api.get(`${F}/payments`, { params: filters }),
+  getPaymentSummary: (projectId) =>
+    api.get(`${F}/payments/summary`, { params: { projectId } }),
+  getPaymentById: (id) => api.get(`${F}/payments/${id}`),
+  createPayment: (data) => api.post(`${F}/payments`, data),
+  updatePayment: (id, data) => api.put(`${F}/payments/${id}`, data),
+  deletePayment: (id) => api.delete(`${F}/payments/${id}`),
 
-  getBudgets: (projectId) => {
-    return axios.get(`${FINANCE_API}/budgets?projectId=${projectId}`, getAuthHeader());
-  },
+  /* ── Vendors ───────────────────────────────────────── */
+  getAllVendors: (filters = {}) =>
+    api.get(`${F}/vendors`, { params: filters }),
+  getVendorMetrics: () => api.get(`${F}/vendors/metrics`),
+  getVendorById: (id) => api.get(`${F}/vendors/${id}`),
+  createVendor: (data) => api.post(`${F}/vendors`, data),
+  updateVendor: (id, data) => api.put(`${F}/vendors/${id}`, data),
+  toggleVendorStatus: (id) => api.patch(`${F}/vendors/${id}/toggle-status`),
+  deleteVendor: (id) => api.delete(`${F}/vendors/${id}`),
 
-  // Reports
-  getCostReport: (projectId) => {
-    return axios.get(`${FINANCE_API}/cost-report?projectId=${projectId}`, getAuthHeader());
-  },
-
-  // Expenses
-  addExpense: (expenseData) => {
-    return axios.post(`${FINANCE_API}/expenses/add`, expenseData, getAuthHeader());
-  },
-
-  // Payments
-  getPaymentStatus: (projectId) => {
-    return axios.get(`${FINANCE_API}/payment-status?projectId=${projectId}`, getAuthHeader());
-  }
+  /* ── Settings ──────────────────────────────────────── */
+  getSettings: () => api.get(`${F}/settings`),
+  updateGeneralSettings: (data) => api.put(`${F}/settings/general`, data),
+  updateTaxSettings: (data) => api.put(`${F}/settings/tax`, data),
+  updateInvoicePrefs: (data) => api.put(`${F}/settings/invoice-prefs`, data),
+  updateGateway: (gateway, data) =>
+    api.put(`${F}/settings/gateway/${gateway}`, data),
+  addBankAccount: (data) => api.post(`${F}/settings/bank-accounts`, data),
+  deleteBankAccount: (id) => api.delete(`${F}/settings/bank-accounts/${id}`),
 };
 
 export default financeService;
