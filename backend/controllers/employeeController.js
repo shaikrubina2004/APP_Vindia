@@ -243,6 +243,27 @@ const getAllEmployees = async (req, res) => {
   }
 };
 
+// ✅ GET BIRTHDAYS — lightweight, unpaginated endpoint dedicated to the
+//    HR dashboard calendar. Returns every employee that has a dob, not
+//    just the latest 100 like getAllEmployees. dob is cast to text so
+//    Postgres hands back the literal "YYYY-MM-DD" string instead of a
+//    JS Date object — node-postgres otherwise converts DATE columns
+//    using the server's local timezone, which can shift the day by one.
+const getBirthdays = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, name, department, dob::text AS dob
+      FROM employees
+      WHERE dob IS NOT NULL
+    `);
+
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error("Get birthdays error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 // ✅ GET BY ID
 const getEmployeeById = async (req, res) => {
   const { id } = req.params;
@@ -479,4 +500,5 @@ module.exports = {
   deleteEmployee,
   getNextEmployeeCode,
   backfillEmployeeCodes,
+  getBirthdays,
 };

@@ -6,21 +6,33 @@ const pool = require("../config/db");
   ──────────────────────────────────────────────────────────
   Monthly Salary (what HR enters) = e.g. ₹40,000
 
-  EARNINGS:
+  EARNINGS (percentages per the company's CTC breakup structure):
     Basic Pay          = 40%
     HRA                = 20%
     Special Allowance  =  5%
     Ex-Gratia / Bonus  = 27%
-    Variable Pay       =  5%
-    Medical Insurance  =  2%
-    Total Earnings     = 99%  (≈ Monthly Salary)
+    Variable Pay       =  5%    ─┐ these two are cost-to-company items,
+    Medical Insurance  =  2%    ─┘ not cash paid — excluded from Total Earnings
+    Total Earnings     = 97%  (Basic+HRA+Special+ExGratia+Variable)
 
   DEDUCTIONS:
-    PF         = 12% of Basic Pay (capped at ₹1,800)
+    PF         = 12% of Basic Pay, UNCAPPED.
+                 (This company runs PF on full Basic, not the ₹15,000
+                 statutory wage-ceiling — confirmed by the real payslip
+                 sample: Basic ≈ ₹40,000 → PF = ₹4,800 exactly.)
     Prof Tax   = ₹200 flat
-    Income Tax = estimated from annual tax slabs (new regime FY 2025-26)
+    Income Tax = 16% of Monthly Salary, FLAT (no slabs).
+                 This % was derived from the reference payslip sample
+                 (Basic ≈ ₹40,000 → Monthly Salary ≈ ₹1,00,000 →
+                 Income Tax ₹15,877 ≈ 16% of Monthly Salary).
+                 Adjust INCOME_TAX_PERCENT below if HR gives a
+                 different rate.
   ══════════════════════════════════════════════════════════
 */
+
+// Flat income-tax rate applied to Monthly Salary — see note above.
+const INCOME_TAX_PERCENT = 0.16;
+
 function calcSalary(monthlySalary) {
   const m = Math.round(Number(monthlySalary) || 0);
 
@@ -33,19 +45,11 @@ function calcSalary(monthlySalary) {
 
   const totalEarnings = basic + hra + specialAllow + exGratia + variablePay;
 
-  const pf      = Math.min(Math.round(basic * 0.12), 1800);
+  const pf      = Math.round(basic * 0.12); // uncapped — see note above
   const profTax = m > 0 ? 200 : 0;
 
-  // Income tax — new regime slabs FY 2025-26
-  const annualCTC     = m * 12;
-  const annualTaxable = annualCTC - pf * 12 - profTax * 12 - 50000;
-  let annualTax = 0;
-  if      (annualTaxable > 1500000) annualTax = 275000 + (annualTaxable - 1500000) * 0.30;
-  else if (annualTaxable > 1200000) annualTax = 175000 + (annualTaxable - 1200000) * 0.20;
-  else if (annualTaxable >  900000) annualTax =  60000 + (annualTaxable -  900000) * 0.15;
-  else if (annualTaxable >  600000) annualTax =  30000 + (annualTaxable -  600000) * 0.10;
-  else if (annualTaxable >  300000) annualTax =          (annualTaxable -  300000) * 0.05;
-  const incomeTax = Math.max(0, Math.round(annualTax / 12));
+  const annualCTC = m * 12;
+  const incomeTax = Math.round(m * INCOME_TAX_PERCENT); // flat % of Monthly Salary
 
   const totalDeductions = pf + profTax + incomeTax;
   const netSalary       = totalEarnings - totalDeductions;
@@ -131,8 +135,9 @@ async function calcLeaveBalance(employeeId, month) {
 
   // ── Approved leaves taken this calendar year ──────────────
   // We count only approved leaves from Jan 1 of curY up to end of curM
-  const yearStart = `${curY}-01-01`;
-  const monthEnd  = `${curY}-${String(curM).padStart(2, "0")}-31`;
+  const yearStart    = `${curY}-01-01`;
+  const curMonthLastDay = new Date(curY, curM, 0).getDate(); // actual days in curM (handles 28/29/30/31)
+  const monthEnd     = `${curY}-${String(curM).padStart(2, "0")}-${String(curMonthLastDay).padStart(2, "0")}`;
 
   const leavesRes = await pool.query(
     `SELECT from_date, to_date, reason
@@ -148,14 +153,23 @@ async function calcLeaveBalance(employeeId, month) {
   let usedCL = 0;
   let usedSL = 0;
 
-  leavesRes.rows.forEach((leave) => {
+  const approvedLeaves = leavesRes.rows.map((leave) => {
     const from   = new Date(leave.from_date);
     const to     = new Date(leave.to_date);
     const days   = Math.round((to - from) / 86400000) + 1;
     const reason = (leave.reason || "").toLowerCase();
+    const type   = reason.includes("sick") ? "Sick Leave" : "Casual Leave";
 
-    if (reason.includes("sick")) usedSL += days;
-    else                         usedCL += days;
+    if (type === "Sick Leave") usedSL += days;
+    else                       usedCL += days;
+
+    return {
+      from_date: leave.from_date,
+      to_date:   leave.to_date,
+      reason:    leave.reason || "—",
+      type,
+      days,
+    };
   });
 
   // ── Balance = accrued − used (cannot go negative) ─────────
@@ -176,6 +190,7 @@ async function calcLeaveBalance(employeeId, month) {
     balanceSL,
     totalAccruedBalance,
     totalBalance,
+    approvedLeaves,     // full list of this year's approved leave entries (for display)
   };
 }
 
@@ -191,6 +206,7 @@ function zeroBalance() {
     balanceSL:       0,
     totalAccruedBalance: 0,
     totalBalance:    0,
+    approvedLeaves:  [],
   };
 }
 
@@ -253,6 +269,12 @@ exports.getPayrollEmployee = async (req, res) => {
     const prefix   = (e.ifsc || "").slice(0, 4).toUpperCase();
     const bankName = BANKS[prefix] || prefix || "—";
 
+    // PAN is stored as a gov_id entry (gov_id_type = 'pan'); fall back to
+    // showing whatever gov ID is on file, labeled by its actual type.
+    const pan = (e.gov_id_type || "").toLowerCase() === "pan"
+      ? (e.gov_id_number || "—")
+      : "—";
+
     res.json({
       employee: {
         id:              e.id,
@@ -268,6 +290,10 @@ exports.getPayrollEmployee = async (req, res) => {
         ifsc:            e.ifsc          || "—",
         gov_id_type:     e.gov_id_type   || "—",
         gov_id_number:   e.gov_id_number || "—",
+        pan,
+        band:            e.band  || "—",
+        level:           e.level || "—",
+        pfNo:            e.pf_no || "—",
         join_date:       e.join_date,
         status:          e.status,
         user_id:         e.user_id,
@@ -278,6 +304,46 @@ exports.getPayrollEmployee = async (req, res) => {
     });
   } catch (err) {
     console.error("getPayrollEmployee:", err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ══════════════════════════════════════════════════════════
+   PATCH /api/payroll/employee/:id/payslip-details
+   Body: { band, level, pf_no }
+   Lets HR fill in the payslip-only fields (Band / Level / PF No.)
+   directly from the Payroll page without touching the full
+   employee onboarding form.
+   ══════════════════════════════════════════════════════════ */
+exports.updatePayslipDetails = async (req, res) => {
+  const { id } = req.params;
+  const { band, level, pf_no } = req.body || {};
+
+  try {
+    const byCode = isNaN(Number(id));
+    const result = await pool.query(
+      byCode
+        ? `UPDATE employees SET
+             band  = COALESCE($1, band),
+             level = COALESCE($2, level),
+             pf_no = COALESCE($3, pf_no)
+           WHERE employee_code = $4
+           RETURNING id, employee_code, band, level, pf_no`
+        : `UPDATE employees SET
+             band  = COALESCE($1, band),
+             level = COALESCE($2, level),
+             pf_no = COALESCE($3, pf_no)
+           WHERE id = $4
+           RETURNING id, employee_code, band, level, pf_no`,
+      [band ?? null, level ?? null, pf_no ?? null, id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+    res.status(200).json(result.rows[0]);
+  } catch (err) {
+    console.error("updatePayslipDetails:", err.message);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -321,6 +387,7 @@ exports.getPayrollAttendance = async (req, res) => {
       if (beforeJoin) {
         return res.json({
           workingDays: 0, daysPayable: 0, lop: 0,
+          lopFromAbsent: 0, lopFromLeave: 0,
           lopDeduction: 0, lopPrevMonth: 0, holidayCount: 0,
           counts: {}, dailyMap: {},
           leaveBalance: zeroBalance(),
@@ -356,15 +423,21 @@ exports.getPayrollAttendance = async (req, res) => {
     });
 
     // ── Mark approved leaves in dailyMap ─────────────────────
+    // Overlap check (not strict containment) so a leave spanning a
+    // month boundary still shows up in every month it touches.
     const leaveRows = await pool.query(
       `SELECT from_date, to_date FROM leaves
        WHERE employee_id = $1 AND status = 'Approved'
-         AND from_date >= $2 AND to_date <= $3`,
+         AND from_date <= $3 AND to_date >= $2`,
       [empId, startDate, endDate]
     );
     leaveRows.rows.forEach((l) => {
-      const cur = new Date(l.from_date);
-      const end = new Date(l.to_date);
+      const monthStartD = new Date(`${startDate}T00:00:00`);
+      const monthEndD   = new Date(`${endDate}T00:00:00`);
+      const leaveFrom   = new Date(l.from_date);
+      const leaveTo     = new Date(l.to_date);
+      const cur = leaveFrom < monthStartD ? monthStartD : leaveFrom;
+      const end = leaveTo   > monthEndD   ? monthEndD   : leaveTo;
       while (cur <= end) {
         const ds = cur.toISOString().slice(0, 10);
         dailyMap[ds] = "leave";
@@ -372,11 +445,26 @@ exports.getPayrollAttendance = async (req, res) => {
       }
     });
 
+    // ── Effective employment window within this month ─────────
+    // Bounded by the employee's join date (can't have "working days"
+    // before they joined) and by today (a future/current month can't
+    // have working days that haven't happened yet).
+    const today        = new Date();
+    today.setHours(0, 0, 0, 0);
+    const monthStartD  = new Date(`${startDate}T00:00:00`);
+    const monthEndD    = new Date(`${endDate}T00:00:00`);
+    const joinDateObj  = joinDate ? new Date(joinDate) : null;
+    const rangeStart   = joinDateObj && joinDateObj > monthStartD ? joinDateObj : monthStartD;
+    const rangeEnd     = today < monthEndD ? today : monthEndD;
+
     // ── Count working days (Mon–Sat, excluding public holidays) ─
+    // Counted over the SAME window used below to fill/count
+    // attendance, so "Working Days" always equals the sum of
+    // present + late + half day + leave + absent + wfh.
     let workingDays  = 0;
     let holidayCount = 0;
-    const cur  = new Date(`${startDate}T00:00:00`);
-    const endD = new Date(`${endDate}T00:00:00`);
+    const cur  = new Date(rangeStart);
+    const endD = rangeEnd;
 
     while (cur <= endD) {
       const ds  = cur.toISOString().slice(0, 10);
@@ -389,11 +477,33 @@ exports.getPayrollAttendance = async (req, res) => {
     // ── Leave balance for this month (no cross-year carry-forward) ─
     const leaveBalance = await calcLeaveBalance(empId, month);
 
+    // ── Fill in missing days as "Absent" ───────────────────────
+    // Mirrors the HR Attendance page: any working day with no punch
+    // record (and no approved leave) is treated as Absent, not
+    // silently skipped. Bounded by the same employment window above.
+    const fillCur = new Date(rangeStart);
+    fillCur.setHours(0, 0, 0, 0);
+    while (fillCur <= rangeEnd) {
+      const ds  = fillCur.toISOString().slice(0, 10);
+      const dow = fillCur.getDay();
+      if (!HOLIDAYS.has(ds) && dow !== 0 && !dailyMap[ds]) {
+        dailyMap[ds] = "absent";
+      }
+      fillCur.setDate(fillCur.getDate() + 1);
+    }
+
     // ── Count attendance statuses from dailyMap ───────────────
     const counts = { present: 0, late: 0, leave: 0, halfday: 0, absent: 0, wfh: 0 };
     Object.entries(dailyMap).forEach(([ds, s]) => {
-      // Only count days that are actual working days
-      const d   = new Date(ds);
+      // Only count days that are actual working days.
+      // IMPORTANT: parse with an explicit local-time component
+      // ("...T00:00:00"), NOT a bare date string. A bare "YYYY-MM-DD"
+      // string is parsed as UTC midnight per the JS spec, while every
+      // other date in this file is built/compared as LOCAL midnight —
+      // on a server whose timezone sits behind UTC that mismatch
+      // silently shifts every date back a day, turning Mondays into
+      // "Sunday" and dropping them from every bucket below.
+      const d   = new Date(`${ds}T00:00:00`);
       const dow = d.getDay();
       if (HOLIDAYS.has(ds) || dow === 0) return; // skip holidays & Sundays
 
@@ -406,21 +516,36 @@ exports.getPayrollAttendance = async (req, res) => {
     });
 
     // ── LOP CALCULATION ───────────────────────────────────────
-    // Both ABSENT and LEAVE days consume from leave balance.
-    // Any excess → Loss of Pay (salary deduction).
+    // Policy: ONLY "Absent" and "Unpaid Leave" (leave taken beyond the
+    // accrued CL/SL balance) reduce pay. Every other status — Present,
+    // Late, Half Day, WFH, and Leave that's covered by the accrued
+    // balance — is treated as a fully paid day, exactly like Present.
     //
-    //   leaveConsumed = absentDays + leaveDays + (halfDays × 0.5)
-    //   lopDays       = max(0, leaveConsumed − totalAccruedBalance)
-    //   lopDeduction  = (monthlySalary ÷ workingDays) × lopDays
+    // Half Day in particular is NOT docked or treated as 0.5 day of
+    // leave consumption; it's paid in full, same as a normal Present day.
+    //
+    // Absent days ALWAYS cause a pay deduction, regardless of leave
+    // balance — an unauthorized absence is never covered by CL/SL.
+    //
+    // Leave draws from the accrued CL/SL balance first; only the portion
+    // that exceeds the balance becomes Leave-Without-Pay and is deducted.
+    //
+    //   leaveConsumed  = leaveDays
+    //   lopFromLeave   = max(0, leaveConsumed − totalAccruedBalance)   [LWP]
+    //   lopFromAbsent  = absentDays                                    [always deducted]
+    //   lopDays        = lopFromLeave + lopFromAbsent
+    //   lopDeduction   = (monthlySalary ÷ workingDays) × lopDays
 
-    const leaveConsumed = parseFloat(
-      (counts.absent + counts.leave + counts.halfday * 0.5).toFixed(2)
-    );
+    const leaveConsumed = parseFloat(counts.leave.toFixed(2));
 
-    const lopDays = Math.max(
+    const lopFromLeave = Math.max(
       0,
       parseFloat((leaveConsumed - leaveBalance.totalAccruedBalance).toFixed(2))
     );
+
+    const lopFromAbsent = counts.absent;
+
+    const lopDays = parseFloat((lopFromAbsent + lopFromLeave).toFixed(2));
 
     const lopDeduction = workingDays > 0
       ? Math.round((monthlySalary / workingDays) * lopDays)
@@ -432,6 +557,8 @@ exports.getPayrollAttendance = async (req, res) => {
       workingDays,
       daysPayable,
       lop:          lopDays,
+      lopFromAbsent,
+      lopFromLeave,
       lopDeduction,
       lopPrevMonth: 0,
       holidayCount,

@@ -129,18 +129,16 @@ router.get("/project/all", async (req, res) => {
 router.get("/project/:project_id", async (req, res) => {
   try {
     const { project_id } = req.params;
-
     const result = await pool.query(
       `SELECT u.*, p.name AS project_name
        FROM pc_daily_updates u
        JOIN projects p ON u.project_id = p.id
        WHERE u.project_id = $1
+         AND u.date >= CURRENT_DATE - INTERVAL '7 days'
        ORDER BY u.date DESC`,
       [project_id]
     );
-
     res.json(result.rows);
-
   } catch (err) {
     console.error("FETCH ERROR:", err);
     res.status(500).json({ message: "Error fetching updates" });

@@ -5,6 +5,7 @@ const {
   getAttendanceByDate,
   getAllAttendance,
   getAttendanceByDateRange,
+  exportAttendanceByDateRange,
   updateAttendance,
   getTotalEmployees,
   getTodayAttendance,
@@ -19,6 +20,7 @@ router.get("/today/all",        getTodayAllEmployees);   // all employees + toda
 router.get("/today",            getTodayAttendance);     // single employee today check
 router.get("/date/:date",       getAttendanceByDate);
 router.get("/filter/date",      getAttendanceByDateRange);
+router.get("/export/range",     exportAttendanceByDateRange); // CEO "Download" CSV
 
 // ── General routes ────────────────────────────────────────────────────────────
 router.post("/",   markAttendance);

@@ -53,8 +53,9 @@ exports.getLeavesByEmployee = async (req, res) => {
 };
 
 /**
- * HR views leave requests (ONLY PENDING)
- * + Optional dynamic filter support
+ * HR views leave requests
+ * Returns ALL leaves by default (Pending, Approved, Rejected).
+ * Optional ?status=Pending / Approved / Rejected filters to just that status.
  */
 exports.getAllLeaves = async (req, res) => {
   const { status } = req.query; // optional
@@ -76,12 +77,12 @@ exports.getAllLeaves = async (req, res) => {
 
     let values = [];
 
-    // ✅ Default: show only Pending
+    // Only filter when a specific status was explicitly requested.
+    // No filter param = return everything, so the frontend can
+    // compute the Pending/Approved/Rejected stat-card counts itself.
     if (status) {
       query += ` WHERE leaves.status = $1`;
       values.push(status);
-    } else {
-      query += ` WHERE leaves.status = 'Pending'`;
     }
 
     query += ` ORDER BY leaves.created_at DESC`;

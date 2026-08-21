@@ -10,7 +10,11 @@ export const ArchitectMenu = [
     path: "/architect/incidents?page=tasks", 
     icon: "file-text" 
   },
-
+  {
+    name: "Drawings",
+    path: "/architect/shared/drawings", // ← fixed path
+    icon: "file-text",
+  },
   { 
     /* Routine site reporting */
     name: "Daily Logs", 
