@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../../styles/HRDashboard.css";
+import CheckInButton from "../../SharedResourse/CheckInButton";
 
 const API_URL = "http://localhost:5000/api";
 
@@ -264,218 +265,6 @@ function LoadingDashboard() {
         <div />
       </div>
     </main>
-  );
-}
-
-/* ==========================================================================
-   Check-in
-   ========================================================================== */
-
-function CheckInButton({ employeeId }) {
-  const [attendance, setAttendance] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [elapsed, setElapsed] = useState("");
-  const timerRef = useRef(null);
-
-  useEffect(() => {
-    if (!employeeId) {
-      setLoading(false);
-      return undefined;
-    }
-
-    fetchTodayAttendance();
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [employeeId]);
-
-  useEffect(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
-    if (!attendance?.check_in || attendance?.check_out) {
-      setElapsed("");
-      return undefined;
-    }
-
-    function updateElapsed() {
-      const [hours, minutes, seconds] = attendance.check_in
-        .split(":")
-        .map(Number);
-
-      const start = new Date();
-
-      start.setHours(hours, minutes, seconds || 0, 0);
-
-      const difference = Math.max(
-        0,
-        Date.now() - start.getTime()
-      );
-
-      const hh = String(
-        Math.floor(difference / 3600000)
-      ).padStart(2, "0");
-
-      const mm = String(
-        Math.floor((difference % 3600000) / 60000)
-      ).padStart(2, "0");
-
-      const ss = String(
-        Math.floor((difference % 60000) / 1000)
-      ).padStart(2, "0");
-
-      setElapsed(`${hh}:${mm}:${ss}`);
-    }
-
-    updateElapsed();
-
-    timerRef.current = setInterval(updateElapsed, 1000);
-
-    return () => clearInterval(timerRef.current);
-  }, [attendance]);
-
-  async function fetchTodayAttendance() {
-    try {
-      setLoading(true);
-
-      const response = await authAxios.get(
-        `${API_URL}/attendance/today`,
-        {
-          params: {
-            employee_id: employeeId,
-          },
-        }
-      );
-
-      setAttendance(response.data || null);
-    } catch (error) {
-      if (error.response?.status !== 404) {
-        console.error(
-          "Unable to fetch attendance:",
-          error
-        );
-      }
-
-      setAttendance(null);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleCheckIn() {
-    try {
-      setBusy(true);
-
-      const now = new Date();
-
-      const response = await authAxios.post(
-        `${API_URL}/attendance`,
-        {
-          employee_id: employeeId,
-          date: getTodayString(),
-          check_in: now.toTimeString().slice(0, 8),
-          shift: "Morning",
-        }
-      );
-
-      setAttendance(response.data);
-    } catch (error) {
-      console.error("Check-in failed:", error);
-      window.alert("Check-in failed. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleCheckOut() {
-    if (!attendance?.id) return;
-
-    try {
-      setBusy(true);
-
-      const now = new Date();
-
-      const response = await authAxios.put(
-        `${API_URL}/attendance/${attendance.id}`,
-        {
-          check_out: now.toTimeString().slice(0, 8),
-        }
-      );
-
-      setAttendance(response.data);
-    } catch (error) {
-      console.error("Check-out failed:", error);
-      window.alert("Check-out failed. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (loading) {
-    return (
-      <Button disabled variant="secondary">
-        Loading
-      </Button>
-    );
-  }
-
-  if (attendance?.check_in && attendance?.check_out) {
-    return (
-      <div className="hrd-attendance-status">
-        <span className="hrd-status-dot hrd-status-success" />
-
-        <div>
-          <strong>Completed</strong>
-
-          <small>
-            {formatTime(attendance.check_in)} –{" "}
-            {formatTime(attendance.check_out)}
-          </small>
-        </div>
-      </div>
-    );
-  }
-
-  if (attendance?.check_in && !attendance?.check_out) {
-    return (
-      <div className="hrd-checkin-group">
-        <div className="hrd-attendance-status">
-          <span className="hrd-status-dot hrd-status-warning" />
-
-          <div>
-            <strong>Working</strong>
-
-            <small>
-              In at {formatTime(attendance.check_in)}
-              {elapsed ? ` · ${elapsed}` : ""}
-            </small>
-          </div>
-        </div>
-
-        <Button
-          variant="danger"
-          onClick={handleCheckOut}
-          disabled={busy}
-        >
-          {busy ? "Saving..." : "Check out"}
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <Button
-      variant="primary"
-      onClick={handleCheckIn}
-      disabled={busy}
-    >
-      {busy ? "Saving..." : "Check in"}
-    </Button>
   );
 }
 
@@ -944,6 +733,12 @@ export default function HRDashboard() {
   const employeeId =
     user?.employee_id || user?.id || null;
 
+  // Used only by CheckInButton to decide whether to skip location
+  // capture for the CEO — falls back to role if designation isn't
+  // stored on the user object yet.
+  const designation =
+    user?.designation || user?.role || null;
+
   useEffect(() => {
     async function fetchDashboardData() {
       try {
@@ -1117,7 +912,10 @@ export default function HRDashboard() {
 
         <div className="hrd-header-actions">
           {employeeId && (
-            <CheckInButton employeeId={employeeId} />
+            <CheckInButton
+              employeeId={employeeId}
+              designation={designation}
+            />
           )}
 
           <Button

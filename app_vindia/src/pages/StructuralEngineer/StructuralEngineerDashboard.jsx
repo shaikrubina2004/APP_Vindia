@@ -17,6 +17,7 @@ import { Bar, Doughnut } from "react-chartjs-2";
 import { ErrorBoundary } from "../../utils/ErrorBoundary";
 import { QUERY_KEYS } from "../../api/structuralApi";
 import { useProject } from "../../context/ProjectContext";
+import CheckInButton from "../../SharedResourse/CheckInButton";
 import "./StructuralEngineerDashboard.css";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, ArcElement, Tooltip, Legend);
@@ -62,6 +63,10 @@ const StructuralEngineerDashboard = () => {
 const { activeProject: selectedProject } = useProject() || {};
 const projectId = selectedProject?.id || null;
 
+  // ── Current user, for the check-in button ──────────────────
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const employeeId = currentUser?.employee_id || currentUser?.id || null;
+  const designation = currentUser?.designation || currentUser?.role || null;
 
   // ── Dashboard stats — re-fetches when project changes ──────────────────
   const {
@@ -122,7 +127,12 @@ const projectId = selectedProject?.id || null;
 
   return (
     <div className="se-container">
-      <h1 className="se-title">Structural Engineer Dashboard</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <h1 className="se-title">Structural Engineer Dashboard</h1>
+        {employeeId && (
+          <CheckInButton employeeId={employeeId} designation={designation} />
+        )}
+      </div>
 
       {/* Project label */}
       {selectedProject && (
