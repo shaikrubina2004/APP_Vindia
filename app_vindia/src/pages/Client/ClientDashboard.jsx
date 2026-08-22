@@ -7,6 +7,7 @@ import {
   fmtDate,
   fmtINR,
 } from "../../hooks/Useclientapi.jsx";
+import CheckInButton from "../../SharedResourse/CheckInButton";
 import "../../styles/Client.css";
 
 // ── Shared pill ────────────────────────────────────────────────────────────
@@ -232,6 +233,18 @@ export default function ClientDashboard() {
   const { data: invoicesData } = useClientAPI("/client/invoices");
   const { data: incidentsData } = useClientAPI("/client/incidents");
 
+  // Used by the shared CheckInButton — decides whether to skip location
+  // capture for the CEO. Falls back to role if designation isn't stored yet.
+  const currentUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  })();
+  const employeeId = currentUser?.employee_id || currentUser?.id || null;
+  const designation = currentUser?.designation || currentUser?.role || null;
+
   if (loading) return <PageLoader />;
   if (error) return <PageError message={error} onRetry={refetch} />;
 
@@ -271,7 +284,18 @@ export default function ClientDashboard() {
             </span>
           </div>
         </div>
-        <ProgressRing pct={progress} />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          {employeeId && (
+            <CheckInButton employeeId={employeeId} designation={designation} />
+          )}
+          <ProgressRing pct={progress} />
+        </div>
       </header>
 
       {/* Stat cards */}

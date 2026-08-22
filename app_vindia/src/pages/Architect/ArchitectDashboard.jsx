@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import {
   ChevronLeft, ChevronRight, MoreVertical, Plus,
   Check, Droplet, Flag, Sparkles, Briefcase, AlertTriangle, ListChecks,
@@ -9,6 +8,7 @@ import { getArchitectProjects } from "../../services/architectprojectService";
 import { getDailyLog } from "../../services/architectDailyLogService";
 import { API } from "../../services/authService";
 import { getDrawings } from "../../services/architectDesignService";
+import CheckInButton from "../../SharedResourse/CheckInButton";
 import "./ArchitectDashboard.css";
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -63,156 +63,11 @@ function normaliseIncident(inc) {
   };
 }
 
-const fmtTime = (t) => {
-  if (!t) return "—";
-  const [h, m] = t.split(":");
-  const hh = parseInt(h, 10);
-  return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
-};
-
 // Days between now and a deadline (negative = overdue)
 const daysUntil = (date) => {
   if (!date) return null;
   const ms = date.setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0);
   return Math.round(ms / 86400000);
-};
-
-// ─── CHECK IN / OUT (lives inside the hero) ───────────────────────────────
-const CheckInButton = ({ employeeId }) => {
-  const [attendance, setAttendance] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [elapsed, setElapsed] = useState("");
-  const timerRef = useRef(null);
-
-  useEffect(() => {
-    fetchTodayAttendance();
-    return () => clearInterval(timerRef.current);
-  }, []);
-
-  useEffect(() => {
-    clearInterval(timerRef.current);
-    if (attendance?.check_in && !attendance?.check_out) {
-      const tick = () => {
-        const [h, m, s] = attendance.check_in.split(":").map(Number);
-        const inMs = (h * 3600 + m * 60 + s) * 1000;
-        const nowMs = new Date() - new Date().setHours(0, 0, 0, 0);
-        const diff = Math.max(0, nowMs - inMs);
-        const th = String(Math.floor(diff / 3600000)).padStart(2, "0");
-        const tm = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
-        const ts = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
-        setElapsed(`${th}:${tm}:${ts}`);
-      };
-      tick();
-      timerRef.current = setInterval(tick, 1000);
-    } else {
-      setElapsed("");
-    }
-  }, [attendance]);
-
-  const fetchTodayAttendance = async () => {
-    setLoading(true);
-    try {
-      const res = await axios.get(
-        `http://localhost:5000/api/attendance/today?employee_id=${employeeId}`
-      );
-      setAttendance(res.data || null);
-    } catch (err) {
-      if (err.response?.status !== 404) console.error(err);
-      setAttendance(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCheckIn = async () => {
-    setBusy(true);
-    try {
-      const now = new Date();
-      const timeStr = now.toTimeString().slice(0, 8);
-      const dateStr = now.toISOString().slice(0, 10);
-      const res = await axios.post("http://localhost:5000/api/attendance", {
-        employee_id: employeeId,
-        date: dateStr,
-        check_in: timeStr,
-        shift: "morning",
-      });
-      setAttendance(res.data);
-    } catch (err) {
-      console.error(err);
-      alert("Check-in failed. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleCheckOut = async () => {
-    if (!attendance?.id) return;
-    setBusy(true);
-    try {
-      const now = new Date();
-      const timeStr = now.toTimeString().slice(0, 8);
-      const res = await axios.put(
-        `http://localhost:5000/api/attendance/${attendance.id}`,
-        { check_out: timeStr }
-      );
-      setAttendance(res.data);
-      clearInterval(timerRef.current);
-    } catch (err) {
-      console.error(err);
-      alert("Check-out failed. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const isCheckedIn  = attendance?.check_in && !attendance?.check_out;
-  const isCheckedOut = attendance?.check_in && attendance?.check_out;
-
-  if (loading) {
-    return (
-      <div className="acd-search-pill">
-        <span className="acd-checkin-dot" />
-        <span className="acd-checkin-label">Loading…</span>
-      </div>
-    );
-  }
-
-  if (isCheckedOut) {
-    return (
-      <div className="acd-checkin-wrap">
-        <div className="acd-search-pill acd-search-pill-done">
-          <span className="acd-checkin-dot acd-checkin-dot-green" />
-          <span className="acd-checkin-label">Done for today</span>
-        </div>
-        <span className="acd-checkin-sub">
-          {fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}
-        </span>
-      </div>
-    );
-  }
-
-  if (isCheckedIn) {
-    return (
-      <div className="acd-checkin-wrap">
-        <button className="acd-search-pill acd-search-pill-btn acd-search-pill-out" onClick={handleCheckOut} disabled={busy}>
-          <span className="acd-checkin-dot acd-checkin-dot-pulse" />
-          <span className="acd-checkin-label">{busy ? "Saving…" : "Check out"}</span>
-        </button>
-        <span className="acd-checkin-sub">
-          In: {fmtTime(attendance.check_in)}
-          {elapsed && <> &nbsp;·&nbsp; <strong>{elapsed}</strong></>}
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <button className="acd-search-pill acd-search-pill-btn acd-search-pill-in" onClick={handleCheckIn} disabled={busy}>
-      <span className="acd-checkin-dot" />
-      <span className="acd-checkin-label">{busy ? "Saving…" : "Check in"}</span>
-    </button>
-  );
 };
 
 // ─── STAT CARD (top row) ───────────────────────────────────────────────────
@@ -344,6 +199,11 @@ export default function ArchitectDashboard() {
     catch { return {}; }
   });
 
+  // Used by the shared CheckInButton — decides whether to skip location
+  // capture for the CEO. Falls back to role if designation isn't stored yet.
+  const employeeId = user?.employee_id || user?.id || null;
+  const designation = user?.designation || user?.role || null;
+
   const [projects,  setProjects]  = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [myTasks,   setMyTasks]   = useState([]);
@@ -443,7 +303,9 @@ export default function ArchitectDashboard() {
             </div>
 
             <div className="acd-hero-right">
-              {user.id && <CheckInButton employeeId={user.id} />}
+              {employeeId && (
+                <CheckInButton employeeId={employeeId} designation={designation} />
+              )}
 
               <div className="acd-hero-buttons">
                 <button className="acd-btn-dark" onClick={() => navigate("/architect/incidents")}>
