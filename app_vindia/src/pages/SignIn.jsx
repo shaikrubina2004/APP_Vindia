@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { login as loginAPI } from "../services/authService";
 import { useAuth } from "../context/useAuth";
 import { getDashboardRoute } from "../utils/dashboardRouter";
@@ -17,6 +18,9 @@ function SignIn() {
 
   const [showForgot, setShowForgot] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+
+  // 👁 SHOW/HIDE PASSWORD
+  const [showPassword, setShowPassword] = useState(false);
 
   // ✅ HANDLE INPUT
   const handleChange = (e) => {
@@ -41,22 +45,21 @@ function SignIn() {
 
       // 🔥 NORMALIZE ROLE (VERY IMPORTANT)
       const userData = {
-  ...user,
-  role: user.role?.toLowerCase().replace(/\s+/g, "_"),
-};
+        ...user,
+        role: user.role?.toLowerCase().replace(/\s+/g, "_"),
+      };
 
-console.log("USER DATA:", userData);
+      console.log("USER DATA:", userData);
 
-localStorage.setItem("token", token);
-localStorage.setItem("user", JSON.stringify(userData));
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(userData));
 
-login(userData);
+      login(userData);
 
-const route = getDashboardRoute(userData.role);
-console.log("REDIRECT TO:", route);
+      const route = getDashboardRoute(userData.role);
+      console.log("REDIRECT TO:", route);
 
-navigate(route);
-
+      navigate(route);
     } catch (error) {
       console.error("LOGIN ERROR:", error);
       alert(error.response?.data?.message || "Invalid credentials");
@@ -66,11 +69,12 @@ navigate(route);
   return (
     <div className="login-bg">
       <div className="login-card">
-
         {/* LEFT PANEL */}
         <div className="login-left">
           <img src={logo} alt="Logo" className="login-logo" />
-          <p>
+
+          {/* 🔥 SAME TYPEWRITER ANIMATION AS SIGNUP PAGE */}
+          <p className="tagline">
             You Dream It. <span className="build-text">We Build It.</span>
           </p>
         </div>
@@ -87,13 +91,24 @@ navigate(route);
           />
 
           <label>Password</label>
-          <input
-            type="password"
-            name="password"
-            placeholder="Enter your Password"
-            value={formData.password}
-            onChange={handleChange}
-          />
+          <div className="password-wrapper">
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              placeholder="Enter your Password"
+              value={formData.password}
+              onChange={handleChange}
+            />
+            <span
+              className="toggle-eye"
+              onClick={() => setShowPassword((prev) => !prev)}
+              role="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              tabIndex={0}
+            >
+              {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+            </span>
+          </div>
 
           <div className="login-options">
             <span className="recover" onClick={() => setShowForgot(true)}>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { signup } from "../services/authService";
 import logo from "../assets/logo.png.png";
 import "./SignUp.css";
@@ -16,6 +17,10 @@ function SignUp() {
   });
 
   const [agree, setAgree] = useState(false);
+
+  // 👁 SHOW/HIDE PASSWORD (separate for each field)
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -68,19 +73,71 @@ function SignUp() {
           <h2>Create Account</h2>
 
           <label>First Name</label>
-          <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} />
+          <input
+            type="text"
+            name="firstName"
+            placeholder="Enter your First Name"
+            value={formData.firstName}
+            onChange={handleChange}
+          />
 
           <label>Last Name</label>
-          <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} />
+          <input
+            type="text"
+            name="lastName"
+            placeholder="Enter your Last Name"
+            value={formData.lastName}
+            onChange={handleChange}
+          />
 
           <label>Email</label>
-          <input type="email" name="email" value={formData.email} onChange={handleChange} />
+          <input
+            type="email"
+            name="email"
+            placeholder="Enter your Email"
+            value={formData.email}
+            onChange={handleChange}
+          />
 
           <label>Password</label>
-          <input type="password" name="password" value={formData.password} onChange={handleChange} />
+          <div className="password-wrapper">
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              placeholder="Enter your Password"
+              value={formData.password}
+              onChange={handleChange}
+            />
+            <span
+              className="toggle-eye"
+              onClick={() => setShowPassword((prev) => !prev)}
+              role="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              tabIndex={0}
+            >
+              {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+            </span>
+          </div>
 
           <label>Confirm Password</label>
-          <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} />
+          <div className="password-wrapper">
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              name="confirmPassword"
+              placeholder="Re-enter your Password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+            />
+            <span
+              className="toggle-eye"
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
+              role="button"
+              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              tabIndex={0}
+            >
+              {showConfirmPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+            </span>
+          </div>
 
           <label className="remember">
             <input type="checkbox" checked={agree} onChange={() => setAgree(!agree)} />
