@@ -111,9 +111,27 @@
   display: block;
 }
 
-.login-right input {
+/* ===========================
+   SHARED INPUT SIZING
+   Email input and the password
+   input (inside .password-wrapper)
+   MUST resolve to the exact same
+   box: same height, same
+   line-height, same vertical
+   padding, same box-sizing.
+   Previously the email input only
+   picked up the generic rule below
+   while the password input had a
+   second, more specific rule
+   re-declaring its own padding —
+   the two could drift out of sync.
+   Both are now driven by the same
+   values so they stay pixel-identical.
+=========================== */
+.login-right input,
+.password-wrapper input[type="password"],
+.password-wrapper input[type="text"] {
   width: 100% !important;
-  padding: 10px !important;
   margin: 8px 0 20px;
   border-radius: 4px !important;
   -webkit-appearance: none;
@@ -131,13 +149,13 @@
      was silently overriding this the moment the password field
      toggles to type="text". */
   font-size: 16px !important;
-  /* Lock every field (Email AND Password) to the exact same
-     height/line-height, also !important for the same reason —
-     the global stylesheet was forcing 6px top/bottom padding
-     on any type="text" field with !important, which we must
-     outrank here, not just out-specify. */
-  height: 48px !important;
-  line-height: 28px !important;
+  /* Single source of truth for the box size, shared by BOTH
+     fields. 44px keeps the boxes compact and identical. */
+  height: 44px !important;
+  line-height: 24px !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+  padding-left: 10px !important;
   box-sizing: border-box !important;
 }
 
@@ -153,36 +171,7 @@
    just needs room on the right for the icon
    so text never runs under it */
 .password-wrapper input {
-  width: 100% !important;
   padding-right: 42px !important;
-}
-
-/* Pin the corner radius directly for BOTH states (type="password"
-   and, after the eye toggle switches it, type="text"). On
-   Firefox/Linux the native GTK theme can render text-type inputs
-   as a full pill unless the radius is re-asserted here too. */
-.password-wrapper input[type="password"],
-.password-wrapper input[type="text"] {
-  padding-top: 10px !important;
-  padding-bottom: 10px !important;
-  padding-left: 10px !important;
-  border-radius: 4px !important;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  font-size: 16px !important;
-  /* Lock the box to a fixed height/line-height. Without this,
-     Firefox uses a taller line-height for the masked "dot" font
-     in type="password" than for normal text in type="text",
-     so the whole box would shrink the moment you toggle to show
-     the password — this keeps both states identical. All
-     !important because a global reset rule
-     (input[type="text"] { padding/font-size !important })
-     was silently overriding these the moment this field
-     switches to type="text". */
-  height: 48px !important;
-  line-height: 28px !important;
-  box-sizing: border-box !important;
 }
 
 /* 🔥 Hide the browser's own built-in "reveal password"
@@ -433,18 +422,18 @@
     display: none;         /* hide labels, placeholders are enough */
   }
 
-  /* Pill-shaped inputs like Image 2 */
-  .login-right input {
-    width: 100%;
+  /* Pill-shaped inputs like Image 2 — shared sizing rule above
+     still applies (height/line-height/padding), just recolored
+     and re-radiused for the mobile look. Both Email and Password
+     stay in sync automatically since they share one rule. */
+  .login-right input,
+  .password-wrapper input[type="password"],
+  .password-wrapper input[type="text"] {
     max-width: 320px;
-    padding: 16px;
+    padding-left: 16px !important;
     margin-bottom: 14px;
-    border-radius: 20px;
-    border: none;
+    border-radius: 20px !important;
     background: #e6f0f7;
-    /* 16px (not 14px) stops iOS/Chrome mobile from
-       auto-zooming the page in when the field is focused */
-    font-size: 16px;
     color: #001d39;
     box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
     transition: 0.25s;
@@ -469,7 +458,7 @@
 
   .password-wrapper input {
     max-width: 320px;
-    padding-right: 44px;
+    padding-right: 44px !important;
   }
 
   .toggle-eye {
