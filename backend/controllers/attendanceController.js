@@ -356,6 +356,88 @@ exports.updateAttendance = async (req, res) => {
   }
 };
 
+// ─── Add Location Ping (live tracking between check-in and check-out) ───────
+// Called every few minutes by the client while an employee is checked in.
+exports.addLocationPing = async (req, res) => {
+  const { id } = req.params; // attendance_id
+  const { lat, lng, recorded_at } = req.body;
+
+  if (lat == null || lng == null) {
+    return res.status(400).json({ error: "lat and lng are required" });
+  }
+
+  try {
+    const existing = await pool.query(
+      `SELECT a.id, a.check_out, a.employee_id, e.designation
+       FROM attendance a
+       LEFT JOIN employees e ON e.user_id = a.employee_id
+       WHERE a.id = $1`,
+      [id]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: "Attendance record not found" });
+    }
+
+    const row = existing.rows[0];
+
+    // Belt-and-braces server-side checks, independent of the client:
+    // don't record pings after checkout, and never for CEOs.
+    if (row.check_out) {
+      return res.status(409).json({ error: "Already checked out — tracking stopped" });
+    }
+    if (isCeoDesignation(row.designation)) {
+      return res.status(403).json({ error: "Location tracking is not captured for this role" });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO attendance_tracking (attendance_id, employee_id, lat, lng, recorded_at)
+       VALUES ($1, $2, $3, $4, COALESCE($5, NOW()))
+       RETURNING *`,
+      [id, row.employee_id, lat, lng, recorded_at || null]
+    );
+
+    return res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("addLocationPing error:", err.message);
+    return res.status(500).json({ error: "Failed to record location ping" });
+  }
+};
+
+// ─── Get Location Track for an Attendance Record ─────────────────────────────
+// Accepts ?viewer_designation=ceo — same client-declared-role pattern as
+// the rest of this file. Only the CEO gets raw lat/lng points; everyone
+// else just gets the ping count and time range.
+exports.getAttendanceTrack = async (req, res) => {
+  const { id } = req.params;
+  const isViewerCEO = isCeoDesignation(req.query.viewer_designation);
+
+  try {
+    const result = await pool.query(
+      `SELECT lat, lng, recorded_at
+       FROM attendance_tracking
+       WHERE attendance_id = $1
+       ORDER BY recorded_at ASC`,
+      [id]
+    );
+
+    const base = {
+      count: result.rows.length,
+      first_recorded_at: result.rows[0]?.recorded_at || null,
+      last_recorded_at: result.rows[result.rows.length - 1]?.recorded_at || null,
+    };
+
+    if (!isViewerCEO) {
+      return res.status(200).json({ ...base, points: [] });
+    }
+
+    return res.status(200).json({ ...base, points: result.rows });
+  } catch (err) {
+    console.error("getAttendanceTrack error:", err.message);
+    return res.status(500).json({ error: "Failed to fetch location track" });
+  }
+};
+
 // ─── Get Today's Attendance (for Check-In button) ────────────────────────────
 // employee_id param = users.id
 exports.getTodayAttendance = async (req, res) => {

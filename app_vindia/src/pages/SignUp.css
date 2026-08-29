@@ -101,15 +101,32 @@
 .signup-right input[type="text"],
 .signup-right input[type="email"],
 .signup-right input[type="password"] {
-  width: 100%;
-  padding: 7px;
+  width: 100% !important;
+  padding: 7px !important;
   margin: 4px 0 10px;
   border-radius: 4px !important;
   -webkit-appearance: none;
+  -moz-appearance: none;
   appearance: none;
   border: none;
   outline: none;
   color: #000;
+  /* 16px stops iOS/Chrome mobile from auto-zooming the whole
+     page in when a field gets focus (anything under 16px
+     triggers the zoom, which is what made the card look like
+     it was "changing shape"). !important because a global
+     reset rule (input[type="text"] { font-size: 12px !important })
+     was silently overriding this. */
+  font-size: 16px !important;
+  /* Lock every field to the exact same height/line-height so
+     none of them can drift out of alignment with each other,
+     regardless of which font/metrics the browser uses for a
+     given field. Also !important — the global stylesheet forces
+     6px top/bottom padding on any type="text" field with
+     !important, which we must outrank, not just out-specify. */
+  height: 36px !important;
+  line-height: 20px !important;
+  box-sizing: border-box !important;
 }
 
 /* ===========================
@@ -125,8 +142,31 @@
    the icon */
 .password-wrapper input[type="password"],
 .password-wrapper input[type="text"] {
-  width: 100%;
-  padding-right: 36px;
+  width: 100% !important;
+  padding-top: 7px !important;
+  padding-bottom: 7px !important;
+  padding-left: 7px !important;
+  padding-right: 36px !important;
+  /* Pin the corner radius directly for BOTH states. On
+     Firefox/Linux the native GTK theme can render text-type
+     inputs as a full pill unless the radius is re-asserted here. */
+  border-radius: 4px !important;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  font-size: 16px !important;
+  /* Lock the box to a fixed height/line-height. Without this,
+     Firefox uses a taller line-height for the masked "dot" font
+     in type="password" than for normal text in type="text", so
+     the box would shrink the moment you toggle to show the
+     password — this keeps both states identical. All !important
+     because a global reset rule
+     (input[type="text"] { padding/font-size !important }) was
+     silently overriding these the moment this field switches
+     to type="text". */
+  height: 36px !important;
+  line-height: 20px !important;
+  box-sizing: border-box !important;
 }
 
 /* Hide the browser's own built-in "reveal password"
@@ -135,6 +175,32 @@
 .password-wrapper input::-ms-reveal,
 .password-wrapper input::-ms-clear {
   display: none;
+}
+
+/* 🔥 Firefox (v103+) ships its own native password-reveal
+   eye button inside input[type="password"] fields. It sits
+   on top of our custom icon and draws its own rounded pill
+   background — this was the actual cause of the field looking
+   like it "changed shape" when toggling visibility. */
+.password-wrapper input::-moz-reveal {
+  display: none;
+}
+
+/* 🔥 Hide Chrome/Edge-Chromium's built-in password reveal
+   button and the autofill "key" / strong-password button.
+   These are what caused the field to visually "change shape"
+   when toggling between type="password" and type="text" —
+   only our custom eye icon should show now. */
+.password-wrapper input::-webkit-textfield-decoration-container {
+  visibility: hidden;
+}
+
+.password-wrapper input::-webkit-credentials-auto-fill-button,
+.password-wrapper input::-webkit-strong-password-auto-fill-button {
+  visibility: hidden;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
 }
 
 .toggle-eye {
@@ -309,7 +375,9 @@
     border-radius: 20px;
     border: none;
     background: #e6f0f7;
-    font-size: 14px;
+    /* 16px (not 14px) stops iOS/Chrome mobile from
+       auto-zooming the page in when the field is focused */
+    font-size: 16px;
     color: #001d39;
     box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
     transition: 0.25s;

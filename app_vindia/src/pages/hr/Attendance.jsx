@@ -1,6 +1,7 @@
 import { API } from "../../services/authService";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import "./Attendance.css";
+import TrackPathModal from "./TrackPathModal";
 
 const STATUS_LABEL = {
   present: "Present",
@@ -429,6 +430,9 @@ function AttendanceManagement() {
   const [historyMap, setHistoryMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState([]);
+
+  // Which attendance record's movement trail is currently open
+  const [trackModal, setTrackModal] = useState(null); // { attendanceId, employeeName } | null
 
   // Whoever is viewing THIS page (HR / CEO / etc) — used only to decide
   // whether raw check-in/check-out coordinates should be requested and
@@ -1662,6 +1666,37 @@ function AttendanceManagement() {
                             </a>
                           )}
                       </div>
+
+                      {/* Movement trail between check-in and
+                          check-out, CEO only, real records only (skip
+                          synthesized "absent-…" rows, which have no
+                          backing attendance row to query). */}
+                      {isCEOViewer &&
+                        record.hasRecord !== false &&
+                        !String(record.id).startsWith("absent-") && (
+                          <button
+                            type="button"
+                            className="am-map-icon"
+                            style={{
+                              border: "none",
+                              background: "transparent",
+                              cursor: "pointer",
+                              fontSize: 11,
+                              color: "#2563eb",
+                              padding: 0,
+                              marginTop: 2,
+                              textAlign: "left",
+                            }}
+                            onClick={() =>
+                              setTrackModal({
+                                attendanceId: record.id,
+                                employeeName: record.name,
+                              })
+                            }
+                          >
+                            View Path →
+                          </button>
+                        )}
                     </div>
                   </td>
                 </tr>
@@ -1756,6 +1791,15 @@ function AttendanceManagement() {
             ›
           </button>
         </div>
+      )}
+
+      {/* Movement trail modal, rendered once, controlled by trackModal state */}
+      {trackModal && (
+        <TrackPathModal
+          attendanceId={trackModal.attendanceId}
+          employeeName={trackModal.employeeName}
+          onClose={() => setTrackModal(null)}
+        />
       )}
     </div>
   );

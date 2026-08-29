@@ -10,6 +10,8 @@ const {
   getTotalEmployees,
   getTodayAttendance,
   getTodayAllEmployees,
+  addLocationPing,
+  getAttendanceTrack,
 } = require("../controllers/attendanceController");
 
 const router = express.Router();
@@ -21,6 +23,10 @@ router.get("/today",            getTodayAttendance);     // single employee toda
 router.get("/date/:date",       getAttendanceByDate);
 router.get("/filter/date",      getAttendanceByDateRange);
 router.get("/export/range",     exportAttendanceByDateRange); // CEO "Download" CSV
+
+// ── Live location tracking (between check-in and check-out) ─────────────────
+router.post("/:id/track", addLocationPing);   // client pings every few minutes
+router.get("/:id/track",  getAttendanceTrack); // CEO views the trail
 
 // ── General routes ────────────────────────────────────────────────────────────
 router.post("/",   markAttendance);

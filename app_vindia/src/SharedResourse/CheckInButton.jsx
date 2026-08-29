@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { isCEO } from "../utils/geolocation";
+import { isCEO, getCurrentLocation } from "../utils/geolocation";
 import LocationConfirmModal from "./LocationConfirmModal";
-// This file lives at src/SharedResourse/CheckInButton.jsx — one level
-// under src/ — so "../utils/geolocation" reaches src/utils/geolocation.js,
-// and "./LocationConfirmModal" is a sibling file in the same folder.
 
 const API = "http://localhost:5000/api";
+
+// How often to ping location once checked in. 3 min is a reasonable
+// balance between tracking granularity, battery usage, and API load —
+// tune to taste.
+const TRACK_INTERVAL_MS = 3 * 60 * 1000;
 
 const fmtTime = (t) => {
   if (!t) return "—";
@@ -15,35 +17,23 @@ const fmtTime = (t) => {
   return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
 };
 
-/* ══════════════════════════════════════════════════════════
-   SHARED CHECK-IN / CHECK-OUT BUTTON
-   Used by every dashboard (BDA, Project Coordinator, HR, etc).
-
-   Location flow now mirrors PagarBook: clicking Check In / Check Out
-   opens a confirm modal with a map + editable address (see
-   LocationConfirmModal.jsx). The employee can drag the pin or search
-   for their real address before hitting Submit — nothing is saved to
-   the backend until they confirm. CEOs skip this entirely: no modal,
-   no prompt, no location captured at all.
-
-   Props:
-     employeeId  — users.id of the logged-in employee (required)
-     designation — employee's designation, used only to decide
-                   whether to skip location capture for the CEO
-══════════════════════════════════════════════════════════ */
 const CheckInButton = ({ employeeId, designation }) => {
   const [attendance, setAttendance] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [busy, setBusy]             = useState(false);
   const [elapsed, setElapsed]       = useState("");
-  const [modalAction, setModalAction] = useState(null); // "checkin" | "checkout" | null
+  const [modalAction, setModalAction] = useState(null);
   const timerRef = useRef(null);
+  const trackingRef = useRef(null); // setInterval id for live tracking
 
   const skipLocation = isCEO(designation);
 
   useEffect(() => {
     fetchTodayAttendance();
-    return () => clearInterval(timerRef.current);
+    return () => {
+      clearInterval(timerRef.current);
+      stopTracking();
+    };
   }, []);
 
   useEffect(() => {
@@ -61,9 +51,15 @@ const CheckInButton = ({ employeeId, designation }) => {
       };
       tick();
       timerRef.current = setInterval(tick, 1000);
+
+      // Resume live tracking if we land here already checked in
+      // (e.g. after a page refresh) and it isn't running yet.
+      if (!skipLocation) startTracking(attendance.id);
     } else {
       setElapsed("");
+      stopTracking();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attendance]);
 
   const fetchTodayAttendance = async () => {
@@ -81,7 +77,38 @@ const CheckInButton = ({ employeeId, designation }) => {
     }
   };
 
-  // ── Actually saves a check-in, given confirmed (or null) location ──
+  // ── Live tracking: fire one ping now, then on an interval, until
+  //    stopTracking() is called at check-out / unmount. ──
+  const sendLocationPing = async (attendanceId) => {
+    const loc = await getCurrentLocation();
+    if (!loc) return; // permission denied / no fix this cycle — just skip it
+    try {
+      await axios.post(`${API}/attendance/${attendanceId}/track`, {
+        lat: loc.lat,
+        lng: loc.lng,
+        recorded_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error("Location ping failed", err);
+    }
+  };
+
+  const startTracking = (attendanceId) => {
+    if (skipLocation || trackingRef.current || !attendanceId) return;
+    sendLocationPing(attendanceId);
+    trackingRef.current = setInterval(
+      () => sendLocationPing(attendanceId),
+      TRACK_INTERVAL_MS
+    );
+  };
+
+  const stopTracking = () => {
+    if (trackingRef.current) {
+      clearInterval(trackingRef.current);
+      trackingRef.current = null;
+    }
+  };
+
   const performCheckIn = async (lat, lng, address) => {
     setBusy(true);
     try {
@@ -105,6 +132,7 @@ const CheckInButton = ({ employeeId, designation }) => {
         check_in_address: address,
       });
       setAttendance(res.data);
+      startTracking(res.data.id);
     } catch (err) {
       console.error(err);
       alert("Check-in failed. Please try again.");
@@ -114,7 +142,6 @@ const CheckInButton = ({ employeeId, designation }) => {
     }
   };
 
-  // ── Actually saves a check-out, given confirmed (or null) location ──
   const performCheckOut = async (lat, lng, address) => {
     if (!attendance?.id) return;
     setBusy(true);
@@ -129,6 +156,7 @@ const CheckInButton = ({ employeeId, designation }) => {
       });
       setAttendance(res.data);
       clearInterval(timerRef.current);
+      stopTracking();
     } catch (err) {
       console.error(err);
       alert("Check-out failed. Please try again.");
@@ -138,7 +166,6 @@ const CheckInButton = ({ employeeId, designation }) => {
     }
   };
 
-  // ── Button click handlers — CEO skips the modal entirely ──
   const triggerCheckIn = () => {
     if (skipLocation) {
       performCheckIn(null, null, null);
