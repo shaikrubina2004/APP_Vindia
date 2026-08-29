@@ -1675,27 +1675,28 @@ function AttendanceManagement() {
                         record.hasRecord !== false &&
                         !String(record.id).startsWith("absent-") && (
                           <button
-                            type="button"
-                            className="am-map-icon"
-                            style={{
-                              border: "none",
-                              background: "transparent",
-                              cursor: "pointer",
-                              fontSize: 11,
-                              color: "#2563eb",
-                              padding: 0,
-                              marginTop: 2,
-                              textAlign: "left",
-                            }}
-                            onClick={() =>
-                              setTrackModal({
-                                attendanceId: record.id,
-                                employeeName: record.name,
-                              })
-                            }
-                          >
-                            View Path →
-                          </button>
+                          type="button"
+                          className="am-map-icon"
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            cursor: "pointer",
+                            fontSize: 11,
+                            color: "#2563eb",
+                            padding: 0,
+                            marginTop: 2,
+                            textAlign: "left",
+                            whiteSpace: "nowrap", // ★ keeps "View Path →" on one line
+                          }}
+                          onClick={() =>
+                            setTrackModal({
+                              attendanceId: record.id,
+                              employeeName: record.name,
+                            })
+                          }
+                        >
+                          View Path →
+                        </button>
                         )}
                     </div>
                   </td>
