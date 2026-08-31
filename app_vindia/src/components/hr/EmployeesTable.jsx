@@ -35,6 +35,7 @@ function EmployeesTable({ employees, search }) {
         <thead>
           <tr>
             <th>ID</th>
+            <th>Emp Code</th>
             <th>Name</th>
             <th>Email</th>
             <th>Department</th>
@@ -65,6 +66,10 @@ function EmployeesTable({ employees, search }) {
             return (
               <tr key={formatted.id}>
                 <td>{formatted.id}</td>
+
+                <td style={{ fontFamily: "monospace", fontSize: 12, color: "#64748b" }}>
+                  {formatted.employee_code || "—"}
+                </td>
 
                 <td>
                   {formatted.name}
@@ -106,4 +111,4 @@ function EmployeesTable({ employees, search }) {
   );
 }
 
-export default EmployeesTable; 
+export default EmployeesTable;

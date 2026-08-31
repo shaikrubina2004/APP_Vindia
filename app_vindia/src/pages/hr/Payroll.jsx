@@ -1,376 +1,769 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  Search,
+  Calendar,
+  Sparkles,
+  CheckCircle2,
+  AlertTriangle,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Pencil,
+  Wallet,
+  ArrowRight,
+  X,
+  User,
+  TrendingUp,
+  BarChart3,
+} from "lucide-react";
 import "./Payroll.css";
 
-function Payroll() {
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const token = () => localStorage.getItem("token");
+const hdrs = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${token()}`,
+});
 
-  const [empId, setEmpId] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("");
+const fmt = (v) => {
+  if (v === "NA" || v == null) return "—";
+  const n = Number(v);
+  return isNaN(n) ? String(v) : n.toLocaleString("en-IN");
+};
 
-  const [employee, setEmployee] = useState({
-    name: "", id: "", dept: "", designation: "",
-    pan: "", band: "", level: "", location: "",
-    bankName: "", bankAccNo: "", pfNo: "",
-    workingDays: 0, daysPayable: 0, lop: 0, lopPrevMonth: 0
+const monthLabel = (m) => {
+  if (!m) return "—";
+  const [y, mo] = m.split("-");
+  return new Date(y, mo - 1, 1).toLocaleString("default", {
+    month: "long",
+    year: "numeric",
   });
+};
 
-  const [calendar, setCalendar] = useState([]);
+const dateLabel = (d) => {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return String(d).slice(0, 10);
+  return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
 
-  const holidays2026 = [
-    "2026-01-01","2026-01-26","2026-01-15","2026-03-19",
-    "2026-04-15","2026-05-01","2026-08-26","2026-09-14",
-    "2026-10-20","2026-12-25",
-  ];
+let toastId = 0;
 
-  const [stats, setStats] = useState({
-    present: 0, late: 0, leave: 0, holiday: 0, halfday: 0
-  });
-
-  const [salary, setSalary] = useState({
-    basicPay: 0, hra: 0, specialAllowance: 0, lta: 0,
-    domesticOnsiteAll: 0, exgratiaBonus: 0, shiftAllowance: 0,
-    variablePay: 0, medicalInsurance: 0,
-    pf: 0, profTax: 0, incomeTax: 0,
-    latePenalty: 0, leaveDeduction: 0,
-    annualCTC: 0
-  });
-
-  /* EMPLOYEE DATABASE */
-  const employees = {
-    EMP001: {
-      name: "John Doe", dept: "HR", designation: "Unit Mgr - Specialization",
-      pan: "BINPS9852C", band: "Band 4", level: "Level 6",
-      location: "BANGALORE", bankName: "HDFC", bankAccNo: "50100026287171",
-      pfNo: "PYBOM00165730000096306", workingDays: 31, daysPayable: 31, lop: 0, lopPrevMonth: 0,
-      attendance: { present: 14, late: 5, leave: 3, halfday: 3, holiday: 6 },
-      salary: {
-        basicPay: 16197, hra: 8099, specialAllowance: 1944, lta: 0,
-        domesticOnsiteAll: 1200, exgratiaBonus: 10800, shiftAllowance: 800,
-        variablePay: 2000, medicalInsurance: 960,
-        pf: 4800, profTax: 200, incomeTax: 15877,
-        latePenalty: 200, leaveDeduction: 1000,
-        annualCTC: 480000
-      }
-    },
-    EMP002: {
-      name: "Jane Smith", dept: "Finance", designation: "Accountant",
-      pan: "ABCDE1234F", band: "Band 3", level: "Level 5",
-      location: "MUMBAI", bankName: "SBI", bankAccNo: "32145678901",
-      pfNo: "PYMUM00987650000012345", workingDays: 30, daysPayable: 29, lop: 1, lopPrevMonth: 0,
-      attendance: { present: 18, late: 2, leave: 1, halfday: 2, holiday: 7 },
-      salary: {
-        basicPay: 11200, hra: 5600, specialAllowance: 1344, lta: 0,
-        domesticOnsiteAll: 0, exgratiaBonus: 7560, shiftAllowance: 0,
-        variablePay: 1500, medicalInsurance: 960,
-        pf: 3200, profTax: 200, incomeTax: 9800,
-        latePenalty: 150, leaveDeduction: 800,
-        annualCTC: 336000
-      }
-    },
-    EMP003: {
-      name: "Alex Brown", dept: "IT", designation: "Developer",
-      pan: "FGHIJ5678K", band: "Band 5", level: "Level 7",
-      location: "HYDERABAD", bankName: "ICICI", bankAccNo: "012345678901",
-      pfNo: "PYHYD00112340000078901", workingDays: 31, daysPayable: 31, lop: 0, lopPrevMonth: 0,
-      attendance: { present: 20, late: 3, leave: 2, halfday: 1, holiday: 5 },
-      salary: {
-        basicPay: 23333, hra: 11667, specialAllowance: 2800, lta: 0,
-        domesticOnsiteAll: 2000, exgratiaBonus: 15750, shiftAllowance: 1200,
-        variablePay: 3000, medicalInsurance: 960,
-        pf: 4200, profTax: 200, incomeTax: 22500,
-        latePenalty: 100, leaveDeduction: 500,
-        annualCTC: 700000
-      }
-    }
-  };
-
-  const searchEmployee = () => {
-    if (!employees[empId]) { alert("Employee not found"); return; }
-    if (!selectedMonth) { alert("Please select a month"); return; }
-    const [year, month] = selectedMonth.split("-");
-    const firstDay = new Date(year, month - 1, 1);
-    const lastDay = new Date(year, month, 0);
-    const emp = employees[empId];
-    setEmployee({ id: empId, ...emp });
-    setSalary(emp.salary);
-    generateMiniCalendar(emp.attendance, firstDay, lastDay);
-  };
-
-  const generateMiniCalendar = (attendanceData, start, end) => {
-    let days = [];
-    let statusPool = [];
-    Object.keys(attendanceData).forEach((status) => {
-      if (status !== "holiday") {
-        for (let i = 0; i < attendanceData[status]; i++) statusPool.push(status);
-      }
-    });
-    let startWeekDay = start.getDay();
-    startWeekDay = startWeekDay === 0 ? 6 : startWeekDay - 1;
-    for (let i = 0; i < startWeekDay; i++) days.push({ label: "", status: "empty" });
-    let index = 0, holidayCount = 0;
-    let current = new Date(start);
-    while (current <= end) {
-      const y = current.getFullYear();
-      const m = String(current.getMonth() + 1).padStart(2, '0');
-      const d = String(current.getDate()).padStart(2, '0');
-      const dateStr = `${y}-${m}-${d}`;
-      let status;
-      if (holidays2026.includes(dateStr)) { status = "holiday"; holidayCount++; }
-      else { status = statusPool[index] || "present"; index++; }
-      days.push({ label: current.getDate(), status });
-      current.setDate(current.getDate() + 1);
-    }
-    setCalendar(days);
-    let newStats = { present: 0, late: 0, leave: 0, halfday: 0, holiday: holidayCount };
-    days.forEach(day => {
-      if (day.status !== "empty" && day.status !== "holiday") newStats[day.status]++;
-    });
-    setStats(newStats);
-  };
-
-  const approvePayment = () => alert("Payslip Approved & Sent to Employee");
-
-  /* SALARY CALCULATIONS */
-  const totalEarnings =
-    salary.basicPay + salary.hra + salary.specialAllowance +
-    (salary.lta || 0) + salary.domesticOnsiteAll +
-    salary.exgratiaBonus + salary.shiftAllowance + salary.variablePay;
-
-  const totalDeductions =
-    salary.pf + salary.profTax + salary.incomeTax +
-    salary.latePenalty + salary.leaveDeduction;
-
-  const netSalary = totalEarnings - totalDeductions + (salary.medicalInsurance || 0) - (salary.medicalInsurance || 0);
-  const netPay = totalEarnings - totalDeductions;
-
-  /* ANNUAL SALARY STRUCTURE */
-  const annualCTC = salary.annualCTC || 0;
-  const salaryStructure = annualCTC > 0 ? [
-    { label: "Basic", monthly: salary.basicPay, annual: salary.basicPay * 12, pct: "40%" },
-    { label: "House Rent Allowance", monthly: salary.hra, annual: salary.hra * 12, pct: "20%" },
-    { label: "Leave Travel Allowance", monthly: "NA", annual: "NA", pct: "" },
-    { label: "Special Allowance", monthly: salary.specialAllowance, annual: salary.specialAllowance * 12, pct: "5%" },
-    { label: "Ex-Gratia Bonus", monthly: salary.exgratiaBonus, annual: salary.exgratiaBonus * 12, pct: "27%" },
-  ] : [];
-
-  const targetFixedCash = salary.basicPay + salary.hra + salary.specialAllowance + salary.exgratiaBonus;
-  const targetCashComp = targetFixedCash + salary.variablePay;
-  const targetCTC = targetCashComp + salary.medicalInsurance;
-
-  const fmt = (v) => typeof v === 'number' ? v.toLocaleString('en-IN') : v;
-
+/* ─── small reusable boxed field ─── */
+function Field({ label, value, muted }) {
   return (
-    <div className="hr-page-wrapper">
-      <div className="container">
-
-        <div className="header">
-          <h1>Payroll</h1>
-        </div>
-
-        {/* SEARCH SECTION */}
-        <div className="search-section">
-          <div className="search-grid">
-            <input type="text" placeholder="Employee ID (EMP001)" value={empId} onChange={(e) => setEmpId(e.target.value)} />
-            <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} />
-            <button onClick={searchEmployee}>Search Employee</button>
-          </div>
-        </div>
-
-        <div className="dashboard">
-
-          {/* LEFT CARD */}
-          <div className="card">
-
-            <h2>Employee Details</h2>
-            <div className="employee-card">
-              <div className="emp-grid-2col">
-                <div>
-                  <div className="emp-row"><span className="emp-label">Name</span><span>{employee.name || "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">Employee No</span><span>{employee.id || "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">Designation</span><span>{employee.designation || "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">Band</span><span>{employee.band || "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">Level</span><span>{employee.level || "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">Location</span><span>{employee.location || "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">Bank Name</span><span>{employee.bankName || "—"}</span></div>
-                </div>
-                <div>
-                  <div className="emp-row"><span className="emp-label">PAN</span><span>{employee.pan || "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">Working Days</span><span>{employee.workingDays || "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">Days Payable</span><span>{employee.daysPayable || "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">PF No.</span><span className="pf-no">{employee.pfNo || "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">LOP</span><span>{employee.lop ?? "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">LOP Prev Month</span><span>{employee.lopPrevMonth ?? "—"}</span></div>
-                  <div className="emp-row"><span className="emp-label">Bank Acc No</span><span>{employee.bankAccNo || "—"}</span></div>
-                </div>
-              </div>
-            </div>
-
-            <h3 className="section-title">Attendance</h3>
-            <div className="attendance-stats">
-              <div className="stat-card present"><span>Present</span><strong>{stats.present}</strong></div>
-              <div className="stat-card late"><span>Late</span><strong>{stats.late}</strong></div>
-              <div className="stat-card halfday"><span>Half Days</span><strong>{stats.halfday}</strong></div>
-              <div className="stat-card leave"><span>Leaves</span><strong>{stats.leave}</strong></div>
-              <div className="stat-card holiday"><span>Holidays</span><strong>{stats.holiday}</strong></div>
-            </div>
-
-            {calendar.length > 0 && (
-              <>
-                <h3 className="section-title">Calendar</h3>
-                <div className="calendar">
-                  <div className="calendar-grid">
-                    {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day,i) => (
-                      <div key={i} className="calendar-header">{day}</div>
-                    ))}
-                    {calendar.map((day,index) => (
-                      <div key={index} className={`calendar-day ${day.status}`}>
-                        {day.status !== "empty" ? day.label : ""}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* RIGHT CARD */}
-          <div className="card">
-
-            <h2>Salary Breakdown</h2>
-
-            {/* PAYSLIP HEADER TABLE */}
-            <div className="payslip-title">Pay Slip for {selectedMonth ? new Date(selectedMonth + "-01").toLocaleString('default',{month:'long',year:'numeric'}) : "—"}</div>
-
-            {/* EARNINGS & DEDUCTIONS SIDE BY SIDE */}
-            <div className="earnings-deductions-grid">
-
-              <div className="ed-section">
-                <div className="ed-header">Earnings</div>
-                <div className="ed-table">
-                  {[
-                    ["Basic Pay", salary.basicPay],
-                    ["House Rent Allowance", salary.hra],
-                    ["Special Allowance", salary.specialAllowance],
-                    ["Leave Travel Allowance", salary.lta || "NA"],
-                    ["Domestic Onsite All", salary.domesticOnsiteAll],
-                    ["EXGRATIA/BONUS", salary.exgratiaBonus],
-                    ["Shift Allowance", salary.shiftAllowance],
-                    ["Variable Pay", salary.variablePay],
-                  ].map(([label, val], i) => (
-                    <div className="ed-row" key={i}>
-                      <span>{label}</span>
-                      <span className="ed-amt">{val === "NA" ? "NA" : val ? `₹${fmt(val)}` : "—"}</span>
-                    </div>
-                  ))}
-                  <div className="ed-row ed-total">
-                    <strong>Total Earnings</strong>
-                    <strong className="amount">₹{fmt(totalEarnings)}</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="ed-section">
-                <div className="ed-header">Deductions</div>
-                <div className="ed-table">
-                  {[
-                    ["Provident Fund", salary.pf],
-                    ["Prof Tax", salary.profTax],
-                    ["Income Tax", salary.incomeTax],
-                    ["Late Penalty", salary.latePenalty],
-                    ["Leave Deduction", salary.leaveDeduction],
-                  ].map(([label, val], i) => (
-                    <div className="ed-row" key={i}>
-                      <span>{label}</span>
-                      <span className="ed-amt deduction-amt">{val ? `₹${fmt(val)}` : "—"}</span>
-                    </div>
-                  ))}
-                  <div className="ed-row ed-total">
-                    <strong>Total Deductions</strong>
-                    <strong className="amount deduction">₹{fmt(totalDeductions)}</strong>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            {/* NET SALARY */}
-            <div className="net-salary-bar">
-              <span>Net Salary</span>
-              <span className="net-amount">₹{fmt(netPay)}</span>
-            </div>
-
-            {/* ANNUAL CTC STRUCTURE */}
-            {annualCTC > 0 && (
-              <>
-                <h3 className="section-title" style={{marginTop:'18px'}}>Annual CTC Structure</h3>
-                <div className="ctc-table-wrap">
-                  <table className="ctc-table">
-                    <thead>
-                      <tr>
-                        <th>Salary</th>
-                        <th colSpan={3} className="ctc-main-val">₹{fmt(annualCTC)}</th>
-                      </tr>
-                      <tr className="ctc-subhead">
-                        <th></th>
-                        <th>1 Month</th>
-                        <th>12 Months</th>
-                        <th>%</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {salaryStructure.map(({ label, monthly, annual, pct }, i) => (
-                        <tr key={i}>
-                          <td>{label}</td>
-                          <td>{monthly === "NA" ? "NA" : monthly ? fmt(monthly) : "—"}</td>
-                          <td>{annual === "NA" ? "NA" : annual ? fmt(annual) : "—"}</td>
-                          <td>{pct}</td>
-                        </tr>
-                      ))}
-                      <tr className="ctc-subtotal">
-                        <td><strong>TOTAL FIXED CASH</strong></td>
-                        <td><strong>{fmt(targetFixedCash)}</strong></td>
-                        <td><strong>{fmt(targetFixedCash * 12)}</strong></td>
-                        <td><strong>93%</strong></td>
-                      </tr>
-                      <tr>
-                        <td>Variable Pay</td>
-                        <td>{fmt(salary.variablePay)}</td>
-                        <td>{fmt(salary.variablePay * 12)}</td>
-                        <td>5%</td>
-                      </tr>
-                      <tr className="ctc-subtotal">
-                        <td><strong>TARGET CASH COMPENSATION</strong></td>
-                        <td><strong>{fmt(targetCashComp)}</strong></td>
-                        <td><strong>{fmt(targetCashComp * 12)}</strong></td>
-                        <td><strong>98%</strong></td>
-                      </tr>
-                      <tr>
-                        <td>Medical Insurance Premium</td>
-                        <td>{fmt(salary.medicalInsurance)}</td>
-                        <td>{fmt(salary.medicalInsurance * 12)}</td>
-                        <td>2%</td>
-                      </tr>
-                      <tr className="ctc-total-row">
-                        <td><strong>TARGET COST TO COMPANY</strong></td>
-                        <td><strong>{fmt(targetCTC)}</strong></td>
-                        <td><strong>{fmt(annualCTC)}</strong></td>
-                        <td><strong>100%</strong></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-
-            <button onClick={approvePayment} className="approve-btn" style={{marginTop:'16px'}}>
-              Approve & Send Payslip
-            </button>
-
-          </div>
-
-        </div>
-      </div>
+    <div className="pr-field">
+      <span className="pr-field-label">{label}</span>
+      <span className={`pr-field-value${muted ? " pr-field-value--muted" : ""}`}>
+        {value || "—"}
+      </span>
     </div>
   );
 }
 
-export default Payroll;
+function SalaryPanel({
+  emp,
+  sal,
+  att,
+  month,
+  monthLabel,
+  adjustedNet,
+  fmt,
+  onApprove,
+  lopDays,
+  lopDeduction,
+  disabled,
+  onSaveDetails,
+  savingDetails,
+}) {
+  const [editing, setEditing] = useState(false);
+  const [band, setBand] = useState("");
+  const [level, setLevel] = useState("");
+  const [pfNo, setPfNo] = useState("");
+
+  useEffect(() => {
+    if (editing) {
+      setBand(emp.band && emp.band !== "—" ? emp.band : "");
+      setLevel(emp.level && emp.level !== "—" ? emp.level : "");
+      setPfNo(emp.pfNo && emp.pfNo !== "—" ? emp.pfNo : "");
+    }
+  }, [editing, emp.band, emp.level, emp.pfNo]);
+
+  const workingDays = att.workingDays ?? 0;
+  const daysPayable = att.daysPayable ?? workingDays;
+  const totalDeductionsAll = (sal.totalDeductions || 0) + (lopDeduction || 0);
+
+  return (
+    <div className="payslip-doc">
+      <div className="pr-section-header">
+        <div className="pr-section-header-left">
+          <TrendingUp size={16} />
+          <h2>Salary</h2>
+        </div>
+        <button type="button" className="pr-edit-link" onClick={() => setEditing((v) => !v)}>
+          {editing ? <X size={13} /> : <Pencil size={13} />}
+          {editing ? "Close" : "Edit details"}
+        </button>
+      </div>
+
+      {editing && (
+        <div className="pr-edit-panel">
+          <div className="pr-edit-field">
+            <label htmlFor="ps-band">Band</label>
+            <input id="ps-band" value={band} onChange={(e) => setBand(e.target.value)} placeholder="e.g. Band 4" />
+          </div>
+          <div className="pr-edit-field">
+            <label htmlFor="ps-level">Level</label>
+            <input id="ps-level" value={level} onChange={(e) => setLevel(e.target.value)} placeholder="e.g. Level 6" />
+          </div>
+          <div className="pr-edit-field pr-edit-field--wide">
+            <label htmlFor="ps-pfno">PF No.</label>
+            <input
+              id="ps-pfno"
+              value={pfNo}
+              onChange={(e) => setPfNo(e.target.value)}
+              placeholder="e.g. PYBOM00165730000096306"
+            />
+          </div>
+          <button
+            type="button"
+            className="pr-edit-save"
+            disabled={savingDetails}
+            onClick={() => onSaveDetails({ band, level, pf_no: pfNo }).then(() => setEditing(false))}
+          >
+            {savingDetails ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      )}
+
+      <div className="pr-banner pr-banner--month">{monthLabel(month)}</div>
+
+      <div className="pr-banner pr-banner--earn">Earnings</div>
+      <div className="pr-row-list">
+        <div className="pr-row">
+          <span>Basic</span>
+          <span className="pr-row-amt">{fmt(sal.basic)}</span>
+        </div>
+        <div className="pr-row">
+          <span>HRA</span>
+          <span className="pr-row-amt">{fmt(sal.hra)}</span>
+        </div>
+        <div className="pr-row">
+          <span>Special Allowance</span>
+          <span className="pr-row-amt">{fmt(sal.specialAllow)}</span>
+        </div>
+        <div className="pr-row">
+          <span>Variable Pay</span>
+          <span className="pr-row-amt">{fmt(sal.exGratia)}</span>
+        </div>
+        <div className="pr-row pr-row--total">
+          <span>Gross Pay</span>
+          <span className="pr-row-amt">₹{fmt(sal.totalEarnings)}</span>
+        </div>
+      </div>
+
+      <div className="pr-banner pr-banner--ded">Deductions</div>
+      <div className="pr-row-list">
+        <div className="pr-row">
+          <span>PF</span>
+          <span className="pr-row-amt">{fmt(sal.pf)}</span>
+        </div>
+        <div className="pr-row">
+          <span>Professional Tax</span>
+          <span className="pr-row-amt">{fmt(sal.profTax)}</span>
+        </div>
+        <div className="pr-row">
+          <span>Income Tax</span>
+          <span className="pr-row-amt">{fmt(sal.incomeTax)}</span>
+        </div>
+        {lopDays > 0 && (
+          <div className="pr-row">
+            <span>Loss of Pay</span>
+            <span className="pr-row-amt">{fmt(lopDeduction)}</span>
+          </div>
+        )}
+        <div className="pr-row pr-row--total">
+          <span>Total Deductions</span>
+          <span className="pr-row-amt">₹{fmt(totalDeductionsAll)}</span>
+        </div>
+      </div>
+
+      <div className="payslip-net-row">
+        <span>
+          Net salary payable · {daysPayable}/{workingDays} days paid
+          {lopDays > 0 ? ` · −${lopDays} LOP` : ""}
+        </span>
+        <strong>₹{fmt(adjustedNet)}</strong>
+      </div>
+
+      <button className="pr-approve-btn" onClick={onApprove} disabled={disabled}>
+        Approve &amp; Send Payslip
+        <ArrowRight size={16} />
+      </button>
+    </div>
+  );
+}
+
+export default function Payroll() {
+  const [query, setQuery] = useState("");
+  const [month, setMonth] = useState("");
+  const [empList, setEmpList] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSugg, setShowSugg] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [empData, setEmpData] = useState(null);
+  const [attData, setAttData] = useState(null);
+  const [attFetchFailed, setAttFetchFailed] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const pickingRef = useRef(false);
+
+  const pushToast = useCallback((message, kind = "success") => {
+    const id = ++toastId;
+    setToasts((t) => [...t, { id, message, kind }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API}/api/payroll/employees`, { headers: hdrs() })
+      .then((r) => r.json())
+      .then((d) => setEmpList(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, []);
+
+  const computeSuggestions = useCallback(
+    (q) => {
+      if (!q || q.length < 2) {
+        setSuggestions([]);
+        return;
+      }
+      const lower = q.toLowerCase();
+      setSuggestions(
+        empList
+          .filter(
+            (e) =>
+              e.name?.toLowerCase().includes(lower) ||
+              e.employee_code?.toLowerCase().includes(lower)
+          )
+          .slice(0, 8)
+      );
+    },
+    [empList]
+  );
+
+  useEffect(() => {
+    computeSuggestions(query);
+    setActiveIdx(-1);
+  }, [query, computeSuggestions]);
+
+  const pickEmployee = (emp) => {
+    pickingRef.current = true;
+    setQuery(emp.employee_code || String(emp.id));
+    setSuggestions([]);
+    setShowSugg(false);
+    setActiveIdx(-1);
+    setTimeout(() => {
+      pickingRef.current = false;
+    }, 300);
+  };
+
+  const handleInputBlur = () => {
+    setTimeout(() => {
+      if (!pickingRef.current) setShowSugg(false);
+    }, 200);
+  };
+
+  const handleInputKeyDown = (e) => {
+    if (!showSugg || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIdx((i) => (i + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIdx((i) => (i - 1 + suggestions.length) % suggestions.length);
+    } else if (e.key === "Enter") {
+      if (activeIdx >= 0) {
+        e.preventDefault();
+        pickEmployee(suggestions[activeIdx]);
+      }
+    } else if (e.key === "Escape") {
+      setShowSugg(false);
+      setActiveIdx(-1);
+    }
+  };
+
+  const generate = useCallback(async () => {
+    const id = query.trim();
+    if (!id) {
+      setError("Please enter an employee name or code");
+      return;
+    }
+    if (!month) {
+      setError("Please select a month");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+    setEmpData(null);
+    setAttData(null);
+    setAttFetchFailed(false);
+
+    try {
+      const [eRes, aRes] = await Promise.all([
+        fetch(`${API}/api/payroll/employee/${encodeURIComponent(id)}`, { headers: hdrs() }),
+        fetch(`${API}/api/payroll/attendance/${encodeURIComponent(id)}?month=${month}`, {
+          headers: hdrs(),
+        }),
+      ]);
+
+      const eJson = await eRes.json();
+      if (!eRes.ok) {
+        setError(eJson.message || "Employee not found");
+        setLoading(false);
+        return;
+      }
+
+      setEmpData(eJson);
+
+      if (!aRes.ok) {
+        setAttFetchFailed(true);
+        setAttData({
+          workingDays: 26,
+          counts: {},
+          dailyMap: {},
+          holidayCount: 0,
+          lopFromAbsent: 0,
+          lopFromLeave: 0,
+          leaveBalance: null,
+        });
+      } else {
+        const aJson = await aRes.json();
+        setAttData(aJson);
+      }
+    } catch {
+      setError("Network error — is the backend running?");
+    } finally {
+      setLoading(false);
+    }
+  }, [query, month]);
+
+  const emp = empData?.employee || {};
+  const sal = empData?.salary || {};
+  const att = attData || {};
+  const workingDays = att.workingDays || 26;
+  const daysPayable = att.daysPayable ?? workingDays;
+  const counts = att.counts || {};
+  const totalPresent = (counts.present || 0) + (counts.wfh || 0);
+  const totalLeave = counts.leave || 0;
+  const totalAbsent = counts.absent || 0;
+  const totalLate = counts.late || 0;
+  const totalHalf = counts.halfday || 0;
+  const lopDays = att.lop || 0;
+  const lopFromAbsent = att.lopFromAbsent || 0;
+  const lopFromLeave = att.lopFromLeave || 0;
+  const lopDeduction = att.lopDeduction || 0;
+  const holidayCount = att.holidayCount || 0;
+  const leaveBal = att.leaveBalance || {};
+  const leavesTakenYTD = (leaveBal.usedCL || 0) + (leaveBal.usedSL || 0);
+  const leaveBalanceRemaining = leaveBal.totalBalance ?? 0;
+  const adjustedNet = Math.max(0, (sal.netSalary || 0) - lopDeduction);
+  const hasData = Boolean(empData);
+  const bankLine = [emp.bankName, emp.ifsc].filter((v) => v && v !== "—").join(" · ") || "—";
+
+  const status = !hasData
+    ? { label: "Awaiting details", tone: "pending" }
+    : attFetchFailed
+    ? { label: "Needs review", tone: "review" }
+    : lopDays > 0
+    ? { label: "Adjusted for LOP", tone: "adjusted" }
+    : { label: "Ready to approve", tone: "ready" };
+
+  const handleSaveDetails = useCallback(
+    async ({ band, level, pf_no }) => {
+      if (!emp.id && !emp.employee_code) return;
+      const idForUrl = emp.employee_code || emp.id;
+      setSavingDetails(true);
+      try {
+        const res = await fetch(
+          `${API}/api/payroll/employee/${encodeURIComponent(idForUrl)}/payslip-details`,
+          {
+            method: "PATCH",
+            headers: hdrs(),
+            body: JSON.stringify({
+              band: band?.trim() || null,
+              level: level?.trim() || null,
+              pf_no: pf_no?.trim() || null,
+            }),
+          }
+        );
+        if (!res.ok) throw new Error("Save failed");
+        const updated = await res.json();
+        setEmpData((prev) =>
+          prev
+            ? {
+                ...prev,
+                employee: {
+                  ...prev.employee,
+                  band: updated.band || "—",
+                  level: updated.level || "—",
+                  pfNo: updated.pf_no || "—",
+                },
+              }
+            : prev
+        );
+        pushToast("Payslip details saved", "success");
+      } catch {
+        pushToast("Could not save payslip details — please try again", "error");
+      } finally {
+        setSavingDetails(false);
+      }
+    },
+    [emp.id, emp.employee_code, pushToast]
+  );
+
+  const handleApproveConfirmed = async () => {
+    setApproving(true);
+    try {
+      const idForUrl = emp.employee_code || emp.id;
+      const totalDeductionsAll = (sal.totalDeductions || 0) + (lopDeduction || 0);
+
+      const payload = {
+        monthLabel: monthLabel(month),
+        employee: {
+          name: emp.name,
+          employeeCode: emp.employee_code,
+          pan: emp.pan,
+          workingDays,
+          designation: emp.designation,
+          daysPayable,
+          band: emp.band,
+          pfNo: emp.pfNo,
+          level: emp.level,
+          lopDays,
+          location: emp.location,
+          lopPrevMonth: 0,
+          bankName: bankLine,
+          bankAccNo: emp.bankAccNo,
+        },
+        earnings: [
+          { label: "Basic", amount: sal.basic },
+          { label: "HRA", amount: sal.hra },
+          { label: "Special Allowance", amount: sal.specialAllow },
+          { label: "Variable Pay", amount: sal.exGratia },
+        ],
+        deductions: [
+          { label: "PF", amount: sal.pf },
+          { label: "Professional Tax", amount: sal.profTax },
+          { label: "Income Tax", amount: sal.incomeTax },
+          ...(lopDays > 0 ? [{ label: "Loss of Pay", amount: lopDeduction }] : []),
+        ],
+        totalEarnings: sal.totalEarnings,
+        totalDeductions: totalDeductionsAll,
+        netPay: adjustedNet,
+      };
+
+      const res = await fetch(
+        `${API}/api/payroll/employee/${encodeURIComponent(idForUrl)}/payslip-pdf`,
+        {
+          method: "POST",
+          headers: hdrs(),
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) throw new Error("Failed to generate payslip");
+
+      // Download the generated PDF
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Payslip-${(emp.name || "employee").replace(/[^a-z0-9]+/gi, "_")}-${monthLabel(month).replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      pushToast(`Payslip for ${emp.name} approved and sent`, "success");
+    } catch {
+      pushToast("Could not send payslip — please try again", "error");
+    } finally {
+      setApproving(false);
+      setConfirmOpen(false);
+    }
+  };
+
+  const stats = [
+    ["Present", totalPresent, false],
+    ["Late", totalLate, false],
+    ["Half Day", totalHalf, false],
+    ["Leave", totalLeave, false],
+    ["Absent", totalAbsent, false],
+    ["Working Days", workingDays, true],
+  ];
+
+  return (
+    <div className="pr-wrapper">
+      <div className="pr-container">
+        <div className="pr-page-header">
+          <h1>Payroll</h1>
+          <p>Review and approve employee payslips</p>
+        </div>
+
+        <div className="pr-search-card">
+          <div className="pr-search-row">
+            <div className="pr-input-wrap pr-input-wrap--search">
+              <Search size={16} className="pr-input-icon" />
+              <input
+                className="pr-input"
+                type="text"
+                placeholder="Search employee by name or code"
+                value={query}
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={showSugg && suggestions.length > 0}
+                aria-autocomplete="list"
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setShowSugg(true);
+                }}
+                onFocus={() => setShowSugg(true)}
+                onBlur={handleInputBlur}
+                onKeyDown={handleInputKeyDown}
+              />
+              {showSugg && query.length >= 2 && (
+                <ul className="pr-suggestions pr-suggestions--floating" role="listbox">
+                  {suggestions.length > 0 ? (
+                    suggestions.map((e, i) => (
+                      <li
+                        key={e.id}
+                        role="option"
+                        aria-selected={i === activeIdx}
+                        className={i === activeIdx ? "is-active" : ""}
+                        onMouseDown={(ev) => {
+                          ev.preventDefault();
+                          pickEmployee(e);
+                        }}
+                        onMouseEnter={() => setActiveIdx(i)}
+                      >
+                        <span className="sugg-code">{e.employee_code}</span>
+                        <span className="sugg-name">{e.name}</span>
+                        <span className="sugg-dept">{e.department}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="sugg-empty">No employees match "{query}"</li>
+                  )}
+                </ul>
+              )}
+            </div>
+
+            <div className="pr-input-wrap">
+              <Calendar size={16} className="pr-input-icon" />
+              <input
+                className="pr-input"
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+              />
+            </div>
+
+            <button className="pr-btn" onClick={generate} disabled={loading}>
+              {loading ? <Loader2 size={16} className="pr-spinner" /> : <Sparkles size={16} />}
+              {loading ? "Generating…" : "Generate"}
+            </button>
+          </div>
+
+          {error && (
+            <div className="pr-error">
+              <AlertTriangle size={15} /> {error}
+            </div>
+          )}
+
+          {hasData && attFetchFailed && (
+            <div className="pr-fetch-error-banner">
+              <AlertTriangle size={15} />
+              <span>Attendance could not be loaded. Showing fallback payroll values.</span>
+            </div>
+          )}
+        </div>
+
+        {/*
+          Layout is always rendered — before Generate is clicked (or while
+          a request is in flight) emp/sal/att are empty objects, so Field
+          / fmt() naturally fall back to "—" / ₹0 placeholders. Once real
+          data arrives, the same DOM re-fills with values.
+        */}
+        <div className="pr-dashboard">
+          <div className="pr-card">
+            <div className="pr-section-header">
+              <div className="pr-section-header-left">
+                <User size={16} />
+                <h2>Employee</h2>
+              </div>
+            </div>
+
+            <div className="pr-field-grid">
+              <Field label="Name" value={emp.name} />
+              <Field label="Location" value={emp.location} />
+              <Field label="Employee No" value={emp.employee_code} />
+              <Field label="Department" value={emp.department} />
+              <Field label="Designation" value={emp.designation} />
+              <Field label="Bank" value={bankLine} />
+              <Field label="IFSC" value={emp.ifsc} />
+              <Field label="Bank A/C No." value={emp.bankAccNo} />
+              <Field label="PAN" value={emp.pan} />
+              <Field label="Monthly Salary" value={hasData ? `₹${fmt(sal.totalEarnings)}` : null} />
+              <Field label="Band / Level" value={hasData ? `${emp.band || "—"} / ${emp.level || "—"}` : null} />
+              <Field label="PF No." value={emp.pfNo} />
+            </div>
+
+            <div className="pr-section-header pr-section-header--sub">
+              <div className="pr-section-header-left">
+                <BarChart3 size={14} />
+                <h2>Attendance Summary</h2>
+              </div>
+            </div>
+
+            <div className="pr-stat-grid">
+              {stats.map(([label, count, highlight]) => (
+                <div className={`pr-stat${highlight ? " pr-stat--highlight" : ""}`} key={label}>
+                  <span className="pr-stat-count">{hasData ? count : "—"}</span>
+                  <span className="pr-stat-label">{label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="pr-field-grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", marginTop: 10 }}>
+              <div className="pr-field">
+                <span className="pr-field-label">Net Pay Status</span>
+                <span className={`pr-field-value pr-status-text pr-status-text--${status.tone}`}>
+                  {hasData ? status.label : "—"}
+                </span>
+              </div>
+              <div className="pr-field">
+                <span className="pr-field-label">LOP Days</span>
+                <span className="pr-field-value">{hasData ? lopDays : "—"}</span>
+              </div>
+              <div className="pr-field">
+                <span className="pr-field-label">LOP Deduction</span>
+                <span className="pr-field-value">{hasData ? `₹${fmt(lopDeduction)}` : "—"}</span>
+              </div>
+            </div>
+
+            <button className="pr-more-btn" onClick={() => setMoreOpen((v) => !v)}>
+              {moreOpen ? "Hide details" : "More details"}
+              {moreOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+
+            {moreOpen && (
+              <div className="pr-more-panel">
+                <div className="pr-more-row">
+                  <span>Holidays this month</span>
+                  <strong>{holidayCount}</strong>
+                </div>
+                <div className="pr-more-row">
+                  <span>Leave balance remaining</span>
+                  <strong>{fmt(leaveBalanceRemaining)} days</strong>
+                </div>
+                <div className="pr-more-row">
+                  <span>Leaves taken this year</span>
+                  <strong>{leavesTakenYTD}</strong>
+                </div>
+                <div className="pr-more-row">
+                  <span>Casual Leave</span>
+                  <strong>{fmt(leaveBal.usedCL || 0)} / {fmt(leaveBal.accruedCL || 0)}</strong>
+                </div>
+                <div className="pr-more-row">
+                  <span>Sick Leave</span>
+                  <strong>{fmt(leaveBal.usedSL || 0)} / {fmt(leaveBal.accruedSL || 0)}</strong>
+                </div>
+
+                {(leaveBal.approvedLeaves || []).length > 0 && (
+                  <div className="pr-more-row pr-more-row--stack">
+                    <span>Approved Leaves (This Year)</span>
+                    <div className="pr-leave-list">
+                      {leaveBal.approvedLeaves.map((lv, i) => (
+                        <div className="pr-leave-list-row" key={i}>
+                          <span>
+                            {lv.type} — {dateLabel(lv.from_date)}
+                            {lv.from_date !== lv.to_date ? ` to ${dateLabel(lv.to_date)}` : ""}
+                          </span>
+                          <strong>{lv.days}d</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="pr-card pr-card--right">
+            <SalaryPanel
+              emp={emp}
+              sal={sal}
+              att={att}
+              month={month}
+              monthLabel={monthLabel}
+              adjustedNet={adjustedNet}
+              fmt={fmt}
+              onApprove={() => setConfirmOpen(true)}
+              lopDays={lopDays}
+              lopDeduction={lopDeduction}
+              disabled={!hasData}
+              onSaveDetails={handleSaveDetails}
+              savingDetails={savingDetails}
+            />
+          </div>
+        </div>
+      </div>
+
+      {confirmOpen && (
+        <div
+          className="pr-modal-backdrop"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !approving) setConfirmOpen(false);
+          }}
+        >
+          <div className="pr-modal" role="dialog" aria-modal="true" aria-labelledby="pr-modal-title">
+            <div className="pr-modal-icon">
+              <Wallet size={20} />
+            </div>
+            <h3 id="pr-modal-title">Approve payslip?</h3>
+            <p>
+              This sends the {monthLabel(month)} payslip to <strong>{emp.name}</strong> for ₹{fmt(adjustedNet)} net pay.
+            </p>
+            <div className="pr-modal-actions">
+              <button className="pr-modal-btn" onClick={() => setConfirmOpen(false)} disabled={approving}>
+                Cancel
+              </button>
+              <button
+                className="pr-modal-btn pr-modal-btn--primary"
+                onClick={handleApproveConfirmed}
+                disabled={approving}
+              >
+                {approving ? "Sending…" : "Approve & Send"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="pr-toast-layer">
+        {toasts.map((t) => (
+          <div key={t.id} className={`pr-toast pr-toast--${t.kind}`}>
+            <CheckCircle2 size={16} />
+            {t.message}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

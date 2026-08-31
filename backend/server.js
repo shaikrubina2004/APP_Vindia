@@ -31,6 +31,7 @@ const attendanceRoutes = require("./routes/attendanceRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const rolesRoutes = require("./routes/rolesRoutes");
 const travelExpenseRoutes = require("./routes/travelExpenseRoutes");
+const payrollRoutes = require("./routes/payrollRoutes");
 
 const projectRoutes = require("./routes/projectRoutes");
 const wbsRoutes = require("./routes/wbsRoutes");
@@ -93,6 +94,11 @@ const pmReportRoutes = require("./routes/pmReportRoutes");
 const metaRoutes = require("./routes/metaRoutes");
 const bdaNotifRoutes = require("./routes/bdaNotificationRoutes");
 
+/* ✅ Finance Manager */
+const financeRoutes = require("./routes/financeRoutes");
+const financeDailyUpdateRoutes = require("./routes/financeDailyUpdateRoutes");
+
+const { errorHandler } = require("./middleware/errorHandler");
 /* ═════════ APP SETUP ═════════ */
 
 const app = express();
@@ -124,6 +130,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/roles", rolesRoutes);
 app.use("/api/travel-expenses", travelExpenseRoutes);
+app.use("/api/payroll", payrollRoutes);
 
 app.use("/api/projects", projectRoutes);
 app.use("/api/wbs", wbsRoutes);
@@ -184,19 +191,12 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/pm-reports", pmReportRoutes);
 app.use("/api/meta", metaRoutes);
 app.use("/api/bda-notifications", bdaNotifRoutes);
-
+/* ✅ Finance Manager */
+app.use("/api/finance", financeRoutes);
+app.use("/api/finance-daily-updates", financeDailyUpdateRoutes);
 /* ═════════ ERROR HANDLING ═════════ */
 
-app.use((_req, res) =>
-  res.status(404).json({ success: false, message: "Route not found" })
-);
-
-app.use((err, _req, res, _next) => {
-  res.status(500).json({
-    success: false,
-    message: err.message || "Internal server error",
-  });
-});
+app.use(errorHandler);
 
 /* ═════════ START ═════════ */
 

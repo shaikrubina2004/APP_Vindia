@@ -9,16 +9,62 @@ const { notifyNewLead, notifyFollowUp } = require("./bdaNotificationsController"
 ══════════════════════════════════════ */
 exports.getDashboardSummary = async (req, res) => {
   try {
-    const [total, todayNew, converted, interested, todayFU, pendingFU, todayConverted] = await Promise.all([
-      pool.query("SELECT COUNT(*) FROM leads WHERE deleted_by_admin = false"),
-      pool.query("SELECT COUNT(*) FROM leads WHERE DATE(created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AND deleted_by_admin = false"),
-      pool.query("SELECT COUNT(*) FROM leads WHERE LOWER(status) = 'converted' AND deleted_by_admin = false"),
-      pool.query("SELECT COUNT(*) FROM leads WHERE LOWER(status) = 'interested' AND deleted_by_admin = false"),
-      pool.query("SELECT COUNT(*) FROM followups WHERE DATE(next_followup) = CURRENT_DATE"),
-      pool.query("SELECT COUNT(*) FROM followups WHERE DATE(next_followup) < CURRENT_DATE"),
-      // ✅ NEW: count leads converted today using converted_at in IST
+    const { role, name } = req.query;
+    const isBda = role === "bda";
+
+    // Base clause + params, reused across all queries
+    const leadFilter = isBda
+      ? "AND (assigned_to = $1 OR assigned_to IS NULL) AND status != 'JUNK_REQUESTED'"
+      : "";
+    const leadVals = isBda ? [name] : [];
+
+    const [total, todayNew, converted, interested, todayConverted] = await Promise.all([
       pool.query(
-        "SELECT COUNT(*) FROM leads WHERE converted_at IS NOT NULL AND DATE(converted_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AND deleted_by_admin = false"
+        `SELECT COUNT(*) FROM leads WHERE deleted_by_admin = false ${leadFilter}`,
+        leadVals
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM leads
+         WHERE DATE(created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+           AND deleted_by_admin = false ${leadFilter}`,
+        leadVals
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM leads
+         WHERE LOWER(status) = 'converted' AND deleted_by_admin = false ${leadFilter}`,
+        leadVals
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM leads
+         WHERE LOWER(status) = 'interested' AND deleted_by_admin = false ${leadFilter}`,
+        leadVals
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM leads
+         WHERE converted_at IS NOT NULL
+           AND DATE(converted_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+           AND deleted_by_admin = false ${leadFilter}`,
+        leadVals
+      ),
+    ]);
+
+    // Follow-ups: join to leads so we can apply the same assigned_to filter
+    const fuFilter = isBda ? "AND (l.assigned_to = $1 OR l.assigned_to IS NULL)" : "";
+
+    const [todayFU, pendingFU] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) FROM followups f
+         JOIN leads l ON f.lead_id = l.id
+         WHERE DATE(f.next_followup) = CURRENT_DATE
+           AND l.deleted_by_admin = false ${fuFilter}`,
+        leadVals
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM followups f
+         JOIN leads l ON f.lead_id = l.id
+         WHERE DATE(f.next_followup) < CURRENT_DATE
+           AND l.deleted_by_admin = false ${fuFilter}`,
+        leadVals
       ),
     ]);
 
@@ -29,7 +75,7 @@ exports.getDashboardSummary = async (req, res) => {
       interested:       parseInt(interested.rows[0].count),
       todayFollowUps:   parseInt(todayFU.rows[0].count),
       pendingFollowUps: parseInt(pendingFU.rows[0].count),
-      todayConverted:   parseInt(todayConverted.rows[0].count), // ✅ NEW field
+      todayConverted:   parseInt(todayConverted.rows[0].count),
     });
   } catch (err) {
     console.error("Dashboard summary error:", err.message);
@@ -42,13 +88,17 @@ exports.getDashboardSummary = async (req, res) => {
 ══════════════════════════════════════ */
 exports.getAllLeads = async (req, res) => {
   try {
-    const { role, email } = req.query;
+    const { role, name } = req.query;
     let sql = "SELECT * FROM leads WHERE deleted_by_admin = false";
-    if (role === "bda1" || role === "bda2") {
-      sql += ` AND (assigned_to = '${email}' OR assigned_to IS NULL) AND status != 'JUNK_REQUESTED'`;
+    const vals = [];
+
+    if (role === "bda") {
+      vals.push(name);
+      sql += ` AND (assigned_to = $${vals.length} OR assigned_to IS NULL) AND status != 'JUNK_REQUESTED'`;
     }
+
     sql += " ORDER BY created_at DESC";
-    const { rows } = await pool.query(sql);
+    const { rows } = await pool.query(sql, vals);
     res.json({ leads: rows });
   } catch (err) {
     console.error("Get leads error:", err.message);
@@ -187,6 +237,12 @@ exports.updateLead = async (req, res) => {
 
 /* ══════════════════════════════════════
    ADD FOLLOW UP
+   ✅ Notification is only ever sent to the
+      lead's actually-assigned BDA. If the
+      lead has no assigned_to, or the name
+      doesn't match any user, no notification
+      is sent — it no longer silently falls
+      back to broadcasting to every BDA.
 ══════════════════════════════════════ */
 exports.addFollowUp = async (req, res) => {
   const { leadId } = req.params;
@@ -232,7 +288,9 @@ exports.addFollowUp = async (req, res) => {
         "SELECT name, phone, assigned_to FROM leads WHERE id = $1",
         [leadId]
       );
-      if (rows.length) {
+
+      // Only attempt to notify if the lead actually has someone assigned
+      if (rows.length && rows[0].assigned_to) {
         const userRes = await pool.query(
           `SELECT email FROM users
            WHERE REGEXP_REPLACE(LOWER(TRIM(name)), '\\s+', ' ', 'g') =
@@ -242,14 +300,20 @@ exports.addFollowUp = async (req, res) => {
         );
         const assignedEmail = userRes.rows[0]?.email || null;
 
-        notifyFollowUp({
-          leadId,
-          name:        rows[0].name,
-          phone:       rows[0].phone,
-          nextFollowUp,
-          assignedTo:  assignedEmail,
-        }).catch(err => console.error("Notify followup error:", err.message));
+        // Only send if we found a real matching user — never fall back to broadcast
+        if (assignedEmail) {
+          notifyFollowUp({
+            leadId,
+            name:        rows[0].name,
+            phone:       rows[0].phone,
+            nextFollowUp,
+            assignedTo:  assignedEmail,
+          }).catch(err => console.error("Notify followup error:", err.message));
+        } else {
+          console.warn(`No matching user found for assigned_to="${rows[0].assigned_to}" on lead ${leadId} — follow-up notification skipped`);
+        }
       }
+      // If the lead has no assigned_to at all, we intentionally skip notifying anyone.
     }
 
     res.json({ success: true });
@@ -476,13 +540,19 @@ exports.permanentDeleteLead = async (req, res) => {
 ══════════════════════════════════════ */
 exports.getTodaysFollowUps = async (req, res) => {
   try {
+    const { role, name } = req.query;
+    const isBda  = role === "bda";
+    const filter = isBda ? "AND (l.assigned_to = $1 OR l.assigned_to IS NULL)" : "";
+    const vals   = isBda ? [name] : [];
+
     const { rows } = await pool.query(
       `SELECT f.*, l.name, l.phone, l.city, l.status, l.source, l.assigned_to
        FROM followups f
        JOIN leads l ON f.lead_id = l.id
        WHERE DATE(f.next_followup) = CURRENT_DATE
-         AND l.deleted_by_admin = false
-       ORDER BY f.created_at DESC`
+         AND l.deleted_by_admin = false ${filter}
+       ORDER BY f.created_at DESC`,
+      vals
     );
     res.json({ todayFollowUps: rows });
   } catch (err) {
@@ -496,13 +566,19 @@ exports.getTodaysFollowUps = async (req, res) => {
 ══════════════════════════════════════ */
 exports.getPendingFollowUps = async (req, res) => {
   try {
+    const { role, name } = req.query;
+    const isBda  = role === "bda";
+    const filter = isBda ? "AND (l.assigned_to = $1 OR l.assigned_to IS NULL)" : "";
+    const vals   = isBda ? [name] : [];
+
     const { rows } = await pool.query(
       `SELECT f.*, l.name, l.phone, l.city, l.status, l.source, l.assigned_to
        FROM followups f
        JOIN leads l ON f.lead_id = l.id
        WHERE DATE(f.next_followup) < CURRENT_DATE
-         AND l.deleted_by_admin = false
-       ORDER BY f.next_followup ASC`
+         AND l.deleted_by_admin = false ${filter}
+       ORDER BY f.next_followup ASC`,
+      vals
     );
     res.json({ pendingFollowUps: rows });
   } catch (err) {

@@ -1,80 +1,74 @@
-const express = require('express');
+// ===== FILE: APP_Vindia/backend/routes/financeRoutes.js =====
+const express = require("express");
 const router = express.Router();
-const pool = require('../config/db');
-const Finance = require('../models/financeModel');
-const Invoice = require('../models/invoiceModel');
-const Budget = require('../models/budgetModel');
+const { protect, requireRole } = require("../middleware/authMiddleware");
 
-// GET /api/finance/dashboard
-router.get('/dashboard', async (req, res) => {
-  try {
-    const { projectId } = req.query;
-    const data = await Finance.getDashboard(projectId);
-    res.json({ success: true, data });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+const financeDashboardController = require("../controllers/financeDashboardController");
+const financeCostReportController = require("../controllers/financecostReportController");
 
-// GET /api/finance/invoices
-router.get('/invoices', async (req, res) => {
-  try {
-    const invoices = await Invoice.getAll(req.query);
-    res.json({ success: true, data: invoices });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+const budgetController = require("../controllers/budgetController");
+const expenseController = require("../controllers/expenseController");
+const invoiceController = require("../controllers/invoiceController");
+const paymentController = require("../controllers/paymentController");
+const vendorController = require("../controllers/vendorController");
+const financeSettingsController = require("../controllers/financeSettingsController");
 
-// POST /api/finance/invoices/create
-router.post('/invoices/create', async (req, res) => {
-  try {
-    const invoice = await Invoice.create(req.body);
-    res.status(201).json({ success: true, data: invoice });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+// Only finance_manager and ceo can access Finance Manager endpoints
+router.use(protect, requireRole("Finance Manager", "CEO"));
 
-// PUT /api/finance/invoices/:id/status
-router.put('/invoices/:id/status', async (req, res) => {
-  try {
-    const invoice = await Invoice.updateStatus(req.params.id, req.body.status);
-    res.json({ success: true, data: invoice });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+/* ── Dashboard ─────────────────────────────────────────── */
+router.get("/dashboard", financeDashboardController.getDashboard);
 
-// DELETE /api/finance/invoices/:id
-router.delete('/invoices/:id', async (req, res) => {
-  try {
-    await Invoice.delete(req.params.id);
-    res.json({ success: true, message: 'Invoice deleted' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+/* ── Cost Reporting ────────────────────────────────────── */
+router.get("/cost-report", financeCostReportController.getCostReport);
 
-// POST /api/finance/budgets/create
-router.post('/budgets/create', async (req, res) => {
-  try {
-    const budget = await Budget.create(req.body);
-    res.status(201).json({ success: true, data: budget });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+/* ── Budgets ───────────────────────────────────────────── */
+router.get("/budgets", budgetController.getAllBudgets);
+router.get("/budgets/project/:projectId", budgetController.getBudgetsByProject);
+router.get("/budgets/:id", budgetController.getBudgetById);
+router.post("/budgets", budgetController.createBudget);
+router.put("/budgets/:id", budgetController.updateBudget);
+router.delete("/budgets/:id", budgetController.deleteBudget);
 
-// GET /api/finance/budgets
-router.get('/budgets', async (req, res) => {
-  try {
-    const budgets = await Budget.getByProject(req.query.projectId);
-    res.json({ success: true, data: budgets });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+/* ── Expenses ──────────────────────────────────────────── */
+router.get("/expenses", expenseController.getAllExpenses);
+router.get("/expenses/summary", expenseController.getExpenseSummary);
+router.get("/expenses/:id", expenseController.getExpenseById);
+router.post("/expenses", expenseController.createExpense);
+router.put("/expenses/:id", expenseController.updateExpense);
+router.delete("/expenses/:id", expenseController.deleteExpense);
 
-module.exports = router; // ✅ Must export the router, not an object
+/* ── Invoices ──────────────────────────────────────────── */
+router.get("/invoices", invoiceController.getAllInvoices);
+router.post("/invoices", invoiceController.createInvoice);
+router.put("/invoices/:id/status", invoiceController.updateInvoiceStatus);
+router.delete("/invoices/:id", invoiceController.deleteInvoice);
+
+/* ── Payments ──────────────────────────────────────────── */
+router.get("/payments", paymentController.getAllPayments);
+router.get("/payments/summary", paymentController.getPaymentSummary);
+router.get("/payments/:id", paymentController.getPaymentById);
+router.post("/payments", paymentController.createPayment);
+router.put("/payments/:id", paymentController.updatePayment);
+router.delete("/payments/:id", paymentController.deletePayment);
+
+/* ── Vendors ───────────────────────────────────────────── */
+router.get("/vendors", vendorController.getAllVendors);
+router.get("/vendors/metrics", vendorController.getVendorMetrics);
+router.get("/vendors/:id", vendorController.getVendorById);
+router.post("/vendors"
+    , vendorController.createVendor);
+router.put("/vendors/:id", vendorController.updateVendor);
+router.patch("/vendors/:id/toggle-status", vendorController.toggleVendorStatus);
+router.delete("/vendors/:id", vendorController.deleteVendor);
+
+/* ── Settings ──────────────────────────────────────────── */
+router.get("/settings", financeSettingsController.getSettings);
+router.put("/settings/general", financeSettingsController.updateGeneral);
+router.put("/settings/tax", financeSettingsController.updateTax);
+router.put("/settings/invoice-prefs", financeSettingsController.updateInvoicePrefs);
+router.put("/settings/gateway/:gateway", financeSettingsController.updateGateway);
+router.post("/settings/bank-accounts", financeSettingsController.addBankAccount);
+router.delete("/settings/bank-accounts/:id", financeSettingsController.deleteBankAccount);
+
+module.exports = router;

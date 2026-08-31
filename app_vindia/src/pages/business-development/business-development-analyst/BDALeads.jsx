@@ -291,7 +291,8 @@ const BDALeads = () => {
   const { user } = useAuth();
   const bdaEmail = user?.email || "";
   const bdaName  = user?.name  || user?.email || "";
-  const isCEO    = user?.role  === "ceo";
+  const role     = user?.role  || null;   // role CODE, e.g. "bda", "ceo"
+  const isCEO    = role === "ceo";
 
   const [leads,    setLeads]    = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -309,7 +310,9 @@ const BDALeads = () => {
   const fetchLeads = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/leads`);
+      const res = await axios.get(`${API}/leads`, {
+        params: { role, name: bdaName },
+      });
       setLeads(res.data.leads || []);
     } catch (err) {
       console.error(err);

@@ -32,6 +32,30 @@
 .inv-root.inv-in { opacity: 1; transform: none; }
 
 /* ═══════════════════════════════════════
+   LOADING / ERROR / HINT STATES
+═══════════════════════════════════════ */
+.inv-state {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--inv-muted);
+  font-size: 14px;
+}
+.inv-state--error { color: #dc2626; }
+.inv-state .inv-btn-outline { margin-left: 10px; }
+
+.inv-form-error {
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+.inv-hint {
+  font-size: 11px;
+  color: var(--inv-dim);
+  margin: -10px 0 12px;
+}
+
+/* ═══════════════════════════════════════
    HEADER
 ═══════════════════════════════════════ */
 .inv-header {
@@ -113,6 +137,7 @@
   transition: opacity 0.2s;
 }
 .inv-btn-primary:hover { opacity: 0.85; }
+.inv-btn-primary:disabled { opacity: 0.5; cursor: default; }
 
 .inv-btn-outline {
   background: none;
@@ -127,6 +152,7 @@
   transition: background 0.2s;
 }
 .inv-btn-outline:hover { background: rgba(10,65,116,0.05); }
+.inv-btn-outline:disabled { opacity: 0.5; cursor: default; }
 
 /* ═══════════════════════════════════════
    STATUS BADGE
@@ -542,16 +568,18 @@
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s;
+  border: none;
 }
 .inv-btn-sm--outline { background: none; border: 1.5px solid var(--inv-border); color: var(--inv-muted); }
 .inv-btn-sm--outline:hover { border-color: var(--inv-accent); color: var(--inv-accent); }
 .inv-btn-sm--primary { background: var(--inv-accent); border: none; color: #fff; }
 .inv-btn-sm--primary:hover { opacity: 0.85; }
+.inv-btn-sm--primary:disabled { opacity: 0.5; cursor: default; }
 
 .inv-empty-state { text-align: center; padding: 60px; color: var(--inv-dim); font-size: 16px; }
 
 /* ═══════════════════════════════════════
-   DRAWER
+   DRAWER (also used for Edit modal)
 ═══════════════════════════════════════ */
 .inv-drawer-overlay {
   position: fixed; inset: 0;
@@ -590,7 +618,7 @@
 }
 .inv-drawer-row:last-child { border-bottom: none; }
 .inv-drawer-label { font-size: 12px; color: var(--inv-muted); font-weight: 500; }
-.inv-drawer-value { font-size: 13px; font-weight: 600; color: var(--inv-text); }
+.inv-drawer-value { font-size: 13px; font-weight: 600; color: var(--inv-text); text-align: right; }
 .inv-drawer-footer { padding: 20px 24px; border-top: 1px solid var(--inv-border); display: flex; gap: 10px; }
 .inv-drawer-footer .inv-btn-primary, .inv-drawer-footer .inv-btn-outline { flex: 1; text-align: center; }
 

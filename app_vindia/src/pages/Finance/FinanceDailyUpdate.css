@@ -1,0 +1,247 @@
+/* ===== FILE: APP_Vindia/app_vindia/src/pages/Finance/FinanceDailyUpdate.css ===== */
+:root {
+  --fdu-bg:       #ffffff;
+  --fdu-surface:  #f5f7fa;
+  --fdu-surface2: #eef1f6;
+  --fdu-border:   rgba(0,0,0,0.08);
+  --fdu-border2:  rgba(0,0,0,0.13);
+  --fdu-text:        #1a2638;
+  --fdu-text-muted:  #5a7184;
+  --fdu-accent:  #0A4174;
+  --fdu-ok:      #10b981;
+  --fdu-warn:    #f59e0b;
+  --fdu-critical:#ef4444;
+  --fdu-radius: 14px;
+  --fdu-shadow: 0 2px 12px rgba(0,0,0,0.07);
+}
+
+.fdu-root {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--fdu-text);
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+}
+
+.fdu-state {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--fdu-text-muted);
+}
+
+.fdu-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.fdu-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--fdu-accent);
+  margin: 0 0 5px;
+}
+.fdu-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+.fdu-sub {
+  margin: 4px 0 0;
+  color: var(--fdu-text-muted);
+  font-size: 13px;
+}
+
+.fdu-badge {
+  padding: 6px 14px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  height: fit-content;
+}
+.fdu-badge-pending  { background: rgba(245,158,11,0.12); color: var(--fdu-warn); }
+.fdu-badge-approved { background: rgba(16,185,129,0.12); color: var(--fdu-ok); }
+.fdu-badge-rejected { background: rgba(239,68,68,0.12); color: var(--fdu-critical); }
+
+.fdu-toast {
+  background: rgba(16,185,129,0.1);
+  border: 1px solid rgba(16,185,129,0.3);
+  color: var(--fdu-ok);
+  padding: 10px 16px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.fdu-error {
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.25);
+  color: var(--fdu-critical);
+  padding: 10px 16px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.fdu-note {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.fdu-note-approved {
+  background: rgba(16,185,129,0.08);
+  border: 1px solid rgba(16,185,129,0.25);
+  color: #0a6b4f;
+}
+.fdu-note-rejected {
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.25);
+  color: #9c2a2a;
+}
+
+.fdu-form {
+  background: var(--fdu-bg);
+  border: 1px solid var(--fdu-border);
+  border-radius: var(--fdu-radius);
+  box-shadow: var(--fdu-shadow);
+  padding: 24px;
+}
+
+.fdu-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.fdu-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fdu-text-muted);
+}
+.fdu-field--full {
+  grid-column: 1 / -1;
+}
+.fdu-field input,
+.fdu-field textarea {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fdu-text);
+  background: var(--fdu-surface);
+  border: 1px solid var(--fdu-border2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.fdu-field input:focus,
+.fdu-field textarea:focus {
+  border-color: var(--fdu-accent);
+}
+
+.fdu-status-row {
+  margin-bottom: 20px;
+}
+.fdu-status-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fdu-text-muted);
+  margin-bottom: 8px;
+}
+.fdu-status-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fdu-status-pill {
+  border: 1px solid var(--fdu-border2);
+  background: var(--fdu-surface);
+  color: var(--fdu-text-muted);
+  padding: 8px 16px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.fdu-status-pill--active {
+  background: var(--pill-color);
+  border-color: var(--pill-color);
+  color: #ffffff;
+}
+
+.fdu-submit-btn {
+  background: var(--fdu-accent);
+  color: #ffffff;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.fdu-submit-btn:hover:not(:disabled) { opacity: 0.88; }
+.fdu-submit-btn:disabled { opacity: 0.6; cursor: default; }
+
+.fdu-history {
+  margin-top: 32px;
+}
+.fdu-history h2 {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+}
+.fdu-history-empty {
+  color: var(--fdu-text-muted);
+  font-size: 13px;
+}
+.fdu-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--fdu-bg);
+  border: 1px solid var(--fdu-border);
+  border-radius: var(--fdu-radius);
+  overflow: hidden;
+  font-size: 13px;
+}
+.fdu-history-table th {
+  text-align: left;
+  background: var(--fdu-surface);
+  color: var(--fdu-text-muted);
+  font-weight: 600;
+  padding: 10px 14px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.fdu-history-table td {
+  padding: 10px 14px;
+  border-top: 1px solid var(--fdu-border);
+}
+.fdu-chip {
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.fdu-chip--on-track { background: rgba(16,185,129,0.12); color: var(--fdu-ok); }
+.fdu-chip--attention { background: rgba(245,158,11,0.12); color: var(--fdu-warn); }
+.fdu-chip--critical { background: rgba(239,68,68,0.12); color: var(--fdu-critical); }
+
+@media (max-width: 720px) {
+  .fdu-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+  .fdu-grid { grid-template-columns: 1fr; }
+}

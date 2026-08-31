@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../../services/api";
 import { getProjects } from "../../services/projectService";
+import CheckInButton from "../../SharedResourse/CheckInButton";
 import "./ThreeDVisualizerDashboard.css";
 
 /* ── helpers ──────────────────────────────────────────────── */
@@ -12,13 +12,6 @@ const fmt = (n) =>
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-
-const fmtTime = (t) => {
-  if (!t) return "—";
-  const [h, m] = t.split(":");
-  const hh = parseInt(h, 10);
-  return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
-};
 
 const fmtDateTime = (v) =>
   v ? new Date(v).toLocaleString("en-GB", {
@@ -122,121 +115,6 @@ const PanelHeader = ({ title, count, linkLabel, onLink }) => (
   </div>
 );
 
-/* ── Check In / Out ───────────────────────────────────────── */
-const CheckInButton = ({ employeeId }) => {
-  const [attendance, setAttendance] = useState(null);
-  const [loading,    setLoading]    = useState(true);
-  const [busy,       setBusy]       = useState(false);
-  const [elapsed,    setElapsed]    = useState("");
-  const timerRef = useRef(null);
-
-  useEffect(() => {
-    fetchToday();
-    return () => clearInterval(timerRef.current);
-  }, []);
-
-  useEffect(() => {
-    clearInterval(timerRef.current);
-    if (attendance?.check_in && !attendance?.check_out) {
-      const tick = () => {
-        const [h, m, s] = attendance.check_in.split(":").map(Number);
-        const inMs  = (h * 3600 + m * 60 + s) * 1000;
-        const nowMs = new Date() - new Date().setHours(0, 0, 0, 0);
-        const diff  = Math.max(0, nowMs - inMs);
-        const th = String(Math.floor(diff / 3600000)).padStart(2, "0");
-        const tm = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
-        const ts = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
-        setElapsed(`${th}:${tm}:${ts}`);
-      };
-      tick();
-      timerRef.current = setInterval(tick, 1000);
-    } else {
-      setElapsed("");
-    }
-  }, [attendance]);
-
-  const fetchToday = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get(`/attendance/today?employee_id=${employeeId}`);
-      setAttendance(res.data || null);
-    } catch (err) {
-      if (err.response?.status !== 404) console.error(err);
-      setAttendance(null);
-    } finally { setLoading(false); }
-  };
-
-  const handleCheckIn = async () => {
-    setBusy(true);
-    try {
-      const now = new Date();
-      const shiftStart = new Date(); shiftStart.setHours(9, 0, 0, 0);
-      const lateMinutes = Math.floor(Math.max(0, now - shiftStart) / 60000);
-      const res = await api.post("/attendance", {
-        employee_id:  employeeId,
-        date:         now.toISOString().slice(0, 10),
-        check_in:     now.toTimeString().slice(0, 8),
-        status:       "Present",
-        shift:        "morning",
-        late_minutes: lateMinutes,
-        remarks:      lateMinutes > 0 ? `Late by ${lateMinutes} min` : "",
-      });
-      setAttendance(res.data);
-    } catch (err) { console.error(err); alert("Check-in failed."); }
-    finally { setBusy(false); }
-  };
-
-  const handleCheckOut = async () => {
-    if (!attendance?.id) return;
-    setBusy(true);
-    try {
-      const res = await api.put(`/attendance/${attendance.id}`, {
-        check_out: new Date().toTimeString().slice(0, 8),
-      });
-      setAttendance(res.data);
-      clearInterval(timerRef.current);
-    } catch (err) { console.error(err); alert("Check-out failed."); }
-    finally { setBusy(false); }
-  };
-
-  const isIn   = attendance?.check_in && !attendance?.check_out;
-  const isDone = attendance?.check_in &&  attendance?.check_out;
-
-  if (loading) return (
-    <button disabled className="tviz-ci-btn tviz-ci-btn--gray">
-      <span className="tviz-ci-dot" /> Loading…
-    </button>
-  );
-  if (isDone) return (
-    <div className="tviz-ci-wrap">
-      <button disabled className="tviz-ci-btn tviz-ci-btn--done">
-        <span className="tviz-ci-dot tviz-ci-dot--green" /> ✓ Done for Today
-      </button>
-      <span className="tviz-ci-sub">
-        {fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}
-      </span>
-    </div>
-  );
-  if (isIn) return (
-    <div className="tviz-ci-wrap">
-      <button onClick={handleCheckOut} disabled={busy} className="tviz-ci-btn tviz-ci-btn--out">
-        <span className="tviz-ci-dot tviz-ci-dot--pulse" />
-        {busy ? "Saving…" : "Check Out"}
-      </button>
-      <span className="tviz-ci-sub">
-        In: {fmtTime(attendance.check_in)}
-        {elapsed && <> · <strong style={{ color: "#2563eb" }}>{elapsed}</strong></>}
-      </span>
-    </div>
-  );
-  return (
-    <button onClick={handleCheckIn} disabled={busy} className="tviz-ci-btn tviz-ci-btn--in">
-      <span className="tviz-ci-dot" />
-      {busy ? "Saving…" : "Check In"}
-    </button>
-  );
-};
-
 /* ═══════════════════════════════════════════════════════════
    MAIN DASHBOARD
 ═══════════════════════════════════════════════════════════ */
@@ -246,6 +124,9 @@ export default function ThreeDVisualizerDashboard() {
   const userId     = user?.id;
   const userName   = user?.name || "3D Vizualizer";
   const employeeId = user?.employee_id || user?.id || null;
+  // Used by the shared CheckInButton — decides whether to skip location
+  // capture for the CEO. Falls back to role if designation isn't stored yet.
+  const designation = user?.designation || user?.role || null;
 
   const [projects,  setProjects]  = useState([]);
   const [drawings,  setDrawings]  = useState([]);
@@ -331,7 +212,9 @@ export default function ThreeDVisualizerDashboard() {
           </h1>
         </div>
         <div className="tviz-header-actions">
-          {employeeId && <CheckInButton employeeId={employeeId} />}
+          {employeeId && (
+            <CheckInButton employeeId={employeeId} designation={designation} />
+          )}
           <button className="tviz-btn tviz-btn--outline"
             onClick={() => navigate("/3d-visualizer/drawings")}>
             Drawings

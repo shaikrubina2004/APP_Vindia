@@ -40,6 +40,11 @@ const financeMenu = [
     path: '/finance-manager/settings',
     icon: 'settings',
   },
+  {
+    name: 'Daily Update',
+    path: '/finance-manager/daily-update',
+    icon: 'send',
+  },
 ];
 
 export default financeMenu;

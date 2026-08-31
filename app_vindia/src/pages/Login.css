@@ -64,14 +64,35 @@
   margin-bottom: 20px;
 }
 
-.login-left p {
-  font-size: 18px;
-  font-weight: 500;
-}
-
 .build-text {
   color: #1f57a4;
   font-weight: 600;
+}
+
+/* ===========================
+   TAGLINE — TYPEWRITER EFFECT
+   Same animation as the SignUp
+   page / main website: text
+   types out with a blinking
+   cursor.
+=========================== */
+.tagline {
+  font-size: 18px;
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 3px solid #1f57a4;
+  width: 0;
+  animation: typing 3s steps(30, end) forwards, blink 0.7s infinite;
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to   { width: 240px; }
+}
+
+@keyframes blink {
+  50% { border-color: transparent; }
 }
 
 /* ===========================
@@ -90,15 +111,128 @@
   display: block;
 }
 
-.login-right input {
-  width: 100%;
-  padding: 10px;
+/* ===========================
+   SHARED INPUT SIZING
+   Email input and the password
+   input (inside .password-wrapper)
+   MUST resolve to the exact same
+   box: same height, same
+   line-height, same vertical
+   padding, same box-sizing.
+   Previously the email input only
+   picked up the generic rule below
+   while the password input had a
+   second, more specific rule
+   re-declaring its own padding —
+   the two could drift out of sync.
+   Both are now driven by the same
+   values so they stay pixel-identical.
+=========================== */
+.login-right input,
+.password-wrapper input[type="password"],
+.password-wrapper input[type="text"] {
+  width: 100% !important;
   margin: 8px 0 20px;
-  border-radius: 4px;
+  border-radius: 4px !important;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
   border: none;
   outline: none;
   background: #fff;
   color: #000;
+  /* 16px stops iOS/Chrome mobile from auto-zooming the whole
+     page in when this field gets focus (anything under 16px
+     triggers the zoom, which is what made the card look like
+     it was "changing shape"). !important because a global
+     reset rule (input[type="text"] { font-size: 12px !important })
+     was silently overriding this the moment the password field
+     toggles to type="text". */
+  font-size: 16px !important;
+  /* Single source of truth for the box size, shared by BOTH
+     fields. 44px keeps the boxes compact and identical. */
+  height: 44px !important;
+  line-height: 24px !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+  padding-left: 10px !important;
+  box-sizing: border-box !important;
+}
+
+/* ===========================
+   PASSWORD FIELD + EYE TOGGLE
+=========================== */
+.password-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* input inside the wrapper keeps the same look,
+   just needs room on the right for the icon
+   so text never runs under it */
+.password-wrapper input {
+  padding-right: 42px !important;
+}
+
+/* 🔥 Hide the browser's own built-in "reveal password"
+   button (Edge/IE add one automatically). Without this,
+   it renders on top of our custom icon and creates that
+   half-cut, overlapping look. */
+.password-wrapper input::-ms-reveal,
+.password-wrapper input::-ms-clear {
+  display: none;
+}
+
+/* 🔥 Firefox (v103+) ships its own native password-reveal
+   eye button inside input[type="password"] fields. It sits
+   on top of our custom icon and draws its own rounded pill
+   background — this was the actual cause of the field looking
+   like it "changed shape" when toggling visibility. */
+.password-wrapper input::-moz-reveal {
+  display: none;
+}
+
+/* 🔥 Hide Chrome/Edge-Chromium's built-in password reveal
+   button and the autofill "key" / strong-password button.
+   These are what caused the field to visually "change shape"
+   when toggling between type="password" and type="text" —
+   only our custom eye icon should show now. */
+.password-wrapper input::-webkit-textfield-decoration-container {
+  visibility: hidden;
+}
+
+.password-wrapper input::-webkit-credentials-auto-fill-button,
+.password-wrapper input::-webkit-strong-password-auto-fill-button {
+  visibility: hidden;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+
+.toggle-eye {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #5a6b85;
+  transition: background 0.2s, color 0.2s;
+  z-index: 3;
+}
+
+.toggle-eye:hover {
+  background: rgba(31, 87, 164, 0.08);
+  color: #1f57a4;
+}
+
+.toggle-eye svg {
+  pointer-events: none;
 }
 
 .login-options {
@@ -183,7 +317,7 @@
   border-radius: 8px;
   border: 1px solid #ccc;
   margin-bottom: 18px;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .modal-buttons {
@@ -258,15 +392,20 @@
     margin-bottom: 16px;
   }
 
-  .login-left p {
-    font-size: 16px;
+  .tagline {
+    font-size: 15px;
     color: #013667;
     font-weight: 500;
+    /* disable typing animation on mobile, same as signup */
+    animation: none;
+    width: auto;
+    white-space: normal;
+    border-right: none;
+    overflow: visible;
   }
 
   .build-text {
     color: #0a4174;
-    font-weight: 700;
   }
 
   /* RIGHT becomes the form below, full width, no blue bg */
@@ -283,16 +422,18 @@
     display: none;         /* hide labels, placeholders are enough */
   }
 
-  /* Pill-shaped inputs like Image 2 */
-  .login-right input {
-    width: 100%;
+  /* Pill-shaped inputs like Image 2 — shared sizing rule above
+     still applies (height/line-height/padding), just recolored
+     and re-radiused for the mobile look. Both Email and Password
+     stay in sync automatically since they share one rule. */
+  .login-right input,
+  .password-wrapper input[type="password"],
+  .password-wrapper input[type="text"] {
     max-width: 320px;
-    padding: 16px;
+    padding-left: 16px !important;
     margin-bottom: 14px;
-    border-radius: 20px;
-    border: none;
+    border-radius: 20px !important;
     background: #e6f0f7;
-    font-size: 14px;
     color: #001d39;
     box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
     transition: 0.25s;
@@ -307,6 +448,27 @@
     box-shadow: 0 0 0 2px rgba(10,65,116,0.25),
                 0 6px 12px rgba(0,0,0,0.08);
     outline: none;
+  }
+
+  /* Password wrapper needs to match the pill inputs on mobile too */
+  .password-wrapper {
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .password-wrapper input {
+    max-width: 320px;
+    padding-right: 44px !important;
+  }
+
+  .toggle-eye {
+    right: 12px;
+    color: #4e8ea2;
+  }
+
+  .toggle-eye:hover {
+    background: rgba(10, 65, 116, 0.1);
+    color: #0a4174;
   }
 
   /* Forgot password — right-aligned */
@@ -360,7 +522,7 @@
 }
 
 /* ===========================
-   ANIMATIONS
+   MODAL ANIMATIONS
 =========================== */
 @keyframes fadeIn {
   from { opacity: 0; }

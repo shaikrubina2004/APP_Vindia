@@ -11,10 +11,19 @@ const {
   updateEmployee,
   deleteEmployee,
   getNextEmployeeCode,
+  backfillEmployeeCodes,
+  getBirthdays,
 } = require("../controllers/employeeController");
 
 // ✅ GENERATE NEXT EMPLOYEE CODE (must be before /:id routes)
 router.get("/generate-code", authMiddleware, getNextEmployeeCode);
+
+// ✅ BIRTHDAYS (must be before /:id routes, otherwise Express treats
+//    "birthdays" as an :id param on the route below)
+router.get("/birthdays", authMiddleware, getBirthdays);
+
+// ✅ BACKFILL MISSING EMPLOYEE CODES
+router.post("/backfill-codes", authMiddleware, backfillEmployeeCodes);
 
 // ✅ CREATE EMPLOYEE (WITH FILE UPLOAD)
 router.post(
@@ -30,7 +39,6 @@ router.post(
 );
 
 // ✅ GET
-router.get("/", getAllEmployees);
 router.get("/", authMiddleware, getAllEmployees);
 router.get("/:id", authMiddleware, getEmployeeById);
 

@@ -1,330 +1,23 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-//import "../../styles/HRDashboard.css";
+import "../../styles/HRDashboard.css";
+import CheckInButton from "../../SharedResourse/CheckInButton";
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+const API_URL = "http://localhost:5000/api";
 
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good Morning";
-  if (h < 17) return "Good Afternoon";
-  return "Good Evening";
-}
+// ✅ Authenticated axios instance — attaches the token from localStorage to
+// every request. Plain `axios.get(...)` never sent the auth token, which
+// worked only because of an unauthenticated duplicate route on the backend;
+// now that the backend correctly requires auth, every call in this file
+// must go through this instance instead of the bare `axios` import.
+const authAxios = axios.create();
 
-function getDaysInMonth(year, month) {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-function getFirstDayOfMonth(year, month) {
-  const d = new Date(year, month, 1).getDay();
-  return (d + 6) % 7;
-}
-
-const fmtTime = (t) => {
-  if (!t) return "—";
-  const [h, m] = t.split(":");
-  const hh = parseInt(h, 10);
-  return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
-};
-
-// ─── Check In / Out Button ───────────────────────────────────────────────────
-
-const CheckInButton = ({ employeeId }) => {
-  const [attendance, setAttendance] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [elapsed, setElapsed] = useState("");
-  const timerRef = useRef(null);
-
-  useEffect(() => {
-    fetchTodayAttendance();
-    return () => clearInterval(timerRef.current);
-  }, []);
-
-  useEffect(() => {
-    clearInterval(timerRef.current);
-    if (attendance?.check_in && !attendance?.check_out) {
-      const tick = () => {
-        const [h, m, s] = attendance.check_in.split(":").map(Number);
-        const inMs = (h * 3600 + m * 60 + s) * 1000;
-        const nowMs = new Date() - new Date().setHours(0, 0, 0, 0);
-        const diff = Math.max(0, nowMs - inMs);
-        const th = String(Math.floor(diff / 3600000)).padStart(2, "0");
-        const tm = String(Math.floor((diff % 3600000) / 60000)).padStart(
-          2,
-          "0",
-        );
-        const ts = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
-        setElapsed(`${th}:${tm}:${ts}`);
-      };
-      tick();
-      timerRef.current = setInterval(tick, 1000);
-    } else {
-      setElapsed("");
-    }
-  }, [attendance]);
-
-  const fetchTodayAttendance = async () => {
-    setLoading(true);
-    try {
-      const res = await axios.get(
-        `http://localhost:5000/api/attendance/today?employee_id=${employeeId}`,
-      );
-      setAttendance(res.data || null);
-    } catch (err) {
-      if (err.response?.status !== 404) console.error(err);
-      setAttendance(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCheckIn = async () => {
-    setBusy(true);
-    try {
-      const now = new Date();
-      const timeStr = now.toTimeString().slice(0, 8);
-      const dateStr = now.toISOString().slice(0, 10);
-
-      const shiftStart = new Date();
-      shiftStart.setHours(9, 0, 0, 0);
-      const lateMs = Math.max(0, now - shiftStart);
-      const lateMinutes = Math.floor(lateMs / 60000);
-
-      const res = await axios.post("http://localhost:5000/api/attendance", {
-        employee_id: employeeId,
-        date: dateStr,
-        check_in: timeStr,
-        status: "Present",
-        shift: "morning",
-        late_minutes: lateMinutes,
-        remarks: lateMinutes > 0 ? `Late by ${lateMinutes} min` : "",
-      });
-      setAttendance(res.data);
-    } catch (err) {
-      console.error(err);
-      alert("Check-in failed. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleCheckOut = async () => {
-    if (!attendance?.id) return;
-    setBusy(true);
-    try {
-      const now = new Date();
-      const timeStr = now.toTimeString().slice(0, 8);
-
-      const res = await axios.put(
-        `http://localhost:5000/api/attendance/${attendance.id}`,
-        { check_out: timeStr },
-      );
-      setAttendance(res.data);
-      clearInterval(timerRef.current);
-    } catch (err) {
-      console.error(err);
-      alert("Check-out failed. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const isCheckedIn = attendance?.check_in && !attendance?.check_out;
-  const isCheckedOut = attendance?.check_in && attendance?.check_out;
-
-  if (loading) {
-    return (
-      <button
-        disabled
-        style={{
-          padding: "8px 18px",
-          borderRadius: 10,
-          border: "1.5px solid #e2e8f0",
-          background: "#f8fafc",
-          color: "#94a3b8",
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: "not-allowed",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: "#cbd5e1",
-            display: "inline-block",
-          }}
-        />
-        Loading…
-      </button>
-    );
-  }
-
-  if (isCheckedOut) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          gap: 2,
-        }}
-      >
-        <button
-          disabled
-          style={{
-            padding: "8px 18px",
-            borderRadius: 10,
-            border: "1.5px solid #86efac",
-            background: "#f0fdf4",
-            color: "#16a34a",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "not-allowed",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: "#16a34a",
-              display: "inline-block",
-            }}
-          />
-          ✓ Done for Today
-        </button>
-        <span style={{ fontSize: 10, color: "#64748b" }}>
-          {fmtTime(attendance.check_in)} – {fmtTime(attendance.check_out)}
-        </span>
-      </div>
-    );
-  }
-
-  if (isCheckedIn) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          gap: 2,
-        }}
-      >
-        <button
-          onClick={handleCheckOut}
-          disabled={busy}
-          style={{
-            padding: "8px 18px",
-            borderRadius: 10,
-            border: "none",
-            background: busy ? "#fca5a5" : "#dc2626",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: busy ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            transition: "all .2s",
-            boxShadow: "0 2px 8px rgba(220,38,38,0.3)",
-          }}
-        >
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: "#fff",
-              display: "inline-block",
-              animation: "pulse 1.2s ease-in-out infinite",
-            }}
-          />
-          {busy ? "Saving…" : "Check Out"}
-        </button>
-        <span
-          style={{
-            fontSize: 10,
-            color: "#64748b",
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          In: {fmtTime(attendance.check_in)}
-          {elapsed && (
-            <>
-              {" "}
-              &nbsp;·&nbsp;{" "}
-              <strong style={{ color: "#2563eb" }}>{elapsed}</strong>
-            </>
-          )}
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <button
-      onClick={handleCheckIn}
-      disabled={busy}
-      style={{
-        padding: "8px 18px",
-        borderRadius: 10,
-        border: "none",
-        background: busy ? "#86efac" : "#16a34a",
-        color: "#fff",
-        fontSize: 13,
-        fontWeight: 700,
-        cursor: busy ? "not-allowed" : "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        transition: "all .2s",
-        boxShadow: "0 2px 8px rgba(22,163,74,0.3)",
-      }}
-    >
-      <span
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: "#fff",
-          display: "inline-block",
-        }}
-      />
-      {busy ? "Saving…" : "Check In"}
-    </button>
-  );
-};
-
-// ─── Stat Card ───────────────────────────────────────────────────────────────
-
-const STAT_GRADIENTS = {
-  navy: "linear-gradient(135deg, #001D39 0%, #0A4174 100%)",
-  teal: "linear-gradient(135deg, #093d2e 0%, #0d5c42 100%)",
-  blue: "linear-gradient(135deg, #0A4174 0%, #49769F 100%)",
-  sky: "linear-gradient(135deg, #4E8EA2 0%, #7BBDE8 100%)",
-};
-
-function StatCard({ label, value, icon, colorKey }) {
-  return (
-    <div className="stat-card" style={{ background: STAT_GRADIENTS[colorKey] }}>
-      <div className="stat-card-icon">{icon}</div>
-      <div className="stat-card-value">{value ?? "—"}</div>
-      <div className="stat-card-label">{label}</div>
-    </div>
-  );
-}
-
-// ─── Calendar ────────────────────────────────────────────────────────────────
+authAxios.interceptors.request.use((req) => {
+  const token = localStorage.getItem("token");
+  if (token) req.headers.Authorization = `Bearer ${token}`;
+  return req;
+});
 
 const MONTH_NAMES = [
   "January",
@@ -341,492 +34,990 @@ const MONTH_NAMES = [
   "December",
 ];
 
-function TrainingCalendar({ employees }) {
-  const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth());
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [notes, setNotes] = useState({});
-  const [selected, setSelected] = useState(null);
-  const [noteInput, setNoteInput] = useState("");
+/* ==========================================================================
+   Utility functions
+   ========================================================================== */
 
-  const daysInMonth = getDaysInMonth(year, month);
-  const firstDay = getFirstDayOfMonth(year, month);
+function getGreeting() {
+  const hour = new Date().getHours();
 
-  const birthdayDays = {};
-  (employees || []).forEach((emp) => {
-    if (!emp.dob) return;
-    const bd = new Date(emp.dob);
-    if (bd.getMonth() === month) {
-      const day = bd.getDate();
-      if (!birthdayDays[day]) birthdayDays[day] = [];
-      birthdayDays[day].push(emp.name);
-    }
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+
+  return "Good evening";
+}
+
+function getTodayString() {
+  const date = new Date();
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
+}
 
-  function prevMonth() {
-    if (month === 0) {
-      setMonth(11);
-      setYear((y) => y - 1);
-    } else setMonth((m) => m - 1);
-    setSelected(null);
-  }
-  function nextMonth() {
-    if (month === 11) {
-      setMonth(0);
-      setYear((y) => y + 1);
-    } else setMonth((m) => m + 1);
-    setSelected(null);
+function formatTime(value) {
+  if (!value) return "—";
+
+  const [hours, minutes] = value.split(":");
+  const hour = Number(hours);
+
+  if (Number.isNaN(hour)) {
+    return value;
   }
 
-  function selectMonth(m) {
-    setMonth(m);
-    setDropdownOpen(false);
-    setSelected(null);
+  return `${hour % 12 || 12}:${minutes || "00"} ${
+    hour >= 12 ? "PM" : "AM"
+  }`;
+}
+
+function getInitials(name = "Employee") {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toUpperCase();
+}
+
+function getDaysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function getFirstDayOfMonth(year, month) {
+  const day = new Date(year, month, 1).getDay();
+
+  return (day + 6) % 7;
+}
+
+/* ==========================================================================
+   Icons
+   ========================================================================== */
+
+function IconSearch() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
+    </svg>
+  );
+}
+
+function IconUsers() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m5 12 4 4L19 6" />
+    </svg>
+  );
+}
+
+function IconClock() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 3" />
+    </svg>
+  );
+}
+
+function IconUserPlus() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M15 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="8" cy="7" r="4" />
+      <path d="M19 8v6" />
+      <path d="M22 11h-6" />
+    </svg>
+  );
+}
+
+function IconCalendar() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
+
+/* ==========================================================================
+   Shared components
+   ========================================================================== */
+
+function Button({
+  children,
+  variant = "secondary",
+  className = "",
+  ...props
+}) {
+  return (
+    <button
+      type="button"
+      className={`hrd-button hrd-button-${variant} ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Card({
+  title,
+  subtitle,
+  action,
+  children,
+  className = "",
+}) {
+  return (
+    <section className={`hrd-card ${className}`}>
+      <div className="hrd-card-header">
+        <div>
+          <h2 className="hrd-card-title">{title}</h2>
+
+          {subtitle && (
+            <p className="hrd-card-subtitle">{subtitle}</p>
+          )}
+        </div>
+
+        {action && <div>{action}</div>}
+      </div>
+
+      {children}
+    </section>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  description,
+  tone,
+  icon: Icon,
+}) {
+  return (
+    <article className={`hrd-metric-card hrd-metric-${tone}`}>
+      <div className="hrd-metric-top">
+        <span className="hrd-metric-label">{label}</span>
+
+        <span className="hrd-metric-icon">
+          <Icon />
+        </span>
+      </div>
+
+      <div className="hrd-metric-value">
+        {value ?? "—"}
+      </div>
+
+      <div className="hrd-metric-description">
+        {description}
+      </div>
+    </article>
+  );
+}
+
+function LoadingDashboard() {
+  return (
+    <main className="hrd-page">
+      <div className="hrd-loading-header">
+        <div className="hrd-loading-small" />
+        <div className="hrd-loading-title" />
+        <div className="hrd-loading-description" />
+      </div>
+
+      <div className="hrd-loading-metrics">
+        <div />
+        <div />
+        <div />
+        <div />
+      </div>
+
+      <div className="hrd-loading-layout">
+        <div />
+        <div />
+      </div>
+    </main>
+  );
+}
+
+/* ==========================================================================
+   Department distribution
+   ========================================================================== */
+
+function DepartmentDistribution({
+  data,
+  remainderDepartments = 0,
+  remainderCount = 0,
+}) {
+  if (!data.length) {
+    return (
+      <div className="hrd-empty-state">
+        No department data available.
+      </div>
+    );
   }
 
-  function handleDayClick(day) {
-    setSelected(day);
-    setNoteInput(notes[`${year}-${month}-${day}`] || "");
-  }
-
-  function saveNote() {
-    if (selected) {
-      setNotes((prev) => ({
-        ...prev,
-        [`${year}-${month}-${selected}`]: noteInput,
-      }));
-      setSelected(null);
-    }
-  }
-
-  const dayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+  const max = Math.max(
+    ...data.map((item) => item.value),
+    1
+  );
 
   return (
-    <div className="calendar-card">
-      <div className="calendar-header">
-        <div className="calendar-month-selector">
-          <button className="cal-nav-btn" onClick={prevMonth}>
-            ‹
-          </button>
-          <div className="month-dropdown-wrap">
-            <button
-              className="month-dropdown-trigger"
-              onClick={() => setDropdownOpen((o) => !o)}
-            >
-              {MONTH_NAMES[month]} {year}
-              <span className="dropdown-arrow">{dropdownOpen ? "▲" : "▼"}</span>
-            </button>
-            {dropdownOpen && (
-              <div className="month-dropdown-menu">
-                {MONTH_NAMES.map((name, i) => (
-                  <button
-                    key={i}
-                    className={`month-option ${i === month ? "month-option--active" : ""}`}
-                    onClick={() => selectMonth(i)}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button className="cal-nav-btn" onClick={nextMonth}>
-            ›
-          </button>
-        </div>
-      </div>
+    <div className="hrd-department-list">
+      {data.map((item, index) => (
+        <div
+          className="hrd-department-row"
+          key={item.label}
+        >
+          <span className="hrd-department-index">
+            {String(index + 1).padStart(2, "0")}
+          </span>
 
-      <div className="calendar-grid">
-        {dayLabels.map((d, i) => (
-          <div key={i} className="cal-day-label">
-            {d}
-          </div>
-        ))}
-        {Array.from({ length: firstDay }).map((_, i) => (
-          <div key={`e${i}`} />
-        ))}
-        {Array.from({ length: daysInMonth }).map((_, i) => {
-          const day = i + 1;
-          const isToday =
-            day === today.getDate() &&
-            month === today.getMonth() &&
-            year === today.getFullYear();
-          const hasNote = !!notes[`${year}-${month}-${day}`];
-          const hasBirthday = !!birthdayDays[day];
-          const isSelected = selected === day;
-
-          return (
-            <div
-              key={day}
-              className={[
-                "cal-day",
-                isToday ? "cal-today" : "",
-                hasNote ? "cal-has-note" : "",
-                hasBirthday ? "cal-birthday" : "",
-                isSelected ? "cal-selected" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => handleDayClick(day)}
-              title={hasBirthday ? `🎂 ${birthdayDays[day].join(", ")}` : ""}
-            >
-              {day}
-              {hasBirthday && <span className="birthday-dot" />}
+          <div className="hrd-department-content">
+            <div className="hrd-department-heading">
+              <span className="hrd-department-name">
+                {item.label}
+              </span>
+              <strong>{item.value}</strong>
             </div>
-          );
-        })}
-      </div>
 
-      <div className="cal-legend">
-        <span>
-          <span className="legend-dot today-dot" /> Today
-        </span>
-        <span>
-          <span className="legend-dot note-dot" /> Reminder
-        </span>
-        <span>
-          <span className="legend-dot bday-dot" /> Birthday
-        </span>
-      </div>
-
-      {selected && (
-        <div className="note-editor">
-          <p className="note-editor-title">
-            {MONTH_NAMES[month]} {selected}
-          </p>
-          {birthdayDays[selected] && (
-            <p className="birthday-notice">
-              🎂 {birthdayDays[selected].join(", ")}
-            </p>
-          )}
-          <textarea
-            value={noteInput}
-            onChange={(e) => setNoteInput(e.target.value)}
-            placeholder="Add a reminder…"
-            rows={2}
-          />
-          <div className="note-actions">
-            <button onClick={saveNote} className="note-save">
-              Save
-            </button>
-            <button onClick={() => setSelected(null)} className="note-cancel">
-              Cancel
-            </button>
+            <div className="hrd-department-track">
+              <span
+                className="hrd-department-fill"
+                style={{
+                  width: `${(item.value / max) * 100}%`,
+                }}
+              />
+            </div>
           </div>
+        </div>
+      ))}
+
+      {remainderDepartments > 0 && (
+        <div className="hrd-department-remainder">
+          +{remainderDepartments} more department
+          {remainderDepartments === 1 ? "" : "s"} ·{" "}
+          {remainderCount} employee
+          {remainderCount === 1 ? "" : "s"}
         </div>
       )}
     </div>
   );
 }
 
-// ─── Attendance Donut ────────────────────────────────────────────────────────
+/* ==========================================================================
+   Attendance trend
+   ========================================================================== */
 
-function AttendanceDonut({ present, absent, onLeave, total }) {
-  const r = 48;
-  const circ = 2 * Math.PI * r;
-  const pPresent = total ? present / total : 0;
-  const pAbsent = total ? absent / total : 0;
-  const pLeave = total ? onLeave / total : 0;
-  const seg1 = pPresent * circ;
-  const seg2 = pAbsent * circ;
-  const seg3 = pLeave * circ;
-
-  return (
-    <div className="attendance-donut-wrap">
-      <svg viewBox="0 0 110 110" width="110" height="110">
-        <circle
-          cx="55"
-          cy="55"
-          r={r}
-          fill="none"
-          stroke="#e8f0f7"
-          strokeWidth="10"
-        />
-        <circle
-          cx="55"
-          cy="55"
-          r={r}
-          fill="none"
-          stroke="#7BBDE8"
-          strokeWidth="10"
-          strokeDasharray={`${seg1} ${circ - seg1}`}
-          strokeDashoffset={circ / 4}
-          strokeLinecap="butt"
-        />
-        <circle
-          cx="55"
-          cy="55"
-          r={r}
-          fill="none"
-          stroke="#0A4174"
-          strokeWidth="10"
-          strokeDasharray={`${seg2} ${circ - seg2}`}
-          strokeDashoffset={circ / 4 - seg1}
-          strokeLinecap="butt"
-        />
-        <circle
-          cx="55"
-          cy="55"
-          r={r}
-          fill="none"
-          stroke="#BDD8E9"
-          strokeWidth="10"
-          strokeDasharray={`${seg3} ${circ - seg3}`}
-          strokeDashoffset={circ / 4 - seg1 - seg2}
-          strokeLinecap="butt"
-        />
-        <text
-          x="55"
-          y="51"
-          textAnchor="middle"
-          fontSize="14"
-          fontWeight="700"
-          fill="#001D39"
-        >
-          {total}
-        </text>
-        <text x="55" y="64" textAnchor="middle" fontSize="8" fill="#6EA2B3">
-          Total
-        </text>
-      </svg>
-      <div className="donut-legend">
-        <span>
-          <span className="legend-dot" style={{ background: "#7BBDE8" }} />{" "}
-          Present <strong>{present}</strong>
-        </span>
-        <span>
-          <span className="legend-dot" style={{ background: "#0A4174" }} />{" "}
-          Absent <strong>{absent}</strong>
-        </span>
-        <span>
-          <span className="legend-dot" style={{ background: "#BDD8E9" }} /> On
-          Leave <strong>{onLeave}</strong>
-        </span>
+function AttendanceTrend({ data }) {
+  if (!data.some((item) => item.value > 0)) {
+    return (
+      <div className="hrd-empty-state">
+        No attendance trend available.
       </div>
-    </div>
-  );
-}
-
-// ─── New Joiners Bar Chart ───────────────────────────────────────────────────
-
-function NewJoinersChart({ employees }) {
-  const monthCounts = {};
-  const monthLabels = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    const label = d.toLocaleString("default", { month: "short" });
-    monthCounts[key] = 0;
-    monthLabels.push({ key, label });
+    );
   }
-  (employees || []).forEach((emp) => {
-    if (!emp.join_date) return;
-    const d = new Date(emp.join_date);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    if (key in monthCounts) monthCounts[key]++;
-  });
-  const values = monthLabels.map((m) => monthCounts[m.key]);
-  const max = Math.max(...values, 1);
+
+  const max = Math.max(
+    ...data.map((item) => item.value),
+    1
+  );
 
   return (
-    <div className="joiners-chart">
-      <div className="chart-bars">
-        {monthLabels.map((m, i) => (
-          <div key={m.key} className="bar-col">
-            <span className="bar-val">{values[i]}</span>
-            <div className="bar-track">
-              <div
-                className="bar-fill"
-                style={{ height: `${(values[i] / max) * 100}%` }}
-              />
-            </div>
-            <span className="bar-label">{m.label}</span>
+    <div className="hrd-trend-chart">
+      {data.map((item) => (
+        <div
+          className="hrd-trend-column"
+          key={item.key}
+        >
+          <span className="hrd-trend-value">
+            {item.value}
+          </span>
+
+          <div className="hrd-trend-bar-area">
+            <span
+              className="hrd-trend-bar"
+              style={{
+                height: `${Math.max(
+                  (item.value / max) * 100,
+                  5
+                )}%`,
+              }}
+            />
           </div>
-        ))}
-      </div>
+
+          <span className="hrd-trend-label">
+            {item.label}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
 
-// ─── Main Dashboard ──────────────────────────────────────────────────────────
+/* ==========================================================================
+   Recent joiners
+   ========================================================================== */
 
-function HRDashboard() {
-  const navigate = useNavigate();
-  const [employees, setEmployees] = useState([]);
-  const [dashboard, setDashboard] = useState(null);
-  const [hrName] = useState("Amanda");
+function RecentJoiners({ employees }) {
+  if (!employees.length) {
+    return (
+      <div className="hrd-empty-state">
+        No recent joiners available.
+      </div>
+    );
+  }
 
-  // ── Get employee_id from localStorage (same pattern as ProjectCoordinatorDashboard) ──
-  const employeeId =
-    JSON.parse(localStorage.getItem("user") || "{}")?.employee_id ||
-    JSON.parse(localStorage.getItem("user") || "{}")?.id ||
-    null;
+  return (
+    <div className="hrd-joiners-list">
+      {employees.map((employee) => (
+        <div
+          className="hrd-joiner-row"
+          key={employee.id || employee.employee_id}
+        >
+          <div className="hrd-employee-avatar">
+            {getInitials(employee.name)}
+          </div>
+
+          <div className="hrd-joiner-info">
+            <strong>
+              {employee.name || "Employee"}
+            </strong>
+
+            <span>
+              {employee.department || "Unassigned"} · Joined{" "}
+              {formatDate(employee.join_date)}
+            </span>
+          </div>
+
+          <span className="hrd-new-badge">New</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ==========================================================================
+   Calendar
+   ========================================================================== */
+
+function CalendarCard() {
+  const today = new Date();
+
+  const [year, setYear] = useState(
+    today.getFullYear()
+  );
+
+  const [month, setMonth] = useState(
+    today.getMonth()
+  );
+
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  // The calendar fetches its own birthday data instead of relying on the
+  // dashboard's `employees` list, which is capped at 100 rows server-side
+  // and also carries a lot of PII (salary, bank details, gov ID) that
+  // this component has no reason to hold in memory.
+  const [birthdayEmployees, setBirthdayEmployees] = useState([]);
+  const [loadingBirthdays, setLoadingBirthdays] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    let cancelled = false;
+
+    async function fetchBirthdays() {
       try {
-        const [empRes, dashRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/employees"),
-          axios.get("http://localhost:5000/api/dashboard"),
-        ]);
-        setEmployees(empRes.data);
-        setDashboard(dashRes.data);
-      } catch (err) {
-        console.error("Dashboard error:", err);
+        setLoadingBirthdays(true);
+
+        const response = await authAxios.get(
+          `${API_URL}/employees/birthdays`
+        );
+
+        if (!cancelled) {
+          setBirthdayEmployees(response.data || []);
+        }
+      } catch (error) {
+        console.error("Unable to fetch birthdays:", error);
+
+        if (!cancelled) {
+          setBirthdayEmployees([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingBirthdays(false);
+        }
       }
+    }
+
+    fetchBirthdays();
+
+    return () => {
+      cancelled = true;
     };
-    fetchData();
   }, []);
 
-  const total = employees.length;
-  const active = employees.filter((e) => e.status === "active").length;
-  const onLeave = employees.filter((e) => e.status === "on_leave").length;
+  // Group birthdays by day-of-month for the currently viewed month.
+  // Parses the date string directly (instead of `new Date(dob)`) so the
+  // day can't shift because of the browser's local timezone. The backend
+  // also sends dob as plain text (dob::text) for the same reason, since
+  // node-postgres otherwise converts DATE columns to JS Date objects
+  // using the server's local timezone.
+  const birthdays = useMemo(() => {
+    const result = {};
 
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const newJoiners = employees.filter(
-    (e) => e.join_date && new Date(e.join_date) >= thirtyDaysAgo,
-  ).length;
+    birthdayEmployees.forEach((employee) => {
+      if (!employee.dob) return;
 
-  const pendingLeaves = (dashboard?.pending || []).filter(
-    (r) => r.status === "pending",
-  ).length;
+      const datePart = String(employee.dob).slice(0, 10);
+      const parts = datePart.split("-").map(Number);
 
-  const present = dashboard?.attendance?.present ?? Math.round(active * 0.85);
-  const absent = dashboard?.attendance?.absent ?? Math.round(active * 0.1);
-  const attendanceOnLeave = dashboard?.attendance?.on_leave ?? onLeave;
+      if (parts.length !== 3 || parts.some(Number.isNaN)) return;
 
-  const statCards = [
-    { label: "Total Employees", value: total, icon: "👥", colorKey: "navy" },
-    { label: "Active Employees", value: active, icon: "✅", colorKey: "teal" },
-    { label: "New Joiners", value: newJoiners, icon: "🌟", colorKey: "blue" },
-    { label: "On Leave", value: onLeave, icon: "🗓️", colorKey: "sky" },
-  ];
+      const [, birthMonth, birthDay] = parts;
 
-  const pendingRequests = (dashboard?.pending || [])
-    .filter((r) => r.status === "pending")
-    .slice(0, 4);
+      if (birthMonth - 1 !== month) return;
+
+      if (!result[birthDay]) {
+        result[birthDay] = [];
+      }
+
+      result[birthDay].push(employee.name);
+    });
+
+    return result;
+  }, [birthdayEmployees, month]);
+
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDay = getFirstDayOfMonth(year, month);
+
+  function changeMonth(direction) {
+    setSelectedDay(null);
+
+    if (direction === "previous") {
+      if (month === 0) {
+        setMonth(11);
+        setYear((currentYear) => currentYear - 1);
+      } else {
+        setMonth((currentMonth) => currentMonth - 1);
+      }
+    }
+
+    if (direction === "next") {
+      if (month === 11) {
+        setMonth(0);
+        setYear((currentYear) => currentYear + 1);
+      } else {
+        setMonth((currentMonth) => currentMonth + 1);
+      }
+    }
+  }
 
   return (
-    <div className="hr-dashboard-v2">
-      {/* ── Top Bar ── */}
-      <div className="top-bar">
-        <div className="greeting-block">
-          <h1 className="greeting-name">
-            {getGreeting()}, {hrName}!
-          </h1>
-          <p className="greeting-sub">
-            Here's what's happening in your organization today
-          </p>
-        </div>
-        <div className="top-actions">
-          <div className="search-box">
-            <span className="search-icon">🔍</span>
-            <input placeholder="Search employees…" />
-          </div>
+    <Card
+      title="Calendar"
+      subtitle="Employee birthdays"
+    >
+      <div className="hrd-calendar-header">
+        <button
+          type="button"
+          className="hrd-calendar-nav"
+          onClick={() => changeMonth("previous")}
+          aria-label="Previous month"
+        >
+          ‹
+        </button>
 
-          {/* ── CHECK IN / OUT — same as ProjectCoordinatorDashboard ── */}
-          {employeeId && <CheckInButton employeeId={employeeId} />}
+        <strong>
+          {MONTH_NAMES[month]} {year}
+        </strong>
 
-          <button
-            className="upgrade-btn"
-            onClick={() => navigate("/hr/employees")}
-          >
-            All Employees
-          </button>
-        </div>
+        <button
+          type="button"
+          className="hrd-calendar-nav"
+          onClick={() => changeMonth("next")}
+          aria-label="Next month"
+        >
+          ›
+        </button>
       </div>
 
-      {/* ── Row 1 ── */}
-      <div className="row-1">
-        <div className="employee-stats-card">
-          <div className="card-header-line">
-            <span className="card-title">Employee Overview</span>
-            <span className="card-subtitle">Today</span>
-          </div>
-          <div className="stat-cards-grid">
-            {statCards.map((c, i) => (
-              <StatCard key={i} {...c} />
-            ))}
-          </div>
-        </div>
-
-        <TrainingCalendar employees={employees} />
-      </div>
-
-      {/* ── Row 2 ── */}
-      <div className="row-2">
-        {/* Attendance */}
-        <div className="bottom-card attendance-card">
-          <div className="card-header-line">
-            <span className="card-title">Attendance Today</span>
-          </div>
-          <AttendanceDonut
-            present={present}
-            absent={absent}
-            onLeave={attendanceOnLeave}
-            total={present + absent + attendanceOnLeave || total}
-          />
-        </div>
-
-        {/* Pending Leaves */}
-        <div className="bottom-card pending-leaves-card">
-          <div className="card-header-line">
-            <span className="card-title">Pending Leave Requests</span>
-            <button
-              className="add-new-btn"
-              onClick={() => navigate("/hr/leaves")}
+      <div className="hrd-calendar-grid">
+        {["M", "T", "W", "T", "F", "S", "S"].map(
+          (day, index) => (
+            <span
+              className="hrd-calendar-weekday"
+              key={`${day}-${index}`}
             >
-              View All <span>→</span>
-            </button>
-          </div>
-          <div className="leaves-scroll">
-            {pendingRequests.length === 0 && (
-              <p className="empty-msg">No pending requests 🎉</p>
-            )}
-            {pendingRequests.map((req, i) => (
-              <div key={i} className="leave-row">
-                <div className="leave-avatar">
-                  {(req.employee_name || req.name || "?")[0].toUpperCase()}
-                </div>
-                <div className="leave-info">
-                  <p className="leave-name">{req.employee_name || req.name}</p>
-                  <p className="leave-meta">
-                    {req.leave_type || "Leave"} ·{" "}
-                    {req.from_date || req.start_date} →{" "}
-                    {req.to_date || req.end_date}
-                  </p>
-                </div>
-                <button
-                  className="approve-btn"
-                  onClick={() => navigate("/hr/leaves")}
-                >
-                  Approve
-                </button>
-              </div>
-            ))}
-          </div>
-          {pendingLeaves > 0 && (
-            <div className="pending-summary">
-              <span className="pending-badge">{pendingLeaves}</span>
-              <span className="pending-label">total pending requests</span>
-            </div>
-          )}
-        </div>
+              {day}
+            </span>
+          )
+        )}
 
-        {/* New Joiners */}
-        <div className="bottom-card joiners-card">
-          <div className="card-header-line">
-            <span className="card-title">New Joiners</span>
-            <span className="card-badge">{newJoiners} this month</span>
-          </div>
-          <NewJoinersChart employees={employees} />
-        </div>
+        {Array.from({ length: firstDay }).map(
+          (_, index) => (
+            <span
+              className="hrd-calendar-empty"
+              key={`empty-${index}`}
+            />
+          )
+        )}
+
+        {Array.from({ length: daysInMonth }).map(
+          (_, index) => {
+            const day = index + 1;
+
+            const isToday =
+              day === today.getDate() &&
+              month === today.getMonth() &&
+              year === today.getFullYear();
+
+            const dayBirthdays = birthdays[day];
+            const hasBirthday = Boolean(dayBirthdays);
+
+            return (
+              <button
+                type="button"
+                key={day}
+                className={[
+                  "hrd-calendar-day",
+                  isToday ? "hrd-calendar-today" : "",
+                  selectedDay === day
+                    ? "hrd-calendar-selected"
+                    : "",
+                  hasBirthday ? "hrd-day-birthday" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => setSelectedDay(day)}
+                title={
+                  hasBirthday
+                    ? `Birthday: ${dayBirthdays.join(", ")}`
+                    : ""
+                }
+              >
+                {day}
+              </button>
+            );
+          }
+        )}
       </div>
-    </div>
+
+      {selectedDay && birthdays[selectedDay] && (
+        <div className="hrd-calendar-selection">
+          <div>
+            <strong>
+              {MONTH_NAMES[month]} {selectedDay}
+            </strong>
+
+            <span>
+              Birthday:{" "}
+              {birthdays[selectedDay].join(", ")}
+            </span>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
-export default HRDashboard;
+/* ==========================================================================
+   Quick actions
+   ========================================================================== */
+
+function QuickActions({ navigate }) {
+  return (
+    <Card
+      title="Quick actions"
+      subtitle="Frequently used HR operations"
+    >
+      <div className="hrd-quick-actions">
+        <button
+          type="button"
+          className="hrd-quick-action"
+          onClick={() => navigate("/hr/employees")}
+        >
+          <span className="hrd-quick-icon">+</span>
+
+          <span className="hrd-quick-content">
+            <strong>Add employee</strong>
+            <small>Create a new employee record</small>
+          </span>
+
+          <span className="hrd-quick-arrow">›</span>
+        </button>
+
+        <button
+          type="button"
+          className="hrd-quick-action"
+          onClick={() => navigate("/hr/leave")}
+        >
+          <span className="hrd-quick-icon">✓</span>
+
+          <span className="hrd-quick-content">
+            <strong>Review leave</strong>
+            <small>Manage pending requests</small>
+          </span>
+
+          <span className="hrd-quick-arrow">›</span>
+        </button>
+
+        <button
+          type="button"
+          className="hrd-quick-action"
+          onClick={() => navigate("/hr/payroll")}
+        >
+          <span className="hrd-quick-icon">₹</span>
+
+          <span className="hrd-quick-content">
+            <strong>Open payroll</strong>
+            <small>View payroll operations</small>
+          </span>
+
+          <span className="hrd-quick-arrow">›</span>
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+/* ==========================================================================
+   Main dashboard
+   ========================================================================== */
+
+export default function HRDashboard() {
+  const navigate = useNavigate();
+
+  const [employees, setEmployees] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
+  const [attendanceRows, setAttendanceRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const user = JSON.parse(
+    localStorage.getItem("user") || "{}"
+  );
+
+  const hrName =
+    user?.name ||
+    user?.full_name ||
+    user?.username ||
+    user?.first_name ||
+    "HR Manager";
+
+  const employeeId =
+    user?.employee_id || user?.id || null;
+
+  // Used only by CheckInButton to decide whether to skip location
+  // capture for the CEO — falls back to role if designation isn't
+  // stored on the user object yet.
+  const designation =
+    user?.designation || user?.role || null;
+
+  useEffect(() => {
+    async function fetchDashboardData() {
+      try {
+        setLoading(true);
+
+        const [
+          employeesResponse,
+          dashboardResponse,
+          attendanceResponse,
+        ] = await Promise.all([
+          authAxios.get(`${API_URL}/employees`),
+          authAxios.get(`${API_URL}/dashboard`),
+          authAxios.get(`${API_URL}/attendance`),
+        ]);
+
+        setEmployees(employeesResponse.data || []);
+        setDashboard(dashboardResponse.data || null);
+        setAttendanceRows(attendanceResponse.data || []);
+      } catch (fetchError) {
+        console.error("Dashboard error:", fetchError);
+
+        setEmployees([]);
+        setDashboard(null);
+        setAttendanceRows([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchDashboardData();
+  }, []);
+
+  const totalEmployees = employees.length;
+
+  const employeesOnLeave = employees.filter(
+    (employee) => employee.status === "on_leave"
+  ).length;
+
+  const newJoiners = employees.filter((employee) => {
+    if (!employee.join_date) return false;
+
+    const joinedDate = new Date(employee.join_date);
+    const thirtyDaysAgo = new Date();
+
+    thirtyDaysAgo.setDate(
+      thirtyDaysAgo.getDate() - 30
+    );
+
+    return joinedDate >= thirtyDaysAgo;
+  }).length;
+
+  const present =
+    dashboard?.attendance?.present ??
+    attendanceRows.filter((row) => {
+      return (
+        row.date === getTodayString() &&
+        String(row.status).toLowerCase() === "present"
+      );
+    }).length;
+
+  const onLeave =
+    dashboard?.attendance?.on_leave ??
+    employeesOnLeave;
+
+  const departmentData = useMemo(() => {
+    const departmentMap = {};
+
+    employees.forEach((employee) => {
+      // Trim so stray whitespace (e.g. " Finance" vs "Finance") doesn't
+      // silently split one department into two separate buckets.
+      const department =
+        employee.department?.trim() || "Unassigned";
+
+      departmentMap[department] =
+        (departmentMap[department] || 0) + 1;
+    });
+
+    const sorted = Object.entries(departmentMap).sort(
+      (first, second) => second[1] - first[1]
+    );
+
+    const top = sorted
+      .slice(0, 6)
+      .map(([label, value]) => ({ label, value }));
+
+    const remainder = sorted.slice(6);
+    const remainderCount = remainder.reduce(
+      (sum, [, value]) => sum + value,
+      0
+    );
+
+    return {
+      top,
+      remainderDepartments: remainder.length,
+      remainderCount,
+    };
+  }, [employees]);
+
+  const recentJoiners = useMemo(() => {
+    return [...employees]
+      .filter((employee) => employee.join_date)
+      .sort(
+        (first, second) =>
+          new Date(second.join_date) -
+          new Date(first.join_date)
+      )
+      .slice(0, 5);
+  }, [employees]);
+
+  const attendanceTrend = useMemo(() => {
+    const months = [];
+
+    for (let index = 5; index >= 0; index -= 1) {
+      const date = new Date();
+
+      date.setDate(1);
+      date.setMonth(date.getMonth() - index);
+
+      months.push({
+        key: `${date.getFullYear()}-${date.getMonth()}`,
+        label: date.toLocaleString("en-US", {
+          month: "short",
+        }),
+        value: 0,
+      });
+    }
+
+    attendanceRows.forEach((row) => {
+      if (!row.date) return;
+
+      const date = new Date(row.date);
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+
+      const matchingMonth = months.find(
+        (month) => month.key === key
+      );
+
+      if (
+        matchingMonth &&
+        String(row.status).toLowerCase() === "present"
+      ) {
+        matchingMonth.value += 1;
+      }
+    });
+
+    return months;
+  }, [attendanceRows]);
+
+  const todayLabel = new Date().toLocaleDateString(
+    "en-US",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }
+  );
+
+  if (loading) {
+    return <LoadingDashboard />;
+  }
+
+  return (
+    <main className="hrd-page">
+      <header className="hrd-header">
+        <div className="hrd-header-content">
+          <h1>
+            {getGreeting()}, {hrName}
+          </h1>
+        </div>
+
+        <div className="hrd-header-actions">
+          {employeeId && (
+            <CheckInButton
+              employeeId={employeeId}
+              designation={designation}
+            />
+          )}
+
+          <Button
+            variant="secondary"
+            onClick={() => navigate("/hr/employees")}
+          >
+            View employees
+          </Button>
+        </div>
+      </header>
+
+      <section className="hrd-toolbar hrd-date-toolbar">
+        <div className="hrd-date">
+          <IconCalendar />
+          <span>{todayLabel}</span>
+        </div>
+      </section>
+
+      <section className="hrd-metrics">
+        <MetricCard
+          label="Total employees"
+          value={totalEmployees}
+          description="Current headcount"
+          tone="brand"
+          icon={IconUsers}
+        />
+
+        <MetricCard
+          label="Present today"
+          value={present}
+          description="Attendance recorded"
+          tone="success"
+          icon={IconCheck}
+        />
+
+        <MetricCard
+          label="On leave"
+          value={onLeave}
+          description="Approved leave"
+          tone="warning"
+          icon={IconClock}
+        />
+
+        <MetricCard
+          label="New joiners"
+          value={newJoiners}
+          description="Joined in the last 30 days"
+          tone="neutral"
+          icon={IconUserPlus}
+        />
+      </section>
+
+      <div className="hrd-layout">
+        <div className="hrd-main-column">
+          <div className="hrd-two-column hrd-primary-grid">
+            <Card
+              title="Department distribution"
+              subtitle="Employee headcount by department"
+            >
+              <DepartmentDistribution
+                data={departmentData.top}
+                remainderDepartments={
+                  departmentData.remainderDepartments
+                }
+                remainderCount={departmentData.remainderCount}
+              />
+            </Card>
+
+            <Card
+              title="Attendance trend"
+              subtitle="Present count over the last six months"
+            >
+              <AttendanceTrend
+                data={attendanceTrend}
+              />
+            </Card>
+          </div>
+
+          <Card
+            title="Recent joiners"
+            subtitle="Newest employees in the company"
+            action={
+              <button
+                type="button"
+                className="hrd-text-button"
+                onClick={() =>
+                  navigate("/hr/employees")
+                }
+              >
+                View all
+              </button>
+            }
+          >
+            <RecentJoiners employees={recentJoiners} />
+          </Card>
+        </div>
+
+        <aside className="hrd-sidebar">
+          <CalendarCard />
+          <QuickActions navigate={navigate} />
+        </aside>
+      </div>
+    </main>
+  );
+}

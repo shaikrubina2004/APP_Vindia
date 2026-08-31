@@ -33,13 +33,24 @@ const protect = (req, res, next) => {
 // ── Role guard — use after protect ────────────────────────────────────────
 // Usage: router.use(requireRole("client"))
 //        router.use(requireRole("admin", "ceo"))
+// Normalizes "Finance Manager" and "finance_manager" (and any casing/spacing
+// variant) to the same key, so role checks work regardless of how the role
+// was stored/cased when the JWT was issued.
+const normalizeRole = (r) =>
+  String(r || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+
 const requireRole =
   (...roles) =>
   (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: "Not authenticated." });
     }
-    if (!roles.includes(req.user.role)) {
+    const userRole = normalizeRole(req.user.role);
+    const allowed = roles.map(normalizeRole);
+    if (!allowed.includes(userRole)) {
       return res
         .status(403)
         .json({ message: "Access denied. Insufficient role." });

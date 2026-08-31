@@ -10,7 +10,7 @@ import ExpenseTracking from "../pages/Finance/ExpenseTracking";
 import CostReporting from "../pages/Finance/CostReporting";
 import VendorManagement from "../pages/Finance/VendorManagement"; // Create this if needed
 import FinanceSettings from "../pages/Finance/FinanceSettings"; // Create this if needed
-
+import FinanceDailyUpdate from "../pages/Finance/FinanceDailyUpdate";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
 
@@ -90,7 +90,7 @@ const FinanceRoutes = () => {
         }
       /> }
 
-      {/* Settings */}
+            {/* Settings */}
       { <Route
         path="/settings"
         element={
@@ -99,8 +99,17 @@ const FinanceRoutes = () => {
           </ProtectedRoute>
         }
       /> }
+
+      {/* Daily Update — Finance Manager submits, CEO reviews separately */}
+      <Route
+        path="/daily-update"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.FINANCE_MANAGER]}>
+            <FinanceDailyUpdate />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 };
-
 export default FinanceRoutes;

@@ -56,6 +56,43 @@
 }
 
 /* ══════════════════════════════════════════
+   LOADING / ERROR / EMPTY STATES
+══════════════════════════════════════════ */
+.fm-state {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--fm-text-muted);
+  font-size: 14px;
+}
+.fm-state--error {
+  color: var(--fm-exp);
+}
+.fm-retry-btn {
+  margin-top: 14px;
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--fm-border2);
+  background: var(--fm-surface);
+  color: var(--fm-text);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.fm-retry-btn:hover {
+  border-color: var(--fm-accent);
+  color: var(--fm-accent);
+}
+.fm-empty-text {
+  color: var(--fm-text-dim);
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ══════════════════════════════════════════
    HEADER
 ══════════════════════════════════════════ */
 .fm-header {
@@ -112,6 +149,83 @@
 .fm-export-btn:hover {
   opacity: 0.88;
   box-shadow: 0 0 16px rgba(123,189,232,0.35);
+}
+
+/* ══════════════════════════════════════════
+   CHECK IN / OUT
+══════════════════════════════════════════ */
+.fm-checkin-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.fm-checkin-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--fm-border2);
+  background: var(--fm-surface);
+  color: var(--fm-text);
+  padding: 8px 18px;
+  border-radius: 100px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.fm-checkin-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.fm-checkin-in {
+  background: var(--fm-accent);
+  border-color: var(--fm-accent);
+  color: #ffffff;
+}
+.fm-checkin-in:hover:not(:disabled) {
+  opacity: 0.88;
+  box-shadow: 0 0 16px rgba(123,189,232,0.35);
+}
+.fm-checkin-out {
+  background: var(--fm-warn);
+  border-color: var(--fm-warn);
+  color: #ffffff;
+}
+.fm-checkin-out:hover:not(:disabled) {
+  opacity: 0.88;
+}
+.fm-checkin-done {
+  background: var(--fm-surface2);
+  border-color: var(--fm-ok);
+  color: var(--fm-ok);
+}
+.fm-checkin-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+}
+.fm-checkin-dot-green {
+  background: var(--fm-ok);
+  opacity: 1;
+}
+.fm-checkin-dot-pulse {
+  background: #ffffff;
+  animation: fm-checkin-pulse 1.4s ease-in-out infinite;
+}
+@keyframes fm-checkin-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+.fm-checkin-sub {
+  font-size: 11px;
+  color: var(--fm-text-muted);
+}
+.fm-checkin-elapsed {
+  color: var(--fm-accent);
 }
 
 /* ══════════════════════════════════════════

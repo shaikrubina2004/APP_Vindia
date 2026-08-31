@@ -2,11 +2,8 @@ import { useState, useEffect } from "react";
 import { useProject } from "../../context/ProjectContext";
 import ProjectSwitcher from "../../components/project/ProjectSwitcher";
 import { API } from "../../services/authService";
+import CheckInButton from "../../SharedResourse/CheckInButton";
 import "../../styles/MEPEngineer.css";
-
-/* ═══════════════════════════════════════
-   PROJECT SWITCHER
-═══════════════════════════════════════ */
 
 /* ═══════════════════════════════════════
    MILESTONE DATA  (per project)
@@ -65,21 +62,22 @@ export default function MEPDashboard() {
   const [milestones, setMilestones] = useState({ M: [], E: [], P: [] });
   const [loading, setLoading] = useState(true);
 
-  const currentUserId = (() => {
+  // Parsed once, reused for id/name/designation — avoids parsing
+  // localStorage three separate times like before.
+  const currentUser = (() => {
     try {
-      return JSON.parse(localStorage.getItem("user"))?.id;
+      return JSON.parse(localStorage.getItem("user")) || {};
     } catch {
-      return null;
+      return {};
     }
   })();
 
-  const currentUserName = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("user"))?.name || "MEP Engineer";
-    } catch {
-      return "MEP Engineer";
-    }
-  })();
+  const currentUserId = currentUser?.id || null;
+  const currentUserName = currentUser?.name || "MEP Engineer";
+  // Used by CheckInButton to decide whether to skip location capture
+  // for the CEO — falls back to role if designation isn't stored yet.
+  const currentDesignation =
+    currentUser?.designation || currentUser?.role || null;
 
   useEffect(() => {
     setDateStr(
@@ -178,20 +176,36 @@ export default function MEPDashboard() {
           <div className="dash-hero-sub">
             {activeProject.code} · {activeProject.location} · {dateStr}
           </div>
-          <a href="/mep/daily-log" className="dash-hero-btn">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Post Today's Log
-          </a>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              marginTop: 10,
+            }}
+          >
+            <a href="/mep/daily-log" className="dash-hero-btn">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Post Today's Log
+            </a>
+            {currentUserId && (
+              <CheckInButton
+                employeeId={currentUserId}
+                designation={currentDesignation}
+              />
+            )}
+          </div>
         </div>
         <div className="dash-hero-right">
           <div className="dash-hero-stat">

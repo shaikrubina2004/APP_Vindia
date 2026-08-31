@@ -48,6 +48,7 @@ function Employees() {
     if (filter === "active") return emp.status === "active";
     if (filter === "leave") return emp.status === "on_leave";
     if (filter === "inactive") return emp.status === "inactive";
+    if (filter === "wfh") return emp.status === "work_from_home";
 
     if (filter === "new") {
       const joinDate = new Date(emp.join_date);

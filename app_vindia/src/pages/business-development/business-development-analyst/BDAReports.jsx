@@ -77,12 +77,23 @@ const BDAReports = ({ role }) => {
   const [timeTo,     setTimeTo]     = useState("");
   const [timeBdaF,   setTimeBdaF]   = useState("");
 
-  useEffect(() => { loadAll(); loadTimeData(); }, []);
+  // ✅ Only CEO is allowed to see this page's data — skip fetching
+  // entirely for anyone else instead of quietly hitting endpoints
+  // that will now reject them server-side.
+  useEffect(() => {
+    if (isCEO) {
+      loadAll();
+      loadTimeData();
+    } else {
+      setLoading(false);
+      setTimeLoading(false);
+    }
+  }, []);
 
   const loadAll = async (filters = {}) => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { role };
       if (filters.from)        params.from        = filters.from;
       if (filters.to)          params.to          = filters.to;
       if (filters.status)      params.status      = filters.status;
@@ -91,8 +102,8 @@ const BDAReports = ({ role }) => {
 
       const [ovRes, bdaRes, srcRes] = await Promise.all([
         axios.get(`${API}/reports/overview`, { params }),
-        axios.get(`${API}/reports/user-performance`),
-        axios.get(`${API}/reports/source-performance`),
+        axios.get(`${API}/reports/user-performance`, { params: { role } }),
+        axios.get(`${API}/reports/source-performance`, { params: { role } }),
       ]);
 
       setOverview(ovRes.data);
@@ -108,7 +119,7 @@ const BDAReports = ({ role }) => {
   const loadTimeData = async (filters = {}) => {
     setTimeLoading(true);
     try {
-      const params = {};
+      const params = { role };
       if (filters.from)      params.from      = filters.from;
       if (filters.to)        params.to        = filters.to;
       if (filters.bda_email) params.bda_email = filters.bda_email;
@@ -154,7 +165,7 @@ const BDAReports = ({ role }) => {
   const handleExportAll = async () => {
     setExporting("all");
     try {
-      const params = {};
+      const params = { role };
       if (from) params.from = from; if (to) params.to = to;
       if (statusF) params.status = statusF; if (sourceF) params.source = sourceF;
       if (assignedF) params.assigned_to = assignedF;
@@ -167,7 +178,7 @@ const BDAReports = ({ role }) => {
   const handleExportConverted = async () => {
     setExporting("converted");
     try {
-      const params = { status: "Converted" };
+      const params = { role, status: "Converted" };
       if (from) params.from = from; if (to) params.to = to;
       if (sourceF) params.source = sourceF; if (assignedF) params.assigned_to = assignedF;
       const res = await axios.get(`${API}/reports/export`, { params, responseType:"blob" });
@@ -179,7 +190,7 @@ const BDAReports = ({ role }) => {
   const handleExportBDA = async () => {
     setExporting("bda");
     try {
-      const res = await axios.get(`${API}/reports/export-bda-performance`, { responseType:"blob" });
+      const res = await axios.get(`${API}/reports/export-bda-performance`, { params: { role }, responseType:"blob" });
       triggerDownload(res.data, `bda-performance-${Date.now()}.xlsx`);
     } catch (err) { alert("Export failed: " + err.message); }
     finally { setExporting(null); }
@@ -820,8 +831,11 @@ const BDAReports = ({ role }) => {
           </div>
         )}
 
-        {/* ════════════ MASK — BDA users ════════════ */}
-        {!isCEO && activeSection !== "time" && (
+        {/* ════════════ MASK — BDA users ════════════
+             ✅ Now covers ALL sections, including "time" —
+             the Time Spent tab is no longer left unmasked
+             for non-CEO users. */}
+        {!isCEO && (
           <div className="rp-mask">
             <div className="rp-mask__box">
               <span className="rp-mask__icon">🔒</span>

@@ -1,26 +1,30 @@
 // backend/routes/travelExpenseRoutes.js
 const express = require("express");
-const { createRequest, getRequests, getRequestById,
-        updateStatus, pmUpdateStatus } = require("../controllers/travelExpenseController");
+const {
+  createRequest,
+  getRequests,
+  getRequestById,
+  updateStatus,
+  pmUpdateStatus,
+  getManualExpenses,
+  saveManualExpenses,
+} = require("../controllers/travelExpenseController");
 
 const router = express.Router();
 
-// Employee submits a request
-router.post("/", createRequest);
+router.post("/",              createRequest);
+router.get("/",               getRequests);
+router.get("/:id",            getRequestById);
+router.put("/:id/status",     updateStatus);
+router.put("/:id/pm-status",  pmUpdateStatus);
 
-// List requests  (HR: all | Employee: ?user_id=N)
-router.get("/", getRequests);
-
-// Single request detail with receipts
-router.get("/:id", getRequestById);
-
-// HR approve / reject
-router.put("/:id/status", updateStatus);
-router.put("/:id/pm-status", pmUpdateStatus);   // ← ADD THIS
-  // existing HR route
+// Manual expense entry by HR / CEO (company-pays requests)
+// Stored as JSONB on the request row — no extra table needed.
+// Run once in your DB:  ALTER TABLE travel_expense_requests ADD COLUMN IF NOT EXISTS manual_expenses JSONB DEFAULT '[]';
+router.get("/:id/manual-expenses", getManualExpenses);
+router.put("/:id/manual-expenses", saveManualExpenses);
 
 module.exports = router;
- 
 /* ─────────────────────────────────────────────────────────────────────────────
    In your server.js, add:
 

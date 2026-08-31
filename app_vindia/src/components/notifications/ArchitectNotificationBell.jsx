@@ -134,7 +134,7 @@ export default function ArchitectNotificationBell({ userId }) {
     e.stopPropagation();
     markRead(n.id);
     setOpen(false);
-    navigate(ROUTES[n.type] ?? "/architect/dashboard");
+    navigate(n.link || ROUTES[n.type] || "/architect/dashboard");
   };
 
   // ── Filtered lists ─────────────────────────────────────────────────────────

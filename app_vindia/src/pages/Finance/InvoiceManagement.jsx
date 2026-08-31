@@ -1,48 +1,86 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import financeService from "../../services/financeService";
+import { getProjects } from "../../services/projectService";
 import "./InvoiceManagement.css";
 
-/* ── Mock Data ─────────────────────────────────────────────── */
-const MOCK_INVOICES = [
-  { id: "INV-2024-0041", client: "Skyline Infra Pvt Ltd",   project: "Tower B Construction",  amount: 1250000, issued: "2024-05-01", due: "2024-05-20", status: "pending" },
-  { id: "INV-2024-0040", client: "Green Valley Developers", project: "Villa Complex Phase 2", amount:  980000, issued: "2024-04-20", due: "2024-05-10", status: "paid"    },
-  { id: "INV-2024-0039", client: "Metro Constructions",     project: "Commercial Hub",        amount: 2100000, issued: "2024-04-10", due: "2024-05-01", status: "overdue" },
-  { id: "INV-2024-0038", client: "Horizon Realty",          project: "Residential Block A",   amount:  650000, issued: "2024-04-08", due: "2024-04-28", status: "paid"    },
-  { id: "INV-2024-0037", client: "BuildRight Corp",         project: "Highway Bridge",        amount: 1750000, issued: "2024-05-05", due: "2024-05-25", status: "pending" },
-  { id: "INV-2024-0036", client: "Urban Spaces Ltd",        project: "Smart City Block 4",    amount:  320000, issued: "2024-03-28", due: "2024-04-15", status: "overdue" },
-  { id: "INV-2024-0035", client: "Pinnacle Constructions",  project: "Office Complex A",      amount: 4500000, issued: "2024-04-01", due: "2024-04-30", status: "paid"    },
-  { id: "INV-2024-0034", client: "Delta Infrastructure",    project: "Bridge Expansion",      amount:  875000, issued: "2024-05-07", due: "2024-05-28", status: "pending" },
-];
-
 const EMPTY_FORM = {
-  client: "", project: "", invoiceNo: "", issueDate: "", dueDate: "",
+  project_id: "", client_name: "", invoiceNo: "", issueDate: "", dueDate: "",
   tax: "18", notes: "",
   items: [{ description: "", qty: 1, rate: "", amount: 0 }],
 };
 
 /* ── Helpers ───────────────────────────────────────────────── */
-const fmt = (n) =>
-  n >= 10000000 ? `₹${(n / 10000000).toFixed(2)}Cr`
-  : n >= 100000 ? `₹${(n / 100000).toFixed(1)}L`
-  : `₹${Number(n).toLocaleString("en-IN")}`;
+const fmt = (n) => {
+  const num = Number(n) || 0;
+  return num >= 10000000 ? `₹${(num / 10000000).toFixed(2)}Cr`
+    : num >= 100000 ? `₹${(num / 100000).toFixed(1)}L`
+    : `₹${num.toLocaleString("en-IN")}`;
+};
+
+const fmtDate = (d) => {
+  if (!d) return "—";
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "—";
+  return date.toISOString().split("T")[0];
+};
 
 const daysDiff = (dateStr) => {
-  const diff = Math.floor((new Date() - new Date(dateStr)) / 86400000);
-  return diff;
+  if (!dateStr) return 0;
+  return Math.floor((new Date() - new Date(dateStr)) / 86400000);
 };
 
 const TABS = ["All Invoices", "Create Invoice", "Pending Invoices"];
 
 /* ════════════════════════════════════════════════════════════
-   MAIN COMPONENT
+   MAIN COMPONENT — owns all data fetching
 ════════════════════════════════════════════════════════════ */
 export default function InvoiceManagement() {
   const [tab, setTab]       = useState("All Invoices");
   const [animIn, setAnimIn] = useState(false);
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [invoices, setInvoices] = useState([]);
+  const [projects, setProjects] = useState([]);
+
   useEffect(() => {
     const f = requestAnimationFrame(() => setAnimIn(true));
     return () => cancelAnimationFrame(f);
   }, []);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [invoicesRes, projectsRes] = await Promise.all([
+        financeService.getAllInvoices(),
+        getProjects(),
+      ]);
+      setInvoices(invoicesRes.data.data || []);
+      setProjects(projectsRes.data.projects || projectsRes.data || []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load invoice data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  const pendingCount = invoices.filter((i) => (i.effectiveStatus || i.status) !== "paid").length;
+
+  if (loading) {
+    return <div className="inv-root"><p className="inv-state">Loading invoices…</p></div>;
+  }
+  if (error) {
+    return (
+      <div className="inv-root">
+        <p className="inv-state inv-state--error">
+          {error} <button className="inv-btn-outline" onClick={loadAll}>Retry</button>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className={`inv-root ${animIn ? "inv-in" : ""}`}>
@@ -66,10 +104,8 @@ export default function InvoiceManagement() {
             onClick={() => setTab(t)}
           >
             {t}
-            {t === "Pending Invoices" && (
-              <span className="inv-tab-badge">
-                {MOCK_INVOICES.filter((i) => i.status !== "paid").length}
-              </span>
+            {t === "Pending Invoices" && pendingCount > 0 && (
+              <span className="inv-tab-badge">{pendingCount}</span>
             )}
           </button>
         ))}
@@ -77,9 +113,15 @@ export default function InvoiceManagement() {
 
       {/* Tab Content */}
       <div className="inv-body">
-        {tab === "All Invoices"     && <AllInvoicesTab />}
-        {tab === "Create Invoice"   && <CreateInvoiceTab onSuccess={() => setTab("All Invoices")} />}
-        {tab === "Pending Invoices" && <PendingInvoicesTab />}
+        {tab === "All Invoices" && (
+          <AllInvoicesTab invoices={invoices} onReload={loadAll} />
+        )}
+        {tab === "Create Invoice" && (
+          <CreateInvoiceTab projects={projects} onSuccess={() => { loadAll(); setTab("All Invoices"); }} />
+        )}
+        {tab === "Pending Invoices" && (
+          <PendingInvoicesTab invoices={invoices} onReload={loadAll} />
+        )}
       </div>
     </div>
   );
@@ -88,24 +130,38 @@ export default function InvoiceManagement() {
 /* ════════════════════════════════════════════════════════════
    TAB 1 — ALL INVOICES
 ════════════════════════════════════════════════════════════ */
-function AllInvoicesTab() {
-  const [search,  setSearch]  = useState("");
-  const [status,  setStatus]  = useState("all");
+function AllInvoicesTab({ invoices, onReload }) {
+  const [search, setSearch]   = useState("");
+  const [status, setStatus]   = useState("all");
   const [selected, setSelected] = useState(null);
+  const [editing, setEditing] = useState(null);
 
-  const filtered = MOCK_INVOICES.filter((inv) => {
-    const matchSearch = inv.client.toLowerCase().includes(search.toLowerCase())
-      || inv.id.toLowerCase().includes(search.toLowerCase())
-      || inv.project.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = status === "all" || inv.status === status;
+  const filtered = invoices.filter((inv) => {
+    const effStatus = inv.effectiveStatus || inv.status;
+    const q = search.toLowerCase();
+    const matchSearch =
+      (inv.client_name || "").toLowerCase().includes(q) ||
+      (inv.invoice_number || "").toLowerCase().includes(q) ||
+      (inv.project_name || "").toLowerCase().includes(q);
+    const matchStatus = status === "all" || effStatus === status;
     return matchSearch && matchStatus;
   });
 
   const totals = {
-    total:   MOCK_INVOICES.reduce((s, i) => s + i.amount, 0),
-    paid:    MOCK_INVOICES.filter((i) => i.status === "paid").reduce((s, i) => s + i.amount, 0),
-    pending: MOCK_INVOICES.filter((i) => i.status === "pending").reduce((s, i) => s + i.amount, 0),
-    overdue: MOCK_INVOICES.filter((i) => i.status === "overdue").reduce((s, i) => s + i.amount, 0),
+    total:   invoices.reduce((s, i) => s + Number(i.amount), 0),
+    paid:    invoices.filter((i) => i.status === "paid").reduce((s, i) => s + Number(i.amount), 0),
+    pending: invoices.filter((i) => (i.effectiveStatus || i.status) === "pending").reduce((s, i) => s + Number(i.amount), 0),
+    overdue: invoices.filter((i) => (i.effectiveStatus || i.status) === "overdue").reduce((s, i) => s + Number(i.amount), 0),
+  };
+
+  const handleDelete = async (inv) => {
+    if (!window.confirm(`Delete invoice ${inv.invoice_number}? This can't be undone.`)) return;
+    try {
+      await financeService.deleteInvoice(inv.id);
+      await onReload();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete invoice");
+    }
   };
 
   return (
@@ -173,18 +229,18 @@ function AllInvoicesTab() {
             )}
             {filtered.map((inv) => (
               <tr key={inv.id} className="inv-row" onClick={() => setSelected(inv)}>
-                <td className="inv-id">{inv.id}</td>
-                <td className="inv-client">{inv.client}</td>
-                <td className="inv-project">{inv.project}</td>
+                <td className="inv-id">{inv.invoice_number}</td>
+                <td className="inv-client">{inv.client_name || "—"}</td>
+                <td className="inv-project">{inv.project_name || "—"}</td>
                 <td className="inv-amount">{fmt(inv.amount)}</td>
-                <td>{inv.issued}</td>
-                <td>{inv.due}</td>
-                <td><StatusBadge status={inv.status} /></td>
+                <td>{fmtDate(inv.issue_date)}</td>
+                <td>{fmtDate(inv.due_date)}</td>
+                <td><StatusBadge status={inv.effectiveStatus || inv.status} /></td>
                 <td onClick={(e) => e.stopPropagation()}>
                   <div className="inv-actions">
-                    <button className="inv-act-btn inv-act-btn--view" title="View">👁</button>
-                    <button className="inv-act-btn inv-act-btn--edit" title="Edit">✏️</button>
-                    <button className="inv-act-btn inv-act-btn--del"  title="Delete">🗑</button>
+                    <button className="inv-act-btn inv-act-btn--view" title="View" onClick={() => setSelected(inv)}>👁</button>
+                    <button className="inv-act-btn inv-act-btn--edit" title="Edit" onClick={() => setEditing(inv)}>✏️</button>
+                    <button className="inv-act-btn inv-act-btn--del" title="Delete" onClick={() => handleDelete(inv)}>🗑</button>
                   </div>
                 </td>
               </tr>
@@ -195,7 +251,20 @@ function AllInvoicesTab() {
 
       {/* Detail Drawer */}
       {selected && (
-        <InvoiceDetailDrawer invoice={selected} onClose={() => setSelected(null)} />
+        <InvoiceDetailDrawer
+          invoice={selected}
+          onClose={() => setSelected(null)}
+          onReload={onReload}
+        />
+      )}
+
+      {/* Edit Modal */}
+      {editing && (
+        <EditInvoiceModal
+          invoice={editing}
+          onClose={() => setEditing(null)}
+          onSaved={async () => { await onReload(); setEditing(null); }}
+        />
       )}
     </>
   );
@@ -204,8 +273,10 @@ function AllInvoicesTab() {
 /* ════════════════════════════════════════════════════════════
    TAB 2 — CREATE INVOICE
 ════════════════════════════════════════════════════════════ */
-function CreateInvoiceTab({ onSuccess }) {
-  const [form,    setForm]    = useState(EMPTY_FORM);
+function CreateInvoiceTab({ projects, onSuccess }) {
+  const [form, setForm]       = useState(EMPTY_FORM);
+  const [saving, setSaving]   = useState(false);
+  const [formError, setFormError] = useState(null);
   const [submitted, setSubmitted] = useState(false);
 
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -227,9 +298,38 @@ function CreateInvoiceTab({ onSuccess }) {
   const taxAmt   = subtotal * (Number(form.tax) / 100);
   const total    = subtotal + taxAmt;
 
-  const handleSubmit = () => {
-    setSubmitted(true);
-    setTimeout(() => { setSubmitted(false); onSuccess(); }, 1500);
+  const projectName = projects.find((p) => String(p.id) === String(form.project_id))?.name;
+
+  const handleSubmit = async () => {
+    if (!form.project_id) {
+      setFormError("Please select a project.");
+      return;
+    }
+    if (subtotal <= 0) {
+      setFormError("Add at least one line item with a rate.");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      await financeService.createInvoice({
+        project_id: form.project_id,
+        client_name: form.client_name || null,
+        invoice_number: form.invoiceNo || undefined, // backend auto-generates if omitted
+        amount: subtotal,
+        tax_amount: taxAmt,
+        issue_date: form.issueDate || undefined,
+        due_date: form.dueDate || null,
+        notes: form.notes || null,
+        status: "pending",
+      });
+      setSubmitted(true);
+      setTimeout(() => { setSubmitted(false); setForm(EMPTY_FORM); onSuccess(); }, 1200);
+    } catch (err) {
+      setFormError(err.response?.data?.message || "Failed to create invoice");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -239,17 +339,23 @@ function CreateInvoiceTab({ onSuccess }) {
       <div className="inv-create-grid">
         {/* Left — Form */}
         <div className="inv-form-col">
+          {formError && <p className="inv-form-error">{formError}</p>}
+
           <section className="inv-section">
-            <h3 className="inv-section-title">Client Details</h3>
+            <h3 className="inv-section-title">Client & Project</h3>
             <div className="inv-form-row">
-              <label>Client Name <span>*</span></label>
-              <input className="inv-input" placeholder="e.g. Skyline Infra Pvt Ltd"
-                value={form.client} onChange={(e) => setField("client", e.target.value)} />
+              <label>Project <span>*</span></label>
+              <select className="inv-input" value={form.project_id} onChange={(e) => setField("project_id", e.target.value)}>
+                <option value="">Select a project…</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
             <div className="inv-form-row">
-              <label>Project</label>
-              <input className="inv-input" placeholder="e.g. Tower B Construction"
-                value={form.project} onChange={(e) => setField("project", e.target.value)} />
+              <label>Client Name</label>
+              <input className="inv-input" placeholder="e.g. Skyline Infra Pvt Ltd"
+                value={form.client_name} onChange={(e) => setField("client_name", e.target.value)} />
             </div>
           </section>
 
@@ -257,8 +363,8 @@ function CreateInvoiceTab({ onSuccess }) {
             <h3 className="inv-section-title">Invoice Details</h3>
             <div className="inv-form-2col">
               <div className="inv-form-row">
-                <label>Invoice No. <span>*</span></label>
-                <input className="inv-input" placeholder="INV-2024-0042"
+                <label>Invoice No.</label>
+                <input className="inv-input" placeholder="Auto-generated if left blank"
                   value={form.invoiceNo} onChange={(e) => setField("invoiceNo", e.target.value)} />
               </div>
               <div className="inv-form-row">
@@ -284,6 +390,7 @@ function CreateInvoiceTab({ onSuccess }) {
               <h3 className="inv-section-title">Line Items</h3>
               <button className="inv-add-item" onClick={addItem}>+ Add Item</button>
             </div>
+            <p className="inv-hint">Used to calculate the invoice total — individual line items aren't stored separately.</p>
             <div className="inv-items-header">
               <span>Description</span><span>Qty</span><span>Rate (₹)</span><span>Amount</span><span></span>
             </div>
@@ -318,7 +425,7 @@ function CreateInvoiceTab({ onSuccess }) {
                 <p className="inv-preview-label">INVOICE</p>
               </div>
               <div className="inv-preview-meta">
-                <p><strong>{form.invoiceNo || "INV-XXXX"}</strong></p>
+                <p><strong>{form.invoiceNo || "Auto-generated"}</strong></p>
                 <p>Issued: {form.issueDate || "—"}</p>
                 <p>Due: {form.dueDate || "—"}</p>
               </div>
@@ -326,8 +433,8 @@ function CreateInvoiceTab({ onSuccess }) {
 
             <div className="inv-preview-to">
               <p className="inv-preview-to-label">BILL TO</p>
-              <p className="inv-preview-to-name">{form.client || "Client Name"}</p>
-              <p>{form.project || "Project Name"}</p>
+              <p className="inv-preview-to-name">{form.client_name || "Client Name"}</p>
+              <p>{projectName || "Select a project"}</p>
             </div>
 
             <table className="inv-preview-table">
@@ -364,8 +471,9 @@ function CreateInvoiceTab({ onSuccess }) {
           </div>
 
           <div className="inv-create-actions">
-            <button className="inv-btn-outline">Save Draft</button>
-            <button className="inv-btn-primary" onClick={handleSubmit}>Create Invoice</button>
+            <button className="inv-btn-primary" onClick={handleSubmit} disabled={saving}>
+              {saving ? "Creating…" : "Create Invoice"}
+            </button>
           </div>
         </div>
       </div>
@@ -376,22 +484,36 @@ function CreateInvoiceTab({ onSuccess }) {
 /* ════════════════════════════════════════════════════════════
    TAB 3 — PENDING INVOICES
 ════════════════════════════════════════════════════════════ */
-function PendingInvoicesTab() {
+function PendingInvoicesTab({ invoices, onReload }) {
   const [filter, setFilter] = useState("all");
+  const [markingId, setMarkingId] = useState(null);
 
-  const pending = MOCK_INVOICES.filter((i) => i.status !== "paid");
-  const shown   = filter === "all" ? pending : pending.filter((i) => i.status === filter);
+  const pending = invoices.filter((i) => (i.effectiveStatus || i.status) !== "paid");
+  const shown   = filter === "all" ? pending : pending.filter((i) => (i.effectiveStatus || i.status) === filter);
 
-  const totalPending = pending.reduce((s, i) => s + i.amount, 0);
-  const totalOverdue = pending.filter((i) => i.status === "overdue").reduce((s, i) => s + i.amount, 0);
+  const totalPending = pending.reduce((s, i) => s + Number(i.amount), 0);
+  const overdueList  = pending.filter((i) => (i.effectiveStatus || i.status) === "overdue");
+  const totalOverdue = overdueList.reduce((s, i) => s + Number(i.amount), 0);
+
+  const handleMarkPaid = async (inv) => {
+    setMarkingId(inv.id);
+    try {
+      await financeService.updateInvoiceStatus(inv.id, "paid");
+      await onReload();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to update invoice");
+    } finally {
+      setMarkingId(null);
+    }
+  };
 
   return (
     <>
       {/* Alert Banner */}
-      {pending.filter((i) => i.status === "overdue").length > 0 && (
+      {overdueList.length > 0 && (
         <div className="inv-alert">
-          ⚠️ <strong>{pending.filter((i) => i.status === "overdue").length} invoices are overdue</strong>
-          — totalling {fmt(totalOverdue)}. Send reminders immediately.
+          ⚠️ <strong>{overdueList.length} invoice{overdueList.length !== 1 ? "s are" : " is"} overdue</strong>
+          — totalling {fmt(totalOverdue)}.
         </div>
       )}
 
@@ -405,7 +527,7 @@ function PendingInvoicesTab() {
         <div className="inv-ps-card inv-ps-card--overdue">
           <p>Overdue</p>
           <h3>{fmt(totalOverdue)}</h3>
-          <span>{pending.filter((i) => i.status === "overdue").length} invoices</span>
+          <span>{overdueList.length} invoices</span>
         </div>
       </div>
 
@@ -423,30 +545,36 @@ function PendingInvoicesTab() {
       {/* Cards */}
       <div className="inv-pending-cards">
         {shown.map((inv) => {
-          const days = daysDiff(inv.due);
+          const status = inv.effectiveStatus || inv.status;
+          const days = daysDiff(inv.due_date);
           return (
-            <div key={inv.id} className={`inv-pcard inv-pcard--${inv.status}`}>
+            <div key={inv.id} className={`inv-pcard inv-pcard--${status}`}>
               <div className="inv-pcard-top">
                 <div>
-                  <p className="inv-pcard-id">{inv.id}</p>
-                  <p className="inv-pcard-client">{inv.client}</p>
-                  <p className="inv-pcard-project">{inv.project}</p>
+                  <p className="inv-pcard-id">{inv.invoice_number}</p>
+                  <p className="inv-pcard-client">{inv.client_name || "—"}</p>
+                  <p className="inv-pcard-project">{inv.project_name || "—"}</p>
                 </div>
                 <div className="inv-pcard-right">
                   <p className="inv-pcard-amount">{fmt(inv.amount)}</p>
-                  <StatusBadge status={inv.status} />
+                  <StatusBadge status={status} />
                 </div>
               </div>
               <div className="inv-pcard-bottom">
                 <span className="inv-pcard-due">
-                  Due: {inv.due}
-                  {inv.status === "overdue" && (
+                  Due: {fmtDate(inv.due_date)}
+                  {status === "overdue" && (
                     <strong className="inv-pcard-overdue-tag"> · {days}d overdue</strong>
                   )}
                 </span>
                 <div className="inv-pcard-actions">
-                  <button className="inv-btn-sm inv-btn-sm--outline">Send Reminder</button>
-                  <button className="inv-btn-sm inv-btn-sm--primary">Mark Paid</button>
+                  <button
+                    className="inv-btn-sm inv-btn-sm--primary"
+                    onClick={() => handleMarkPaid(inv)}
+                    disabled={markingId === inv.id}
+                  >
+                    {markingId === inv.id ? "Marking…" : "Mark Paid"}
+                  </button>
                 </div>
               </div>
             </div>
@@ -465,28 +593,145 @@ function PendingInvoicesTab() {
 /* ════════════════════════════════════════════════════════════
    INVOICE DETAIL DRAWER
 ════════════════════════════════════════════════════════════ */
-function InvoiceDetailDrawer({ invoice, onClose }) {
+function InvoiceDetailDrawer({ invoice, onClose, onReload }) {
+  const [busy, setBusy] = useState(false);
+  const status = invoice.effectiveStatus || invoice.status;
+
+  const handleMarkPaid = async () => {
+    setBusy(true);
+    try {
+      await financeService.updateInvoiceStatus(invoice.id, "paid");
+      await onReload();
+      onClose();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to update invoice");
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete invoice ${invoice.invoice_number}? This can't be undone.`)) return;
+    setBusy(true);
+    try {
+      await financeService.deleteInvoice(invoice.id);
+      await onReload();
+      onClose();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete invoice");
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="inv-drawer-overlay" onClick={onClose}>
       <div className="inv-drawer" onClick={(e) => e.stopPropagation()}>
         <div className="inv-drawer-header">
           <div>
-            <p className="inv-drawer-id">{invoice.id}</p>
-            <StatusBadge status={invoice.status} />
+            <p className="inv-drawer-id">{invoice.invoice_number}</p>
+            <StatusBadge status={status} />
           </div>
           <button className="inv-drawer-close" onClick={onClose}>✕</button>
         </div>
         <div className="inv-drawer-body">
-          <Row label="Client"     value={invoice.client} />
-          <Row label="Project"    value={invoice.project} />
-          <Row label="Amount"     value={fmt(invoice.amount)} />
-          <Row label="Issued"     value={invoice.issued} />
-          <Row label="Due Date"   value={invoice.due} />
-          <Row label="Status"     value={<StatusBadge status={invoice.status} />} />
+          <Row label="Client"      value={invoice.client_name || "—"} />
+          <Row label="Project"     value={invoice.project_name || "—"} />
+          <Row label="Amount"      value={fmt(invoice.amount)} />
+          <Row label="Tax"         value={fmt(invoice.tax_amount)} />
+          <Row label="Issued"      value={fmtDate(invoice.issue_date)} />
+          <Row label="Due Date"    value={fmtDate(invoice.due_date)} />
+          <Row label="Paid Date"   value={fmtDate(invoice.paid_date)} />
+          <Row label="Status"      value={<StatusBadge status={status} />} />
+          {invoice.notes && <Row label="Notes" value={invoice.notes} />}
         </div>
         <div className="inv-drawer-footer">
-          <button className="inv-btn-outline">Download PDF</button>
-          <button className="inv-btn-primary">Mark as Paid</button>
+          <button className="inv-btn-outline" onClick={handleDelete} disabled={busy}>
+            Delete
+          </button>
+          {status !== "paid" && (
+            <button className="inv-btn-primary" onClick={handleMarkPaid} disabled={busy}>
+              {busy ? "Working…" : "Mark as Paid"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════
+   EDIT MODAL — only client_name, amount, tax_amount, due_date,
+   notes can be changed (project_id and invoice_number are
+   immutable per Invoice.update() on the backend)
+════════════════════════════════════════════════════════════ */
+function EditInvoiceModal({ invoice, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    client_name: invoice.client_name || "",
+    amount: invoice.amount || "",
+    tax_amount: invoice.tax_amount || "",
+    due_date: invoice.due_date ? fmtDate(invoice.due_date) : "",
+    notes: invoice.notes || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await financeService.updateInvoice(invoice.id, {
+        client_name: form.client_name,
+        amount: Number(form.amount),
+        tax_amount: Number(form.tax_amount) || 0,
+        due_date: form.due_date || null,
+        notes: form.notes,
+      });
+      await onSaved();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to save changes");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="inv-drawer-overlay" onClick={onClose}>
+      <div className="inv-drawer" onClick={(e) => e.stopPropagation()}>
+        <div className="inv-drawer-header">
+          <div>
+            <p className="inv-drawer-id">Edit {invoice.invoice_number}</p>
+          </div>
+          <button className="inv-drawer-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="inv-drawer-body">
+          {error && <p className="inv-form-error">{error}</p>}
+          <div className="inv-form-row">
+            <label>Client Name</label>
+            <input className="inv-input" value={form.client_name} onChange={(e) => setF("client_name", e.target.value)} />
+          </div>
+          <div className="inv-form-row">
+            <label>Amount (₹)</label>
+            <input className="inv-input" type="number" value={form.amount} onChange={(e) => setF("amount", e.target.value)} />
+          </div>
+          <div className="inv-form-row">
+            <label>Tax Amount (₹)</label>
+            <input className="inv-input" type="number" value={form.tax_amount} onChange={(e) => setF("tax_amount", e.target.value)} />
+          </div>
+          <div className="inv-form-row">
+            <label>Due Date</label>
+            <input className="inv-input" type="date" value={form.due_date} onChange={(e) => setF("due_date", e.target.value)} />
+          </div>
+          <div className="inv-form-row">
+            <label>Notes</label>
+            <textarea className="inv-textarea" rows={3} value={form.notes} onChange={(e) => setF("notes", e.target.value)} />
+          </div>
+        </div>
+        <div className="inv-drawer-footer">
+          <button className="inv-btn-outline" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="inv-btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
         </div>
       </div>
     </div>
@@ -495,6 +740,7 @@ function InvoiceDetailDrawer({ invoice, onClose }) {
 
 /* ── Shared helpers ────────────────────────────────────────── */
 function StatusBadge({ status }) {
+  if (!status) return null;
   return <span className={`inv-badge inv-badge--${status}`}>{status.charAt(0).toUpperCase() + status.slice(1)}</span>;
 }
 

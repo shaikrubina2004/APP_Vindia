@@ -108,6 +108,11 @@
   color: var(--primary);
 }
 
+.stat-card.purple { border-left-color: #7c3aed; }
+.stat-card.purple h2 { color: #7c3aed; }
+.stat-card.purple:hover { background: #f5f3ff; }
+.stat-card.purple.active-stat { background: #ede9fe; border-left-color: #7c3aed; }
+
 
 /* ================= TABLE ================= */
 
@@ -174,6 +179,11 @@
 
 .status-on_leave {
   color: #64748b;
+  font-weight: 500;
+}
+
+.status-work_from_home {
+  color: #7c3aed;
   font-weight: 500;
 }
 

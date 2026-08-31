@@ -14,12 +14,11 @@ const TYPE_LINK = {
   drawing: "/structural-engineer/shared/drawings",
   rfi: "/structural-engineer/rfi",
   incident: "/structural-engineer/incidents",
-  approval: "/structural-engineer/shared/drawings",
   work: "/structural-engineer/daily-updates",
-  boq: "/structural-engineer/boq",
   task: "/structural-engineer/incidents?page=tasks",
-  handover: "/structural-engineer/shared/drawings",
   analysis: "/structural-engineer/daily-updates",
+  coordination: "/structural-engineer/coordination",
+  upload: "/structural-engineer/shared/uploads",
 };
 
 // ── Safe role checker ───────────────────────────────────────

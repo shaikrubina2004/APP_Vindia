@@ -16,7 +16,7 @@ exports.createRFI = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO rfi (raised_by, title, description, zone, discipline, priority, assigned_to, status, created_at)
+      `INSERT INTO rfis (raised_by, title, description, zone, discipline, priority, assigned_to, status, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', NOW())
        RETURNING *`,
       [raised_by, title, description, zone, discipline, priority, assignedTo]

@@ -1,5 +1,6 @@
 // backend/controllers/travelExpenseController.js
 const pool = require("../config/db");
+const { insertArchitectNotification } = require("./architectNotificationsController");
 
 // ── HR roles that bypass PM and go directly to CEO ───────────────────────────
 const HR_ROLES = [
@@ -12,6 +13,9 @@ const HR_ROLES = [
 
 const isHRRole = (role = "") =>
   HR_ROLES.includes(role.toLowerCase().replace(/\s+/g, "_"));
+
+const isArchitectRole = (role = "") =>
+  role.toLowerCase().replace(/\s+/g, "_") === "architect";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -81,14 +85,15 @@ exports.createRequest = async (req, res) => {
 
   // Determine approval routing:
   // - HR staff → routed to CEO (pm_status auto-approved, final approval by CEO)
-  // - Everyone else → goes to PM first, then HR
+  // - Everyone else → pm_status is also auto-approved (there is currently no
+  //   PM-approval UI in the app), so requests land directly in HR's table.
   const isHR = route_to_ceo === true || isHRRole(designation);
-  console.log(`[TravelExpense] createRequest | designation="${designation}" | isHR=${isHR} | initialPmStatus=${isHR ? "Approved" : "Pending"}`);
+  console.log(`[TravelExpense] createRequest | designation="${designation}" | isHR=${isHR} | initialPmStatus=Approved`);
 
-  // For HR requests: pm_status = 'Approved' so it skips PM entirely;
-  // a separate 'ceo_status' field tracks CEO approval (stored in review_note
-  // pathway for now — or extend the table to add ceo_status if needed).
-  const initialPmStatus = isHR ? "Approved" : "Pending";
+  // pm_status is auto-set to 'Approved' for every request. The column and
+  // guard logic in updateStatus() are left in place in case a real PM
+  // approval step is added later — only the default written here changed.
+  const initialPmStatus = "Approved";
   const initialStatus = "Pending";
 
   const client = await pool.connect();
@@ -172,9 +177,19 @@ exports.getRequests = async (req, res) => {
 
   let query = `
     SELECT ter.*,
-           p.name AS project_name
+           p.name AS project_name,
+           COALESCE(
+             NULLIF(NULLIF(TRIM(ter.department), ''), '—'),
+             emp.department,
+             dept.name,
+             ter.department
+           ) AS department
     FROM travel_expense_requests ter
     LEFT JOIN projects p ON p.id = ter.project_id
+    LEFT JOIN employees emp ON emp.user_id = ter.user_id
+    LEFT JOIN users u ON u.id = ter.user_id
+    LEFT JOIN roles r ON r.id = u.role_id
+    LEFT JOIN departments dept ON dept.id = r.department_id
     WHERE 1=1
   `;
   const params = [];
@@ -192,14 +207,21 @@ exports.getRequests = async (req, res) => {
     // PM sees non-HR requests that haven't been PM-reviewed yet
     query += ` AND ter.pm_status = 'Pending' AND ter.status = 'Pending'`;
   } else if (role === "hr_manager") {
-    // HR sees non-HR requests that PM has approved
-    query += ` AND ter.pm_status = 'Approved' AND ter.status = 'Pending'
+    // HR sees all non-HR requests that PM has approved (Pending review,
+    // Approved, and Rejected) so the dashboard can list past decisions too —
+    // not just the ones still awaiting review.
+    query += ` AND ter.pm_status = 'Approved'
                AND ter.designation NOT IN (${HR_ROLES.map((_, i) => `$${params.length + i + 1}`).join(",")})`;
     params.push(...HR_ROLES);
   } else if (role === "ceo") {
-    // CEO sees HR-submitted requests (pm_status auto-approved) pending final decision
-    query += ` AND ter.pm_status = 'Approved' AND ter.status = 'Pending'
+    // CEO queue: all HR-submitted requests (Pending, Approved, Rejected)
+    // so approved/rejected history shows up, not only the pending ones.
+    query += ` AND ter.pm_status = 'Approved'
                AND ter.designation IN (${HR_ROLES.map((_, i) => `$${params.length + i + 1}`).join(",")})`;
+    params.push(...HR_ROLES);
+  } else if (role === "ceo_all") {
+    // CEO "All Requests" tab: all HR-submitted requests regardless of status
+    query += ` AND ter.designation IN (${HR_ROLES.map((_, i) => `$${params.length + i + 1}`).join(",")})`;
     params.push(...HR_ROLES);
   }
 
@@ -219,7 +241,8 @@ exports.getRequestById = async (req, res) => {
   const { id } = req.params;
   try {
     const reqResult = await pool.query(
-      `SELECT ter.*, p.name AS project_name
+      `SELECT ter.*, p.name AS project_name,
+              COALESCE(ter.manual_expenses, '[]'::jsonb) AS manual_expenses
        FROM travel_expense_requests ter
        LEFT JOIN projects p ON p.id = ter.project_id
        WHERE ter.id = $1`,
@@ -268,6 +291,52 @@ exports.pmUpdateStatus = async (req, res) => {
   }
 };
 
+// ── GET /api/travel-expenses/:id/manual-expenses ─────────────────────────────
+// Returns the manual_expenses JSONB array stored on the request row
+exports.getManualExpenses = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT COALESCE(manual_expenses, '[]'::jsonb) AS manual_expenses
+       FROM travel_expense_requests WHERE id = $1`,
+      [id]
+    );
+    if (!result.rows.length) return res.status(404).json({ message: "Not found" });
+    res.json(result.rows[0].manual_expenses);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch manual expenses" });
+  }
+};
+
+// ── PUT /api/travel-expenses/:id/manual-expenses ─────────────────────────────
+// HR / CEO saves all expense rows at once — stored as JSONB on the request row
+exports.saveManualExpenses = async (req, res) => {
+  const { id } = req.params;
+  const { expenses } = req.body; // [{ category, type, description, amount }]
+
+  if (!Array.isArray(expenses)) {
+    return res.status(400).json({ message: "expenses array required" });
+  }
+
+  const valid = expenses.filter((e) => parseFloat(e.amount) > 0);
+
+  try {
+    const result = await pool.query(
+      `UPDATE travel_expense_requests
+       SET manual_expenses = $1::jsonb, updated_at = NOW()
+       WHERE id = $2
+       RETURNING manual_expenses`,
+      [JSON.stringify(valid), id]
+    );
+    if (!result.rows.length) return res.status(404).json({ message: "Not found" });
+    res.json(result.rows[0].manual_expenses);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to save manual expenses" });
+  }
+};
+
 // ── PUT /api/travel-expenses/:id/status ───────────────────────────────────────
 // HR approves/rejects regular (non-HR-submitted) requests after PM approval.
 // CEO approves/rejects HR-submitted requests.
@@ -281,7 +350,8 @@ exports.updateStatus = async (req, res) => {
 
   try {
     const check = await pool.query(
-      `SELECT pm_status, designation FROM travel_expense_requests WHERE id=$1`,
+      `SELECT pm_status, designation, user_id, trip_title, destination
+       FROM travel_expense_requests WHERE id=$1`,
       [id]
     );
     if (!check.rows.length) return res.status(404).json({ message: "Not found" });
@@ -309,6 +379,26 @@ exports.updateStatus = async (req, res) => {
        WHERE id=$4 RETURNING *`,
       [status, reviewed_by || null, review_note || null, id]
     );
+
+    // Notify only the specific architect who submitted this request —
+    // never broadcast to every architect.
+    if (isArchitectRole(row.designation) && row.user_id) {
+      const tripLabel = row.trip_title || row.destination || "your trip";
+      insertArchitectNotification(
+        row.user_id,
+        "task",
+        status === "Approved"
+          ? `Travel request approved: ${tripLabel}`
+          : `Travel request ${status.toLowerCase()}: ${tripLabel}`,
+        status === "Approved"
+          ? `Your travel request for "${tripLabel}" has been approved.${review_note ? ` Note: ${review_note}` : ""}`
+          : `Your travel request for "${tripLabel}" was ${status.toLowerCase()}.${review_note ? ` Reason: ${review_note}` : ""}`,
+        "/hr/travelrequest?view=history",
+        status === "Approved" ? "ok" : "warn",
+        id
+      );
+    }
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
