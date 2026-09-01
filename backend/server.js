@@ -59,6 +59,10 @@ const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoute
 const materialRequestRoutes = require("./routes/materialRequestRoutes");
 const snagRoutes = require("./routes/snagRoutes");
 const siteProgressRoutes = require("./routes/siteProgressRoutes");
+const sitephotosRoutes = require("./routes/sitephotosRoutes");
+const labourRegistryRoutes = require("./routes/labourRoutes");
+const labourReportRoutes = require("./routes/labourReportRoutes");
+const approvalRoutes = require("./routes/approvalRoutes");
 
 /* Architect */
 const architectProjectsRoutes = require("./routes/architectProjects");
@@ -83,6 +87,9 @@ const costReportRoutes = require("./routes/costReportRoutes");
 const quantityReportRoutes = require("./routes/Quantityreportroutes");
 const qsNotifRoutes = require("./routes/qsNotificationRoutes");
 const measurementRoutes = require("./routes/measurementRoutes");
+
+// ✅ NEW: Site Measurements (SE submits actual quantities against BOQ)
+const siteMeasurementRoutes = require("./routes/siteMeasurementRoutes");
 
 /* Others */
 const mepNotifRoutes = require("./routes/mepNotificationsRoutes");
@@ -150,8 +157,14 @@ app.use("/api/boq", boqRoutes);
 app.use("/api/cost-report", costReportRoutes);
 app.use("/api/quantity-report", quantityReportRoutes);
 
-/* ⚠️ optional */
+/* ⚠️ Old measurement sheets (QS measurement sheets — kept for backward compat) */
 app.use("/api/measurement", measurementRoutes);
+app.use("/api/measurements", measurementRoutes);
+
+// ✅ NEW: Site measurements — SE submits actual quantities against a BOQ
+// Used by QSMeasurements.jsx: POST /api/site-measurements
+app.use("/api/site-measurements", siteMeasurementRoutes);
+app.use("/api/approvals", approvalRoutes);
 
 app.use("/api/timesheets", timesheetRoutes);
 app.use("/api/daily-reports", dailyRoutes);
@@ -175,13 +188,16 @@ app.use("/api/architect-notifications", architectNotifRoutes);
 /* ✅ Site Engineer */
 app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes);
 app.use("/api/ncr", ncrRoutes);
-app.use("/api/diary", upload.array("attachments"), siteDiaryRoutes);
+app.use("/api/diary", siteDiaryRoutes);
 app.use("/api/activity-log", activityLogRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/site-engineer-dashboard", siteEngineerDashboardRoutes);
 app.use("/api/material-request", materialRequestRoutes);
 app.use("/api/snags", snagRoutes);
 app.use("/api/site-progress", siteProgressRoutes);
+app.use("/api/photos", sitephotosRoutes);
+app.use("/api/labour-registry", labourRegistryRoutes);
+app.use("/api/labour-report", labourReportRoutes);
 
 /* Shared */
 app.use("/api/drawings", drawingUploadRoutes);

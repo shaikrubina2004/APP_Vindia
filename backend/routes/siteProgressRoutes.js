@@ -19,17 +19,37 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "uploads/");
   },
+
   filename: (req, file, cb) => {
-    const uniqueName = Date.now() + "-" + file.originalname;
+    const uniqueName =
+      Date.now() +
+      "-" +
+      Math.round(Math.random() * 1e9) +
+      path.extname(file.originalname);
+
     cb(null, uniqueName);
   },
 });
 
-const upload = multer({ storage });
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith("image/")) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only image files are allowed"), false);
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10 MB per file
+  },
+});
 
 /* ================= ROUTES ================= */
 
-// ✅ CREATE (with auth + file upload)
+/* CREATE */
 router.post(
   "/",
   authMiddleware,
@@ -37,13 +57,45 @@ router.post(
   createSiteProgress
 );
 
-// ✅ GET ALL
-router.get("/", getSiteProgress);
+/* GET ALL */
+router.get(
+  "/",
+  authMiddleware,
+  getSiteProgress
+);
 
-// ✅ GET BY ID
-router.get("/:id", getSiteProgressById);
+/* GET BY ID */
+router.get(
+  "/:id",
+  authMiddleware,
+  getSiteProgressById
+);
 
-// ✅ DELETE
-router.delete("/:id", authMiddleware, deleteSiteProgress);
+/* DELETE */
+router.delete(
+  "/:id",
+  authMiddleware,
+  deleteSiteProgress
+);
+
+/* ================= MULTER ERROR HANDLER ================= */
+
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+
+  if (err) {
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+
+  next();
+});
 
 module.exports = router;

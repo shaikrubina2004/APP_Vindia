@@ -1,786 +1,1174 @@
-// src/pages/qs/QSMeasurements.jsx
-// QS view: Receive SE measurements → verify quantities vs BOQ → approve/reject → generate billing %
+// src/pages/siteEngineer/QSMeasurements.jsx
+// FIX: api.post now calls /site-measurements (was /measurements)
+
 import React, {
   useCallback, useEffect, useMemo, useRef, useState,
 } from "react";
 import api from "../../services/api";
 import "../../styles/shared-pages.css";
-import "../../styles/Qsmeasurements.css";
+import "../../styles/QSMeasurements.css";
 
-/* ── constants ───────────────────────────────────────────── */
-const PAGE_SIZE = 8;
-
-const STATUS_FLOW = ["pending", "verified", "approved", "rejected"];
-
-const STATUS_CFG = {
-  pending:  { label: "Pending QS",    icon: "⏳" },
-  verified: { label: "Verified",      icon: "🔍" },
-  approved: { label: "Approved",      icon: "✅" },
-  rejected: { label: "Rejected",      icon: "❌" },
-};
-
-const UNITS = ["m³", "m²", "m", "kg", "tonne", "nos", "bag", "litre", "LS"];
-
-/* ── demo data ───────────────────────────────────────────── */
-const DEMO = [
-  {
-    id: 1, refNo: "MSR-001", zone: "Level 2 / Grid A–D", activity: "Column Casting",
-    submittedBy: "Ahmed Al-Rashid", submittedAt: new Date(Date.now() - 2*3600000).toISOString(),
-    status: "pending",
-    linked_rfi: "", linked_ncr: "",
-    notes: "All 12 columns poured. Lab cylinders collected. Batch certs attached.",
-    items: [
-      { description: "Concrete C30",    unit: "m³",  qty_actual: 18.4, qty_boq: 20.0 },
-      { description: "TMT Rebar Fe500", unit: "kg",  qty_actual: 2840, qty_boq: 3000 },
-      { description: "Formwork",        unit: "m²",  qty_actual: 112,  qty_boq: 120  },
-    ],
-  },
-  {
-    id: 2, refNo: "MSR-002", zone: "Basement B1", activity: "Waterproofing Membrane",
-    submittedBy: "Priya Sharma", submittedAt: new Date(Date.now() - 26*3600000).toISOString(),
-    status: "verified",
-    linked_rfi: "", linked_ncr: "NCR-028",
-    notes: "60% complete — remainder halted pending NCR-028 resolution (wet conditions).",
-    items: [
-      { description: "Waterproofing membrane", unit: "m²", qty_actual: 320, qty_boq: 530 },
-      { description: "Primer coat",            unit: "m²", qty_actual: 320, qty_boq: 530 },
-    ],
-    qs_notes: "Quantities confirmed on site visit 24 Apr. NCR-028 noted — partial approval.",
-  },
-  {
-    id: 3, refNo: "MSR-003", zone: "Level 1 / Slab S7", activity: "Rebar Fixing",
-    submittedBy: "Ahmed Al-Rashid", submittedAt: new Date(Date.now() - 3*86400000).toISOString(),
-    status: "approved",
-    linked_rfi: "", linked_ncr: "",
-    notes: "Rebar complete. Additional bars added per NCR-029 corrective action.",
-    items: [
-      { description: "TMT Rebar 12mm", unit: "kg", qty_actual: 1850, qty_boq: 1800 },
-      { description: "Binding wire",   unit: "kg", qty_actual: 45,   qty_boq: 40   },
-    ],
-    qs_notes: "Approved. Variance on rebar (+50 kg) within 3% BOQ tolerance. Billing authorised.",
-    approved_at: new Date(Date.now() - 2*86400000).toISOString(),
-  },
-  {
-    id: 4, refNo: "MSR-004", zone: "Level 4 / Staircore", activity: "Formwork Erection",
-    submittedBy: "Khalid Noor", submittedAt: new Date(Date.now() - 5*86400000).toISOString(),
-    status: "rejected",
-    linked_rfi: "RFI-028", linked_ncr: "",
-    notes: "30% complete. Stopped pending RFI-028 design clarification.",
-    items: [
-      { description: "Formwork panels", unit: "m²", qty_actual: 48, qty_boq: 160 },
-    ],
-    rejection_reason: "Measurement rejected — work stopped due to RFI-028. Resubmit when RFI resolved and work resumes to at least 50% completion.",
-  },
-  {
-    id: 5, refNo: "MSR-005", zone: "Level 3 / Grid A–D", activity: "Column Casting",
-    submittedBy: "Ahmed Al-Rashid", submittedAt: new Date(Date.now() - 1*3600000).toISOString(),
-    status: "pending",
-    linked_rfi: "", linked_ncr: "",
-    notes: "7 of 12 columns cast today. Remaining 5 scheduled tomorrow.",
-    items: [
-      { description: "Concrete C30",    unit: "m³", qty_actual: 10.8, qty_boq: 16.8 },
-      { description: "TMT Rebar Fe500", unit: "kg", qty_actual: 1620, qty_boq: 2520 },
-    ],
-  },
+/* ─────────────────────────────────────────────────────────
+   CONSTANTS
+───────────────────────────────────────────────────────── */
+const UNITS = [
+  "sqm","m²","m³","m","sqft","RMT","nos",
+  "kg","tonnes","bags","litre","LS",
 ];
 
-/* ── helpers ─────────────────────────────────────────────── */
-function stableKey(it) {
-  if (!it) return "";
-  if (it.id != null) return String(it.id);
-  return `${it.refNo || ""}|${it.zone || ""}|${it.submittedAt || ""}`;
-}
+const BOQ_STATUS = {
+  measurement_pending:  { label: "Awaiting Measurements",     color: "#BA7517", bg: "#FEF3C7", border: "#FCD34D" },
+  measurement_received: { label: "Measurements Received",     color: "#185FA5", bg: "#E6F1FB", border: "#90C1EF" },
+  pending_se_approval:  { label: "QR Needs Your Review",      color: "#6D28D9", bg: "#EDE9FE", border: "#C4B5FD" },
+  rejected_by_se:       { label: "Rejected by SE ↩️",         color: "#791F1F", bg: "#FCEBEB", border: "#E8A0A0" },
+  finalised:            { label: "Finalised ✅",               color: "#085041", bg: "#E1F5EE", border: "#5DCAA5" },
+};
 
-function fmtDate(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
+const QR_STATUS = {
+  pending_se: { label: "Awaiting Your Approval", icon: "⏳", color: "#185FA5", bg: "#E6F1FB", border: "#90C1EF" },
+  approved:   { label: "Approved by You ✅",     icon: "✅", color: "#085041", bg: "#E1F5EE", border: "#5DCAA5" },
+  rejected:   { label: "Rejected by You ↩️",    icon: "↩️", color: "#791F1F", bg: "#FCEBEB", border: "#E8A0A0" },
+};
 
-function fmtTime(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-}
+/* ─────────────────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────────────────── */
+const safeArr = (v) => {
+  if (Array.isArray(v)) return v;
+  if (!v) return [];
+  if (typeof v === "string") { try { return JSON.parse(v); } catch { return []; } }
+  if (typeof v === "object") return Array.isArray(v) ? v : [];
+  return [];
+};
+const toNum   = (v) => parseFloat(v) || 0;
+const nowISO  = ()  => new Date().toISOString().slice(0, 10);
+const fmtDate = (s) => s
+  ? new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+  : "—";
 
-function completionPct(items = []) {
-  if (!items.length) return 0;
-  const tot = items.reduce((s, it) => s + Number(it.qty_boq || 0), 0);
-  const act = items.reduce((s, it) => s + Number(it.qty_actual || 0), 0);
-  if (!tot) return 0;
-  return Math.min(100, Math.round((act / tot) * 100));
-}
-
-function variance(actual, boq) {
-  if (!boq) return 0;
+function varPct(actual, boq) {
+  if (!boq) return null;
   return Math.round(((actual - boq) / boq) * 100);
 }
+function varStyle(pct) {
+  if (pct === null) return { color: "var(--c-text-3)", bg: "transparent", border: "none" };
+  const abs = Math.abs(pct);
+  if (abs <= 5)  return { color: "#085041", bg: "#E1F5EE", border: "#5DCAA5" };
+  if (abs <= 15) return { color: "#92400E", bg: "#FEF3C7", border: "#FCD34D" };
+  return { color: "#7F1D1D", bg: "#FEE2E2", border: "#FCA5A5" };
+}
+const blankItem = () => ({ description: "", unit: "sqm", qty_actual: "" });
 
-function barColor(pct) {
-  if (pct >= 100) return "var(--c-danger)";
-  if (pct >= 80)  return "var(--c-success)";
-  return "linear-gradient(90deg, var(--c-navy-700), var(--c-teal-400))";
+/* ─────────────────────────────────────────────────────────
+   STEP BAR
+───────────────────────────────────────────────────────── */
+function StepBar({ step }) {
+  const steps = [
+    { n: 1, label: "View BOQ"      },
+    { n: 2, label: "Measure"       },
+    { n: 3, label: "QS Creates QR" },
+    { n: 4, label: "You Approve"   },
+    { n: 5, label: "BOQ Final"     },
+  ];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 20, flexWrap: "wrap" }}>
+      {steps.map((s, i) => {
+        const done    = step > s.n;
+        const current = step === s.n;
+        return (
+          <React.Fragment key={s.n}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 7,
+              padding: "6px 12px", borderRadius: 99,
+              background: current ? "var(--c-navy-700,#0A4174)" : done ? "#E1F5EE" : "var(--c-surface-2,#F4F8FB)",
+              border: `1px solid ${current ? "var(--c-navy-700)" : done ? "#5DCAA5" : "var(--c-border,rgba(10,65,116,.12))"}`,
+            }}>
+              <span style={{
+                width: 20, height: 20, borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, fontWeight: 800,
+                background: current ? "#fff" : done ? "#085041" : "var(--c-border)",
+                color: current ? "var(--c-navy-700)" : done ? "#fff" : "var(--c-text-3)",
+              }}>
+                {done ? "✓" : s.n}
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: current ? 700 : 500,
+                color: current ? "#fff" : done ? "#085041" : "var(--c-text-3)",
+              }}>
+                {s.label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div style={{ width: 24, height: 1, background: done ? "#5DCAA5" : "var(--c-border,rgba(10,65,116,.12))" }}/>
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   STATUS BADGES
+───────────────────────────────────────────────────────── */
+function BoqStatusBadge({ status }) {
+  const s = BOQ_STATUS[status] || { label: status, color: "#666", bg: "#f4f4f4", border: "#ccc" };
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99,
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap",
+    }}>{s.label}</span>
+  );
+}
+
+function QrStatusBadge({ status }) {
+  const s = QR_STATUS[status] || { label: status, icon: "📑", color: "#666", bg: "#f4f4f4", border: "#ccc" };
+  return (
+    <span style={{
+      fontSize: 12, fontWeight: 700, padding: "5px 14px", borderRadius: 99,
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap",
+    }}>{s.icon} {s.label}</span>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   VARIANCE BADGE
+───────────────────────────────────────────────────────── */
+function VarBadge({ actual, boq }) {
+  if (boq === null || boq === undefined)
+    return <span style={{ color: "var(--c-text-3)", fontSize: 11 }}>—</span>;
+  const pct = varPct(actual, boq);
+  const st  = varStyle(pct);
+  const lbl = pct === 0 ? "On BOQ" : pct > 0 ? `+${pct}%` : `${pct}%`;
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 700, fontFamily: "monospace",
+      padding: "2px 8px", borderRadius: 99,
+      background: st.bg, color: st.color,
+      border: st.border !== "none" ? `1px solid ${st.border}` : "none",
+    }}>{lbl}</span>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   BOQ ITEMS TABLE (read-only, prices hidden)
+───────────────────────────────────────────────────────── */
+function BoqItemsTable({ rows }) {
+  const items = safeArr(rows);
+  if (!items.length)
+    return <div style={{ fontSize: 12, color: "var(--c-text-3)", padding: "8px 0" }}>No BOQ items recorded.</div>;
+  return (
+    <table className="qs-line-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Material / Item</th><th>Unit</th>
+          <th>BOQ Qty (Planned)</th><th>Rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((r, i) => (
+          <tr key={i}>
+            <td style={{ fontFamily: "monospace", color: "var(--c-text-3)", width: 32 }}>{i + 1}</td>
+            <td style={{ fontWeight: 600, color: "var(--c-navy-900,#001D39)" }}>{r.material}</td>
+            <td style={{ fontFamily: "monospace", color: "var(--c-text-3)" }}>{r.unit}</td>
+            <td style={{ fontFamily: "monospace", fontWeight: 700, color: "#185FA5" }}>
+              {toNum(r.quantity).toLocaleString("en-IN")}
+            </td>
+            <td style={{ fontSize: 11, color: "var(--c-text-3)", fontStyle: "italic" }}>🔒 Hidden</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════
-   COMPONENT
+   MAIN COMPONENT
 ═══════════════════════════════════════════════════════════ */
 export default function QSMeasurements() {
-  const [measurements, setMeasurements] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [search, setSearch]     = useState("");
-  const [filterStat, setFStat]  = useState("all");
-  const [expandedId, setExp]    = useState(null);
-  const [updating, setUpdating] = useState(null);
-  const [qsNotes, setQSNotes]   = useState({});     // { [id]: "QS notes text" }
-  const [rejectReason, setRej]  = useState({});     // { [id]: "rejection reason" }
-  const [showReject, setShowRej]= useState({});     // { [id]: boolean }
-  const [page, setPage]         = useState(1);
-  const alive = useRef(true);
+  console.count("QSMeasurements Render");
 
-  /* ── load ─────────────────────────────────────────────── */
+  const [view,     setView]    = useState("list");
+  const [selBoq,   setSelBoq]  = useState(null);
+  const [qr,       setQr]      = useState(null);
+  const [qrLoaded, setQrLoaded]= useState(false);
+
+  const [boqs,       setBoqs]    = useState([]);
+  const [boqLoading, setBoqLoad] = useState(true);
+  const [boqSearch,  setBSearch] = useState("");
+  const [filterProj, setFProj]   = useState("");
+  const [projects,   setProjects]= useState([]);
+
+  const [labourReports, setLRs] = useState([]);
+
+  const [mDate,   setMDate]  = useState(nowISO());
+  const [mZone,   setMZone]  = useState("");
+  const [mAct,    setMAct]   = useState("");
+  const [mNotes,  setMNotes] = useState("");
+  const [mItems,  setMItems] = useState([blankItem()]);
+  const [mErrors, setMErrors]= useState({});
+  const [mMsg,    setMMsg]   = useState("");
+  const [mSaving, setMSaving]= useState(false);
+  const [linkedLR,setLLR]    = useState("");
+  const [lrDetails, setLrDetails] = useState(null);
+
+  const [qrActing,      setQrActing] = useState(false);
+  const [qrMsg,         setQrMsg]    = useState("");
+  const [showReject,    setShowRej]  = useState(false);
+  const [rejectComment, setRejCmt]   = useState("");
+
+  const pollRef = useRef(null);
+  const alive   = useRef(true);
+
+  /* ── Mount ── */
   useEffect(() => {
     alive.current = true;
-    load();
-    return () => { alive.current = false; };
+    loadBoqs();
+    loadProjects();
+    loadLabourReports();
+    return () => { alive.current = false; clearInterval(pollRef.current); };
+  }, []);
+  useEffect(() => {
+  if (!linkedLR) {
+    setLrDetails(null);
+    return;
+  }
+
+  const loadLabourReportDetails = async () => {
+    try {
+      const res = await api.get(`/labour-report/measurement/${linkedLR}`);
+
+      const data = res.data;
+
+      setLrDetails(data);
+
+      // Auto-fill the measurement form
+      setMDate(data.date || nowISO());
+      setMZone(data.zone || "");
+      setMAct(data.work_done || "");
+
+    } catch (err) {
+      console.error("Failed to load labour report details", err);
+    }
+  };
+
+  loadLabourReportDetails();
+
+}, [linkedLR]);
+
+  /* ── Loaders ── */
+  async function loadBoqs() {
+    setBoqLoad(true);
+    try {
+      const res = await api.get("/boq?role=se");
+      const raw = Array.isArray(res?.data) ? res.data : safeArr(res?.data?.data);
+      if (alive.current) setBoqs(raw);
+    } catch (e) {
+      console.error("loadBoqs:", e?.response?.data || e.message);
+    } finally {
+      if (alive.current) setBoqLoad(false);
+    }
+  }
+
+  async function loadProjects() {
+    try {
+      const r = await api.get("/projects");
+      if (alive.current) setProjects(Array.isArray(r?.data) ? r.data : r?.data?.data || []);
+    } catch {}
+  }
+
+  async function loadLabourReports() {
+  try {
+    const r = await api.get("/labour-report");
+    const list = Array.isArray(r?.data) ? r.data : [];
+
+    if (alive.current) {
+      setLRs(list);
+    }
+  } catch {}
+}
+
+  /* ── Fetch QR ── */
+  const fetchQr = useCallback(async (boqId) => {
+    console.count("fetchQr");
+    console.log("Fetching QR for:", boqId);
+    try {
+      const res  = await api.get(`/quantity-report?boqId=${boqId}`);
+      const list = Array.isArray(res?.data) ? res.data : safeArr(res?.data?.data);
+      const active = list.find(r => !["rejected","obsolete"].includes(r.status)) || list[0] || null;
+      if (alive.current) { setQr(active); setQrLoaded(true); }
+      return active;
+    } catch (e) {
+      console.error("fetchQr:", e?.response?.data || e.message);
+      if (alive.current) { setQr(null); setQrLoaded(true); }
+      return null;
+    }
   }, []);
 
-  async function load() {
-    setLoading(true);
-    try {
-      const res = await api.get("/measurements");
-      if (!alive.current) return;
-      const raw = Array.isArray(res?.data) ? res.data.slice().reverse() : [];
-      const seen = new Set();
-      const data = raw.filter(it => { const k = stableKey(it); if (seen.has(k)) return false; seen.add(k); return true; });
-      setMeasurements(data.length ? data : DEMO);
-    } catch {
-      if (alive.current) setMeasurements(DEMO);
-    } finally {
-      if (alive.current) setLoading(false);
-    }
+  function startPolling(boqId) {
+        console.log("START POLLING", boqId);
+
+    clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+              console.log("POLL TICK");
+      const found = await fetchQr(boqId);
+      if (found) clearInterval(pollRef.current);
+    }, 15000);
   }
 
-  /* ── verify action (QS reviews → pending → verified) ──── */
-  const verify = useCallback(async (m) => {
-    if (updating) return;
-    setUpdating(m.id);
-    const body = {
-      status: "verified",
-      qs_notes: qsNotes[m.id] || "",
-      verified_at: new Date().toISOString(),
-    };
-    try {
-      await api.patch(`/measurements/${m.id}`, body);
-      setMeasurements(s => s.map(it => it.id === m.id ? { ...it, ...body } : it));
-    } catch { alert("Update failed — check connection"); }
-    finally { setUpdating(null); }
-  }, [updating, qsNotes]);
+  /* ── Open BOQ detail ── */
+  const openBoq = useCallback(async (boq) => {
+  clearInterval(pollRef.current);
 
-  /* ── approve action (verified → approved) ─────────────── */
-  const approve = useCallback(async (m) => {
-    if (updating) return;
-    setUpdating(m.id);
-    const body = {
-      status: "approved",
-      qs_notes: qsNotes[m.id] || m.qs_notes || "",
-      approved_at: new Date().toISOString(),
-    };
-    try {
-      await api.patch(`/measurements/${m.id}`, body);
-      setMeasurements(s => s.map(it => it.id === m.id ? { ...it, ...body } : it));
-    } catch { alert("Update failed — check connection"); }
-    finally { setUpdating(null); }
-  }, [updating, qsNotes]);
+  setSelBoq(boq);
+  setView("detail");
 
-  /* ── reject action ─────────────────────────────────────── */
-  const reject = useCallback(async (m) => {
-    if (updating) return;
-    const reason = rejectReason[m.id] || "";
-    if (!reason.trim()) { alert("Please enter a rejection reason before rejecting."); return; }
-    setUpdating(m.id);
-    const body = {
-      status: "rejected",
-      rejection_reason: reason,
-      rejected_at: new Date().toISOString(),
-    };
-    try {
-      await api.patch(`/measurements/${m.id}`, body);
-      setMeasurements(s => s.map(it => it.id === m.id ? { ...it, ...body } : it));
-      setShowRej(r => ({ ...r, [m.id]: false }));
-    } catch { alert("Update failed — check connection"); }
-    finally { setUpdating(null); }
-  }, [updating, rejectReason]);
+  setQr(null);
+  setQrLoaded(false);
+  setQrMsg("");
+  setMMsg("");
+  setMErrors({});
+  setShowRej(false);
+  setRejCmt("");
 
-  /* ── filter ───────────────────────────────────────────── */
-  const filtered = useMemo(() => {
-    let list = measurements.slice();
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(it =>
-        (it.zone        || "").toLowerCase().includes(q) ||
-        (it.activity    || "").toLowerCase().includes(q) ||
-        (it.submittedBy || "").toLowerCase().includes(q) ||
-        (it.refNo       || "").toLowerCase().includes(q)
+  setMZone(boq.milestoneName || "");
+  setMAct("");
+  setMDate(nowISO());
+  setMItems([blankItem()]);
+
+  // Find today's Labour Report for THIS BOQ's project
+  const matchingLabour = labourReports.find((lr) => {
+  const sameDate = lr.date === nowISO();
+
+  const sameProject =
+    String(lr.project_id || "") ===
+    String(boq.projectId || "");
+
+  const sameMilestone =
+    !boq.milestoneId ||
+    String(lr.milestone_id || "") ===
+    String(boq.milestoneId || "");
+
+  return sameDate && sameProject && sameMilestone;
+});
+
+  if (matchingLabour) {
+    setLLR(String(matchingLabour.id));
+  } else {
+    setLLR("");
+  }
+
+  const found = await fetchQr(boq.id);
+
+  if (!found) {
+    startPolling(boq.id);
+  }
+}, [fetchQr, labourReports]);
+
+  const backToList = useCallback(() => {
+    clearInterval(pollRef.current);
+    setView("list"); setSelBoq(null);
+    setQr(null); setQrLoaded(false);
+    setQrMsg(""); setMMsg("");
+  }, []);
+
+  const refreshQr = useCallback(async () => {
+    if (!selBoq) return;
+    setQrLoaded(false);
+    const found = await fetchQr(selBoq.id);
+    if (!found) startPolling(selBoq.id);
+    else clearInterval(pollRef.current);
+  }, [selBoq, fetchQr]);
+
+  /* ── Measurement form helpers ── */
+  const addItem    = () => setMItems(p => [...p, blankItem()]);
+  const removeItem = (i) => setMItems(p => p.filter((_, j) => j !== i));
+  const setItem    = (i, k, v) =>
+    setMItems(p => { const c = [...p]; c[i] = { ...c[i], [k]: v }; return c; });
+
+  function validateMeas() {
+    const e = {};
+    if (!mDate)        e.date  = "Date required";
+    if (!mZone.trim()) e.zone  = "Zone / location required";
+    const valid = mItems.filter(it => it.description.trim() && toNum(it.qty_actual) > 0);
+    if (!valid.length) e.items = "At least one item with description and quantity is required";
+    return e;
+  }
+
+  /* ── SUBMIT MEASUREMENT ──────────────────────────────────
+     FIX: posts to /site-measurements (was /measurements)
+     FIX: payload uses camelCase field names matching
+          siteMeasurementController.create() exactly
+  ───────────────────────────────────────────────────────── */
+  const submitMeasurement = useCallback(async (ev) => {
+    ev?.preventDefault();
+    const errs = validateMeas();
+    setMErrors(errs);
+    if (Object.keys(errs).length) { setMMsg("Fix errors above"); return; }
+
+    setMSaving(true);
+    setMMsg("Submitting…");
+
+    try {
+      const validItems = mItems.filter(
+        it => it.description.trim() && toNum(it.qty_actual) > 0
+      );
+
+      // ── Payload exactly matches siteMeasurementController.create() ──
+      const payload = {
+  boqId: selBoq.id,
+  projectId: selBoq.projectId,
+  milestoneId: selBoq.milestoneId,
+
+  labourReportId: linkedLR || null,
+  dailyDiaryId: lrDetails?.daily_diary_id || null,
+
+  submittedBy: "Site Engineer",
+
+  date: mDate,
+  zone: mZone,
+  activity: mAct || "",
+  notes: mNotes || "",
+
+  items: validItems.map(it => ({
+    description: it.description.trim(),
+    unit: it.unit,
+    qty_actual: toNum(it.qty_actual),
+  })),
+};
+
+      console.log("📐 Submitting to /site-measurements →", payload);
+
+      // ── FIXED ENDPOINT ──
+      await api.post("/site-measurements", payload);
+
+      setMMsg("✓ Submitted! QS will now create a Quantity Report.");
+      setMItems([blankItem()]);
+      setMNotes("");
+
+      setSelBoq(prev => prev ? {
+        ...prev,
+        status: "measurement_received",
+        hasMeasurements: true,
+      } : prev);
+
+      loadBoqs();
+      startPolling(selBoq.id);
+
+    } catch (err) {
+      const msg = err?.response?.data?.error || "Submission failed";
+      console.error("submitMeasurement error:", msg);
+      setMMsg(`Error: ${msg}`);
+    } finally {
+      if (alive.current) setMSaving(false);
+    }
+}, [
+  selBoq,
+  mDate,
+  mZone,
+  mAct,
+  mNotes,
+  mItems,
+  linkedLR,
+  lrDetails,
+]);
+
+  /* ── QR Approve ── */
+  const approveQr = useCallback(async () => {
+    if (!qr) return;
+    setQrActing(true); setQrMsg("");
+    try {
+      await api.put(`/quantity-report/approve/${qr.id}`, {});
+      setQr(p => ({ ...p, status: "approved" }));
+      setSelBoq(p => p ? { ...p, status: "finalised" } : p);
+      setBoqs(prev => prev.map(b =>
+        b.id === selBoq?.id ? { ...b, status: "finalised", qtyReportStatus: "approved" } : b
+      ));
+      setQrMsg("✅ Approved — BOQ is now finalised! QS can generate the Final Bill.");
+    } catch (err) {
+      setQrMsg(`❌ ${err?.response?.data?.error || "Approval failed"}`);
+    } finally { setQrActing(false); }
+  }, [qr, selBoq]);
+
+  /* ── QR Reject ── */
+  const rejectQr = useCallback(async () => {
+    if (!qr) return;
+    if (!rejectComment.trim()) { setQrMsg("❌ Please enter a rejection comment."); return; }
+    setQrActing(true); setQrMsg("");
+    try {
+      await api.put(`/quantity-report/reject/${qr.id}`, { comment: rejectComment.trim() });
+      setQr(p => ({ ...p, status: "rejected", seComment: rejectComment }));
+      setSelBoq(p => p ? { ...p, status: "rejected_by_se" } : p);
+      setBoqs(prev => prev.map(b =>
+        b.id === selBoq?.id ? { ...b, status: "rejected_by_se", qtyReportStatus: "rejected" } : b
+      ));
+      setShowRej(false); setRejCmt("");
+      setQrMsg("↩️ Changes requested — QS will revise and resubmit.");
+    } catch (err) {
+      setQrMsg(`❌ ${err?.response?.data?.error || "Rejection failed"}`);
+    } finally { setQrActing(false); }
+  }, [qr, rejectComment, selBoq]);
+
+  /* ── Computed ── */
+  const filteredBoqs = useMemo(() => {
+    let list = boqs.slice();
+    if (filterProj) list = list.filter(b => String(b.projectId) === filterProj);
+    if (boqSearch.trim()) {
+      const q = boqSearch.toLowerCase();
+      list = list.filter(b =>
+        (b.projectName || "").toLowerCase().includes(q) ||
+        (b.milestoneName || "").toLowerCase().includes(q)
       );
     }
-    if (filterStat !== "all")
-      list = list.filter(it => (it.status || "pending") === filterStat);
     return list;
-  }, [measurements, search, filterStat]);
+  }, [boqs, filterProj, boqSearch]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages]);
+  const boqCounts = useMemo(() => ({
+    total:      boqs.length,
+    needReview: boqs.filter(b => b.qtyReportStatus === "pending_se").length,
+    finalised:  boqs.filter(b => b.status === "finalised").length,
+  }), [boqs]);
 
-  /* ── stats ────────────────────────────────────────────── */
-  const stats = useMemo(() => ({
-    pending:  measurements.filter(m => m.status === "pending"  || !m.status).length,
-    verified: measurements.filter(m => m.status === "verified").length,
-    approved: measurements.filter(m => m.status === "approved").length,
-    rejected: measurements.filter(m => m.status === "rejected").length,
-  }), [measurements]);
-
-  /* ── overall billing % (approved only) ───────────────── */
-  const overallPct = useMemo(() => {
-    const approved = measurements.filter(m => m.status === "approved");
-    if (!approved.length) return 0;
-    const ptot = approved.reduce((s, m) => {
-      const items = parseItems(m.items);
-      return s + items.reduce((ss, it) => ss + Number(it.qty_boq || 0), 0);
-    }, 0);
-    const aact = approved.reduce((s, m) => {
-      const items = parseItems(m.items);
-      return s + items.reduce((ss, it) => ss + Number(it.qty_actual || 0), 0);
-    }, 0);
-    return ptot ? Math.min(100, Math.round((aact / ptot) * 100)) : 0;
-  }, [measurements]);
-
-  /* billing by zone */
-  const billingByZone = useMemo(() => {
-    const zones = [...new Set(measurements.map(m => m.zone).filter(Boolean))];
-    return zones.slice(0, 8).map(z => {
-      const zItems = measurements.filter(m => m.zone === z);
-      const approved = zItems.filter(m => m.status === "approved");
-      const pct = completionPct(approved.flatMap(m => parseItems(m.items)));
-      const hasApproved = approved.length > 0;
-      const hasPending  = zItems.some(m => m.status === "pending" || !m.status);
-      return { z, pct, hasApproved, hasPending };
-    });
-  }, [measurements]);
-
-  function parseItems(items) {
-    if (!items) return [];
-    if (typeof items === "string") { try { return JSON.parse(items); } catch { return []; } }
-    return Array.isArray(items) ? items : [];
+  function currentStep() {
+    if (!selBoq) return 1;
+    if (!qr) {
+      if (selBoq.hasMeasurements || selBoq.status === "measurement_received") return 3;
+      return 2;
+    }
+    if (qr.status === "approved") return 5;
+    if (qr.status === "rejected") return 3;
+    return 4;
   }
 
-  /* ── render ───────────────────────────────────────────── */
-  return (
-    <div className="qs-page">
+  const todayLR = useMemo(
+  () =>
+    labourReports.find(
+      lr =>
+        lr.date === nowISO() &&
+        String(lr.project_id || "") ===
+          String(selBoq?.projectId || "")
+    ),
+  [labourReports, selBoq]
+);
+  const selLR     = labourReports.find(lr => String(lr.id) === linkedLR);
+  const boqRows   = safeArr(selBoq?.rows);
+  const boqLabour = safeArr(selBoq?.labourRows || selBoq?.labour_rows);
+  const qrItems   = safeArr(qr?.items);
+  const qrSt      = qr ? (QR_STATUS[qr.status] || QR_STATUS.pending_se) : null;
 
-      {/* ── HEADER ── */}
-      <div className="qs-page-header">
-        <div>
-          <div className="qs-eyebrow">Quantity Surveyor</div>
-          <h1 className="qs-title">Measurement Verification</h1>
-          <div className="qs-sub">
-            Review site measurements from Engineers — verify quantities vs BOQ — approve for billing
+  /* ═══════════════════════════════════════════════════════════
+     LIST VIEW
+  ═══════════════════════════════════════════════════════════ */
+  if (view === "list") {
+    return (
+      <div className="qs-page">
+        <div className="qs-page-header">
+          <div>
+            <div className="qs-eyebrow">Site Engineer · Quantity Hub</div>
+            <h1 className="qs-title">Measurements &amp; QR Approvals</h1>
+            <div className="qs-sub">Select a BOQ → enter site measurements → review and approve the Quantity Report</div>
           </div>
-        </div>
-        <div className="qs-header-pills">
-          <span className="qs-pill qs-pill--amber">{stats.pending} Pending</span>
-          <span className="qs-pill qs-pill--success">{stats.approved} Approved</span>
-          <span className="qs-pill qs-pill--muted">{measurements.length} Total</span>
-        </div>
-      </div>
-
-      {/* ── WORKFLOW PIPELINE ── */}
-      <div className="qs-pipeline">
-        {[
-          { dot: "qs-pipeline-dot--se",      icon: "👷", label: "Site Engineer", sub: "Submits measurements" },
-          null,
-          { dot: "qs-pipeline-dot--qs",      icon: "🔍", label: "QS — Verify",   sub: "Check vs BOQ on site" },
-          null,
-          { dot: "qs-pipeline-dot--qs",      icon: "✅", label: "QS — Approve",  sub: "Authorise billing qty" },
-          null,
-          { dot: "qs-pipeline-dot--billing", icon: "💰", label: "Billing",       sub: "Interim certificate" },
-        ].map((step, i) => step === null ? (
-          <div key={i} className="qs-pipeline-arrow">›</div>
-        ) : (
-          <div key={i} className="qs-pipeline-node">
-            <div className={`qs-pipeline-dot ${step.dot}`}>{step.icon}</div>
-            <div className="qs-pipeline-label">{step.label}</div>
-            <div className="qs-pipeline-sub">{step.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── KPI STATS BAR ── */}
-      <div className="qs-stats-bar">
-        {[
-          { icon: "⏳", num: stats.pending,  lbl: "Pending Review",  mod: "pending",  action: () => { setFStat("pending");  setPage(1); } },
-          { icon: "🔍", num: stats.verified, lbl: "Verified",        mod: "verified", action: () => { setFStat("verified"); setPage(1); } },
-          { icon: "✅", num: stats.approved, lbl: "Approved",        mod: "approved", action: () => { setFStat("approved"); setPage(1); } },
-          { icon: "❌", num: stats.rejected, lbl: "Rejected",        mod: "rejected", action: () => { setFStat("rejected"); setPage(1); } },
-        ].map(({ icon, num, lbl, mod, action }) => (
-          <div key={lbl} className={`qs-stat-card qs-stat-card--${mod}`} onClick={action}>
-            <div className="qs-stat-icon">{icon}</div>
-            <div className="qs-stat-info">
-              <div className="qs-stat-num">{num}</div>
-              <div className="qs-stat-lbl">{lbl}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── BOQ BILLING BANNER ── */}
-      {measurements.length > 0 && (
-        <div className="qs-boq-banner">
-          <div className="qs-boq-pct">{overallPct}%</div>
-          <div className="qs-boq-info">
-            <div className="qs-boq-label">Overall Billing Authorised — Al-Noor Residential Tower · Block C Phase 2</div>
-            <div className="qs-boq-track">
-              <div className="qs-boq-fill" style={{ width: `${overallPct}%` }} />
-            </div>
-            <div className="qs-boq-meta">
-              Based on {stats.approved} approved measurement{stats.approved !== 1 ? "s" : ""} · {stats.pending} pending review
-            </div>
-          </div>
-          <div className="qs-boq-figures">
-            <div className="qs-boq-fig">
-              <div className="qs-boq-fig-val">{stats.approved}</div>
-              <div className="qs-boq-fig-lbl">Approved</div>
-            </div>
-            <div className="qs-boq-fig">
-              <div className="qs-boq-fig-val">{stats.pending}</div>
-              <div className="qs-boq-fig-lbl">Pending</div>
-            </div>
-            <div className="qs-boq-fig">
-              <div className="qs-boq-fig-val">{stats.rejected}</div>
-              <div className="qs-boq-fig-lbl">Rejected</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── MAIN LAYOUT ── */}
-      <div className="qs-layout">
-
-        {/* ══ LEFT — MEASUREMENT LIST ══════════════════════ */}
-        <div className="qs-main">
-          <div className="qs-panel">
-            <div className="qs-panel-head">
-              <div className="qs-panel-title">Measurement Submissions</div>
-              <span className="qs-pill qs-pill--muted">{filtered.length} records</span>
-            </div>
-
-            {/* Search + status filter */}
-            <div className="qs-controls">
-              <div className="qs-search">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.8"/>
-                  <path d="M20 20l-3-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-                <input
-                  value={search}
-                  onChange={e => { setSearch(e.target.value); setPage(1); }}
-                  placeholder="Search zone, activity, engineer, ref…"
-                  aria-label="Search measurements"
-                />
-              </div>
-              <select
-                className="qs-input qs-select"
-                style={{ width: 160 }}
-                value={filterStat}
-                onChange={e => { setFStat(e.target.value); setPage(1); }}
-                aria-label="Filter by status"
-              >
-                <option value="all">All status</option>
-                {STATUS_FLOW.map(s => <option key={s} value={s}>{STATUS_CFG[s]?.label || s}</option>)}
-              </select>
-            </div>
-
-            {/* Quick filter chips */}
-            <div className="qs-filter-chips">
-              <span
-                className={`qs-filter-chip${filterStat === "all" ? " qs-filter-chip--active" : ""}`}
-                onClick={() => { setFStat("all"); setPage(1); }}
-              >All</span>
-              {STATUS_FLOW.map(s => (
-                <span
-                  key={s}
-                  className={`qs-filter-chip qs-filter-chip--${s}${filterStat === s ? ` qs-filter-chip--active` : ""}`}
-                  onClick={() => { setFStat(prev => prev === s ? "all" : s); setPage(1); }}
-                >
-                  {STATUS_CFG[s]?.icon} {STATUS_CFG[s]?.label}
-                </span>
-              ))}
-            </div>
-
-            {/* List */}
-            {loading ? (
-              <div className="qs-loading"><div className="qs-spinner" role="status" />Loading…</div>
-            ) : pageItems.length === 0 ? (
-              <div className="qs-empty">No measurement submissions match this filter</div>
-            ) : (
-              <>
-                {pageItems.map((m, idx) => {
-                  const items  = parseItems(m.items);
-                  const pct    = completionPct(items);
-                  const isOpen = expandedId === m.id;
-                  const status = m.status || "pending";
-
-                  return (
-                    <div
-                      key={stableKey(m)}
-                      className={`qs-item qs-item--${status}`}
-                      style={{ animationDelay: `${idx * 35}ms` }}
-                    >
-                      {/* Header row — click to expand */}
-                      <div
-                        className="qs-item-header"
-                        onClick={() => setExp(isOpen ? null : m.id)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={e => e.key === "Enter" && setExp(isOpen ? null : m.id)}
-                        aria-expanded={isOpen}
-                      >
-                        <div className="qs-item-main">
-                          {/* Tags row */}
-                          <div className="qs-item-tags">
-                            <span className="qs-ref">{m.refNo || `MSR-${String(m.id ?? "").padStart(3, "0")}`}</span>
-                            <span className={`qs-badge qs-badge--${status}`}>
-                              {STATUS_CFG[status]?.icon} {STATUS_CFG[status]?.label}
-                            </span>
-                            {m.linked_rfi && (
-                              <span className="qs-pill qs-pill--amber">RFI: {m.linked_rfi}</span>
-                            )}
-                            {m.linked_ncr && (
-                              <span className="qs-pill qs-pill--danger">NCR: {m.linked_ncr}</span>
-                            )}
-                          </div>
-
-                          {/* Title */}
-                          <div className="qs-item-title">{m.zone} — {m.activity}</div>
-
-                          {/* Completion bar */}
-                          <div className="qs-item-bar-wrap">
-                            <div className="qs-item-bar-head">
-                              <span className="qs-item-bar-lbl">Completion vs BOQ</span>
-                              <span className={`qs-item-bar-pct ${pct > 100 ? "qs-item-bar-pct--over" : status === "approved" ? "qs-item-bar-pct--approved" : "qs-item-bar-pct--normal"}`}>
-                                {pct}%
-                              </span>
-                            </div>
-                            <div className="qs-item-bar-track">
-                              <div className="qs-item-bar-boq" style={{ width: "100%" }} />
-                              <div
-                                className="qs-item-bar-actual"
-                                style={{ width: `${Math.min(100, pct)}%`, background: barColor(pct) }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Meta */}
-                          <div className="qs-item-meta">
-                            <span>👷 {m.submittedBy || "Site Engineer"}</span>
-                            <span>📅 {fmtTime(m.submittedAt)}</span>
-                            <span>📦 {items.length} line item{items.length !== 1 ? "s" : ""}</span>
-                            {m.approved_at && <span>✅ Approved {fmtDate(m.approved_at)}</span>}
-                          </div>
-                        </div>
-
-                        <div className="qs-item-arrow">
-                          {isOpen ? "▲" : "›"}
-                        </div>
-                      </div>
-
-                      {/* ── EXPANDED BODY ── */}
-                      {isOpen && (
-                        <div className="qs-expand">
-
-                          {/* Line items table */}
-                          <div>
-                            <div className="qs-expand-section-title">Measurement Line Items</div>
-                            <table className="qs-line-table">
-                              <thead>
-                                <tr>
-                                  <th>Description</th>
-                                  <th>Unit</th>
-                                  <th>BOQ Qty</th>
-                                  <th>Actual Qty</th>
-                                  <th>% of BOQ</th>
-                                  <th>Variance</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {items.map((it, ii) => {
-                                  const pBoq = Number(it.qty_boq || 0);
-                                  const pAct = Number(it.qty_actual || 0);
-                                  const lineP = pBoq ? Math.round((pAct / pBoq) * 100) : 0;
-                                  const v = variance(pAct, pBoq);
-                                  return (
-                                    <tr key={ii}>
-                                      <td style={{ fontWeight: 600, color: "var(--c-navy-900)" }}>{it.description}</td>
-                                      <td style={{ fontFamily: "var(--c-mono)", color: "var(--c-text-3)" }}>{it.unit}</td>
-                                      <td className="qs-line-boq">{pBoq.toLocaleString()}</td>
-                                      <td className="qs-line-qty">{pAct.toLocaleString()}</td>
-                                      <td>
-                                        <span className={`qs-item-bar-pct ${lineP > 100 ? "qs-item-bar-pct--over" : "qs-item-bar-pct--normal"}`}>
-                                          {lineP}%
-                                        </span>
-                                      </td>
-                                      <td>
-                                        <span className={`qs-variance-tag qs-variance-tag--${v > 0 ? "over" : v < 0 ? "under" : "exact"}`}>
-                                          {v > 0 ? `+${v}%` : v < 0 ? `${v}%` : "On BOQ"}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-
-                          {/* SE Notes */}
-                          {m.notes && (
-                            <div>
-                              <div className="qs-expand-section-title">Site Engineer Notes</div>
-                              <div style={{
-                                background: "var(--c-surface-2)",
-                                border: "1px solid var(--c-border)",
-                                borderRadius: "var(--c-r)",
-                                padding: "11px 14px",
-                                fontSize: 13,
-                                color: "var(--c-text-2)",
-                                lineHeight: 1.65,
-                              }}>
-                                {m.notes}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Approved state */}
-                          {status === "approved" && (
-                            <div className="qs-approved-box">
-                              ✅ Measurement approved — billing authorised for {pct}% of BOQ
-                              {m.qs_notes && <span style={{ fontWeight: 400, color: "var(--c-success)" }}> · {m.qs_notes}</span>}
-                            </div>
-                          )}
-
-                          {/* Rejected state */}
-                          {status === "rejected" && m.rejection_reason && (
-                            <div className="qs-reject-box">
-                              <strong>Rejected:</strong> {m.rejection_reason}
-                            </div>
-                          )}
-
-                          {/* Previous QS notes (verified) */}
-                          {status === "verified" && m.qs_notes && (
-                            <div>
-                              <div className="qs-expand-section-title">QS Verification Notes</div>
-                              <div style={{
-                                background: "var(--c-info-bg)",
-                                border: "1px solid var(--c-info-bdr)",
-                                borderRadius: "var(--c-r)",
-                                padding: "11px 14px",
-                                fontSize: 13,
-                                color: "var(--c-teal-500)",
-                                lineHeight: 1.65,
-                              }}>
-                                {m.qs_notes}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* ── QS ACTION AREA ── */}
-                          {(status === "pending" || status === "verified") && (
-                            <div>
-                              <div className="qs-expand-section-title">
-                                {status === "pending" ? "QS Verification Notes" : "QS Approval Notes"}
-                              </div>
-                              <textarea
-                                className="qs-verify-box"
-                                value={qsNotes[m.id] || ""}
-                                onChange={e => setQSNotes(n => ({ ...n, [m.id]: e.target.value }))}
-                                placeholder={
-                                  status === "pending"
-                                    ? "Record your site verification findings — measurements checked, any discrepancies noted…"
-                                    : "Add approval notes for the billing certificate…"
-                                }
-                              />
-
-                              {/* Rejection reason textarea */}
-                              {showReject[m.id] && (
-                                <div style={{ marginTop: 10 }}>
-                                  <div className="qs-expand-section-title">Rejection Reason *</div>
-                                  <textarea
-                                    className="qs-verify-box"
-                                    style={{ borderColor: "var(--c-danger-bdr)", background: "var(--c-danger-bg)" }}
-                                    value={rejectReason[m.id] || ""}
-                                    onChange={e => setRej(r => ({ ...r, [m.id]: e.target.value }))}
-                                    placeholder="State clearly why this measurement is rejected and what the SE must do before resubmitting…"
-                                  />
-                                </div>
-                              )}
-
-                              <div className="qs-action-row" style={{ marginTop: 14 }}>
-                                {status === "pending" && (
-                                  <button
-                                    className="qs-action-btn qs-action-btn--verify"
-                                    onClick={() => verify(m)}
-                                    disabled={updating === m.id}
-                                  >
-                                    {updating === m.id ? "Updating…" : "🔍 Verify Measurement"}
-                                  </button>
-                                )}
-
-                                {status === "verified" && (
-                                  <button
-                                    className="qs-action-btn qs-action-btn--approve"
-                                    onClick={() => approve(m)}
-                                    disabled={updating === m.id}
-                                  >
-                                    {updating === m.id ? "Updating…" : "✅ Approve for Billing"}
-                                  </button>
-                                )}
-
-                                {!showReject[m.id] ? (
-                                  <button
-                                    className="qs-action-btn qs-action-btn--reject"
-                                    onClick={() => setShowRej(r => ({ ...r, [m.id]: true }))}
-                                  >
-                                    ✕ Reject
-                                  </button>
-                                ) : (
-                                  <>
-                                    <button
-                                      className="qs-action-btn qs-action-btn--reject"
-                                      onClick={() => reject(m)}
-                                      disabled={updating === m.id}
-                                    >
-                                      {updating === m.id ? "Updating…" : "Confirm Reject"}
-                                    </button>
-                                    <button
-                                      className="qs-action-btn"
-                                      style={{ background: "transparent", border: "1px solid var(--c-border-md)", color: "var(--c-text-3)" }}
-                                      onClick={() => setShowRej(r => ({ ...r, [m.id]: false }))}
-                                    >
-                                      Cancel
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* Pagination */}
-                <div className="qs-pagination">
-                  <span className="qs-page-info">
-                    Page {page} of {totalPages} · {filtered.length} submissions
-                  </span>
-                  <div className="qs-page-btns">
-                    <button className="qs-page-btn" onClick={() => setPage(p => Math.max(1, p-1))} disabled={page <= 1}>← Prev</button>
-                    <button className="qs-page-btn" onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page >= totalPages}>Next →</button>
-                  </div>
-                </div>
-              </>
+          <div className="qs-header-pills">
+            <span className="qs-pill qs-pill--muted">{boqCounts.total} BOQs</span>
+            {boqCounts.needReview > 0 && (
+              <span className="qs-pill qs-pill--danger">
+                ⚠️ {boqCounts.needReview} QR{boqCounts.needReview > 1 ? "s" : ""} need approval
+              </span>
             )}
           </div>
         </div>
 
-        {/* ══ RIGHT — ASIDE ════════════════════════════════ */}
-        <aside className="qs-aside">
+        <div className="qs-pipeline">
+          {[
+            { icon:"📋", label:"QS Creates BOQ",  sub:"Planned quantities", dot:"qs-pipeline-dot--qs"      },null,
+            { icon:"📐", label:"You Measure",     sub:"Enter actual qty",   dot:"qs-pipeline-dot--se"      },null,
+            { icon:"📑", label:"QS Creates QR",   sub:"From measurement",   dot:"qs-pipeline-dot--qs"      },null,
+            { icon:"✅", label:"You Approve",     sub:"Finalises the BOQ",  dot:"qs-pipeline-dot--billing" },null,
+            { icon:"💰", label:"QS Bills",        sub:"Final certificate",  dot:"qs-pipeline-dot--qs"      },
+          ].map((s, i) => s === null
+            ? <div key={i} className="qs-pipeline-arrow">›</div>
+            : (
+              <div key={i} className="qs-pipeline-node">
+                <div className={`qs-pipeline-dot ${s.dot}`}>{s.icon}</div>
+                <div className="qs-pipeline-label">{s.label}</div>
+                <div className="qs-pipeline-sub">{s.sub}</div>
+              </div>
+            )
+          )}
+        </div>
 
-          {/* Summary */}
+        <div className="qs-stats-bar">
+          {[
+            { icon:"📋", num:boqCounts.total,      lbl:"Total BOQs",      mod:"pending"  },
+            { icon:"⏳", num:boqCounts.needReview, lbl:"QR Needs Review", mod:"verified" },
+            { icon:"✅", num:boqCounts.finalised,  lbl:"Finalised",       mod:"approved" },
+          ].map(({ icon, num, lbl, mod }) => (
+            <div key={lbl} className={`qs-stat-card qs-stat-card--${mod}`}>
+              <div className="qs-stat-icon">{icon}</div>
+              <div className="qs-stat-info">
+                <div className="qs-stat-num">{num}</div>
+                <div className="qs-stat-lbl">{lbl}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="qs-controls" style={{ marginBottom: 16 }}>
+          <div className="qs-search">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.8"/>
+              <path d="M20 20l-3-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+            <input value={boqSearch} onChange={e => setBSearch(e.target.value)}
+              placeholder="Search project or milestone…"/>
+          </div>
+          <select className="qs-input qs-select" value={filterProj}
+            onChange={e => setFProj(e.target.value)}>
+            <option value="">All projects</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+
+        {boqLoading ? (
+          <div className="qs-loading"><div className="qs-spinner"/>Loading BOQs…</div>
+        ) : filteredBoqs.length === 0 ? (
+          <div className="qs-empty">
+            <div style={{ fontSize: 40, opacity: .25, marginBottom: 12 }}>📋</div>
+            <div style={{ fontWeight: 600, color: "var(--c-text-2)" }}>No BOQs found</div>
+            <div style={{ fontSize: 12, color: "var(--c-text-3)", marginTop: 4, maxWidth: 300, textAlign: "center" }}>
+              The Quantity Surveyor creates BOQs. They will appear here once created.
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {filteredBoqs.map(boq => {
+              const qrs        = boq.qtyReportStatus;
+              const needAction = qrs === "pending_se";
+              const rows       = safeArr(boq.rows);
+              return (
+                <div key={boq.id} onClick={() => openBoq(boq)}
+                  style={{
+                    border: `1.5px solid ${needAction ? "#90C1EF" : "var(--c-border,rgba(10,65,116,.12))"}`,
+                    borderLeft: `4px solid ${needAction ? "#185FA5" : "#CBD5E1"}`,
+                    borderRadius: 12, cursor: "pointer",
+                    background: needAction ? "#F0F7FF" : "var(--c-surface,#fff)",
+                    transition: "box-shadow .15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 18px rgba(10,65,116,.10)"}
+                  onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+                >
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"16px 20px", gap:16 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5, flexWrap:"wrap" }}>
+                        <span style={{ fontFamily:"monospace", fontSize:11, color:"var(--c-text-3)", fontWeight:700 }}>BOQ #{boq.id}</span>
+                        <BoqStatusBadge status={boq.status}/>
+                        {qrs && (
+                          <span style={{
+                            fontSize:11, padding:"2px 9px", borderRadius:99, fontWeight:600,
+                            background: qrs==="approved"?"#E1F5EE":qrs==="pending_se"?"#E6F1FB":"#FCEBEB",
+                            color:      qrs==="approved"?"#085041":qrs==="pending_se"?"#185FA5":"#791F1F",
+                          }}>
+                            📑 QR: {qrs==="approved"?"Approved ✅":qrs==="pending_se"?"Needs Review ⏳":"Rejected ↩️"}
+                          </span>
+                        )}
+                        {needAction && (
+                          <span style={{ fontSize:10, fontWeight:800, padding:"2px 8px", borderRadius:99, background:"#185FA5", color:"#fff", letterSpacing:".05em" }}>
+                            ACTION NEEDED
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontWeight:700, fontSize:15, color:"var(--c-navy-900,#001D39)", marginBottom:4, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                        {boq.projectName}
+                      </div>
+                      <div style={{ display:"flex", gap:14, flexWrap:"wrap", fontSize:12, color:"var(--c-text-3)" }}>
+                        <span>🏗️ {boq.milestoneName}</span>
+                        <span>📦 {rows.length} items</span>
+                        <span>📅 {boq.date||"—"}</span>
+                        {boq.hasMeasurements && (
+                          <span style={{ color:"#085041", fontWeight:600 }}>
+                            📐 {boq.measurementCount} measurement{boq.measurementCount!==1?"s":""}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ fontSize:20, color:needAction?"#185FA5":"var(--c-text-3)", fontWeight:700, flexShrink:0 }}>›</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     DETAIL VIEW
+  ═══════════════════════════════════════════════════════════ */
+  return (
+    <div className="qs-page">
+      <div className="qs-page-header">
+        <div style={{ display:"flex", alignItems:"flex-start", gap:14 }}>
+          <button onClick={backToList} style={{
+            marginTop:4, background:"none",
+            border:"1px solid var(--c-border-md,rgba(10,65,116,.18))",
+            borderRadius:8, padding:"5px 12px", cursor:"pointer",
+            fontSize:12, color:"var(--c-navy-700,#0A4174)", fontWeight:600,
+          }}>← All BOQs</button>
+          <div>
+            <div className="qs-eyebrow">BOQ #{selBoq?.id} · {selBoq?.projectName}</div>
+            <h1 className="qs-title" style={{ fontSize:20, marginTop:2 }}>{selBoq?.milestoneName}</h1>
+            <BoqStatusBadge status={selBoq?.status}/>
+          </div>
+        </div>
+        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+          <button onClick={refreshQr} style={{
+            fontSize:11, padding:"5px 12px", borderRadius:8, cursor:"pointer",
+            background:"transparent", border:"1px solid var(--c-border-md,rgba(10,65,116,.18))",
+            color:"var(--c-navy-700)", fontWeight:600,
+          }}>↻ Refresh QR</button>
+          {qr ? <QrStatusBadge status={qr.status}/>
+           : qrLoaded ? <span className="qs-pill qs-pill--muted">⏳ No QR yet</span>
+           : null}
+        </div>
+      </div>
+
+      <StepBar step={currentStep()}/>
+
+      {qrMsg && (
+        <div style={{
+          marginBottom:16, padding:"12px 18px", borderRadius:10,
+          fontSize:13, fontWeight:600,
+          background: qrMsg.startsWith("✅")?"#E1F5EE":qrMsg.startsWith("↩️")?"#FEF3C7":"#FEE2E2",
+          border: `1px solid ${qrMsg.startsWith("✅")?"#5DCAA5":qrMsg.startsWith("↩️")?"#FCD34D":"#FCA5A5"}`,
+          color: qrMsg.startsWith("✅")?"#085041":qrMsg.startsWith("↩️")?"#92400E":"#7F1D1D",
+        }}>{qrMsg}</div>
+      )}
+
+      <div className="qs-layout">
+        <div className="qs-main">
+
+          {/* SECTION 1 — BOQ table (always visible, no prices) */}
+          <div className="qs-panel" style={{ marginBottom:20 }}>
+            <div className="qs-panel-head">
+              <div>
+                <div className="qs-panel-title">📋 Bill of Quantities — Planned (by QS)</div>
+                <div style={{ fontSize:12, color:"var(--c-text-3)", marginTop:2 }}>
+                  These are the QS estimates. Compare against your actual measurements below.
+                </div>
+              </div>
+              <span className="qs-pill qs-pill--muted">{boqRows.length} items</span>
+            </div>
+            <div style={{ padding:"0 20px 16px" }}>
+              <BoqItemsTable rows={boqRows}/>
+              {boqLabour.length > 0 && (
+                <>
+                  <div className="qs-expand-section-title" style={{ marginTop:16 }}>Labour (Planned)</div>
+                  <table className="qs-line-table">
+                    <thead><tr><th>#</th><th>Labour Type</th><th>Workers</th><th>Days</th><th>Wages</th></tr></thead>
+                    <tbody>
+                      {boqLabour.map((r, i) => (
+                        <tr key={i}>
+                          <td style={{ fontFamily:"monospace", color:"var(--c-text-3)", width:32 }}>{i+1}</td>
+                          <td style={{ fontWeight:600, color:"var(--c-navy-900)" }}>{r.labourType}</td>
+                          <td style={{ fontFamily:"monospace" }}>{r.workers}</td>
+                          <td style={{ fontFamily:"monospace" }}>{r.workingDays}</td>
+                          <td style={{ fontSize:11, color:"var(--c-text-3)", fontStyle:"italic" }}>🔒 Hidden</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* SECTION 2A — Measurement form (only when no active QR) */}
+          {qrLoaded && !qr && (selBoq?.status === "measurement_pending" || selBoq?.status === "rejected_by_se") && (
+            <div className="qs-panel" style={{ marginBottom:20 }}>
+              <div className="qs-panel-head">
+                <div>
+                  <div className="qs-panel-title">📐 Enter Actual Site Measurements</div>
+                  <div style={{ fontSize:12, color:"var(--c-text-3)", marginTop:2 }}>
+                    Measure on site and submit — QS will verify and create a Quantity Report
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding:"16px 20px" }}>
+                <form onSubmit={submitMeasurement} noValidate>
+                  <div className="qs-form-grid" style={{ marginBottom:18 }}>
+                    <div className="qs-form-field">
+                      <label className="qs-form-label">Date *</label>
+                      <input type="date" className="qs-form-input" value={mDate}
+                        onChange={e => { setMDate(e.target.value); setMErrors(p=>({...p,date:undefined})); }}/>
+                      {mErrors.date && <div className="qs-form-error">{mErrors.date}</div>}
+                    </div>
+                    <div className="qs-form-field">
+                      <label className="qs-form-label">Zone / Location *</label>
+                      <input className="qs-form-input" value={mZone}
+                        onChange={e => { setMZone(e.target.value); setMErrors(p=>({...p,zone:undefined})); }}
+                        placeholder="e.g. Level 3 / Grid A–D"/>
+                      {mErrors.zone && <div className="qs-form-error">{mErrors.zone}</div>}
+                    </div>
+                    <div className="qs-form-field">
+                      <label className="qs-form-label">Activity</label>
+                      <input className="qs-form-input" value={mAct}
+                        onChange={e => setMAct(e.target.value)}
+                        placeholder="e.g. Column Casting, Slab Pour…"/>
+                    </div>
+                    <div className="qs-form-field">
+                      <label className="qs-form-label">
+                        Link Labour Report
+                        {selLR?.date === nowISO() && (
+                          <span style={{ marginLeft:6, fontSize:10, fontWeight:700, color:"#085041", background:"#E1F5EE", padding:"1px 6px", borderRadius:99 }}>
+                            ✓ Today's auto-selected
+                          </span>
+                        )}
+                      </label>
+                      <select
+  className="qs-form-select"
+  value={linkedLR}
+  onChange={e => setLLR(e.target.value)}
+>
+  <option value="">No labour report</option>
+
+  {labourReports
+  .filter((lr) => {
+    const sameProject =
+      String(lr.project_id || "") ===
+      String(selBoq?.projectId || "");
+
+    const sameMilestone =
+      !selBoq?.milestoneId ||
+      String(lr.milestone_id || "") ===
+      String(selBoq.milestoneId || "");
+
+    return sameProject && sameMilestone;
+  })
+  .map(lr => (
+      <option key={lr.id} value={lr.id}>
+        {lr.date === nowISO() ? "★ Today — " : ""}
+        {lr.date} · {lr.total_headcount || 0} workers
+      </option>
+    ))}
+</select>
+                    </div>
+                  </div>
+
+                  {selLR && (
+                    <div style={{ marginBottom:18, padding:"10px 14px", background:"var(--c-surface-2,#F4F8FB)", border:"1px solid var(--c-border,rgba(10,65,116,.10))", borderLeft:"4px solid #085041", borderRadius:10 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:"var(--c-navy-900)", marginBottom:4 }}>
+                        👷 {selLR.total_headcount||0} workers linked — {selLR.date}
+                      </div>
+                      {safeArr(selLR.trades).slice(0,4).map((t,i) => (
+                        <div key={i} style={{ display:"flex", justifyContent:"space-between", fontSize:12, padding:"3px 0", color:"var(--c-text-2)" }}>
+                          <span>{t.trade}</span><strong style={{ fontFamily:"monospace" }}>{t.count}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                    <div className="qs-expand-section-title" style={{ margin:0 }}>Actual Quantities *</div>
+                    <button type="button" className="qs-btn qs-btn--ghost" style={{ padding:"3px 10px", fontSize:11 }} onClick={addItem}>+ Add Row</button>
+                  </div>
+                  <div className="qs-form-notice" style={{ marginBottom:10 }}>
+                    ℹ️ Enter what you measured on site. Descriptions should match BOQ items above. No pricing needed.
+                  </div>
+                  <div className="qs-items-head">
+                    <span>#</span><span>Description</span><span>Unit</span><span>Actual Qty</span><span></span>
+                  </div>
+                  {mItems.map((item, i) => (
+                    <div key={i} className="qs-item-row">
+                      <span className="qs-item-row-num">{i+1}</span>
+                      <input className="qs-form-input" value={item.description}
+                        onChange={e => { setItem(i,"description",e.target.value); setMErrors(p=>({...p,items:undefined})); }}
+                        list={`boq-list-${i}`} placeholder="e.g. Concrete C30, TMT Rebar…"/>
+                      <datalist id={`boq-list-${i}`}>
+                        {boqRows.map((r,j) => <option key={j} value={r.material}/>)}
+                      </datalist>
+                      <select className="qs-form-select" value={item.unit} onChange={e => setItem(i,"unit",e.target.value)}>
+                        {UNITS.map(u => <option key={u}>{u}</option>)}
+                      </select>
+                      <input type="number" min="0" step="0.01"
+                        className="qs-form-input qs-form-input--qty"
+                        value={item.qty_actual}
+                        onChange={e => { setItem(i,"qty_actual",e.target.value); setMErrors(p=>({...p,items:undefined})); }}
+                        placeholder="0.00"/>
+                      <button type="button" className="qs-item-remove" onClick={() => removeItem(i)} disabled={mItems.length===1}>×</button>
+                    </div>
+                  ))}
+                  {mErrors.items && <div className="qs-form-error" style={{ marginTop:6 }}>{mErrors.items}</div>}
+
+                  <div style={{ marginTop:14, marginBottom:14 }}>
+                    <label className="qs-form-label">Notes for QS (optional)</label>
+                    <textarea className="qs-verify-box" value={mNotes} onChange={e => setMNotes(e.target.value)}
+                      placeholder="Deductions, adjustments, NCR refs, site conditions…" style={{ minHeight:70 }}/>
+                  </div>
+
+                  <div className="qs-action-row" style={{ borderTop:"1px solid var(--c-border,rgba(10,65,116,.10))", paddingTop:14 }}>
+                    <button type="submit" className="qs-action-btn qs-action-btn--approve" disabled={mSaving}>
+                      {mSaving ? "Submitting…" : "📐 Submit Measurements to QS"}
+                    </button>
+                    <button type="button" className="qs-action-btn"
+                      style={{ background:"transparent", border:"1px solid var(--c-border-md,rgba(10,65,116,.18))", color:"var(--c-text-3)" }}
+                      onClick={() => { setMItems([blankItem()]); setMNotes(""); setMMsg(""); setMErrors({}); }}>
+                      Clear
+                    </button>
+                    {mMsg && (
+                      <span style={{ fontSize:12, fontFamily:"monospace", color:mMsg.startsWith("✓")?"#085041":mMsg.startsWith("Error")?"#DC2626":"var(--c-text-3)" }}>
+                        {mMsg}
+                      </span>
+                    )}
+                  </div>
+                </form>
+
+                {mMsg.startsWith("✓") && (
+                  <div style={{ marginTop:16, padding:"12px 16px", background:"#E6F1FB", border:"1px solid #90C1EF", borderRadius:10, fontSize:13, color:"#185FA5", lineHeight:1.65 }}>
+                    <strong>✓ Measurement submitted.</strong><br/>
+                    The QS will now create a Quantity Report from your data.
+                    This page auto-checks every 15 s — or click <strong>↻ Refresh QR</strong> above.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Loading QR */}
+          {!qrLoaded && (
+            <div className="qs-loading" style={{ marginBottom:20 }}>
+              <div className="qs-spinner"/>Checking for Quantity Report…
+            </div>
+          )}
+
+          {/* SECTION 2B — QR comparison + approve/reject */}
+          {qr && (
+            <div className="qs-panel">
+              <div className="qs-panel-head">
+                <div>
+                  <div className="qs-panel-title">📑 Quantity Report — Review &amp; Approve</div>
+                  <div style={{ fontSize:12, color:"var(--c-text-3)", marginTop:2 }}>
+                    BOQ (planned) vs Actual (measured on site). Approve to finalise the BOQ.
+                  </div>
+                  {(qr.zone || qr.activity || qr.submittedBy) && (
+                    <div style={{ fontSize:12, color:"var(--c-text-3)", marginTop:6, display:"flex", gap:14, flexWrap:"wrap" }}>
+                      {qr.zone           && <span>📍 Zone: <strong>{qr.zone}</strong></span>}
+                      {qr.activity       && <span>⚙️ Activity: <strong>{qr.activity}</strong></span>}
+                      {qr.submittedBy    && <span>👤 By: <strong>{qr.submittedBy}</strong></span>}
+                      {qr.measurementDate && <span>📅 Measured: <strong>{fmtDate(qr.measurementDate)}</strong></span>}
+                    </div>
+                  )}
+                </div>
+                <QrStatusBadge status={qr.status}/>
+              </div>
+              <div style={{ padding:"0 20px 20px" }}>
+                <div className="qs-qr-no-price-notice" style={{ marginBottom:16 }}>
+                  🔒 <strong>Quantities only</strong> — pricing is hidden. Approving this finalises the BOQ.
+                </div>
+                {qr.status==="rejected" && qr.seComment && (
+                  <div style={{ marginBottom:14, padding:"10px 14px", background:"#FEF3C7", border:"1px solid #FCD34D", borderRadius:10, fontSize:13, color:"#92400E" }}>
+                    <strong>Your feedback to QS:</strong> {qr.seComment}
+                  </div>
+                )}
+                <div className="qs-expand-section-title">BOQ (Planned) vs Actual (Measured)</div>
+                <table className="qs-line-table" style={{ marginTop:8, marginBottom:20 }}>
+                  <thead>
+                    <tr>
+                      <th>#</th><th>Material / Item</th><th>Unit</th>
+                      <th style={{ color:"#185FA5" }}>BOQ Qty ←</th>
+                      <th style={{ color:"#085041" }}>Actual Qty →</th>
+                      <th>Variance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(qrItems.length ? qrItems : boqRows.map(b=>({material:b.material,unit:b.unit,quantity:0}))).map((it,i) => {
+                      const boqRow = boqRows.find(b => (b.material||"").toLowerCase().trim()===(it.material||"").toLowerCase().trim());
+                      const boqQty = toNum(it.boqQuantity ?? boqRow?.quantity);
+                      const actual = toNum(it.quantity);
+                      const hasBoq = it.boqQuantity!=null || boqRow;
+                      return (
+                        <tr key={i}>
+                          <td style={{ fontFamily:"monospace", color:"var(--c-text-3)", width:32 }}>{i+1}</td>
+                          <td style={{ fontWeight:600, color:"var(--c-navy-900)" }}>{it.material}</td>
+                          <td style={{ fontFamily:"monospace", color:"var(--c-text-3)" }}>{it.unit}</td>
+                          <td style={{ fontFamily:"monospace", fontWeight:600, color:"#185FA5" }}>{hasBoq ? boqQty.toLocaleString("en-IN") : "—"}</td>
+                          <td style={{ fontFamily:"monospace", fontWeight:700, color:"#085041" }}>{actual.toLocaleString("en-IN")}</td>
+                          <td><VarBadge actual={actual} boq={hasBoq ? boqQty : null}/></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))", gap:10, marginBottom:20 }}>
+                  {[
+                    { label:"Material Items", val:qrItems.length,                    icon:"📦" },
+                    { label:"Pricing",        val:"🔒 Hidden",                        icon:"💰" },
+                    { label:"Source",         val:qr.generatedFrom||"Measurement",   icon:"📐" },
+                    { label:"Status",         val:qrSt?.label||qr.status,            icon:qrSt?.icon||"📑" },
+                  ].map(({ label, val, icon }) => (
+                    <div key={label} style={{ padding:"10px 14px", textAlign:"center", background:"var(--c-surface-2,#F4F8FB)", border:"1px solid var(--c-border,rgba(10,65,116,.10))", borderRadius:10 }}>
+                      <div style={{ fontSize:18, marginBottom:3 }}>{icon}</div>
+                      <div style={{ fontSize:13, fontWeight:800, color:"var(--c-navy-900)", fontFamily:"monospace" }}>{val}</div>
+                      <div style={{ fontSize:10, color:"var(--c-text-3)", marginTop:2 }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {qr.status==="pending_se" && !showReject && (
+                  <div className="qs-action-row" style={{ borderTop:"1px solid var(--c-border,rgba(10,65,116,.10))", paddingTop:16 }}>
+                    <button className="qs-action-btn qs-action-btn--approve" disabled={qrActing} onClick={approveQr}>
+                      {qrActing ? "Processing…" : "✅ Approve Quantity Report"}
+                    </button>
+                    <button className="qs-action-btn qs-action-btn--reject" disabled={qrActing} onClick={() => setShowRej(true)}>
+                      ↩️ Request Changes
+                    </button>
+                    <span style={{ fontSize:11, color:"var(--c-text-3)", lineHeight:1.5, maxWidth:220 }}>
+                      Approving locks the BOQ and allows QS to generate the Final Bill.
+                    </span>
+                  </div>
+                )}
+
+                {qr.status==="pending_se" && showReject && (
+                  <div style={{ marginTop:8, padding:16, background:"#FFF7ED", border:"1px solid #FCD34D", borderRadius:12 }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:"#92400E", marginBottom:8 }}>
+                      ↩️ What needs to be revised? (required)
+                    </div>
+                    <textarea className="qs-verify-box"
+                      placeholder="e.g. Concrete quantities are higher than poured — re-check Level 3 measurements…"
+                      value={rejectComment} onChange={e => setRejCmt(e.target.value)}
+                      rows={3} autoFocus style={{ marginBottom:12 }}/>
+                    <div style={{ display:"flex", gap:10 }}>
+                      <button className="qs-action-btn qs-action-btn--reject" disabled={qrActing} onClick={rejectQr}>
+                        {qrActing ? "Sending…" : "✕ Send to QS for Revision"}
+                      </button>
+                      <button className="qs-action-btn"
+                        style={{ background:"transparent", border:"1px solid var(--c-border-md,rgba(10,65,116,.18))", color:"var(--c-text-3)" }}
+                        onClick={() => { setShowRej(false); setRejCmt(""); }}>
+                        Cancel
+                      </button>
+                    </div>
+                    {qrMsg && qrMsg.startsWith("❌") && (
+                      <div style={{ marginTop:8, fontSize:12, color:"#DC2626" }}>{qrMsg}</div>
+                    )}
+                  </div>
+                )}
+
+                {qr.status==="approved" && (
+                  <div style={{ padding:"14px 18px", background:"#E1F5EE", border:"1px solid #5DCAA5", borderRadius:10, display:"flex", alignItems:"center", gap:12, fontSize:13, color:"#085041", fontWeight:600 }}>
+                    <span style={{ fontSize:24 }}>✅</span>
+                    <div>You approved this Quantity Report — the BOQ is now <strong>finalised</strong>. The QS can now generate the Final Bill.</div>
+                  </div>
+                )}
+
+                {qr.status==="rejected" && (
+                  <div style={{ padding:"14px 18px", background:"#FEF3C7", border:"1px solid #FCD34D", borderRadius:10, fontSize:13, color:"#92400E", fontWeight:600 }}>
+                    ↩️ You requested changes. QS will revise the quantities and resubmit.
+                    Click <strong>↻ Refresh QR</strong> above to check for updates.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* SIDEBAR */}
+        <aside className="qs-aside">
           <div className="qs-aside-card">
-            <div className="qs-aside-title">Summary</div>
+            <div className="qs-aside-title">BOQ Info</div>
             {[
-              ["Total Submissions", measurements.length],
-              ["Pending Review",   stats.pending],
-              ["Verified",         stats.verified],
-              ["Approved",         stats.approved],
-              ["Rejected",         stats.rejected],
-              ["Billing Auth.",    `${overallPct}%`],
+              ["Project",      selBoq?.projectName   || "—"],
+              ["Milestone",    selBoq?.milestoneName || "—"],
+              ["BOQ #",        `#${selBoq?.id}`],
+              ["Created",      selBoq?.date          || "—"],
+              ["Status",       BOQ_STATUS[selBoq?.status]?.label || selBoq?.status || "—"],
+              ["Materials",    `${boqRows.length} items`],
+              ["Labour",       boqLabour.length > 0 ? `${boqLabour.length} types` : "None"],
+              ["Measurements", selBoq?.measurementCount > 0 ? `${selBoq.measurementCount} submitted` : "None yet"],
             ].map(([l, v]) => (
               <div key={l} className="qs-aside-row">
-                <span>{l}</span>
-                <strong style={l === "Pending Review" && stats.pending > 0 ? { color: "var(--c-warning)" } : {}}>{v}</strong>
+                <span style={{ fontSize:12 }}>{l}</span>
+                <strong style={{ fontSize:12, textAlign:"right", maxWidth:140 }}>{v}</strong>
               </div>
             ))}
           </div>
 
-          {/* Billing by Zone */}
-          {billingByZone.length > 0 && (
+          {qr && (
             <div className="qs-aside-card">
-              <div className="qs-aside-title">Billing by Zone</div>
-              {billingByZone.map(({ z, pct, hasApproved, hasPending }) => (
-                <div
-                  key={z}
-                  className="qs-billing-item"
-                  onClick={() => { setSearch(z); setPage(1); }}
-                >
-                  <div className="qs-billing-head">
-                    <span className="qs-billing-zone" title={z}>{z}</span>
-                    <span className={`qs-billing-pct ${hasApproved ? "qs-billing-pct--approved" : hasPending ? "qs-billing-pct--pending" : "qs-billing-pct--partial"}`}>
-                      {pct}%
-                    </span>
-                  </div>
-                  <div className="qs-billing-track">
-                    <div
-                      className="qs-billing-fill"
-                      style={{
-                        width: `${pct}%`,
-                        background: hasApproved
-                          ? "var(--c-success)"
-                          : hasPending
-                            ? "var(--c-warning)"
-                            : "linear-gradient(90deg, var(--c-navy-700), var(--c-teal-400))",
-                      }}
-                    />
-                  </div>
+              <div className="qs-aside-title">Quantity Report</div>
+              {[
+                ["QR #",     `#${qr.id}`],
+                ["Status",   `${qrSt?.icon||""} ${qrSt?.label||qr.status}`],
+                ["Items",    `${qrItems.length} materials`],
+                ["Zone",     qr.zone     || "—"],
+                ["Activity", qr.activity || "—"],
+                ["Created",  fmtDate(qr.createdDate || qr.created_at)],
+              ].map(([l, v]) => (
+                <div key={l} className="qs-aside-row">
+                  <span style={{ fontSize:12 }}>{l}</span>
+                  <strong style={{ fontSize:12, textAlign:"right", maxWidth:140 }}>{v}</strong>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Quick filters */}
           <div className="qs-aside-card">
-            <div className="qs-aside-title">Quick Filter</div>
-            {[
-              { label: "All Submissions",  action: () => { setFStat("all"); setSearch(""); setPage(1); } },
-              { label: "⏳ Pending Review", action: () => { setFStat("pending"); setPage(1); } },
-              { label: "🔍 Verified",       action: () => { setFStat("verified"); setPage(1); } },
-              { label: "✅ Approved",        action: () => { setFStat("approved"); setPage(1); } },
-              { label: "❌ Rejected",        action: () => { setFStat("rejected"); setPage(1); } },
-            ].map(f => (
-              <button
-                key={f.label}
-                className="qs-btn qs-btn--ghost"
-                style={{ width: "100%", justifyContent: "flex-start", marginBottom: 6, fontSize: 12 }}
-                onClick={f.action}
-              >
-                {f.label}
-              </button>
-            ))}
+            <div className="qs-aside-title">
+              {!qr ? "What to do" : qr.status==="pending_se" ? "Review Checklist" : "What happens next"}
+            </div>
+            {!qr && (
+              <ul className="qs-tips">
+                <li>Check the BOQ table — QS estimates.</li>
+                <li>Go to site and measure actual quantities.</li>
+                <li>Enter actual quantities in the form below.</li>
+                <li>Submit — QS will verify and create a QR.</li>
+                <li>Come back here to approve the QR.</li>
+                <li>Page auto-checks every 15 s for new QR.</li>
+              </ul>
+            )}
+            {qr?.status==="pending_se" && (
+              <ul className="qs-tips">
+                <li>Compare BOQ qty vs Actual qty.</li>
+                <li>🟢 Green = within 5% — safe to approve.</li>
+                <li>🟡 Amber = 6–15% variance — check first.</li>
+                <li>🔴 Red = &gt;15% — investigate before approving.</li>
+                <li>If wrong, reject with a specific comment.</li>
+                <li>Approving is final — BOQ will be locked.</li>
+              </ul>
+            )}
+            {qr?.status==="approved" && (
+              <ul className="qs-tips">
+                <li>BOQ is locked ✅</li>
+                <li>QS can now generate the Final Bill.</li>
+              </ul>
+            )}
+            {qr?.status==="rejected" && (
+              <ul className="qs-tips">
+                <li>QS will revise and resubmit the QR.</li>
+                <li>Click ↻ Refresh QR to check for updates.</li>
+                <li>You will need to review again after revision.</li>
+              </ul>
+            )}
           </div>
 
-          {/* QS Rules */}
-          <div className="qs-aside-card">
-            <div className="qs-aside-title">QS Rules</div>
-            <ul className="qs-tips">
-              <li>Verify every measurement on site before approving — never approve from paper only.</li>
-              <li>Quantities more than 5% over BOQ require PM sign-off before approval.</li>
-              <li>Rejected measurements must clearly state what the SE must fix before resubmitting.</li>
-              <li>Approved quantities directly generate the interim payment certificate.</li>
-              <li>Link measurement to RFI or NCR if any constraint affected completion %.</li>
-            </ul>
-          </div>
-
+          {!qr && todayLR && (
+            <div className="qs-aside-card">
+              <div className="qs-aside-title">Today's Labour on Site</div>
+              <div style={{ padding:"10px 16px" }}>
+                <div style={{ fontSize:26, fontWeight:900, fontFamily:"monospace", color:"var(--c-navy-900)" }}>
+                  {todayLR.total_headcount||0}
+                </div>
+                <div style={{ fontSize:11, color:"var(--c-text-3)", marginBottom:8 }}>workers on site today</div>
+                {safeArr(todayLR.trades).slice(0,4).map((t,i) => (
+                  <div key={i} style={{ display:"flex", justifyContent:"space-between", fontSize:12, padding:"3px 0", color:"var(--c-text-2)", borderBottom:"1px solid var(--c-border,rgba(10,65,116,.06))" }}>
+                    <span>{t.trade}</span>
+                    <strong style={{ fontFamily:"monospace" }}>{t.count}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </aside>
       </div>
     </div>

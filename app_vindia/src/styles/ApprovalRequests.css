@@ -1,0 +1,534 @@
+/* ============================================
+   APPROVAL REQUESTS PAGE
+============================================ */
+
+.approval-requests-page *,
+.approval-requests-page *::before,
+.approval-requests-page *::after {
+  box-sizing: border-box;
+}
+
+.approval-requests-page {
+  padding: 28px;
+  background: #f6f8fb;
+  min-height: 100%;
+}
+
+/* ── Header ── */
+.approval-requests-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.approval-requests-header h1 {
+  margin: 0;
+  font-size: 27px;
+  color: #172b4d;
+}
+
+.approval-requests-header p {
+  margin: 6px 0 0;
+  color: #667085;
+}
+
+.approval-refresh-btn {
+  border: 1px solid #d0d5dd;
+  background: white;
+  border-radius: 7px;
+  padding: 9px 14px;
+  font-weight: 600;
+  color: #344054;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  white-space: nowrap;
+}
+.approval-refresh-btn:hover  { background: #f9fafb; border-color: #98a2b3; }
+.approval-refresh-btn:active { background: #f2f4f7; }
+
+/* ── Status tabs ── */
+.approval-tabs {
+  display: flex;
+  gap: 8px;
+  background: white;
+  padding: 7px;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.approval-tabs button {
+  border: 0;
+  background: transparent;
+  padding: 9px 15px;
+  border-radius: 7px;
+  cursor: pointer;
+  color: #475467;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+
+.approval-tabs button:hover { background: #f2f4f7; }
+
+.approval-tabs button.active { background: #173f5f; color: white; }
+.approval-tabs button.active:hover { background: #173f5f; }
+
+.approval-tabs span {
+  margin-left: 7px;
+  font-weight: 700;
+}
+
+/* ── Request list ── */
+.approval-request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.approval-request-card {
+  background: white;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.approval-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.approval-card-meta {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 11px;
+  color: #667085;
+  text-transform: uppercase;
+  flex-wrap: wrap;
+}
+
+.approval-type {
+  font-weight: 700;
+  color: #475467;
+}
+
+.approval-card-header h2 {
+  margin: 7px 0 0;
+  font-size: 19px;
+  color: #172b4d;
+  word-break: break-word;
+}
+
+.approval-status-badge {
+  height: fit-content;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.approval-status-badge.pending  { background: #fff4d6; color: #8a5a00; }
+.approval-status-badge.approved { background: #e8f7ee; color: #176b3a; }
+.approval-status-badge.rejected { background: #fde8e8; color: #991b1b; }
+.approval-status-badge.revision { background: #eee7f8; color: #5b21b6; }
+
+/* ── Summary grid ── */
+.approval-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-top: 20px;
+  padding-top: 17px;
+  border-top: 1px solid #eef2f6;
+}
+
+.approval-info label {
+  display: block;
+  font-size: 11px;
+  color: #667085;
+  margin-bottom: 4px;
+}
+
+.approval-info strong {
+  font-size: 13px;
+  color: #344054;
+  word-break: break-word;
+}
+
+.approval-card-description {
+  margin-top: 18px;
+}
+
+.approval-card-description label {
+  display: block;
+  font-size: 11px;
+  color: #667085;
+  margin-bottom: 5px;
+}
+
+.approval-card-description p {
+  margin: 0;
+  color: #344054;
+  line-height: 1.5;
+}
+
+/* ── Card footer + actions ── */
+.approval-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #eef2f6;
+  flex-wrap: wrap;
+}
+
+.approval-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.approval-view-btn,
+.approve-btn,
+.reject-btn,
+.revision-btn {
+  border-radius: 7px;
+  padding: 9px 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, opacity .15s, transform .1s;
+  white-space: nowrap;
+}
+.approval-view-btn:active,
+.approve-btn:active,
+.reject-btn:active,
+.revision-btn:active {
+  transform: scale(.98);
+}
+
+.approval-view-btn {
+  border: 1px solid #d0d5dd;
+  background: white;
+  color: #344054;
+}
+.approval-view-btn:hover { background: #f9fafb; }
+
+.approve-btn {
+  border: 1px solid #176b3a;
+  background: #176b3a;
+  color: white;
+}
+.approve-btn:hover { background: #145c31; border-color: #145c31; }
+
+.reject-btn {
+  border: 1px solid #d92d20;
+  background: white;
+  color: #b42318;
+}
+.reject-btn:hover { background: #fef3f2; }
+
+.revision-btn {
+  border: 1px solid #7f56d9;
+  background: white;
+  color: #6941c6;
+}
+.revision-btn:hover { background: #f9f5ff; }
+
+/* focus-visible for keyboard users, across all interactive elements */
+.approval-requests-page button:focus-visible {
+  outline: 2px solid #173f5f;
+  outline-offset: 2px;
+}
+
+/* ── Loading / empty states ── */
+.approval-loading,
+.approval-empty {
+  background: white;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  padding: 55px 24px;
+  text-align: center;
+}
+
+.approval-empty-icon {
+  margin: 0 auto 14px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e8f7ee;
+  color: #176b3a;
+  font-weight: 700;
+}
+
+.approval-empty h3 {
+  margin-bottom: 5px;
+}
+
+.approval-empty p {
+  color: #667085;
+}
+
+/* ============================================
+   MODAL
+============================================ */
+
+.approval-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 25px;
+  z-index: 1000;
+}
+
+.approval-modal {
+  width: min(850px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: white;
+  border-radius: 13px;
+}
+
+.approval-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 22px;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.approval-modal-header h2 {
+  margin: 7px 0 0;
+  word-break: break-word;
+}
+
+.approval-modal-close {
+  border: 0;
+  background: transparent;
+  font-size: 25px;
+  line-height: 1;
+  color: #667085;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
+}
+.approval-modal-close:hover { background: #f2f4f7; color: #172b4d; }
+
+.approval-modal-body {
+  padding: 22px;
+}
+
+.approval-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.approval-detail-section {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #eef2f6;
+}
+
+.approval-detail-section h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.approval-detail-section p {
+  margin: 0;
+  line-height: 1.6;
+  color: #344054;
+}
+
+.reference-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+.approval-existing-note {
+  margin-top: 20px;
+  padding: 14px;
+  background: #fff8e6;
+  border-radius: 8px;
+}
+/* =========================================
+   REVIEW COMMENTS
+========================================= */
+
+.aw-review-note {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+
+.aw-review-note--revision {
+  background: #f3edf8;
+  border: 1px solid #c49fdc;
+}
+
+.aw-review-note--rejected {
+  background: #fcebeb;
+  border: 1px solid #e8a0a0;
+}
+
+.aw-review-note-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+
+.aw-review-note--revision .aw-review-note-title {
+  color: #4a1a6e;
+}
+
+.aw-review-note--rejected .aw-review-note-title {
+  color: #791f1f;
+}
+
+.aw-review-note-text {
+  font-size: 13px;
+  color: #374151;
+  white-space: pre-wrap;
+}
+
+.approval-existing-note p {
+  margin: 5px 0 0;
+}
+
+.approval-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding: 16px 22px;
+  border-top: 1px solid #eef2f6;
+  flex-wrap: wrap;
+}
+
+/* ============================================
+   RESPONSIVE
+============================================ */
+
+/* Tablet: tighten grids, stack footer actions */
+@media (max-width: 800px) {
+  .approval-summary,
+  .approval-detail-grid,
+  .reference-list {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .approval-card-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .approval-card-actions {
+    flex-direction: column;
+  }
+
+  .approval-card-actions button {
+    width: 100%;
+  }
+}
+
+/* Mobile: single-column layout, full-width controls, near-fullscreen modal */
+@media (max-width: 560px) {
+  .approval-requests-page {
+    padding: 16px;
+  }
+
+  .approval-requests-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .approval-requests-header h1 {
+    font-size: 22px;
+  }
+
+  .approval-refresh-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .approval-tabs {
+    width: 100%;
+  }
+
+  .approval-tabs button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .approval-request-card {
+    padding: 16px;
+  }
+
+  .approval-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .approval-summary,
+  .approval-detail-grid,
+  .reference-list {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .approval-modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .approval-modal {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 13px 13px 0 0;
+  }
+
+  .approval-modal-header,
+  .approval-modal-body {
+    padding: 16px;
+  }
+
+  .approval-modal-footer {
+    padding: 12px 16px;
+    flex-direction: column-reverse;
+  }
+
+  .approval-modal-footer button {
+    width: 100%;
+  }
+
+  .approval-empty,
+  .approval-loading {
+    padding: 36px 18px;
+  }
+}

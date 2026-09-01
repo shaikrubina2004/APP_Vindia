@@ -1,96 +1,97 @@
-// src/config/siteEngineerMenu.js
-
 const siteEngineerMenu = [
-  // 🏠 DASHBOARD
   {
     name: "Dashboard",
     path: "/site-engineer/dashboard",
     icon: "home",
   },
 
-  // 📘 DAILY OPERATIONS
   {
     name: "Daily Diary",
-    path: "/site-engineer/daily-diary", // ✅ matches route
+    path: "/site-engineer/daily-diary",
     icon: "book",
   },
+
   {
-    name: "Checklist",
-    path: "/site-engineer/checklist",
-    icon: "check-square",
+    name: "Labour Report",
+    path: "/site-engineer/labour-report",
+    icon: "users",
   },
 
-  // ⚠️ QUALITY & ISSUES
+  
+
   {
     name: "RFI Register",
     path: "/site-engineer/rfi",
-    icon: "alert-circle",
+    icon: "help-circle",
   },
-  // {
-  //   name: "NCR Register",
-  //   path: "/site-engineer/ncr",
-  //   icon: "x-circle",
-  // },
+
   {
     name: "Incidents",
     path: "/site-engineer/incidents",
     icon: "alert-triangle",
   },
+
   {
     name: "Tasks",
-    path: "/site-engineer/incidents?page=tasks", // ✅ handled by AppShell
+    path: "/site-engineer/incidents?page=tasks",
     icon: "list",
   },
 
-  // 📊 PERFORMANCE
   {
     name: "Progress",
     path: "/site-engineer/progress",
-    icon: "trending-up",
+    icon: "bar-chart",
   },
 
-  // 🧾 TRACKING
-  {
-    name: "Activity Log",
-    path: "/site-engineer/activity",
-    icon: "clock",
-  },
+ 
 
-  // 📌 EXTRA MODULES (NEW PAGES)
   {
     name: "Snag List",
     path: "/site-engineer/snag-list",
     icon: "tool",
   },
+
   {
     name: "Material Request",
     path: "/site-engineer/materials",
     icon: "package",
   },
-  {
-    name: "Approvals",
-    path: "/site-engineer/approvals",
-    icon: "check-circle",
-  },
-  {
-    name: "Photo Gallery",
-    path: "/site-engineer/photos",
-    icon: "image",
-  },
+
   {
     name: "Site Instructions",
     path: "/site-engineer/site-instructions",
     icon: "file-text",
   },
+
   {
-   name: "QS Measurements",
-   path: "/site-engineer/qs-measurements",
-   icon: "circle",
+    name: "Approvals",
+    path: "/site-engineer/approvals",
+    icon: "check-circle",
   },
+  
+
   {
-   name: "Architect Drawings",
-   path: "/site-engineer/ArchitectDrawings",
-   icon: "circle",
+    name: "Photo Gallery",
+    path: "/site-engineer/photos",
+    icon: "image",
+  },
+
+  {
+    name: "QS Measurements",
+    path: "/site-engineer/qs-measurements",
+    icon: "edit-3",
+  },
+
+  {
+    name: "Architect Drawings",
+    path: "/site-engineer/ArchitectDrawings",
+    icon: "pen-tool",
+  },
+
+  {
+    name: "Labour Registry",
+    path: "/site-engineer/labour-registry",
+    icon: "users",
   },
 ];
 

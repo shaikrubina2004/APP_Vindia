@@ -7,10 +7,16 @@ const CR_API = "/api/cost-report";
 const QR_API = "/api/quantity-report";
 
 const STATUS = {
-  pending_pm: { label: "Awaiting PM Approval", color: "amber", icon: "⏳" },
-  pending_se: { label: "Awaiting SE Approval", color: "blue",  icon: "⏳" },
-  finalised:  { label: "Finalised",            color: "green", icon: "✅" },
-  rejected:   { label: "Changes Requested",    color: "red",   icon: "↩️" },
+  // Original statuses (kept for backward compatibility)
+  pending_pm: { label: "Awaiting PM Approval",  color: "amber",  icon: "⏳" },
+  pending_se: { label: "Awaiting SE Approval",   color: "blue",   icon: "⏳" },
+  finalised:  { label: "Finalised",              color: "green",  icon: "✅" },
+  rejected:   { label: "Changes Requested",      color: "red",    icon: "↩️" },
+  // New workflow statuses
+  measurement_pending:  { label: "Awaiting Measurements",  color: "amber",  icon: "📐" },
+  measurement_received: { label: "Measurements Received",  color: "blue",   icon: "📐" },
+  pending_se_approval:  { label: "Awaiting SE Approval",   color: "blue",   icon: "⏳" },
+  rejected_by_se:       { label: "Rejected by SE",         color: "red",    icon: "↩️" },
 };
 
 const UNITS        = ["m³", "m²", "m", "kg", "nos", "ltr", "ton", "bag", "rft"];
@@ -20,14 +26,35 @@ const LABOUR_TYPES = [
   "Machine Operator", "Supervisor", "Other",
 ];
 
-const uid         = () => Math.random().toString(36).substr(2, 9);
-const blank       = () => ({ id: uid(), material: "", unit: "m²", quantity: "", unitPrice: "", fromMeasurement: false });
+// FIX #5: crypto.randomUUID() replaces deprecated Math.random().toString(36).substr(2,9)
+const uid         = () => crypto.randomUUID();
+const blank = () => ({
+  id: uid(),
+
+  // ERP Relationships
+  dailyDiaryId: null,
+  labourReportId: null,
+  measurementId: null,
+  boqItemId: null,
+
+  // Material Details
+  material: "",
+  unit: "m²",
+  quantity: "",
+  unitPrice: "",
+
+  // Metadata
+  source: "manual",      // manual | measurement
+  fromMeasurement: false,
+
+  total: 0
+});
 const blankLabour = () => ({ id: uid(), labourType: "", workers: "", workingDays: "", dailyWage: "" });
 const fmtN        = (n) => parseFloat(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
 const safeArr = (val) => {
-  if (Array.isArray(val)) return val;
   if (!val) return [];
+  if (Array.isArray(val)) return val;
   if (typeof val === "string") {
     try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch (_) { return []; }
   }
@@ -74,39 +101,63 @@ export default function Qsboq() {
   const [crComment,       setCrComment]       = useState("");
   const [qrComment,       setQrComment]       = useState("");
   const [reportsLoading,  setReportsLoading]  = useState(false);
-  const [creatingReports, setCreatingReports] = useState(false);
-  const [sentToSeIds,     setSentToSeIds]     = useState([]);
+
+  // FIX #3: split into two independent loading states
+  const [creatingCostReport, setCreatingCostReport] = useState(false);
+  const [creatingQtyReport,  setCreatingQtyReport]  = useState(false);
+
 
   // ── Read pre-fill params from Measurement "Push to BOQ" ──
   useEffect(() => {
-    const params       = new URLSearchParams(location.search);
-    const preMeasurementId = params.get("measurementId");
-    const preProject   = params.get("projectId");
-    const preMilestone = params.get("milestoneId");
-    const preMaterial  = params.get("material");
-    const preQty       = params.get("qty");
-    const preUnit      = params.get("unit");
+  const params = new URLSearchParams(location.search);
 
-    if (preProject && preMaterial) {
-      setProject(preProject);
-      setTab("create");
-      if (preQty && preUnit) {
-        setRows([{
-  id: uid(),
-  material: decodeURIComponent(preMaterial),
-  unit: decodeURIComponent(preUnit),
-  quantity: preQty,
-  unitPrice: "",
-  fromMeasurement: true,
-  measurementId: preMeasurementId   // 🔥 ADD THIS
-}, blank()]);
-      }
-      if (preMilestone) {
-        sessionStorage.setItem("boq_prefill_milestone", preMilestone);
-      }
+  const measurementId = params.get("measurementId");
+  const projectId = params.get("projectId");
+  const milestoneId = params.get("milestoneId");
+
+  if (!measurementId || !projectId) return;
+
+  setProject(projectId);
+  setTab("create");
+
+  if (milestoneId) {
+    sessionStorage.setItem("boq_prefill_milestone", milestoneId);
+  }
+
+  const loadMeasurementItems = async () => {
+    try {
+      const res = await fetch(
+        `/api/site-measurements/${measurementId}/items`
+      );
+
+      const items = await res.json();
+
+      if (!res.ok) throw new Error(items.error);
+
+      setRows(
+        items.map(item => ({
+          ...blank(),
+
+          material: item.description,
+          quantity: item.quantity,
+          unit: item.unit,
+
+          source: "measurement",
+          fromMeasurement: true,
+
+          measurementId: item.measurementId,
+          boqItemId: item.boqItemId
+        }))
+      );
+
+    } catch (err) {
+      notify(err.message, "error");
     }
-  }, [location.search]);
+  };
 
+  loadMeasurementItems();
+
+}, [location.search]);
   // ── Set milestone once milestones have loaded from pre-fill ──
   useEffect(() => {
     const stored = sessionStorage.getItem("boq_prefill_milestone");
@@ -119,10 +170,7 @@ export default function Qsboq() {
     }
   }, [milestones]);
 
-  const markSentToSe = (boqId) => {
-    setSentToSeIds((prev) => [...new Set([...prev, boqId])]);
-    notify("🚀 BOQ sent to Site Engineer successfully!");
-  };
+  
 
   const notify = (msg, type = "success") => {
     setToast({ msg, type });
@@ -132,19 +180,19 @@ export default function Qsboq() {
   // ── Material row helpers ──
   const change        = (id, field, val) => setRows((p) => p.map((r) => (r.id === id ? { ...r, [field]: val } : r)));
   const rowTotal      = (r) => (parseFloat(r.quantity) || 0) * (parseFloat(r.unitPrice) || 0);
-  const materialTotal = rows.reduce((s, r) => s + rowTotal(r), 0);
-
+const materialTotal = rows.reduce(
+  (sum, row) => sum + rowTotal(row),
+  0
+);
   // ── Labour row helpers ──
   const changeLabour   = (id, field, val) => setLabourRows((p) => p.map((r) => (r.id === id ? { ...r, [field]: val } : r)));
   const labourRowTotal = (r) =>
-    (parseInt(r.workers) || 0) * (parseInt(r.workingDays) || 0) * (parseFloat(r.dailyWage) || 0);
+    (parseInt(r.workers || 0)) * (parseInt(r.workingDays || 0)) * (parseFloat(r.dailyWage) || 0);
   const labourTotal    = labourRows.reduce((s, r) => s + labourRowTotal(r), 0);
 
   const grandTotal = materialTotal + labourTotal;
 
-  // ═══════════════════════════════════════════════════════════════
-  //  FETCH — Projects
-  // ═══════════════════════════════════════════════════════════════
+  // ── FETCH Projects ──
   useEffect(() => {
     (async () => {
       try {
@@ -158,9 +206,7 @@ export default function Qsboq() {
     })();
   }, []);
 
-  // ═══════════════════════════════════════════════════════════════
-  //  FETCH — Milestones
-  // ═══════════════════════════════════════════════════════════════
+  // ── FETCH Milestones ──
   useEffect(() => {
     if (!project) { setMilestones([]); setMilestone(""); return; }
     (async () => {
@@ -180,9 +226,7 @@ export default function Qsboq() {
     })();
   }, [project]);
 
-  // ═══════════════════════════════════════════════════════════════
-  //  FETCH — BOQ list
-  // ═══════════════════════════════════════════════════════════════
+  // ── FETCH BOQ list ──
   const fetchBoqs = useCallback(async () => {
     setBoqsLoading(true);
     try {
@@ -202,16 +246,15 @@ export default function Qsboq() {
 
   useEffect(() => { if (tab === "list") fetchBoqs(); }, [tab, fetchBoqs]);
 
-  // ═══════════════════════════════════════════════════════════════
-  //  FETCH — Linked reports for detail view
-  // ═══════════════════════════════════════════════════════════════
+  // ── FETCH Linked report statuses for detail view ──
   const fetchReportStatuses = async (boqId) => {
     setReportsLoading(true);
     setCrStatus(null); setQrStatus(null); setCrComment(""); setQrComment("");
     try {
       const [crRes, qrRes] = await Promise.all([
         fetch(`${CR_API}?boqId=${boqId}`),
-        fetch(`${QR_API}?boqId=${boqId}`),
+        // FIX: cache busting so browser always fetches fresh QR data
+        fetch(`${QR_API}?boqId=${boqId}&_=${Date.now()}`),
       ]);
       const crData = await crRes.json();
       const qrData = await qrRes.json();
@@ -221,14 +264,97 @@ export default function Qsboq() {
     finally { setReportsLoading(false); }
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  //  SUBMIT BOQ
-  // ═══════════════════════════════════════════════════════════════
+  // ── SUBMIT BOQ ──
   const handleSubmit = async () => {
     if (!project)   return notify("Please select a project.", "error");
     if (!milestone) return notify("Please select a milestone.", "error");
-    if (rows.some((r) => !r.material || !r.quantity || !r.unitPrice))
-      return notify("Please fill in all material row fields.", "error");
+    // Remove completely empty rows
+const validRows = rows.filter(
+  (r) =>
+    r.material ||
+    r.quantity ||
+    r.unitPrice
+);
+
+const submissionMaterialTotal =
+    validRows.reduce(
+        (sum, row) => sum + rowTotal(row),
+        0
+    );
+
+if (validRows.length === 0) {
+  return notify("Please add at least one material.", "error");
+}
+
+// Required fields
+if (
+  validRows.some(
+    (r) =>
+      !r.material ||
+      !r.unit ||
+      r.quantity === "" ||
+      r.unitPrice === ""
+  )
+) {
+  return notify("Please complete all material fields.", "error");
+}
+
+// Quantity validation
+if (
+  validRows.some((r) => Number(r.quantity) <= 0)
+) {
+  return notify(
+    "Quantity must be greater than zero.",
+    "error"
+  );
+}
+
+// Unit Price validation
+if (
+  validRows.some((r) => Number(r.unitPrice) < 0)
+) {
+  return notify(
+    "Unit Price cannot be negative.",
+    "error"
+  );
+}
+
+const normalize = (text) =>
+  text
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+// Duplicate material check
+const duplicateMaterial = validRows.find(
+  (row, index) =>
+    validRows.findIndex(
+      (r) =>
+        normalize(r.material) ===
+        normalize(row.material)
+    ) !== index
+);
+
+if (duplicateMaterial) {
+  return notify(
+    `Duplicate material found: ${duplicateMaterial.material}`,
+    "error"
+  );
+}
+
+// Measurement validation
+if (
+  validRows.some(
+    (r) =>
+      r.source === "measurement" &&
+      !r.measurementId
+  )
+) {
+  return notify(
+    "Measurement reference missing.",
+    "error"
+  );
+}
 
     const filledLabour = labourRows.filter((r) => r.labourType || r.workers || r.workingDays || r.dailyWage);
     if (filledLabour.some((r) => !r.labourType || !r.workers || !r.workingDays || !r.dailyWage))
@@ -241,21 +367,38 @@ export default function Qsboq() {
       projectId:     parseInt(project),
       milestoneId:   milestoneObj.id,
       milestoneName: milestoneObj.name,
-      rows: rows.map((r) => ({
-  ...r,
-  measurementId: r.measurementId || null,
-  total: rowTotal(r),
-  quantity: parseFloat(r.quantity),
-  unitPrice: parseFloat(r.unitPrice),
+      rows: validRows.map((r) => ({
+    id: r.id,
+
+    material: r.material,
+
+    unit: r.unit,
+
+    quantity: parseFloat(r.quantity),
+
+    unitPrice: parseFloat(r.unitPrice),
+
+    total: rowTotal(r),
+
+    source: r.source,
+
+    measurementId: r.measurementId,
+
+    dailyDiaryId: r.dailyDiaryId,
+
+    labourReportId: r.labourReportId,
+
+    boqItemId: r.boqItemId
 })),
       labourRows: filledLabour.map((r) => ({
         ...r,
-        workers:     parseInt(r.workers),
-        workingDays: parseInt(r.workingDays),
-        dailyWage:   parseFloat(r.dailyWage),
+        // FIX #4: parseInt with || 0 fallback to prevent NaN
+        workers:     parseInt(r.workers || 0),
+        workingDays: parseInt(r.workingDays || 0),
+        dailyWage:   parseFloat(r.dailyWage || 0),
         total:       labourRowTotal(r),
       })),
-      materialTotal,
+      materialTotal: submissionMaterialTotal,
       labourTotal,
       grandTotal,
     };
@@ -270,7 +413,7 @@ export default function Qsboq() {
         });
         data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to update BOQ");
-        notify("BOQ updated ✓ — now create Cost & Quantity Reports");
+        notify("BOQ updated ✓");
         setEditingId(null);
       } else {
         res  = await fetch(API, {
@@ -279,7 +422,7 @@ export default function Qsboq() {
         });
         data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to create BOQ");
-        notify("BOQ created ✓ — now create Cost & Quantity Reports");
+        notify("BOQ created ✓");
       }
       setRows([blank(), blank()]);
       setLabourRows([blankLabour(), blankLabour()]);
@@ -293,30 +436,30 @@ export default function Qsboq() {
     }
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  //  CREATE COST REPORT
-  // ═══════════════════════════════════════════════════════════════
+  // ── CREATE COST REPORT ──
+  // UNCHANGED — cost report flow is separate from QR
   const handleCreateReports = async (boq) => {
-    setCreatingReports(true);
+    setCreatingCostReport(true);
     try {
       const projObj        = projects.find((p) => String(p.id) === String(boq.projectId));
       const safeLabourRows = safeArr(boq.labourRows);
+      const boqRows        = safeArr(boq.rows); // FIX #6: hoist safeArr call
       const crPayload = {
         projectId:     boq.projectId,
         projectName:   boq.projectName || projObj?.name,
         milestoneId:   boq.milestoneId,
         milestoneName: boq.milestoneName,
         boqId:         boq.id,
-        items: safeArr(boq.rows).map((r) => ({
+        items: boqRows.map((r) => ({
           material:  r.material, unit: r.unit,
           quantity:  parseFloat(r.quantity), unitPrice: parseFloat(r.unitPrice),
           total:     parseFloat(r.total || 0),
         })),
         labourItems: safeLabourRows.map((r) => ({
           labourType:  r.labourType,
-          workers:     parseInt(r.workers),
-          workingDays: parseInt(r.workingDays),
-          dailyWage:   parseFloat(r.dailyWage),
+          workers:     parseInt(r.workers  || 0),
+          workingDays: parseInt(r.workingDays || 0),
+          dailyWage:   parseFloat(r.dailyWage || 0),
           total:       parseFloat(r.total || 0),
         })),
         materialTotal: parseFloat(boq.materialTotal || boq.grandTotal),
@@ -332,38 +475,33 @@ export default function Qsboq() {
       const crOk   = crRes.ok || crRes.status === 409;
       if (!crOk) throw new Error("Cost Report: " + (crData.error || "Failed"));
 
-      notify(crRes.status === 409 ? "Reports already created ✓" : "Cost Report created & sent to PM ✓");
+      notify(crRes.status === 409 ? "Cost Report already exists ✓" : "Cost Report created & sent to PM ✓");
       fetchBoqs();
       if (viewingBoq?.id === boq.id) { fetchReportStatuses(boq.id); refreshDetail(boq.id); }
     } catch (err) {
       notify(err.message, "error");
     } finally {
-      setCreatingReports(false);
+      setCreatingCostReport(false);
     }
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  //  CREATE QUANTITY REPORT
-  // ═══════════════════════════════════════════════════════════════
+  // ── CREATE QUANTITY REPORT ──
+  // FIX #1: payload now sends only projectId, milestoneId, boqId (all as integers)
+  // FIX #2: button condition changed from "pending_se" to "measurement_received"
+  // WHY: quantityReportController.createReport() fetches site_measurements itself
+  //      and builds QR items from them. It does not need items/labourItems from frontend.
+  //      The old "pending_se" status check never matched the new workflow status.
   const handleCreateQtyReport = async (boq) => {
-    setCreatingReports(true);
+    setCreatingQtyReport(true);
     try {
-      const projObj        = projects.find((p) => String(p.id) === String(boq.projectId));
-      const safeLabourRows = safeArr(boq.labourRows);
+      // Send only what the controller expects — it loads measurements from DB itself
       const qrPayload = {
-        projectId:     boq.projectId,
-        projectName:   boq.projectName || projObj?.name,
-        milestoneId:   boq.milestoneId,
-        milestoneName: boq.milestoneName,
-        boqId:         boq.id,
-        items: safeArr(boq.rows).map((r) => ({
-          material: r.material, unit: r.unit, quantity: parseFloat(r.quantity),
-        })),
-        labourItems: safeLabourRows.map((r) => ({
-          labourType: r.labourType, workers: parseInt(r.workers), workingDays: parseInt(r.workingDays),
-        })),
-        totalItems: safeArr(boq.rows).length,
+        projectId:   parseInt(boq.projectId),
+        milestoneId: parseInt(boq.milestoneId),
+        boqId:       parseInt(boq.id),
       };
+
+      console.log("📐 Creating QR:", qrPayload); // temporary — remove after confirming
 
       const qrRes  = await fetch(QR_API, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -372,24 +510,28 @@ export default function Qsboq() {
       const qrData = await qrRes.json();
       if (!qrRes.ok && qrRes.status !== 409) throw new Error("Qty Report: " + (qrData.error || "Failed"));
 
-      notify(qrRes.status === 409 ? "Qty Report already created ✓" : "Qty Report created & sent to SE ✓");
+      notify(qrRes.status === 409 ? "Qty Report already exists ✓" : "Qty Report created & sent to SE ✓");
       fetchBoqs();
       if (viewingBoq?.id === boq.id) { fetchReportStatuses(boq.id); refreshDetail(boq.id); }
     } catch (err) {
       notify(err.message, "error");
     } finally {
-      setCreatingReports(false);
+      setCreatingQtyReport(false);
     }
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  //  EDIT
-  // ═══════════════════════════════════════════════════════════════
+  // ── EDIT ──
   const handleEdit = (boq) => {
     setProject(String(boq.projectId));
     setMilestone(String(boq.milestoneId));
-    setRows(safeArr(boq.rows).map((r) => ({ ...r, id: r.id || uid() })));
-    const lr = safeArr(boq.labourRows);
+setRows(
+  safeArr(boq.rows).map((r) => ({
+    ...blank(),          // provide defaults for new ERP fields
+    ...r,
+    id: r.id || uid(),
+    source: r.source || "manual",
+  }))
+);    const lr = safeArr(boq.labourRows);
     setLabourRows(
       lr.length > 0
         ? lr.map((r) => ({ ...r, id: r.id || uid() }))
@@ -407,9 +549,7 @@ export default function Qsboq() {
     setMilestone("");
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  //  DETAIL
-  // ═══════════════════════════════════════════════════════════════
+  // ── DETAIL ──
   const openDetail = async (boq) => {
     setTab("detail");
     setViewingBoq({
@@ -441,15 +581,14 @@ export default function Qsboq() {
     setViewingBoq(null); setCrStatus(null); setQrStatus(null); setTab("list");
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  //  EXPORT CSV
-  // ═══════════════════════════════════════════════════════════════
+  // ── EXPORT CSV ──
   const exportCSV = (boq) => {
     const safeLabourRows = safeArr(boq.labourRows);
+    const boqRows        = safeArr(boq.rows); // FIX #6: hoist
     const matLines = [
       ["--- MATERIALS ---"].join(","),
       ["Material", "Unit", "Quantity", "Unit Price (₹)", "Total (₹)"].join(","),
-      ...safeArr(boq.rows).map((r) =>
+      ...boqRows.map((r) =>
         [r.material, r.unit, r.quantity, r.unitPrice, parseFloat(r.total || 0).toFixed(2)].join(",")
       ),
       `,,,,Material Total,${parseFloat(boq.materialTotal || boq.grandTotal).toFixed(2)}`,
@@ -582,8 +721,8 @@ export default function Qsboq() {
     );
   };
 
-  const isPrefilled = !!new URLSearchParams(location.search).get("material");
-
+const isPrefilled =
+    !!new URLSearchParams(location.search).get("measurementId");
   // ═══════════════════════════════════════════════════════════════
   //  RENDER
   // ═══════════════════════════════════════════════════════════════
@@ -624,7 +763,7 @@ export default function Qsboq() {
 
       {/* FLOW STEPS */}
       <div className="boq__flow-bar">
-        {["1. Create BOQ", "2. Create Reports", "3. PM Approves Cost", "4. SE Approves Qty", "5. BOQ Finalised"]
+        {["1. Create BOQ", "2. PM Approves", "3. SE Measures", "4. Create QR", "5. SE Approves", "6. Finalised"]
           .map((s, i, arr) => (
             <React.Fragment key={i}>
               <div className="boq__flow-step"><span className="boq__flow-label">{s}</span></div>
@@ -642,24 +781,23 @@ export default function Qsboq() {
           <>
             {editingId && (
               <div className="boq__edit-banner">
-                <span>✏️ Editing rejected BOQ — make changes based on the suggestion and resubmit.</span>
+                <span>✏️ Editing BOQ — make changes and resubmit.</span>
                 <button className="boq__cancel-edit" onClick={() => { cancelEdit(); setTab("list"); }}>✕ Cancel</button>
               </div>
             )}
 
-            {/* ── Pre-fill banner from Measurement ── */}
             {isPrefilled && !editingId && (
               <div className="boq__prefill-banner">
                 <span className="boq__prefill-icon">📐</span>
                 <div className="boq__prefill-text">
                   <strong>Pre-filled from Measurement Sheet</strong>
-                  <span>Row 1 has been filled with the net quantity. Just add the unit price to complete.</span>
+                  <span>Row 1 has been filled with the net quantity. Add the unit price to complete.</span>
                 </div>
                 <span className="boq__prefill-tag">From Measurement</span>
               </div>
             )}
 
-            {/* Step 1 */}
+            {/* Step 1 — Project & Milestone */}
             <div className="boq__block">
               <div className="boq__block-label">
                 <span className="boq__num">1</span> Select Project &amp; Milestone
@@ -729,9 +867,7 @@ export default function Qsboq() {
                           <div style={{display:"flex", alignItems:"center", gap:"6px"}}>
                             <input className="boq__inp" placeholder="e.g. M25 Concrete, Steel Bar…"
                               value={row.material} onChange={(e) => change(row.id, "material", e.target.value)} />
-                            {row.fromMeasurement && (
-                              <span className="boq__ms-tag">📐 Measurement</span>
-                            )}
+                            {row.fromMeasurement && <span className="boq__ms-tag">📐 Measurement</span>}
                           </div>
                         </td>
                         <td>
@@ -741,14 +877,14 @@ export default function Qsboq() {
                           </select>
                         </td>
                         <td>
-                          <input 
-  className="boq__inp boq__inp--n"
-  type="number"
-  min="0"
-  placeholder="0"
-  value={row.quantity}
-  disabled={row.fromMeasurement}   // ✅ correct
-/>
+                          {/* FIX #1: onChange added — quantity is editable for manual rows */}
+                          <input
+                            className="boq__inp boq__inp--n"
+                            type="number" min="0" placeholder="0"
+                            value={row.quantity}
+                            disabled={row.fromMeasurement}
+                            onChange={(e) => change(row.id, "quantity", e.target.value)}
+                          />
                         </td>
                         <td>
                           <input
@@ -786,9 +922,7 @@ export default function Qsboq() {
                   + Add Labour
                 </button>
               </div>
-              <div className="boq__labour-hint">
-                Total Wage = No. of Workers × Working Days × Daily Wage
-              </div>
+              <div className="boq__labour-hint">Total Wage = Workers × Working Days × Daily Wage</div>
               <LabourTable labRows={labourRows} editable={true} />
             </div>
 
@@ -869,7 +1003,8 @@ export default function Qsboq() {
             ) : (
               <div className="boq__cards-list">
                 {filtered.map((boq) => {
-                  const st = STATUS[boq.status] || STATUS.pending_pm;
+                  const st          = STATUS[boq.status] || STATUS.pending_pm;
+                  const boqRows     = safeArr(boq.rows); // FIX #6: hoist
                   return (
                     <div key={boq.id} className={`boq__card boq__card--${st.color}`}>
                       <div className="boq__card-top">
@@ -919,32 +1054,41 @@ export default function Qsboq() {
 
                       <div className="boq__card-actions">
                         <button className="boq__view-btn" onClick={() => openDetail(boq)}>👁 View BOQ</button>
+
+                        {/* Cost Report button — unchanged condition */}
                         {boq.status === "pending_pm" && !boq.costReportStatus && (
-                          <button className="boq__create-reports-btn" onClick={() => handleCreateReports(boq)} disabled={creatingReports}>
-                            {creatingReports ? "Creating…" : "📄 Create Cost Report"}
+                          <button className="boq__create-reports-btn"
+                            onClick={() => handleCreateReports(boq)} disabled={creatingCostReport}>
+                            {creatingCostReport ? "Creating…" : "📄 Create Cost Report"}
                           </button>
                         )}
-                        {boq.status === "pending_se" && !boq.qtyReportStatus && (
-                          <button className="boq__create-qty-btn" onClick={() => handleCreateQtyReport(boq)} disabled={creatingReports}>
-                            {creatingReports ? "Creating…" : "📐 Create Qty Report"}
+
+                        {/*
+                          FIX #2: Qty Report button condition
+                          BEFORE: boq.status === "pending_se" && !boq.qtyReportStatus
+                          AFTER:  boq.status === "measurement_received" && !boq.qtyReportStatus
+                          WHY: "pending_se" was the old workflow status — it never matched the
+                               new status "measurement_received" so the button never appeared.
+                        */}
+                        {boq.status === "measurement_received" && !boq.qtyReportStatus && (
+                          <button className="boq__create-qty-btn"
+                            onClick={() => handleCreateQtyReport(boq)} disabled={creatingQtyReport}>
+                            {creatingQtyReport ? "Creating…" : "📐 Create Qty Report"}
                           </button>
                         )}
-                        {boq.status === "rejected" && (
+
+                        {(boq.status === "rejected" || boq.status === "rejected_by_se") && (
                           <button className="boq__edit-btn" onClick={() => handleEdit(boq)}>✏️ Edit BOQ</button>
                         )}
+
                         {boq.status === "finalised" && (
-                          <>
-                            {sentToSeIds.includes(boq.id) || boq.sentToSE ? (
-                              <div className="boq__card-sent-confirm">
-                                <span className="boq__card-sent-icon">✅</span>
-                                <span className="boq__card-sent-title">✅ Submitted to SE</span>
-                              </div>
-                            ) : (
-                              <button className="boq__send-se-btn" onClick={() => markSentToSe(boq.id)}>🚀 Submit to SE</button>
-                            )}
-                            <button className="boq__export-btn" onClick={() => exportCSV(boq)}>⬇ Export CSV</button>
-                          </>
-                        )}
+  <button
+    className="boq__export-btn"
+    onClick={() => exportCSV(boq)}
+  >
+    ⬇ Export CSV
+  </button>
+)}
                       </div>
                     </div>
                   );
@@ -960,6 +1104,8 @@ export default function Qsboq() {
           const st               = STATUS[boq.status] || STATUS.pending_pm;
           const detailLabourRows = safeArr(boq.labourRows);
           const hasLabour        = detailLabourRows.length > 0;
+          // FIX #6: hoist safeArr(boq.rows) once
+          const boqRows          = safeArr(boq.rows);
 
           return (
             <div className="boq__detail">
@@ -973,9 +1119,10 @@ export default function Qsboq() {
                 {hasLabour && <div className="boq__detail-infoitem"><span className="boq__detail-infolbl">Labour</span><span className="boq__detail-infoval" style={{color:"#1d4ed8"}}>₹ {fmtN(boq.labourTotal || 0)}</span></div>}
               </div>
 
-              {boq.status === "rejected" && (
+              {/* Rejection box */}
+              {(boq.status === "rejected" || boq.status === "rejected_by_se") && (
                 <div className="boq__rejection-box">
-                  <div className="boq__rejection-box-title">↩️ Changes Requested — Please review the suggestions below and edit your BOQ</div>
+                  <div className="boq__rejection-box-title">↩️ Changes Requested — review feedback below and edit your BOQ</div>
                   <div className="boq__rejection-comments">
                     {(boq.pmNote || crComment) && (
                       <div className="boq__rejection-comment boq__rejection-comment--pm">
@@ -996,7 +1143,7 @@ export default function Qsboq() {
                       </div>
                     )}
                     {!boq.pmNote && !crComment && !boq.seNote && !qrComment && (
-                      <div className="boq__rejection-no-comment">No specific comments provided. Please review and resubmit.</div>
+                      <div className="boq__rejection-no-comment">No specific comments. Please review and resubmit.</div>
                     )}
                   </div>
                   <button className="boq__edit-inline" onClick={() => handleEdit(boq)}>✏️ Edit BOQ &amp; Resubmit</button>
@@ -1009,12 +1156,17 @@ export default function Qsboq() {
                 <div className="boq__approval-track">
                   {[
                     { label: "BOQ Created", done: true },
-                    { label: "Cost Report → PM", done: crStatus === "approved", current: crStatus === "pending_pm", rejected: crStatus === "rejected",
+                    { label: "Cost Report → PM",
+                      done: crStatus === "approved", current: crStatus === "pending_pm", rejected: crStatus === "rejected",
                       sub: crStatus === "approved" ? "✅ PM Approved" : crStatus === "rejected" ? "↩️ PM Rejected" : crStatus === "pending_pm" ? "⏳ Waiting for PM" : "Not created yet" },
-                    { label: "Qty Report → SE", done: qrStatus === "approved", current: qrStatus === "pending_se", rejected: qrStatus === "rejected",
+                    { label: "SE Submits Measurements",
+                      done: ["measurement_received","pending_se_approval","finalised"].includes(boq.status),
+                      sub: ["measurement_received","pending_se_approval","finalised"].includes(boq.status) ? "✅ Received" : "⏳ Waiting for SE" },
+                    { label: "Qty Report → SE",
+                      done: qrStatus === "approved", current: qrStatus === "pending_se", rejected: qrStatus === "rejected",
                       sub: qrStatus === "approved" ? "✅ SE Approved" : qrStatus === "rejected" ? "↩️ SE Rejected" : qrStatus === "pending_se" ? "⏳ Waiting for SE" : "Not created yet" },
                     { label: "BOQ Finalised", done: boq.status === "finalised",
-                      sub: boq.status === "finalised" ? `Sent to SE on ${boq.finalisedDate}` : "Pending both approvals" },
+                      sub: boq.status === "finalised" ? `Finalised on ${boq.finalisedDate || boq.date}` : "Pending both approvals" },
                   ].map((step, i, arr) => (
                     <React.Fragment key={i}>
                       <div className={`boq__ap-step ${step.done ? "done" : step.rejected ? "rejected" : step.current ? "active" : ""}`}>
@@ -1026,122 +1178,59 @@ export default function Qsboq() {
                     </React.Fragment>
                   ))}
                 </div>
-                {(crStatus === "rejected" || qrStatus === "rejected") && (
-                  <div className="boq__approval-comments">
-                    {crStatus === "rejected" && crComment && <div className="boq__approval-comment boq__approval-comment--pm"><strong>💬 PM Comment:</strong> {crComment}</div>}
-                    {qrStatus === "rejected" && qrComment && <div className="boq__approval-comment boq__approval-comment--se"><strong>💬 SE Comment:</strong> {qrComment}</div>}
-                  </div>
-                )}
               </div>
 
-              {/* Action buttons */}
+              {/* Detail action buttons */}
               <div className="boq__detail-action-bar">
                 {boq.status === "pending_pm" && !crStatus && (
-                  <button className="boq__create-reports-btn boq__create-reports-btn--lg" onClick={() => handleCreateReports(boq)} disabled={creatingReports}>
-                    {creatingReports ? "Creating…" : "📄 Create Cost Report & Send to PM"}
+                  <button className="boq__create-reports-btn boq__create-reports-btn--lg"
+                    onClick={() => handleCreateReports(boq)} disabled={creatingCostReport}>
+                    {creatingCostReport ? "Creating…" : "📄 Create Cost Report & Send to PM"}
                   </button>
                 )}
-                {boq.status === "pending_se" && !qrStatus && (
-                  <button className="boq__create-qty-btn boq__create-qty-btn--lg" onClick={() => handleCreateQtyReport(boq)} disabled={creatingReports}>
-                    {creatingReports ? "Creating…" : "📐 Create Quantity Report & Send to SE"}
+
+                {/*
+                  FIX #2 (detail view): same condition fix as card actions above
+                  BEFORE: boq.status === "pending_se" && !qrStatus
+                  AFTER:  boq.status === "measurement_received" && !qrStatus
+                */}
+                {boq.status === "measurement_received" && !qrStatus && (
+                  <button className="boq__create-qty-btn boq__create-qty-btn--lg"
+                    onClick={() => handleCreateQtyReport(boq)} disabled={creatingQtyReport}>
+                    {creatingQtyReport ? "Creating…" : "📐 Create Quantity Report & Send to SE"}
                   </button>
                 )}
-                {boq.status === "rejected" && (
+
+                {(boq.status === "rejected" || boq.status === "rejected_by_se") && (
                   <button className="boq__edit-btn boq__edit-btn--lg" onClick={() => handleEdit(boq)}>✏️ Edit BOQ</button>
                 )}
               </div>
 
-              {/* Finalised */}
-              {boq.status === "finalised" && (
-                <>
-                  <div className="boq__finalised-banner">
-                    <span className="boq__finalised-icon">✅</span>
-                    <div>
-                      <div className="boq__finalised-title">BOQ Finalised</div>
-                      <div className="boq__finalised-sub">Both Cost Report (PM) and Quantity Report (SE) approved. Finalised on {boq.finalisedDate}.</div>
-                    </div>
-                    <div className="boq__finalised-btns">
-                      {sentToSeIds.includes(boq.id) || boq.sentToSE ? (
-                        <div className="boq__sent-confirmation">
-                          <span className="boq__sent-check">✅</span>
-                          <div><div className="boq__sent-title">Submitted to Site Engineer</div><div className="boq__sent-sub">Site Engineer has received this BOQ for execution.</div></div>
-                        </div>
-                      ) : (
-                        <button className="boq__send-se-btn" onClick={() => markSentToSe(boq.id)}>🚀 Submit to Site Engineer</button>
-                      )}
-                      <button className="boq__export-btn boq__export-btn--lg" onClick={() => exportCSV(boq)}>⬇ Export CSV</button>
-                    </div>
-                  </div>
+              {/* Finalised banner */}
+              <button
+    className="boq__export-btn boq__export-btn--lg"
+    onClick={() => exportCSV(boq)}
+>
+    ⬇ Export CSV
+</button>
 
-                  <div className="boq__block">
-                    <div className="boq__block-label"><span className="boq__num">📋</span> Final Bill of Quantities — Materials</div>
-                    <div className="boq__table-scroll">
-                      <table className="boq__table">
-                        <colgroup><col style={{width:"44px"}}/><col/><col style={{width:"88px"}}/><col style={{width:"120px"}}/><col style={{width:"150px"}}/><col style={{width:"155px"}}/></colgroup>
-                        <thead><tr><th>#</th><th>Material</th><th>Unit</th><th>Quantity</th><th>Unit Price (₹)</th><th>Total (₹)</th></tr></thead>
-                        <tbody>
-                          {safeArr(boq.rows).map((r, i) => (
-                            <tr key={r.id || i} className={r.fromMeasurement ? "boq__row--prefilled" : ""}>
-                              <td className="td-num">
-                                {r.fromMeasurement
-                                  ? <span className="boq__ms-badge" title="From Measurement Sheet">📐</span>
-                                  : i + 1}
-                              </td>
-                              <td>
-                                <strong>{r.material}</strong>
-                                {r.fromMeasurement && <span className="boq__ms-tag">📐 Measurement</span>}
-                              </td>
-                              <td>{r.unit}</td>
-                              <td className="td-num">{parseFloat(r.quantity).toLocaleString("en-IN")}</td>
-                              <td className="td-num">₹ {parseFloat(r.unitPrice).toLocaleString("en-IN")}</td>
-                              <td className="td-total">₹ {fmtN(r.total || 0)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot><tr><td colSpan={5} className="tfoot-lbl">Material Total</td><td className="tfoot-val">₹ {fmtN(boq.materialTotal || boq.grandTotal)}</td></tr></tfoot>
-                      </table>
-                    </div>
-                  </div>
-
-                  {hasLabour && (
-                    <div className="boq__block">
-                      <div className="boq__block-label"><span className="boq__num boq__num--blue">👷</span> Final Bill of Quantities — Labour</div>
-                      <LabourTable labRows={detailLabourRows} editable={false} />
-                    </div>
-                  )}
-
-                  <div className="boq__grand-summary">
-                    <div className="boq__grand-summary-row"><span>Material Total</span><span className="boq__grand-summary-mat">₹ {fmtN(boq.materialTotal || boq.grandTotal)}</span></div>
-                    {hasLabour && <div className="boq__grand-summary-row"><span>Labour Total</span><span className="boq__grand-summary-lab">₹ {fmtN(boq.labourTotal)}</span></div>}
-                    <div className="boq__grand-summary-total"><span>Grand Total</span><span>₹ {fmtN(boq.grandTotal)}</span></div>
-                  </div>
-                </>
-              )}
-
-              {/* Pending tables */}
+              {/* Pending tables (non-finalised) */}
               {boq.status !== "finalised" && (
                 <>
                   <div className="boq__block">
                     <div className="boq__block-label">
                       <span className="boq__num">📋</span> BOQ Items — Materials
-                      <span className="boq__pending-note">Waiting for approvals</span>
+                      <span className="boq__pending-note">Pending approvals</span>
                     </div>
                     <div className="boq__table-scroll">
                       <table className="boq__table">
                         <colgroup><col style={{width:"44px"}}/><col/><col style={{width:"88px"}}/><col style={{width:"120px"}}/><col style={{width:"150px"}}/><col style={{width:"155px"}}/></colgroup>
                         <thead><tr><th>#</th><th>Material</th><th>Unit</th><th>Quantity</th><th>Unit Price (₹)</th><th>Total (₹)</th></tr></thead>
                         <tbody>
-                          {safeArr(boq.rows).map((r, i) => (
+                          {boqRows.map((r, i) => (
                             <tr key={r.id || i} className={r.fromMeasurement ? "boq__row--prefilled" : ""}>
-                              <td className="td-num">
-                                {r.fromMeasurement
-                                  ? <span className="boq__ms-badge" title="From Measurement Sheet">📐</span>
-                                  : i + 1}
-                              </td>
-                              <td>
-                                {r.material}
-                                {r.fromMeasurement && <span className="boq__ms-tag">📐 Measurement</span>}
-                              </td>
+                              <td className="td-num">{r.fromMeasurement ? <span className="boq__ms-badge">📐</span> : i + 1}</td>
+                              <td>{r.material}{r.fromMeasurement && <span className="boq__ms-tag">📐 Measurement</span>}</td>
                               <td>{r.unit}</td>
                               <td className="td-num">{parseFloat(r.quantity).toLocaleString("en-IN")}</td>
                               <td className="td-num">₹ {parseFloat(r.unitPrice).toLocaleString("en-IN")}</td>
@@ -1158,7 +1247,7 @@ export default function Qsboq() {
                     <div className="boq__block">
                       <div className="boq__block-label">
                         <span className="boq__num boq__num--blue">👷</span> BOQ Items — Labour
-                        <span className="boq__pending-note">Waiting for approvals</span>
+                        <span className="boq__pending-note">Pending approvals</span>
                       </div>
                       <LabourTable labRows={detailLabourRows} editable={false} />
                     </div>

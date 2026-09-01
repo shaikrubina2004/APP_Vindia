@@ -1,33 +1,34 @@
 /* ============================================
-   BOQ MODULE — Qsboq.css  (v3 — with approvals)
+   BOQ MODULE — Qsboq.css  (v4 — cleaned & deduped)
    Font: Outfit + IBM Plex Sans + IBM Plex Mono
 ============================================ */
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
 
 :root {
-  --c-bg:       #f0f2f5;
-  --c-surface:  #ffffff;
-  --c-border:   #e2e5ea;
-  --c-teal:     #0b6e72;
-  --c-teal-lt:  #e6f4f4;
-  --c-amber:    #d97706;
-  --c-amber-lt: #fef3c7;
-  --c-blue:     #1d4ed8;
-  --c-blue-lt:  #dbeafe;
-  --c-green:    #15803d;
-  --c-green-lt: #dcfce7;
-  --c-red:      #b91c1c;
-  --c-red-lt:   #fee2e2;
-  --c-grey:     #6b7280;
-  --c-grey-lt:  #f3f4f6;
-  --c-muted:    #6b7280;
-  --c-text:     #111827;
-  --c-hover:    #f8fafc;
-  --radius:     10px;
-  --shadow:     0 1px 4px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
-  --font:       "IBM Plex Sans", sans-serif;
-  --font-head:  "Outfit", sans-serif;
-  --font-mono:  "IBM Plex Mono", monospace;
+  --c-bg:        #f0f2f5;
+  --c-surface:   #ffffff;
+  --c-border:    #e2e5ea;
+  --c-teal:      #0b6e72;
+  --c-teal-lt:   #e6f4f4;
+  --c-amber:     #d97706;
+  --c-amber-lt:  #fef3c7;
+  --c-blue:      #1d4ed8;
+  --c-blue-lt:   #dbeafe;
+  --c-blue-pale: #eff6ff; /* lighter tint used for pre-fill banners/rows */
+  --c-green:     #15803d;
+  --c-green-lt:  #dcfce7;
+  --c-red:       #b91c1c;
+  --c-red-lt:    #fee2e2;
+  --c-grey:      #6b7280;
+  --c-grey-lt:   #f3f4f6;
+  --c-muted:     #6b7280;
+  --c-text:      #111827;
+  --c-hover:     #f8fafc;
+  --radius:      10px;
+  --shadow:      0 1px 4px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
+  --font:        "IBM Plex Sans", sans-serif;
+  --font-head:   "Outfit", sans-serif;
+  --font-mono:   "IBM Plex Mono", monospace;
 }
 
 .boq *, .boq *::before, .boq *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,6 +38,13 @@
   color: var(--c-text);
   min-height: 100vh;
   padding-bottom: 60px;
+}
+
+/* ── Focus-visible (keyboard a11y) for all interactive elements ── */
+.boq button:focus-visible,
+.boq a:focus-visible {
+  outline: 2px solid var(--c-teal);
+  outline-offset: 2px;
 }
 
 /* ── Toast ── */
@@ -135,6 +143,7 @@
   border-radius: 6px; font-size: 12px; font-weight: 700;
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
+.boq__num--blue { background: var(--c-blue); }
 
 /* ── Selectors row (project + milestone side by side) ── */
 .boq__selectors {
@@ -171,6 +180,8 @@
   cursor: pointer; transition: background .15s;
 }
 .boq__add-btn:hover { background: #ccebeb; }
+.boq__add-btn--blue { background: var(--c-blue-lt); border-color: #93c5fd; color: var(--c-blue); }
+.boq__add-btn--blue:hover { background: #bfdbfe; }
 
 /* ── Table ── */
 .boq__table-scroll {
@@ -193,6 +204,7 @@
 
 .td-num  { font-family: var(--font-mono); font-size: 12px; color: var(--c-muted); text-align: center; }
 .td-total { font-family: var(--font-mono); font-weight: 500; color: var(--c-teal); }
+.td-labour-total { font-family: var(--font-mono); font-weight: 500; color: var(--c-blue); }
 
 .boq__table tfoot tr { background: var(--c-teal); }
 .tfoot-lbl {
@@ -214,6 +226,11 @@
 .boq__inp:focus { outline: none; border-color: var(--c-teal); box-shadow: 0 0 0 3px rgba(11,110,114,.1); }
 .boq__inp--sel { cursor: pointer; width: 100%; }
 .boq__inp--n   { width: 100%; font-family: var(--font-mono); }
+.boq__inp--highlight {
+  border-color: var(--c-blue) !important;
+  box-shadow: 0 0 0 3px rgba(29,78,216,.15) !important;
+  background: var(--c-blue-pale) !important;
+}
 
 /* ── Delete ── */
 .boq__del {
@@ -248,6 +265,7 @@
 }
 .boq__submit-btn:hover  { background: #085558; }
 .boq__submit-btn:active { transform: scale(.98); }
+.boq__submit-btn:disabled { opacity: .6; cursor: not-allowed; }
 
 /* ── View head + filters ── */
 .boq__view-head {
@@ -257,27 +275,41 @@
 .boq__view-h { font-family: var(--font-head); font-size: 17px; font-weight: 700; }
 .boq__filters { display: flex; gap: 10px; flex-wrap: wrap; }
 
-/* ── BOQ Cards ── */
-.boq__cards { display: flex; flex-direction: column; gap: 20px; }
+/* ── BOQ Card List ──
+   (single canonical definition — this class was previously defined twice
+   with conflicting layouts; this is the version that was actually winning
+   in the cascade) */
+.boq__cards,
+.boq__cards-list {
+  display: flex; flex-direction: column; gap: 16px;
+}
 .boq__card {
   background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
 }
 .boq__card--green { border-left: 4px solid var(--c-green); }
 .boq__card--amber { border-left: 4px solid var(--c-amber); }
-.boq__card--blue  { border-left: 4px solid var(--c-blue);  }
-.boq__card--red   { border-left: 4px solid var(--c-red);   }
-.boq__card--grey  { border-left: 4px solid var(--c-grey);  }
+.boq__card--blue  { border-left: 4px solid var(--c-blue); }
+.boq__card--red   { border-left: 4px solid var(--c-red); }
+.boq__card--grey  { border-left: 4px solid var(--c-grey); }
 
 .boq__card-top {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 16px 20px; flex-wrap: wrap; gap: 10px;
   background: #f8fafc; border-bottom: 1px solid var(--c-border);
-  padding: 14px 18px;
-  display: flex; justify-content: space-between; align-items: flex-start;
-  flex-wrap: wrap; gap: 10px;
 }
-.boq__card-proj { font-family: var(--font-head); font-size: 15px; font-weight: 600; }
+.boq__card-proj { font-family: var(--font-head); font-size: 15px; font-weight: 700; }
 .boq__card-meta { font-size: 12px; color: var(--c-muted); margin-top: 3px; font-family: var(--font-mono); }
-.boq__card-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.boq__card-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+}
+.boq__card-total {
+  font-family: var(--font-mono); font-size: 16px; font-weight: 700;
+  color: var(--c-teal);
+}
+
+/* card table (no border radius) */
+.boq__card .boq__table-scroll { border: none; border-radius: 0; border-top: 1px solid var(--c-border); }
 
 /* ── Status badge ── */
 .boq__status-badge {
@@ -298,6 +330,7 @@
   cursor: pointer; transition: background .15s;
 }
 .boq__edit-btn:hover { background: #fef3c7; }
+.boq__edit-btn--lg { padding: 10px 22px; font-size: 14px; }
 
 .boq__export-btn {
   padding: 7px 14px; background: #fff; border: 1.5px solid var(--c-border);
@@ -305,14 +338,9 @@
   cursor: pointer; color: var(--c-text); transition: background .15s;
 }
 .boq__export-btn:hover { background: var(--c-bg); }
+.boq__export-btn--lg { margin-left: auto; padding: 10px 20px; font-size: 14px; }
 
-/* ── Rejection note ── */
-.boq__note {
-  background: #fff7ed; border-bottom: 1px solid #fed7aa;
-  padding: 10px 18px; font-size: 13px; color: #92400e;
-}
-
-/* ── Approval progress tracker ── */
+/* ── Approval progress tracker (basic — used on simpler views) ── */
 .boq__approval-track {
   display: flex; align-items: center;
   padding: 14px 18px; gap: 0;
@@ -323,23 +351,13 @@
   display: flex; align-items: center; flex-direction: column;
   gap: 5px; min-width: 110px; text-align: center;
 }
-.boq__ap-dot {
+.boq__approval-step .boq__ap-dot {
   width: 28px; height: 28px;
-  border-radius: 50%;
-  background: var(--c-border); color: var(--c-muted);
-  font-size: 12px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  transition: all .3s;
 }
 .boq__approval-step.done .boq__ap-dot   { background: var(--c-green); color: #fff; }
 .boq__approval-step.active .boq__ap-dot { background: var(--c-amber); color: #fff; }
-.boq__ap-label { font-size: 11.5px; color: var(--c-muted); line-height: 1.4; }
 .boq__approval-step.done   .boq__ap-label { color: var(--c-green); font-weight: 600; }
 .boq__approval-step.active .boq__ap-label { color: var(--c-amber); font-weight: 600; }
-.boq__ap-line {
-  flex: 1; height: 2px; background: var(--c-border);
-  min-width: 20px; margin-bottom: 14px;
-}
 
 /* ── Demo action buttons ── */
 .boq__demo-actions {
@@ -362,9 +380,6 @@
   transition: background .15s;
 }
 .boq__reject-btn:hover { background: var(--c-red-lt); }
-
-/* ── card table (no border radius) ── */
-.boq__card .boq__table-scroll { border: none; border-radius: 0; border-top: 1px solid var(--c-border); }
 
 /* ── Empty ── */
 .boq__empty {
@@ -456,6 +471,13 @@
 }
 .boq__view-btn:hover { background: #ccebeb; }
 
+/* ── List approval columns ── */
+.boq__list-approval { white-space: nowrap; }
+.boq__approval-ok      { color: var(--c-green); font-size: 12px; font-weight: 600; }
+.boq__approval-rej     { color: var(--c-red);   font-size: 12px; font-weight: 600; }
+.boq__approval-pending { color: var(--c-amber); font-size: 12px; font-weight: 600; }
+.boq__approval-nil     { color: var(--c-muted); font-size: 12px; }
+
 /* ══════════════════════════════════════
    DETAIL PAGE
 ══════════════════════════════════════ */
@@ -488,6 +510,17 @@
   font-size: 14px; font-weight: 600; color: var(--c-text);
 }
 
+/* Detail action bar (create buttons in detail view) */
+.boq__detail-action-bar {
+  display: flex; gap: 12px; flex-wrap: wrap;
+}
+
+/* Detail bottom actions */
+.boq__detail-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; padding-bottom: 20px;
+}
+
 /* Finalised banner */
 .boq__finalised-banner {
   background: linear-gradient(135deg, #f0fdf4, #dcfce7);
@@ -504,26 +537,9 @@
 .boq__finalised-sub {
   font-size: 13px; color: #166534; margin-top: 3px;
 }
-.boq__export-btn--lg {
-  margin-left: auto; padding: 10px 20px; font-size: 14px;
+.boq__finalised-btns {
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
 }
-
-/* Edit inline (in rejection note) */
-.boq__edit-inline {
-  margin-left: 14px; padding: 4px 12px;
-  background: #fff; border: 1.5px solid #fed7aa;
-  color: #92400e; border-radius: 5px;
-  font-size: 12.5px; font-weight: 600; cursor: pointer;
-  transition: background .15s;
-}
-.boq__edit-inline:hover { background: #fef3c7; }
-
-/* Detail bottom actions */
-.boq__detail-actions {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap; padding-bottom: 20px;
-}
-.boq__edit-btn--lg { padding: 10px 22px; font-size: 14px; }
 
 /* ── Loading spinner ── */
 .boq__loading {
@@ -546,11 +562,6 @@
   background: var(--c-red-lt); color: var(--c-red);
   border-bottom: 2px solid #fca5a5;
   padding: 10px 24px; font-size: 13.5px; font-weight: 500;
-}
-
-/* ── Submit disabled state ── */
-.boq__submit-btn:disabled {
-  opacity: .6; cursor: not-allowed;
 }
 
 /* ══════════════════════════════════════════════════
@@ -625,21 +636,14 @@
 .boq__approval-mini-table tfoot tr { background: var(--c-teal); }
 
 .boq__mini-total { font-family: var(--font-mono); font-weight: 600; color: var(--c-teal); }
-.boq__mini-qty   { font-family: var(--font-mono); font-weight: 600; color: #1d4ed8; }
+.boq__mini-qty   { font-family: var(--font-mono); font-weight: 600; color: var(--c-blue); }
 .boq__mini-lbl   { text-align: right; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.8); padding: 8px 10px; }
 .boq__mini-val   { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: #fff; padding: 8px 10px; }
 
 .boq__mini-pct-wrap  { display: flex; align-items: center; gap: 6px; }
 .boq__mini-pct-wrap span { font-family: var(--font-mono); font-size: 11px; color: var(--c-muted); white-space: nowrap; }
 .boq__mini-pct-bar   { flex: 1; height: 5px; background: var(--c-border); border-radius: 99px; overflow: hidden; min-width: 40px; }
-.boq__mini-pct-fill  { height: 100%; background: #1d4ed8; border-radius: 99px; }
-
-/* ── List approval columns ── */
-.boq__list-approval { white-space: nowrap; }
-.boq__approval-ok      { color: var(--c-green); font-size: 12px; font-weight: 600; }
-.boq__approval-rej     { color: var(--c-red);   font-size: 12px; font-weight: 600; }
-.boq__approval-pending { color: var(--c-amber); font-size: 12px; font-weight: 600; }
-.boq__approval-nil     { color: var(--c-muted); font-size: 12px; }
+.boq__mini-pct-fill  { height: 100%; background: var(--c-blue); border-radius: 99px; }
 
 /* ── Final BOQ section ── */
 .boq__final-boq {
@@ -672,48 +676,9 @@
 }
 .boq__finalise-btn:hover { background: #166534; }
 
-/* Blue variable needed for mini table */
-:root { --c-blue: #1d4ed8; --c-blue-lt: #dbeafe; }
-
 /* ══════════════════════════════════════════════════
-   NEW CARD LIST + REPORT BUTTONS (v4)
+   CARD REPORT PILLS + ACTIONS
 ══════════════════════════════════════════════════ */
-
-/* ── BOQ Card List ── */
-.boq__cards-list {
-  display: flex; flex-direction: column; gap: 16px;
-}
-.boq__card {
-  background: var(--c-surface); border: 1px solid var(--c-border);
-  border-radius: var(--radius); box-shadow: var(--shadow);
-  overflow: hidden;
-}
-.boq__card--green { border-left: 4px solid var(--c-green); }
-.boq__card--amber { border-left: 4px solid var(--c-amber); }
-.boq__card--blue  { border-left: 4px solid #1d4ed8; }
-.boq__card--red   { border-left: 4px solid var(--c-red); }
-
-.boq__card-top {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  padding: 16px 20px; flex-wrap: wrap; gap: 10px;
-  background: #f8fafc; border-bottom: 1px solid var(--c-border);
-}
-.boq__card-proj {
-  font-family: var(--font-head); font-size: 15px; font-weight: 700;
-}
-.boq__card-meta {
-  font-size: 12px; color: var(--c-muted); margin-top: 3px;
-  font-family: var(--font-mono);
-}
-.boq__card-right {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
-}
-.boq__card-total {
-  font-family: var(--font-mono); font-size: 16px; font-weight: 700;
-  color: var(--c-teal);
-}
-
-/* ── Report status pills inside card ── */
 .boq__card-reports {
   display: flex; gap: 12px; padding: 12px 20px;
   border-bottom: 1px solid var(--c-border); flex-wrap: wrap;
@@ -731,17 +696,15 @@
 }
 .boq__report-pill-val.green { color: var(--c-green); }
 .boq__report-pill-val.amber { color: var(--c-amber); }
-.boq__report-pill-val.blue  { color: #1d4ed8; }
+.boq__report-pill-val.blue  { color: var(--c-blue); }
 .boq__report-pill-val.red   { color: var(--c-red); }
 .boq__report-pill-val.grey  { color: var(--c-muted); }
 
-/* ── Card actions ── */
 .boq__card-actions {
   display: flex; align-items: center; gap: 10px; padding: 12px 20px;
   flex-wrap: wrap;
 }
 
-/* ── Create Reports button ── */
 .boq__create-reports-btn {
   padding: 8px 18px;
   background: var(--c-teal); color: #fff;
@@ -753,10 +716,9 @@
 .boq__create-reports-btn:disabled { opacity: .6; cursor: not-allowed; }
 .boq__create-reports-btn--lg { padding: 11px 24px; font-size: 14px; }
 
-/* ── Create Qty Report button ── */
 .boq__create-qty-btn {
   padding: 8px 18px;
-  background: #1d4ed8; color: #fff;
+  background: var(--c-blue); color: #fff;
   border: none; border-radius: 7px;
   font-family: var(--font); font-size: 13px; font-weight: 600;
   cursor: pointer; transition: background .18s; white-space: nowrap;
@@ -765,12 +727,7 @@
 .boq__create-qty-btn:disabled { opacity: .6; cursor: not-allowed; }
 .boq__create-qty-btn--lg { padding: 11px 24px; font-size: 14px; }
 
-/* ── Detail action bar (create buttons in detail view) ── */
-.boq__detail-action-bar {
-  display: flex; gap: 12px; flex-wrap: wrap;
-}
-
-/* ── Approval tracker (updated with sub-labels and rejected state) ── */
+/* ── Approval tracker with sub-labels + rejected state ── */
 .boq__ap-step {
   display: flex; align-items: center; flex-direction: column;
   gap: 4px; min-width: 130px; text-align: center;
@@ -797,7 +754,7 @@
   min-width: 20px; margin-bottom: 18px;
 }
 
-/* ── Approval comments ── */
+/* ── Approval comments (inline, on tracker) ── */
 .boq__approval-comments { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 .boq__approval-comment {
   padding: 10px 14px; border-radius: 7px; font-size: 13.5px;
@@ -806,10 +763,10 @@
   background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;
 }
 .boq__approval-comment--se {
-  background: #dbeafe; color: #1e3a8a; border: 1px solid #93c5fd;
+  background: var(--c-blue-lt); color: #1e3a8a; border: 1px solid #93c5fd;
 }
 
-/* ── Note (rejection suggestion) ── */
+/* ── Rejection suggestion note (single canonical definition) ── */
 .boq__note {
   background: #fff7ed; border: 1.5px solid #fed7aa;
   border-radius: 8px; padding: 14px 18px;
@@ -833,9 +790,6 @@
 }
 
 /* ── Send to Site Engineer button ── */
-.boq__finalised-btns {
-  display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
-}
 .boq__send-se-btn {
   padding: 11px 24px;
   background: var(--c-green); color: #fff;
@@ -847,7 +801,7 @@
 .boq__send-se-btn:hover  { background: #166534; }
 .boq__send-se-btn:active { transform: scale(.98); }
 
-/* ── Sent to SE confirmation ── */
+/* ── Sent to SE confirmation (large, standalone) ── */
 .boq__sent-confirmation {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--c-green-lt);
@@ -858,18 +812,17 @@
 .boq__sent-title  { font-size: 13px; font-weight: 700; color: var(--c-green); }
 .boq__sent-sub    { font-size: 11.5px; color: #166534; margin-top: 1px; }
 
-/* ── Sent confirmation in list card ── */
+/* ── Sent confirmation pill inside a list card (compact — canonical version) ── */
 .boq__card-sent-confirm {
-  display: flex; align-items: center; gap: 10px;
-  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
-  border: 1.5px solid #86efac; border-radius: 10px;
-  padding: 9px 16px;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--c-green-lt);
+  border: 1.5px solid #86efac; border-radius: 20px;
+  padding: 5px 12px;
 }
-.boq__card-sent-icon  { font-size: 20px; flex-shrink: 0; }
-.boq__card-sent-title {
-  font-size: 13px; font-weight: 700; color: var(--c-green);
-}
-.boq__card-sent-sub   { font-size: 11.5px; color: #166534; margin-top: 1px; }
+.boq__card-sent-icon  { font-size: 13px; flex-shrink: 0; }
+.boq__card-sent-title { font-size: 12px; font-weight: 600; color: var(--c-green); white-space: nowrap; }
+/* .boq__card-sent-sub intentionally not rendered in the compact pill —
+   omit the element in markup rather than adding a display:none rule here. */
 
 /* ══ Rejection Box with PM/SE Comments ══ */
 .boq__rejection-box {
@@ -890,7 +843,7 @@
   border-left: 4px solid transparent;
 }
 .boq__rejection-comment--pm { border-left-color: var(--c-teal); }
-.boq__rejection-comment--se { border-left-color: #1d4ed8; }
+.boq__rejection-comment--se { border-left-color: var(--c-blue); }
 
 .boq__rejection-comment-from {
   display: flex; align-items: center; gap: 8px;
@@ -904,7 +857,7 @@
   flex-shrink: 0;
 }
 .boq__rejection-avatar--pm { background: var(--c-teal); }
-.boq__rejection-avatar--se { background: #1d4ed8; }
+.boq__rejection-avatar--se { background: var(--c-blue); }
 
 .boq__rejection-comment-text {
   font-size: 14px; color: var(--c-text); line-height: 1.6;
@@ -924,7 +877,6 @@
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
 }
 
-/* Quick range buttons */
 .boq__range-btns {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
 }
@@ -949,7 +901,6 @@
   color: #fff; font-weight: 600;
 }
 
-/* Custom date inputs */
 .boq__date-range {
   display: flex; align-items: center; gap: 8px;
 }
@@ -967,35 +918,12 @@
   outline: none; border-color: var(--c-teal);
 }
 
-/* ── Smaller "Submitted to SE" card in list ── */
-.boq__card-sent-confirm {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: var(--c-green-lt);
-  border: 1.5px solid #86efac; border-radius: 20px;
-  padding: 5px 12px;
-}
-.boq__card-sent-icon  { font-size: 13px; flex-shrink: 0; }
-.boq__card-sent-title {
-  font-size: 12px; font-weight: 600; color: var(--c-green); white-space: nowrap;
-}
-.boq__card-sent-sub   { display: none; }
 /* ══ LABOUR SECTION ══ */
-.boq__num--blue {
-  background: #1d4ed8;
-}
-.boq__add-btn--blue {
-  background: #dbeafe; border-color: #93c5fd; color: #1d4ed8;
-}
-.boq__add-btn--blue:hover { background: #bfdbfe; }
-
 .boq__labour-hint {
   font-size: 12px; color: var(--c-muted); font-family: var(--font-mono);
   margin-bottom: 12px; padding: 7px 12px;
   background: var(--c-blue-lt); border-radius: 6px;
   border: 1px solid #93c5fd; color: var(--c-blue);
-}
-.td-labour-total {
-  font-family: var(--font-mono); font-weight: 500; color: #1d4ed8;
 }
 
 /* ══ GRAND TOTAL BREAKDOWN ══ */
@@ -1005,11 +933,9 @@
 .boq__grand-line {
   display: flex; align-items: baseline; gap: 14px;
 }
-.boq__grand-lbl { font-size: 13px; font-weight: 500; color: var(--c-muted); min-width: 80px; }
 .boq__grand-lbl--main { font-size: 14px; font-weight: 700; color: var(--c-text); }
-.boq__grand-amt { font-family: var(--font-mono); font-size: 22px; font-weight: 600; color: var(--c-teal); }
 .boq__grand-amt--mat { font-size: 16px; color: var(--c-teal); }
-.boq__grand-amt--lab { font-size: 16px; color: #1d4ed8; }
+.boq__grand-amt--lab { font-size: 16px; color: var(--c-blue); }
 .boq__grand-divider { height: 1px; background: var(--c-border); margin: 4px 0; }
 
 /* ══ COST SPLIT PILLS IN CARD ══ */
@@ -1032,48 +958,37 @@
   font-size: 14px; color: var(--c-text);
 }
 .boq__grand-summary-mat { font-family: var(--font-mono); font-weight: 600; color: var(--c-teal); }
-.boq__grand-summary-lab { font-family: var(--font-mono); font-weight: 600; color: #1d4ed8; }
+.boq__grand-summary-lab { font-family: var(--font-mono); font-weight: 600; color: var(--c-blue); }
 .boq__grand-summary-total {
   display: flex; justify-content: space-between; align-items: center;
   padding: 14px 20px; background: var(--c-teal);
   font-family: var(--font-head); font-size: 15px; font-weight: 700; color: #fff;
 }
-/* ── Pre-fill banner from Measurement ── */
-.boq__prefill-banner {
-  background: #eff6ff; border: 1.5px solid #93c5fd;
-  border-radius: 8px; padding: 12px 18px;
-  display: flex; align-items: center; gap: 10px;
-  font-size: 13.5px; color: #1d4ed8; font-weight: 500;
-}
-/* ══ MEASUREMENT PRE-FILL ROW ══ */
+
+/* ══ MEASUREMENT PRE-FILL ══ */
 .boq__row--prefilled td {
-  background: #eff6ff !important;
+  background: var(--c-blue-pale) !important;
 }
 .boq__row--prefilled:hover td {
-  background: #dbeafe !important;
+  background: var(--c-blue-lt) !important;
 }
 .boq__ms-badge {
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; border-radius: 4px;
-  background: #1d4ed8; color: #fff; font-size: 11px;
+  background: var(--c-blue); color: #fff; font-size: 11px;
   cursor: help;
 }
 .boq__ms-tag {
   display: inline-flex; align-items: center; gap: 3px;
   font-size: 11px; font-weight: 600; padding: 2px 7px;
-  background: #dbeafe; color: #1d4ed8;
+  background: var(--c-blue-lt); color: var(--c-blue);
   border: 1px solid #93c5fd; border-radius: 20px;
   margin-left: 8px; white-space: nowrap;
 }
-.boq__inp--highlight {
-  border-color: #1d4ed8 !important;
-  box-shadow: 0 0 0 3px rgba(29,78,216,.15) !important;
-  background: #eff6ff !important;
-}
 
-/* ══ PRE-FILL BANNER ══ */
+/* ── Pre-fill banner (single canonical definition, with icon/text layout) ── */
 .boq__prefill-banner {
-  background: #eff6ff; border: 1.5px solid #93c5fd;
+  background: var(--c-blue-pale); border: 1.5px solid #93c5fd;
   border-radius: 8px; padding: 14px 18px;
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
@@ -1082,13 +997,13 @@
   display: flex; flex-direction: column; gap: 2px; flex: 1;
 }
 .boq__prefill-text strong {
-  font-size: 13.5px; font-weight: 700; color: #1d4ed8;
+  font-size: 13.5px; font-weight: 700; color: var(--c-blue);
 }
 .boq__prefill-text span {
   font-size: 12.5px; color: #1e40af;
 }
 .boq__prefill-tag {
   font-size: 12px; font-weight: 600; padding: 4px 12px;
-  background: #1d4ed8; color: #fff;
+  background: var(--c-blue); color: #fff;
   border-radius: 20px; white-space: nowrap; flex-shrink: 0;
 }

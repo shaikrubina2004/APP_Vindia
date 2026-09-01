@@ -39,6 +39,11 @@ export const ArchitectMenu = [
     path: "/architect/incidents", 
     icon: "alert-triangle" 
   },
+{
+    name: "Approval Requests",
+    path: "/architect/approvals",
+    icon: "check-circle",
+  },
 
  {
     name: "Projects",

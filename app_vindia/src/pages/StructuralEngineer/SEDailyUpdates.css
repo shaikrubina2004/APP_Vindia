@@ -1115,7 +1115,7 @@
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
   gap: 16px;
 }
-..sed-footer-info {
+.sed-footer-info {
   display: flex;
   align-items: center;
   gap: 12px;

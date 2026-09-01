@@ -1,15 +1,36 @@
+// backend/routes/architectDrawingUploadRoutes.js
+
 const express = require("express");
 const router = express.Router();
-const upload = require("../middleware/upload"); // reuse same middleware
-const path = require("path");
 
-// POST /api/architect-drawings/upload
-router.post("/upload", upload.single("file"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+const upload = require("../middleware/upload");
+const authMiddleware = require("../middleware/authMiddleware");
 
-  // ✅ Full URL so React on port 5173 can reach it
-  const fileUrl = `http://localhost:5000/uploads/${req.file.filename}`;
-  
-  res.json({ url: fileUrl, file_name: req.file.originalname });
-});
+/* ========================================
+   POST /api/architect-drawings/upload
+======================================== */
+
+router.post(
+  "/upload",
+  authMiddleware,
+  upload.single("file"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: "No file uploaded",
+      });
+    }
+
+    const fileUrl =
+      `${process.env.BASE_URL || "http://localhost:5000"}/uploads/${req.file.filename}`;
+
+    return res.json({
+      success: true,
+      url: fileUrl,
+      file_name: req.file.originalname,
+    });
+  }
+);
+
 module.exports = router;

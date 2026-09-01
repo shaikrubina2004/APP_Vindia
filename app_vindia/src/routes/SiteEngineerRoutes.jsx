@@ -1,5 +1,5 @@
-    // src/routes/SiteEngineerRoutes.jsx
-    // FIX: React Router v6 does NOT allow a component that returns <Route> elements
+// src/routes/SiteEngineerRoutes.jsx
+// FIX: React Router v6 does NOT allow a component that returns <Route> elements
     // inside <Routes>. The solution is to export an ARRAY of <Route> elements,
     // then spread them inside <Routes> in AppRoutes.jsx using {SiteEngineerRoutes}
     //
@@ -31,11 +31,13 @@
     import PhotoGallery     from "../pages/siteEngineer/Photogallery";
     import SiteInstruction  from "../pages/siteEngineer/Siteinstruction";
     import MaterialRequest  from "../pages/siteEngineer/Materialrequest";
+    import LabourReport from "../pages/siteEngineer/Labourreport";``
 
     // ── Shared ─────────────────────────────────────────────────
     import AppShell from "../components/incidents/AppShell";
 import QSMeasurements from "../pages/siteEngineer/Qsmeasurements";
 import ArchitectDesigns     from "../pages/Architect/ArchitectDesigns";
+import LabourRegistry from "../pages/siteEngineer/Labourregistry";
 
 
     // ── Allowed roles ──────────────────────────────────────────
@@ -108,7 +110,7 @@ import ArchitectDesigns     from "../pages/Architect/ArchitectDesigns";
     />,
 
     <Route
-        key="se-checklist"
+        key="se-architect-drawings"
         path="/site-engineer/ArchitectDrawings"
         element={
         <ProtectedRoute allowedRoles={SE_ROLES}>
@@ -155,6 +157,17 @@ import ArchitectDesigns     from "../pages/Architect/ArchitectDesigns";
         </ProtectedRoute>
         }
     />,
+    
+    <Route
+        key="labour"
+        path="/site-engineer/labour-registry"
+        element={
+        <ProtectedRoute allowedRoles={SE_ROLES}>
+            <SiteEngineerLayout><LabourRegistry /></SiteEngineerLayout>
+        </ProtectedRoute>
+        }
+    />,
+
 
     <Route
         key="se-approvals"
@@ -165,6 +178,19 @@ import ArchitectDesigns     from "../pages/Architect/ArchitectDesigns";
         </ProtectedRoute>
         }
     />,
+
+
+<Route
+  key="se-labour-report"
+  path="/site-engineer/labour-report"
+  element={
+    <ProtectedRoute allowedRoles={SE_ROLES}>
+      <SiteEngineerLayout>
+        <LabourReport />
+      </SiteEngineerLayout>
+    </ProtectedRoute>
+  }
+/>,
 
     <Route
         key="se-photos"
@@ -197,13 +223,24 @@ import ArchitectDesigns     from "../pages/Architect/ArchitectDesigns";
     />,
     <Route
         key="se-rfi"
-        path="site-engineer/rfi"
+        path="/site-engineer/rfi"
         element={
         <ProtectedRoute allowedRoles={SE_ROLES}>
             <SiteEngineerLayout><RFI/></SiteEngineerLayout>
         </ProtectedRoute>
         }
     />,
+    <Route
+    key="se-approvals"
+    path="/site-engineer/approvals"
+    element={
+    <ProtectedRoute allowedRoles={[...SE_ROLES, ROLES.QC_ENGINEER]}>
+        <SiteEngineerLayout>
+            <ApprovalWorkflow />
+        </SiteEngineerLayout>
+    </ProtectedRoute>
+    }
+/>,
     
 
     ];

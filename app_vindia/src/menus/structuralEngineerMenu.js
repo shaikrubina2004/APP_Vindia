@@ -32,6 +32,12 @@ export const StructuralEngineerMenu = [
     icon: "check-square",
   },
   {
+    name: "Approval Requests",
+    path: "/structural-engineer/approvals",
+    icon: "check-circle",
+  },
+
+  {
     name: "Daily Updates",
     path: "/structural-engineer/daily-updates",
     icon: "calendar",

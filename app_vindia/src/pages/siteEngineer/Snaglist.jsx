@@ -59,11 +59,14 @@ export default function SnagList() {
     } catch { /* ignore */ }
     return { role: "site_engineer", id: null, name: "Site Engineer" };
   }, []);
-  const path = window.location.pathname;
+  
 
-const userRole = path.includes("site-engineer")
-  ? "site_engineer"
-  : currentUser?.role || "site_engineer";
+const userRole = String(
+  currentUser?.role || "site_engineer"
+)
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, "_");
 
 //   const userRole = currentUser?.role || "site_engineer";
 
@@ -133,46 +136,71 @@ const userRole = path.includes("site-engineer")
     setUpdating(snag.id);
 
     try {
-      const body = { status: newStatus };
+    const body = {
+  status: newStatus,
+};
 
-      if (newStatus === "in_progress") {
-        body.started_at   = new Date().toISOString();
-        body.assigned_to  = currentUser?.id || null;
-        body.assigned_name = currentUser?.name || "Site Engineer";
-      }
+if (newStatus === "in_progress") {
+  body.assigned_to = currentUser?.id || null;
+  body.assigned_name = currentUser?.name || "Site Engineer";
+}
 
-      if (newStatus === "resolved") {
-        body.resolved_at       = new Date().toISOString();
-        body.resolution_notes  = resolution[snag.id] || "";
+if (newStatus === "resolved") {
+  body.resolved_at = new Date().toISOString();
+  body.resolution_notes = resolution[snag.id] || "";
+}
 
-        const snagPhotos = photos[snag.id] || [];
-        if (snagPhotos.length > 0) {
-          const fd = new FormData();
-          Object.entries(body).forEach(([k, v]) => fd.append(k, String(v ?? "")));
-          snagPhotos.forEach(f => fd.append("photos", f, f.name));
+if (newStatus === "closed") {
+  body.closed_at = new Date().toISOString();
+}
 
-          await api.patch(`/snags/${snag.id}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+const snagPhotos = photos[snag.id] || [];
 
-          if (snag.linked_rfi) {
-            api.patch(`/site-engineer/rfi/${snag.linked_rfi}`, { related_snag_status: "resolved" }).catch(() => {});
-          }
+if (snagPhotos.length > 0) {
+  const fd = new FormData();
 
-          setSnags(s => s.map(it => it.id === snag.id ? { ...it, ...body } : it));
-          push(`Snag resolved: "${snag.title || snag.snag_number}"`, "approval", { linked_ref: snag.snag_number });
-          setUpdating(null);
-          return;
-        }
-      }
+  Object.entries(body).forEach(([key, value]) => {
+    fd.append(key, String(value ?? ""));
+  });
 
-      if (newStatus === "closed") {
-        body.closed_at = new Date().toISOString();
-      }
+  snagPhotos.forEach((file) => {
+    fd.append("photos", file, file.name);
+  });
 
-    // TEMP: simulate success
-await api.patch(`/api/snags/${snag.id}`, body);
+  await api.patch(
+    `/snags/${snag.id}`,
+    fd,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+} else {
+  await api.patch(`/snags/${snag.id}`, body);
+}
 
-   setSnags(s => s.map(it => it.id === snag.id ? { ...it, ...body } : it));
-      push(`Snag ${newStatus.replace("_", " ")}: "${snag.title || snag.snag_number}"`, "approval", { linked_ref: snag.snag_number });
+if (newStatus === "resolved" && snag.linked_rfi) {
+  api
+    .patch(`/site-engineer/rfi/${snag.linked_rfi}`, {
+      related_snag_status: "resolved",
+    })
+    .catch(() => {});
+}
+
+setSnags((s) =>
+  s.map((it) =>
+    it.id === snag.id
+      ? { ...it, ...body }
+      : it
+  )
+);
+
+push(
+  `Snag ${newStatus.replace("_", " ")}: "${snag.title || snag.snag_number}"`,
+  "approval",
+  { linked_ref: snag.snag_number }
+);
 
     } catch {
       alert("Update failed — check your connection and try again.");

@@ -48,7 +48,7 @@ const ZONE_CFG = {
 
 const PIP = {
   rfi: "#7BBDE8",
-  incident: "#b83232", 
+  incident: "#b83232",
   dsr: "#6EA2B3",
   itp: "#4E8EA2",
   mat: "#49769F",
@@ -57,20 +57,64 @@ const PIP = {
   si: "#C49FDC",
   approval: "#5DCAA5",
   photo: "#6EA2B3",
+
+  labour: "#49769F",
+  measurement: "#5DCAA5",
 };
 
 /* ── quick actions — all wired to real routes ────────────── */
 const QUICK_ACTIONS = [
-  { label: "Daily Diary",       icon: "📋", route: "/site-engineer/daily-diary"       },
-  { label: "Raise RFI",         icon: "❓", route: "/site-engineer/rfi"               },
-  { label: "Log Progress",      icon: "📊", route: "/site-engineer/progress"          },
-  { label: "Material Request",  icon: "📦", route: "/site-engineer/materials"         },
-  { label: "Request Approval",  icon: "✅", route: "/site-engineer/approvals"         },
-  { label: "Upload Photos",     icon: "📸", route: "/site-engineer/photos"            },
-  { label: "Site Instructions", icon: "📝", route: "/site-engineer/site-instructions" },
-  { label: "Snag List",         icon: "🔧", route: "/site-engineer/snag-list"         },
+  {
+    label: "Daily Diary",
+    icon: "📋",
+    route: "/site-engineer/daily-diary",
+  },
+  {
+    label: "Labour Report",
+    icon: "👷",
+    route: "/site-engineer/labour-report",
+  },
+  {
+    label: "Measurements",
+    icon: "📏",
+    route: "/site-engineer/qs-measurements",
+  },
+  {
+    label: "Raise RFI",
+    icon: "❓",
+    route: "/site-engineer/rfi",
+  },
+  {
+    label: "Log Progress",
+    icon: "📊",
+    route: "/site-engineer/progress",
+  },
+  {
+    label: "Material Request",
+    icon: "📦",
+    route: "/site-engineer/materials",
+  },
+  {
+    label: "Request Approval",
+    icon: "✅",
+    route: "/site-engineer/approvals",
+  },
+  {
+    label: "Upload Photos",
+    icon: "📸",
+    route: "/site-engineer/photos",
+  },
+  {
+    label: "Site Instructions",
+    icon: "📝",
+    route: "/site-engineer/site-instructions",
+  },
+  {
+    label: "Snag List",
+    icon: "🔧",
+    route: "/site-engineer/snag-list",
+  },
 ];
-
 /* ═══════════════════════════════════════════════════════════
    DASHBOARD
 ═══════════════════════════════════════════════════════════ */
@@ -94,6 +138,8 @@ export default function SiteEngineerDashboard() {
   const [pendingSIs, setPendingSIs] = useState([]);
   const [pendingMaterials, setPendingMaterials] = useState([]);
   const [diaryToday, setDiaryToday] = useState(false);
+  const [labourReports, setLabourReports] = useState([]);
+const [measurements, setMeasurements] = useState([]);
 
   const loaded = useRef(false);
 
@@ -111,28 +157,33 @@ export default function SiteEngineerDashboard() {
     try {
       // 🔹 Dashboard summary (fast KPIs)
       const dashRes = await api.get("/dashboard");
-      console.log("Dashboard KPI:", dashRes.data);
-
+      console.log("SITE ENGINEER DASHBOARD DATA:", dashRes.data);
       // 🔹 Full module data (IMPORTANT)
       const [
-        rfiRes,
-        incRes,
-        progRes,
-        aprRes,
-        snagRes,
-        siRes,
-        matRes,
-        diaryRes
-      ] = await Promise.allSettled([
-        api.get("/site-engineer/rfi"),
-        api.get("/incidents"),
-        api.get("/site-progress"),
-        api.get("/approvals"),
-        api.get("/snags"),
-        api.get("/site-instructions"),
-        api.get("/material-request"),
-        api.get("/diary"),
-      ]);
+  rfiRes,
+  incRes,
+  progRes,
+  aprRes,
+  snagRes,
+  siRes,
+  matRes,
+  diaryRes,
+  labourRes,
+  measurementRes
+] = await Promise.allSettled([
+  api.get("/site-engineer/rfi"),
+  api.get("/incidents"),
+  api.get("/site-progress"),
+  api.get("/approvals"),
+  api.get("/snags"),
+  api.get("/site-instructions"),
+  api.get("/material-request"),
+  api.get("/diary"),
+
+  // Construction workflow
+  api.get("/labour-report"),
+  api.get("/site-measurements"),
+]);
 
       if (rfiRes.status === "fulfilled")
         setRFIs(Array.isArray(rfiRes.value?.data) ? rfiRes.value.data : []);
@@ -167,6 +218,21 @@ export default function SiteEngineerDashboard() {
         const all = diaryRes.value?.data || [];
         setDiaryToday(all.some(d => (d.date || "").slice(0, 10) === today));
       }
+      if (labourRes.status === "fulfilled") {
+  const all = Array.isArray(labourRes.value?.data)
+    ? labourRes.value.data
+    : [];
+
+  setLabourReports(all);
+}
+
+if (measurementRes.status === "fulfilled") {
+  const all = Array.isArray(measurementRes.value?.data)
+    ? measurementRes.value.data
+    : [];
+
+  setMeasurements(all);
+}
 
     } catch (err) {
       console.error("Dashboard error:", err);
@@ -184,6 +250,27 @@ export default function SiteEngineerDashboard() {
   () => incidents.filter(i => !["Resolved", "Closed"].includes(i.status)),
   [incidents]
 );
+const today = nowISO();
+
+const labourToday = useMemo(
+  () =>
+    labourReports.filter(
+      r => (r.date || "").slice(0, 10) === today
+    ),
+  [labourReports, today]
+);
+
+const pendingMeasurements = useMemo(
+  () =>
+    measurements.filter(
+      m =>
+        ["submitted", "under_review"].includes(
+          String(m.status || "").toLowerCase()
+        )
+    ),
+  [measurements]
+);
+
 
   // Planned vs Actual from progress entries
   const avgPlanned = useMemo(() =>
@@ -235,24 +322,104 @@ export default function SiteEngineerDashboard() {
 
   // Recent activity feed — built from live data
   const activityFeed = useMemo(() => {
-    const items = [];
-    rfis.slice(0, 2).forEach(r => items.push({ label: `RFI ${r.refNo || ""} — ${r.title || r.subject || "raised"}`, type: "rfi", time: r.createdAt }));
-incidents.slice(0, 2).forEach(i =>
-  items.push({
-    label: `Incident ${i.incidentNo} — ${i.title}`,
-    type: "incident",
-    time: i.createdAt
-  })
-);    pendingSIs.slice(0, 1).forEach(s => items.push({ label: `Site Instruction received: ${s.title || s.si_number || ""}`, type: "si", time: s.issued_date || s.createdAt }));
-    openSnags.slice(0, 1).forEach(s => items.push({ label: `Snag open: ${s.title || s.snag_number || ""} — ${s.zone || ""}`, type: "snag", time: s.raised_date || s.createdAt }));
-    pendingApprovals.slice(0, 1).forEach(a => items.push({ label: `Approval pending: ${a.title || ""}`, type: "approval", time: a.createdAt }));
-    if (diaryToday) items.push({ label: "Daily Diary submitted today ✓", type: "dsr", time: new Date().toISOString() });
-    return items
-      .filter(i => i.time)
-      .sort((a, b) => new Date(b.time) - new Date(a.time))
-      .slice(0, 6);
-  }, [rfis, incidents, pendingSIs, openSnags, pendingApprovals, diaryToday]);
+  const items = [];
 
+  // RFIs
+  rfis.slice(0, 2).forEach((r) => {
+    items.push({
+      label: `RFI ${r.refNo || ""} — ${
+        r.title || r.subject || "raised"
+      }`,
+      type: "rfi",
+      time: r.createdAt,
+    });
+  });
+
+  // Incidents
+  incidents.slice(0, 2).forEach((i) => {
+    items.push({
+      label: `Incident ${i.incidentNo || ""} — ${
+        i.title || "reported"
+      }`,
+      type: "incident",
+      time: i.createdAt,
+    });
+  });
+
+  // Site Instructions
+  pendingSIs.slice(0, 1).forEach((s) => {
+    items.push({
+      label: `Site Instruction received: ${
+        s.title || s.si_number || ""
+      }`,
+      type: "si",
+      time: s.issued_date || s.createdAt,
+    });
+  });
+
+  // Snags
+  openSnags.slice(0, 1).forEach((s) => {
+    items.push({
+      label: `Snag open: ${
+        s.title || s.snag_number || ""
+      } — ${s.zone || ""}`,
+      type: "snag",
+      time: s.raised_date || s.createdAt,
+    });
+  });
+
+  // Approvals
+  pendingApprovals.slice(0, 1).forEach((a) => {
+    items.push({
+      label: `Approval pending: ${a.title || ""}`,
+      type: "approval",
+      time: a.createdAt,
+    });
+  });
+
+  // Daily Diary
+  if (diaryToday) {
+    items.push({
+      label: "Daily Diary submitted today ✓",
+      type: "dsr",
+      time: new Date().toISOString(),
+    });
+  }
+
+  // Labour Reports
+  labourToday.slice(0, 2).forEach((r) => {
+    items.push({
+      label: `Labour Report submitted — ${
+        r.project_name || "Project"
+      }`,
+      type: "labour",
+      time: r.submitted_at || r.created_at,
+    });
+  });
+
+  // Measurements awaiting QS review
+  pendingMeasurements.slice(0, 2).forEach((m) => {
+    items.push({
+      label: `Measurement #${m.id} submitted for QS review`,
+      type: "measurement",
+      time: m.updated_at || m.updatedAt || m.created_at || m.createdAt,
+    });
+  });
+
+  return items
+    .filter((i) => i.time)
+    .sort((a, b) => new Date(b.time) - new Date(a.time))
+    .slice(0, 6);
+}, [
+  rfis,
+  incidents,
+  pendingSIs,
+  openSnags,
+  pendingApprovals,
+  diaryToday,
+  labourToday,
+  pendingMeasurements,
+]);
   // ── loading ────────────────────────────────────────────────
   if (loading) {
     return (
@@ -291,7 +458,7 @@ incidents.slice(0, 2).forEach(i =>
             {/* Diary not submitted warning */}
             {!diaryToday && (
               <div
-                onClick={() => navigate("/site-engineer/diary")}
+                onClick={() => navigate("/site-engineer/daily-diary")}
                 style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px", background: "rgba(184,50,50,0.18)", border: "1px solid rgba(184,50,50,0.4)", borderRadius: 8, cursor: "pointer", fontSize: 13, color: "#ffcdd2", fontWeight: 500 }}
               >
                 ⚠ Daily Diary not submitted today — tap to submit
@@ -560,7 +727,28 @@ incidents.slice(0, 2).forEach(i =>
               </div>
               <div className="dash-panel-body">
                 {[
-                  { label: "Daily Diary",       icon: "📋", value: diaryToday ? "Submitted ✓" : "⚠ Not submitted", ok: diaryToday,  route: "/site-engineer/diary"             },
+                  { label: "Daily Diary",       icon: "📋", value: diaryToday ? "Submitted ✓" : "⚠ Not submitted", ok: diaryToday,  route: "/site-engineer/daily-diary"             },
+                  {
+  label: "Labour Report",
+  icon: "👷",
+  value:
+    labourToday.length > 0
+      ? `${labourToday.length} submitted today`
+      : "⚠ Not submitted today",
+  ok: labourToday.length > 0,
+  route: "/site-engineer/labour-report",
+},
+
+{
+  label: "Measurements",
+  icon: "📏",
+  value:
+    pendingMeasurements.length > 0
+      ? `${pendingMeasurements.length} awaiting QS review`
+      : "All reviewed ✓",
+  ok: pendingMeasurements.length === 0,
+  route: "/site-engineer/qs-measurements",
+},
                   { label: "Open RFIs",         icon: "❓", value: `${openRFIs.length} open`,                       ok: openRFIs.length === 0, route: "/site-engineer/rfi"     },
 { 
   label: "Incidents", 
@@ -596,7 +784,7 @@ incidents.slice(0, 2).forEach(i =>
             <div className="dash-panel">
               <div className="dash-panel-head">
                 <div className="dash-panel-title">Activity Feed</div>
-                <span className="dash-panel-hint" style={{ cursor: "pointer" }} onClick={() => navigate("/site-engineer/activity-log")}>View all →</span>
+                <span className="dash-panel-hint" style={{ cursor: "pointer" }} onClick={() => navigate("/site-engineer/activity")}>View all →</span>
               </div>
               <div className="dash-feed">
                 {activityFeed.length === 0

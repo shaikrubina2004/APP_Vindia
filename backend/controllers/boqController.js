@@ -36,7 +36,9 @@ const pool = require("../config/db");
     `);
     console.log("✅ boqs table ready");
   } catch (err) {
-    console.error("❌ boqs table setup failed:", err.message);
+    console.error("❌ boqs table setup failed");
+    console.error("MESSAGE:", err.message);
+    console.error("STACK:", err.stack);
   }
 })();
 
@@ -124,9 +126,35 @@ exports.getMilestones = async (req, res) => {
 };
 
 // ── GET ALL BOQs ──
-exports.getAllBoqs = async (req, res) => {
+// CHANGED: added role=se filtering logic.
+//
+// WHY the previous version was wrong:
+//   The original function had no role parameter at all.
+//   QSMeasurements.jsx calls GET /boq?role=se but the backend
+//   ignored the role param entirely — returning ALL BOQs including
+//   finalised and pending_pm ones. SE was seeing completed BOQs
+//   they cannot act on, causing the backend to reject measurement
+//   submissions with "Cannot submit measurements for a BOQ with
+//   status: finalised".
+//
+// WHAT CHANGED (only for role=se):
+//   SE receives BOQs where EITHER:
+//   (a) BOQ status is in the active measurement workflow:
+//       measurement_pending, measurement_received, rejected_by_se
+//   OR
+//   (b) A QR exists for this BOQ with status = pending_se
+//       (SE must still review and approve/reject it)
+//
+//   SE does NOT receive:
+//   - finalised  (workflow complete, nothing for SE to do)
+//   - pending_pm (BOQ not yet approved by PM, SE not involved yet)
+//   - draft      (QS still editing)
+//
+// Everything else in this function is identical to the original.
+exports.getAllBoqs = async (req, res) => {console.log("✅ getAllBoqs called — role =", req.query.role);
+  console.log("✅ File location check — this is the UPDATED controller");
   try {
-    const { projectId, status, milestoneId } = req.query;
+    const { projectId, status, milestoneId, role } = req.query;
     const conditions = [];
     const values     = [];
 
@@ -141,6 +169,18 @@ exports.getAllBoqs = async (req, res) => {
     if (milestoneId) {
       values.push(milestoneId);
       conditions.push(`b.milestone_id = $${values.length}`);
+    }
+
+    // CHANGED: role=se — only return BOQs relevant to SE measurement workflow
+    if (role === "se") {
+      conditions.push(`(
+        b.status IN ('measurement_pending', 'measurement_received', 'rejected_by_se')
+        OR EXISTS (
+          SELECT 1 FROM quantity_reports qr2
+          WHERE qr2.boq_id = b.id
+            AND qr2.status = 'pending_se'
+        )
+      )`);
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";

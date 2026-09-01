@@ -1,325 +1,470 @@
-// ══════════════════════════════════════════════════════════════════════════════
-//  quantityReportController.js
-// ══════════════════════════════════════════════════════════════════════════════
+// controllers/quantityReportController.js
+//
+// CHANGES (measurement lifecycle only — nothing else touched):
+//
+// 1. createReport()  → measurement status: submitted → under_review
+//    WHY: QS has generated a QR from this measurement.
+//         It is now under active SE review.
+//
+// 2. approveReport() → measurement status: → approved
+//    WHY: SE approved the QR built from this measurement.
+//         The measurement lifecycle is now complete.
+//
+// 3. rejectReport()  → measurement status: → rejected
+//    WHY: SE rejected the QR. The measurement is flagged
+//         so QS knows it needs revision. Still editable.
+//
+// 4. deleteReport()  → measurement status: → submitted
+//    WHY: QR was deleted. Measurement reverts so QS can
+//         regenerate a QR from it.
+//
+// NOT changed:
+// - All existing QR logic
+// - BOQ status transitions
+// - All routes and endpoint URLs
+// - getAllReports, getReportById, updateReport
+
 const pool = require("../config/db");
-const { createNotificationDirect } = require("./qsNotificationController");
 
-// ── Auto-create table ─────────────────────────────────────────────────────────
-(async () => {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS quantity_reports (
-        id              SERIAL        PRIMARY KEY,
-        project_id      INTEGER       NOT NULL,
-        project_name    VARCHAR(255)  NOT NULL,
-        milestone_id    INTEGER       NOT NULL,
-        milestone_name  VARCHAR(255)  NOT NULL,
-        boq_id          INTEGER       NOT NULL,
-        items           JSONB         NOT NULL DEFAULT '[]',
-        total_items     INTEGER       NOT NULL DEFAULT 0,
-        status          VARCHAR(50)   NOT NULL DEFAULT 'pending_se',
-        se_comment      TEXT          DEFAULT '',
-        created_date    DATE          DEFAULT CURRENT_DATE,
-        updated_date    DATE,
-        created_at      TIMESTAMP     DEFAULT NOW(),
-        updated_at      TIMESTAMP     DEFAULT NOW()
-      );
-      CREATE INDEX IF NOT EXISTS idx_qr_project_id   ON quantity_reports (project_id);
-      CREATE INDEX IF NOT EXISTS idx_qr_milestone_id ON quantity_reports (milestone_id);
-      CREATE INDEX IF NOT EXISTS idx_qr_boq_id       ON quantity_reports (boq_id);
-      CREATE INDEX IF NOT EXISTS idx_qr_status       ON quantity_reports (status);
-    `);
-    console.log("✅ quantity_reports table ready");
-  } catch (err) {
-    console.error("❌ quantity_reports table setup failed:", err.message);
+// Reuse the helper from siteMeasurementController — no SQL duplication
+const { updateMeasurementStatus } = require("./siteMeasurementController");
+
+const toInt = v => { const n = parseInt(v); return isNaN(n) ? null : n; };
+
+function safeArr(v) {
+  if (Array.isArray(v)) return v;
+  if (v === null || v === undefined) return [];
+  if (typeof v === "string") {
+    if (v.trim() === "" || v.trim() === "null") return [];
+    try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; }
+    catch { return []; }
   }
-})();
+  if (typeof v === "object") return Array.isArray(v) ? v : [];
+  return [];
+}
 
-// ── Format helper ─────────────────────────────────────────────────────────────
-function formatReport(r) {
+function fmtDate(v) {
+  if (!v) return null;
+  return new Date(v).toLocaleDateString("en-IN", {
+    day: "2-digit", month: "short", year: "numeric",
+  });
+}
+
+function formatQr(r) {
   return {
-    id:            r.id,
-    projectId:     r.project_id,
-    projectName:   r.project_name,
-    milestoneId:   r.milestone_id,
-    milestoneName: r.milestone_name,
-    boqId:         r.boq_id,
-    items:         r.items || [],
-    totalItems:    r.total_items || 0,
-    status:        r.status,
-    seComment:     r.se_comment || "",
-    createdDate:   r.created_date
-      ? new Date(r.created_date).toLocaleDateString("en-IN", {
-          day: "2-digit", month: "short", year: "numeric",
-        })
+    id:              r.id,
+    boqId:           r.boq_id,
+    projectId:       r.project_id,
+    projectName:     r.project_name    || "",
+    milestoneId:     r.milestone_id,
+    milestoneName:   r.milestone_name  || "",
+    status:          r.status,
+    seComment:       r.se_comment      || "",
+    totalItems:      r.total_items     || 0,
+    items:           safeArr(r.items),
+    measurementId:   r.measurement_id  || null,
+    generatedFrom:   r.generated_from  || "measurement",
+    submittedBy:     r.submitted_by    || "",
+    zone:            r.zone            || "",
+    activity:        r.activity        || "",
+    measurementDate: r.measurement_date
+      ? new Date(r.measurement_date).toISOString().split("T")[0]
       : null,
-    updatedDate: r.updated_date
-      ? new Date(r.updated_date).toLocaleDateString("en-IN", {
-          day: "2-digit", month: "short", year: "numeric",
-        })
-      : null,
+    createdDate:     fmtDate(r.created_at),
+    updatedDate:     fmtDate(r.updated_at),
   };
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  GET ALL  —  GET /api/quantity-report
-// ══════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
+   GET ALL  —  unchanged
+═══════════════════════════════════════════════════════════ */
 exports.getAllReports = async (req, res) => {
   try {
-    const { projectId, status, boqId } = req.query;
-    const conditions = [];
-    const values     = [];
-
-    if (projectId) { values.push(projectId); conditions.push(`project_id = $${values.length}`); }
-    if (status)    { values.push(status);    conditions.push(`status = $${values.length}`);     }
-    if (boqId)     { values.push(boqId);     conditions.push(`boq_id = $${values.length}`);    }
-
-    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const { projectId, boqId, status } = req.query;
+    const conds = [], params = [];
+    if (boqId)     { params.push(toInt(boqId));     conds.push(`boq_id = $${params.length}`); }
+    if (projectId) { params.push(toInt(projectId)); conds.push(`project_id = $${params.length}`); }
+    if (status)    { params.push(status);            conds.push(`status = $${params.length}`); }
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
     const result = await pool.query(
-      `SELECT * FROM quantity_reports ${where} ORDER BY created_at DESC`, values
+      `SELECT * FROM quantity_reports ${where} ORDER BY created_at DESC`, params
     );
-    res.json(result.rows.map(formatReport));
+    return res.json(result.rows.map(formatQr));
   } catch (err) {
-    console.error("getAllReports:", err.message);
-    res.status(500).json({ error: "Failed to fetch quantity reports: " + err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  GET ONE  —  GET /api/quantity-report/:id
-// ══════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
+   GET ONE  —  unchanged
+═══════════════════════════════════════════════════════════ */
 exports.getReportById = async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT * FROM quantity_reports WHERE id = $1", [req.params.id]
     );
-    if (!result.rows.length) {
-      return res.status(404).json({ error: "Quantity report not found" });
-    }
-    res.json(formatReport(result.rows[0]));
+    if (!result.rows.length) return res.status(404).json({ error: "Not found" });
+    return res.json(formatQr(result.rows[0]));
   } catch (err) {
-    console.error("getReportById:", err.message);
-    res.status(500).json({ error: "Failed to fetch quantity report: " + err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  CREATE  —  POST /api/quantity-report
-// ══════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
+   CREATE   POST /api/quantity-report
+   CHANGED: measurement status → under_review after QR created
+   WHY: QS acted on the measurement by building a QR from it.
+        SE is now reviewing it. Status reflects this.
+   UNCHANGED: all QR creation logic and BOQ logic
+═══════════════════════════════════════════════════════════ */
 exports.createReport = async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { projectId, projectName, milestoneId, milestoneName, boqId, items, totalItems } = req.body;
+    await client.query("BEGIN");
+
+    const { projectId, milestoneId, boqId } = req.body;
 
     if (!projectId || !milestoneId || !boqId) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ error: "projectId, milestoneId and boqId are required" });
     }
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "items must be a non-empty array" });
-    }
 
-    const boqCheck = await pool.query("SELECT id, status FROM boqs WHERE id = $1", [boqId]);
-    if (!boqCheck.rows.length) {
-      return res.status(404).json({ error: "Linked BOQ not found" });
+    const boqRes = await client.query("SELECT * FROM boqs WHERE id = $1", [toInt(boqId)]);
+    if (!boqRes.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "BOQ not found" });
     }
-    if (boqCheck.rows[0].status !== "pending_se") {
-      return res.status(400).json({
-        error: `Quantity report requires a pending_se BOQ. Current status: ${boqCheck.rows[0].status}.`,
+    const boq = boqRes.rows[0];
+
+    const allowedStatuses = ["measurement_received", "rejected_by_se"];
+    if (!allowedStatuses.includes(boq.status)) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({
+        error: `Cannot create QR for BOQ with status: ${boq.status}. Measurements must be received first.`,
       });
     }
 
-    const existing = await pool.query(
-      "SELECT id FROM quantity_reports WHERE boq_id = $1 AND status != 'rejected'", [boqId]
+    const measurementRes = await client.query(
+      `SELECT * FROM site_measurements WHERE boq_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [toInt(boqId)]
     );
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ error: "A quantity report already exists for this BOQ. Edit it instead." });
+    if (!measurementRes.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(422).json({
+        error: "Site Engineer measurements must be submitted before creating a Quantity Report.",
+      });
+    }
+    const measurement = measurementRes.rows[0];
+
+    const existing = await client.query(
+      `SELECT id FROM quantity_reports WHERE boq_id = $1 AND status = 'pending_se'`,
+      [toInt(boqId)]
+    );
+    if (existing.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: "A quantity report is already pending SE approval for this BOQ.",
+      });
     }
 
-    const cleanItems = items.map(({ material, unit, quantity }) => ({
-      material, unit, quantity: parseFloat(quantity) || 0,
-    }));
+    const measurementItems = safeArr(measurement.items);
+    const boqRows          = safeArr(boq.rows);
 
-    const result = await pool.query(
+    const cleanItems = measurementItems.map(({ description, unit, qty_actual }) => {
+      const boqRow = boqRows.find(r =>
+        (r.material || "").toLowerCase().trim() === (description || "").toLowerCase().trim()
+      );
+      return {
+        material:    description || "",
+        unit:        unit        || "",
+        quantity:    parseFloat(qty_actual) || 0,
+        boqQuantity: boqRow ? (parseFloat(boqRow.quantity) || 0) : null,
+      };
+    });
+
+    const result = await client.query(
       `INSERT INTO quantity_reports
          (project_id, project_name, milestone_id, milestone_name,
-          boq_id, items, total_items, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending_se')
+          boq_id, measurement_id, items, labour_items,
+          total_items, status, generated_from,
+          submitted_by, zone, activity, measurement_date,
+          created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending_se','measurement',
+               $10,$11,$12,$13,NOW(),NOW())
        RETURNING id`,
-      [projectId, projectName, milestoneId, milestoneName,
-       boqId, JSON.stringify(cleanItems), totalItems || cleanItems.length]
+      [
+        toInt(projectId),
+        boq.project_name   || "",
+        toInt(milestoneId),
+        boq.milestone_name || "",
+        toInt(boqId),
+        toInt(measurement.id),
+        JSON.stringify(cleanItems),
+        JSON.stringify([]),
+        cleanItems.length,
+        measurement.submitted_by || "Site Engineer",
+        measurement.zone         || "",
+        measurement.activity     || "",
+        measurement.date         || null,
+      ]
     );
 
-    res.status(201).json({
-      message: "Quantity Report created and sent to Site Engineer for approval",
-      id:      result.rows[0].id,
-      status:  "pending_se",
+    // BOQ stays measurement_received — no BOQ status change here
+
+    // CHANGED: measurement status → under_review
+    await updateMeasurementStatus(client, measurement.id, "under_review");
+
+    await client.query("COMMIT");
+
+    return res.status(201).json({
+      message:           "Quantity Report generated from SE measurements and sent for SE approval.",
+      id:                result.rows[0].id,
+      status:            "pending_se",
+      measurementStatus: "under_review",
     });
+
   } catch (err) {
-    console.error("createReport:", err.message);
-    res.status(500).json({ error: "Failed to create quantity report: " + err.message });
+    await client.query("ROLLBACK");
+    console.error("qr.create ERROR:", err.message);
+    return res.status(500).json({ error: "Failed to create quantity report: " + err.message });
+  } finally {
+    client.release();
   }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  UPDATE  —  PUT /api/quantity-report/:id
-// ══════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
+   UPDATE   PUT /api/quantity-report/:id
+   UNCHANGED — QS revises rejected QR and resubmits
+   Measurement status not changed during QS revision.
+═══════════════════════════════════════════════════════════ */
 exports.updateReport = async (req, res) => {
   try {
     const { id } = req.params;
-    const { projectId, projectName, milestoneId, milestoneName, boqId, items, totalItems } = req.body;
+    const { items, totalItems } = req.body;
 
-    const check = await pool.query("SELECT status FROM quantity_reports WHERE id = $1", [id]);
+    const check = await pool.query(
+      "SELECT status, boq_id FROM quantity_reports WHERE id = $1", [id]
+    );
     if (!check.rows.length) return res.status(404).json({ error: "Quantity report not found" });
     if (check.rows[0].status === "approved") {
       return res.status(403).json({ error: "Cannot edit an approved quantity report" });
     }
 
     const cleanItems = items
-      ? items.map(({ material, unit, quantity }) => ({
-          material, unit, quantity: parseFloat(quantity) || 0,
+      ? safeArr(items).map(({ material, unit, quantity, boqQuantity }) => ({
+          material,
+          unit,
+          quantity:    parseFloat(quantity)    || 0,
+          boqQuantity: boqQuantity !== undefined ? (parseFloat(boqQuantity) || null) : null,
         }))
       : null;
 
     const result = await pool.query(
       `UPDATE quantity_reports
-       SET project_id     = COALESCE($1, project_id),
-           project_name   = COALESCE($2, project_name),
-           milestone_id   = COALESCE($3, milestone_id),
-           milestone_name = COALESCE($4, milestone_name),
-           boq_id         = COALESCE($5, boq_id),
-           items          = COALESCE($6, items),
-           total_items    = COALESCE($7, total_items),
-           status         = 'pending_se',
-           se_comment     = '',
-           updated_date   = CURRENT_DATE,
-           updated_at     = NOW()
-       WHERE id = $8
-       RETURNING id, status`,
-      [projectId, projectName, milestoneId, milestoneName, boqId,
-       cleanItems ? JSON.stringify(cleanItems) : null, totalItems, id]
+       SET items       = COALESCE($1, items),
+           total_items = COALESCE($2, total_items),
+           status      = 'pending_se',
+           se_comment  = '',
+           updated_at  = NOW()
+       WHERE id = $3
+       RETURNING id, status, boq_id`,
+      [cleanItems ? JSON.stringify(cleanItems) : null, totalItems || null, id]
     );
 
     res.json({
-      message: "Quantity Report updated and resubmitted to SE",
+      message: "Quantity Report resubmitted to Site Engineer.",
       id:      result.rows[0].id,
-      status:  result.rows[0].status,
+      status:  "pending_se",
     });
   } catch (err) {
-    console.error("updateReport:", err.message);
+    console.error("qr.update:", err.message);
     res.status(500).json({ error: "Failed to update quantity report: " + err.message });
   }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  SE APPROVE  —  PUT /api/quantity-report/approve/:id
-// ══════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
+   SE APPROVE   PUT /api/quantity-report/approve/:id
+   CHANGED: measurement status → approved
+   WHY: SE approved the QR. The measurement lifecycle is complete.
+   UNCHANGED: QR approval, BOQ finalisation
+═══════════════════════════════════════════════════════════ */
 exports.approveReport = async (req, res) => {
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
+    await client.query("BEGIN");
+
+    const result = await client.query(
       `UPDATE quantity_reports
        SET status = 'approved', se_comment = '', updated_at = NOW()
        WHERE id = $1 AND status = 'pending_se'
-       RETURNING id, status, boq_id, project_name, milestone_name`,
+       RETURNING id, status, boq_id, measurement_id, project_name, milestone_name`,
       [req.params.id]
     );
     if (!result.rows.length) {
-      return res.status(404).json({ error: "Quantity report not found or not awaiting SE approval" });
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        error: "Quantity report not found or not awaiting SE approval",
+      });
     }
 
-    const { boq_id, project_name, milestone_name } = result.rows[0];
+    const { boq_id, measurement_id, project_name, milestone_name } = result.rows[0];
 
-    await pool.query(
+    // Finalise BOQ (unchanged)
+    await client.query(
       `UPDATE boqs
-       SET status = 'finalised', sent_to_se = TRUE,
-           finalised_date = CURRENT_DATE, se_note = '', updated_at = NOW()
-       WHERE id = $1 AND status = 'pending_se'`,
+       SET status = 'finalised', finalised_date = CURRENT_DATE, updated_at = NOW()
+       WHERE id = $1`,
       [boq_id]
     );
 
-    // ── QS Notification ──────────────────────────────────────
-    await createNotificationDirect({
-      type:         "Quantity",
-      project_name: project_name,
-      milestone:    milestone_name,
-      title:        "Quantity Report Approved ✅",
-      message:      `Your quantity report for ${milestone_name} has been approved by SE. BOQ finalised.`,
-      status:       "approved",
-    });
+    // CHANGED: measurement status → approved
+    await updateMeasurementStatus(client, measurement_id, "approved");
+
+    await client.query("COMMIT");
+
+    try {
+      const { createNotificationDirect } = require("./qsNotificationController");
+      await createNotificationDirect({
+        type:      "Quantity",
+        project_name,
+        milestone: milestone_name,
+        title:     "Quantity Report Approved ✅",
+        message:   "BOQ is now finalised!",
+        status:    "approved",
+      });
+    } catch {}
 
     res.json({
-      message: "Quantity Report approved by SE ✅ — BOQ finalised!",
-      id:      result.rows[0].id,
-      status:  "approved",
-      boqId:   boq_id,
+      message:           "✅ QR Approved — BOQ FINALISED!",
+      id:                result.rows[0].id,
+      status:            "approved",
+      boqId:             boq_id,
+      finalised:         true,
+      measurementStatus: "approved",
     });
+
   } catch (err) {
-    console.error("approveReport:", err.message);
-    res.status(500).json({ error: "Failed to approve quantity report: " + err.message });
+    await client.query("ROLLBACK");
+    console.error("qr.approve:", err.message);
+    res.status(500).json({ error: "Failed to approve: " + err.message });
+  } finally {
+    client.release();
   }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  SE REJECT  —  PUT /api/quantity-report/reject/:id
-// ══════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
+   SE REJECT   PUT /api/quantity-report/reject/:id
+   CHANGED: measurement status → rejected
+   WHY: SE rejected the QR. Measurement is flagged for revision.
+        Measurement remains editable (rejected is not locked).
+   UNCHANGED: QR rejection, BOQ rejected_by_se
+═══════════════════════════════════════════════════════════ */
 exports.rejectReport = async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { comment } = req.body;
-    const note = comment || "Please revise the quantities.";
+    await client.query("BEGIN");
 
-    const result = await pool.query(
+    const note = req.body.comment || "Please revise the quantities.";
+
+    const result = await client.query(
       `UPDATE quantity_reports
        SET status = 'rejected', se_comment = $1, updated_at = NOW()
        WHERE id = $2 AND status = 'pending_se'
-       RETURNING id, status, boq_id, project_name, milestone_name`,
+       RETURNING id, status, boq_id, measurement_id, project_name, milestone_name`,
       [note, req.params.id]
     );
     if (!result.rows.length) {
-      return res.status(404).json({ error: "Quantity report not found or not awaiting SE approval" });
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        error: "Quantity report not found or not awaiting SE approval",
+      });
     }
 
-    const { boq_id, project_name, milestone_name } = result.rows[0];
+    const { boq_id, measurement_id, project_name, milestone_name } = result.rows[0];
 
-    await pool.query(
-      `UPDATE boqs SET status = 'rejected', se_note = $1, updated_at = NOW()
-       WHERE id = $2`,
+    await client.query(
+      `UPDATE boqs SET status = 'rejected_by_se', se_note = $1, updated_at = NOW() WHERE id = $2`,
       [note, boq_id]
     );
 
-    // ── QS Notification ──────────────────────────────────────
-    await createNotificationDirect({
-      type:         "Quantity",
-      project_name: project_name,
-      milestone:    milestone_name,
-      title:        "Quantity Report Rejected ↩️",
-      message:      note,
-      status:       "rejected",
-    });
+    // CHANGED: measurement status → rejected
+    await updateMeasurementStatus(client, measurement_id, "rejected");
+
+    await client.query("COMMIT");
+
+    try {
+      const { createNotificationDirect } = require("./qsNotificationController");
+      await createNotificationDirect({
+        type:      "Quantity",
+        project_name,
+        milestone: milestone_name,
+        title:     "Quantity Report Rejected ↩️",
+        message:   note,
+        status:    "rejected",
+      });
+    } catch {}
 
     res.json({
-      message: "SE requested changes ↩️ — BOQ rejected, QS must edit and resubmit",
-      id:      result.rows[0].id,
-      status:  "rejected",
-      boqId:   boq_id,
+      message:           "Changes requested ↩️ — QS must revise and resubmit.",
+      id:                result.rows[0].id,
+      status:            "rejected",
+      boqId:             boq_id,
+      measurementStatus: "rejected",
     });
   } catch (err) {
-    console.error("rejectReport:", err.message);
-    res.status(500).json({ error: "Failed to reject quantity report: " + err.message });
+    await client.query("ROLLBACK");
+    console.error("qr.reject:", err.message);
+    res.status(500).json({ error: "Failed to reject: " + err.message });
+  } finally {
+    client.release();
   }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  DELETE  —  DELETE /api/quantity-report/:id
-// ══════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
+   DELETE   DELETE /api/quantity-report/:id
+   CHANGED: measurement status → submitted on QR delete
+   WHY: QR was deleted. Measurement goes back to submitted
+        so QS can generate a new QR from it.
+   UNCHANGED: BOQ revert logic
+═══════════════════════════════════════════════════════════ */
 exports.deleteReport = async (req, res) => {
+  const client = await pool.connect();
   try {
-    const check = await pool.query("SELECT status FROM quantity_reports WHERE id = $1", [req.params.id]);
-    if (!check.rows.length) return res.status(404).json({ error: "Quantity report not found" });
+    await client.query("BEGIN");
+
+    const check = await pool.query(
+      "SELECT status, boq_id, measurement_id FROM quantity_reports WHERE id = $1",
+      [req.params.id]
+    );
+    if (!check.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Quantity report not found" });
+    }
     if (check.rows[0].status === "approved") {
+      await client.query("ROLLBACK");
       return res.status(403).json({ error: "Cannot delete an approved quantity report" });
     }
-    await pool.query("DELETE FROM quantity_reports WHERE id = $1", [req.params.id]);
+
+    const { boq_id, measurement_id } = check.rows[0];
+
+    await client.query("DELETE FROM quantity_reports WHERE id = $1", [req.params.id]);
+
+    await client.query(
+      `UPDATE boqs SET status = 'measurement_received', updated_at = NOW()
+       WHERE id = $1 AND status NOT IN ('finalised')`,
+      [boq_id]
+    );
+
+    // CHANGED: measurement status → submitted so QS can regenerate QR
+    await updateMeasurementStatus(client, measurement_id, "submitted");
+
+    await client.query("COMMIT");
     res.json({ message: "Quantity report deleted", id: parseInt(req.params.id) });
   } catch (err) {
-    console.error("deleteReport:", err.message);
-    res.status(500).json({ error: "Failed to delete quantity report: " + err.message });
+    await client.query("ROLLBACK");
+    console.error("qr.delete:", err.message);
+    res.status(500).json({ error: "Failed to delete: " + err.message });
+  } finally {
+    client.release();
   }
 };

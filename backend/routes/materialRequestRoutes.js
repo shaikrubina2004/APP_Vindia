@@ -1,26 +1,60 @@
 const express = require("express");
 const router = express.Router();
 
+const authMiddleware = require("../middleware/authMiddleware");
 const controller = require("../controllers/materialRequestController");
 
-/* ─────────────────────────────
+/* =========================
    ROUTES
-───────────────────────────── */
+========================= */
 
-router.get("/", controller.getRequests);
+// Get requests
+router.get(
+  "/",
+  authMiddleware,
+  controller.getRequests
+);
 
-router.post("/", controller.createRequest);
+// Create request
+router.post(
+  "/",
+  authMiddleware,
+  controller.createRequest
+);
 
-// ✅ FULL EDIT (not just status)
-router.put("/:id", controller.updateFullRequest);
+// Full edit
+router.put(
+  "/:id",
+  authMiddleware,
+  controller.updateFullRequest
+);
 
-// ✅ DELETE
-router.delete("/:id", controller.deleteRequest);
+// Delete
+router.delete(
+  "/:id",
+  authMiddleware,
+  controller.deleteRequest
+);
 
-// status update (if needed separately)
-router.put("/status/:id", controller.updateRequest);
+// Status update
+router.put(
+  "/status/:id",
+  authMiddleware,
+  controller.updateRequest
+);
 
-router.post("/delivery", controller.addDelivery);
-router.post("/receive", controller.receiveMaterial);
+// Delivery
+router.post(
+  "/delivery",
+  authMiddleware,
+  controller.addDelivery
+);
+
+// Receive material
+router.post(
+  "/receive",
+  authMiddleware,
+  controller.receiveMaterial
+);
 
 module.exports = router;

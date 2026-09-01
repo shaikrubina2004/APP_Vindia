@@ -1,13 +1,45 @@
 export const ProjectManagerMenu = [
-  { name: "Dashboard", path: "/project-manager/dashboard", icon: "home" },
 
-  { name: "Incidents", path: "/pm/incidents", icon: "alert-triangle" },
+  {
+    name: "Dashboard",
+    path: "/project-manager/dashboard",
+    icon: "home",
+  },
 
-  { name: "Daily Updates", path: "/pm/daily-updates", icon: "calendar" },
+  {
+    name: "Incidents",
+    path: "/pm/incidents",
+    icon: "alert-triangle",
+  },
 
-  { name: "Team Management", path: "/pm/team", icon: "users" },
+  {
+    name: "Daily Updates",
+    path: "/pm/daily-updates",
+    icon: "calendar",
+  },
 
-  { name: "Reports", path: "/pm/reports", icon: "bar-chart-2" },
+  {
+    name: "Team Management",
+    path: "/pm/team",
+    icon: "users",
+  },
 
-  { name: "Cost Reports",    path: "/pm/cost-reports",            icon: "dollar-sign"    },
+  {
+    name: "Approval Requests",
+    path: "/project-manager/approvals",
+    icon: "check-circle",
+  },
+
+  {
+    name: "Reports",
+    path: "/pm/reports",
+    icon: "bar-chart-2",
+  },
+
+  {
+    name: "Cost Reports",
+    path: "/pm/cost-reports",
+    icon: "dollar-sign",
+  },
+
 ];

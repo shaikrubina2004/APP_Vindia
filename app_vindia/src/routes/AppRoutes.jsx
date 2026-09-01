@@ -38,6 +38,7 @@ import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
 import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
 import Reports from "../pages/projects/projectmanager/Reports";
 import Pmcostreports from "../pages/projects/projectmanager/Pmcostreports";
+import ApprovalRequests from "../pages/siteEngineer/ApprovalRequests";
 
 /* ── SHARED COMPONENTS ───────────────────────────────────── */
 import AppShell from "../components/incidents/AppShell";
@@ -236,6 +237,18 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+  path="/project-manager/approvals"
+  element={
+    <ProtectedRoute
+      allowedRoles={[ROLES.PROJECT_MANAGER]}
+    >
+      <ProjectManagerLayout>
+        <ApprovalRequests />
+      </ProjectManagerLayout>
+    </ProtectedRoute>
+  }
+/>
 
         {/* ══ HR ════════════════════════════════════════════ */}
         <Route
@@ -414,6 +427,16 @@ const AppRoutes = () => {
             </QuantitySurveyorLayout>
           }
         />
+        <Route
+  path="/quantity-surveyor/approvals"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+      <QuantitySurveyorLayout>
+        <ApprovalRequests />
+      </QuantitySurveyorLayout>
+    </ProtectedRoute>
+  }
+/>
 
         {/* ══ MEP ═══════════════════════════════════════════ */}
         <Route path="/mep/*" element={<MEPRoutes />} />
@@ -491,6 +514,16 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+  path="/architect/approvals"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
+      <ArchitectLayout>
+        <ApprovalRequests />
+      </ArchitectLayout>
+    </ProtectedRoute>
+  }
+/>
         <Route
           path="/architect/designs"
           element={

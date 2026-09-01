@@ -29,6 +29,12 @@ const QuantitySurveyorMenu = [
     path: "/quantity-surveyor/quantity-report",
     icon: "bar-chart-2",
   },
+  {
+    name: "Approval Requests",
+    path: "/quantity-surveyor/approvals",
+    icon: "check-circle",
+  },
+
 
   // ✅ NEW
   {

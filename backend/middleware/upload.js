@@ -1,8 +1,7 @@
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs"); // ✅ ADD THIS
+const fs = require("fs");
 
-// ✅ Ensure uploads folder exists
 const uploadPath = path.join(__dirname, "../uploads");
 
 if (!fs.existsSync(uploadPath)) {
@@ -11,13 +10,26 @@ if (!fs.existsSync(uploadPath)) {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadPath); // ✅ USE THIS instead of "uploads/"
+    cb(null, uploadPath);
   },
+
   filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+    cb(
+      null,
+      `${Date.now()}-${safeName}`
+    );
   },
 });
 
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+
+  limits: {
+    fileSize: 100 * 1024 * 1024,
+    files: 10,
+  },
+});
 
 module.exports = upload;

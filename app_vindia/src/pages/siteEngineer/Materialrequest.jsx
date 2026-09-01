@@ -52,9 +52,25 @@ function stableKey(it) {
 
 function validate(f) {
   const e = {};
-  if (!f.purpose || f.purpose.trim().length < 3) e.purpose = "Describe the purpose (min 3 chars)";
-  if (!f.required_by) e.required_by = "Required-by date is needed";
-  if (!f.items.some(it => it.description.trim())) e.items = "Add at least one material item";
+
+  if (!f.purpose || f.purpose.trim().length < 3) {
+    e.purpose = "Describe the purpose (min 3 chars)";
+  }
+
+  if (!f.required_by) {
+    e.required_by = "Required-by date is needed";
+  }
+
+  const validItems = f.items.filter(
+    item =>
+      item.description?.trim() &&
+      Number(item.qty) > 0
+  );
+
+  if (!validItems.length) {
+    e.items = "Add at least one material item with quantity";
+  }
+
   return e;
 }
 
@@ -438,31 +454,45 @@ const grid2    = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 };
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 6 }}>
-                        {r.status !== "approved" && (
-  
-                          <button
-                          onClick={() => {
-                            setForm({
-                              ...r,
-                              items: typeof r.items === "string" ? JSON.parse(r.items) : r.items
-                            });
-                            setEditingId(r.id);
-                            window.scrollTo({ top: 0, behavior: "smooth" });
-                          }}
-                          style={{ fontSize: 11, cursor: "pointer" }}
-                          
-                          >
+                        {(r.status || "requested") === "requested" && (
+  <>
+    <button
+      onClick={() => {
+        setForm({
+          ...r,
+          items:
+            typeof r.items === "string"
+              ? JSON.parse(r.items)
+              : r.items,
+        });
 
-    ✏️ Edit
-  </button>
-  )}
+        setEditingId(r.id);
 
-  <button
-    onClick={() => deleteRequest(r.id)}
-    style={{ fontSize: 11, color: "red", cursor: "pointer" }}
-  >
-    🗑 Delete
-  </button>
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      }}
+      style={{
+        fontSize: 11,
+        cursor: "pointer",
+      }}
+    >
+      ✏️ Edit
+    </button>
+
+    <button
+      onClick={() => deleteRequest(r.id)}
+      style={{
+        fontSize: 11,
+        color: "red",
+        cursor: "pointer",
+      }}
+    >
+      🗑 Delete
+    </button>
+  </>
+)}
 </div>
 
                       {/* Material tags */}
