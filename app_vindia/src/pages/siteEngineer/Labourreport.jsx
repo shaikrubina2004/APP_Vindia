@@ -7,7 +7,7 @@ import React, {
   useCallback, useEffect, useMemo, useRef, useState,
 } from "react";
 import api from "../../services/api";
-import "../../styles/LabourReport.css";
+import "../../styles/Labourreport.css";
 
 /* ── Constants ───────────────────────────────────────────── */
 const PAGE_SIZE = 8;

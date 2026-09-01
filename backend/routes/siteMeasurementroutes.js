@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const c = require("../controllers/siteMeasurementController");
+const c = require("../controllers/siteMeasurementcontroller");
 
 router.get("/", c.getAll);
 

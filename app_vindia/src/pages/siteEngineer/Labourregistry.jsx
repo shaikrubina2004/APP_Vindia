@@ -12,7 +12,7 @@ import React, {
   useCallback, useEffect, useMemo, useRef, useState,
 } from "react";
 import api from "../../services/api";
-import "../../styles/LabourRegistry.css";
+import "../../styles/Labourregistry.css";
 
 /* ── Constants ───────────────────────────────────────────── */
 const PAGE_SIZE = 10;

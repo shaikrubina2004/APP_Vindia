@@ -27,7 +27,7 @@
 const pool = require("../config/db");
 
 // Reuse the helper from siteMeasurementController — no SQL duplication
-const { updateMeasurementStatus } = require("./siteMeasurementController");
+const { updateMeasurementStatus } = require("./siteMeasurementcontroller");
 
 const toInt = v => { const n = parseInt(v); return isNaN(n) ? null : n; };
 
