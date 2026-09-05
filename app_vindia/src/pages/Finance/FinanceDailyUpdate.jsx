@@ -1,5 +1,6 @@
 // ===== FILE: APP_Vindia/app_vindia/src/pages/Finance/FinanceDailyUpdate.jsx =====
 import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../../context/useAuth";
 import financeDailyUpdateService from "../../services/financeDailyUpdateService";
 import "./FinanceDailyUpdate.css";
 
@@ -28,7 +29,24 @@ const REVIEW_LABEL = {
   rejected: { text: "Rejected — resubmit below", cls: "fdu-badge-rejected" },
 };
 
+/* ═══════════════════════════════════════════════════════════════
+   TOP-LEVEL — routes to the right view based on who's logged in.
+   Finance Manager sees the submission form (unchanged).
+   CEO sees the review inbox.
+═══════════════════════════════════════════════════════════════ */
 export default function FinanceDailyUpdate() {
+  const { user } = useAuth();
+
+  if (user?.role === "ceo") {
+    return <DailyUpdateReview />;
+  }
+  return <DailyUpdateSubmit />;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FINANCE MANAGER VIEW — submission form (unchanged from before)
+═══════════════════════════════════════════════════════════════ */
+function DailyUpdateSubmit() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [today, setToday] = useState(null); // existing record for today, if any
   const [history, setHistory] = useState([]);
@@ -283,6 +301,209 @@ export default function FinanceDailyUpdate() {
           </table>
         )}
       </section>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CEO VIEW — review inbox: filter, expand, approve/reject
+═══════════════════════════════════════════════════════════════ */
+const FILTERS = [
+  { value: "pending", label: "Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+  { value: "", label: "All" },
+];
+
+function DailyUpdateReview() {
+  const [filter, setFilter] = useState("pending");
+  const [updates, setUpdates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [openId, setOpenId] = useState(null);
+  const [notes, setNotes] = useState({}); // { [id]: noteText }
+  const [actingId, setActingId] = useState(null); // id currently being approved/rejected
+
+  const load = useCallback(async (status) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await financeDailyUpdateService.getAllUpdates(
+        status ? { status } : {}
+      );
+      setUpdates(res.data.data || []);
+    } catch (err) {
+      console.error("Failed to load daily updates:", err);
+      setError(
+        err?.response?.data?.message || "Couldn't load submissions."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load(filter);
+  }, [filter, load]);
+
+  const handleReview = async (id, status) => {
+    setActingId(id);
+    setError(null);
+    try {
+      await financeDailyUpdateService.reviewUpdate(id, status, notes[id] || "");
+      setToast(status === "approved" ? "Update approved." : "Sent back for revision.");
+      setTimeout(() => setToast(null), 3000);
+      setOpenId(null);
+      load(filter);
+    } catch (err) {
+      console.error("Failed to review update:", err);
+      setError(
+        err?.response?.data?.message || "Couldn't submit your review. Please try again."
+      );
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  return (
+    <div className="fdu-root">
+      <header className="fdu-header">
+        <div>
+          <p className="fdu-eyebrow">Finance Overview</p>
+          <h1 className="fdu-title">Daily Update — Review</h1>
+          <p className="fdu-sub">Approve or send back each Finance Manager's daily submission.</p>
+        </div>
+      </header>
+
+      {toast && <div className="fdu-toast">{toast}</div>}
+      {error && <div className="fdu-error">{error}</div>}
+
+      <div className="fdu-review-filters">
+        {FILTERS.map((f) => (
+          <button
+            key={f.value || "all"}
+            type="button"
+            className={`fdu-review-filter ${filter === f.value ? "fdu-review-filter--active" : ""}`}
+            onClick={() => setFilter(f.value)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="fdu-state">Loading submissions…</div>
+      ) : updates.length === 0 ? (
+        <p className="fdu-history-empty">No submissions in this filter.</p>
+      ) : (
+        <div className="fdu-review-list">
+          {updates.map((u) => {
+            const isOpen = openId === u.id;
+            const reviewInfo = REVIEW_LABEL[u.status];
+            return (
+              <div key={u.id} className="fdu-review-card">
+                <button
+                  type="button"
+                  className="fdu-review-card-header"
+                  onClick={() => setOpenId(isOpen ? null : u.id)}
+                >
+                  <div>
+                    <strong>{u.submitted_by_name}</strong>
+                    <span className="fdu-review-date">
+                      {" "}— {new Date(u.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                  </div>
+                  <div className="fdu-review-card-header-right">
+                    <span className={`fdu-chip fdu-chip--${u.overall_status}`}>
+                      {STATUS_OPTIONS.find((o) => o.value === u.overall_status)?.label || u.overall_status}
+                    </span>
+                    <span className={`fdu-badge ${reviewInfo?.cls || ""}`}>
+                      {reviewInfo?.text || u.status}
+                    </span>
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="fdu-review-card-body">
+                    <div className="fdu-grid">
+                      <div className="fdu-review-stat">
+                        <span>Cash / Bank Position</span>
+                        <strong>₹{Number(u.cash_position).toLocaleString("en-IN")}</strong>
+                      </div>
+                      <div className="fdu-review-stat">
+                        <span>Today's Collections</span>
+                        <strong>₹{Number(u.todays_collections).toLocaleString("en-IN")}</strong>
+                      </div>
+                      <div className="fdu-review-stat">
+                        <span>Today's Expenses</span>
+                        <strong>₹{Number(u.todays_expenses).toLocaleString("en-IN")}</strong>
+                      </div>
+                      <div className="fdu-review-stat">
+                        <span>Invoices Raised</span>
+                        <strong>{u.invoices_raised}</strong>
+                      </div>
+                      <div className="fdu-review-stat">
+                        <span>Payments Made</span>
+                        <strong>{u.payments_made}</strong>
+                      </div>
+                      <div className="fdu-review-stat">
+                        <span>Pending Approvals</span>
+                        <strong>{u.pending_approvals}</strong>
+                      </div>
+                    </div>
+
+                    {u.summary && (
+                      <p className="fdu-review-summary">"{u.summary}"</p>
+                    )}
+
+                    {u.status !== "pending" && (
+                      <p className="fdu-review-summary">
+                        Reviewed by {u.reviewed_by_name || "—"} on{" "}
+                        {u.reviewed_at ? new Date(u.reviewed_at).toLocaleString("en-IN") : "—"}
+                        {u.review_note && <> — "{u.review_note}"</>}
+                      </p>
+                    )}
+
+                    {u.status === "pending" && (
+                      <>
+                        <label className="fdu-field fdu-field--full">
+                          <span>Note (optional — shown to the Finance Manager)</span>
+                          <textarea
+                            rows={2}
+                            value={notes[u.id] || ""}
+                            onChange={(e) =>
+                              setNotes((n) => ({ ...n, [u.id]: e.target.value }))
+                            }
+                          />
+                        </label>
+                        <div className="fdu-review-actions">
+                          <button
+                            type="button"
+                            className="fdu-submit-btn"
+                            disabled={actingId === u.id}
+                            onClick={() => handleReview(u.id, "approved")}
+                          >
+                            {actingId === u.id ? "Working…" : "Approve"}
+                          </button>
+                          <button
+                            type="button"
+                            className="fdu-review-reject-btn"
+                            disabled={actingId === u.id}
+                            onClick={() => handleReview(u.id, "rejected")}
+                          >
+                            {actingId === u.id ? "Working…" : "Send Back"}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

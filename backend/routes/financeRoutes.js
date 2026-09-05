@@ -14,7 +14,7 @@ const vendorController = require("../controllers/vendorController");
 const financeSettingsController = require("../controllers/financeSettingsController");
 
 // Only finance_manager and ceo can access Finance Manager endpoints
-router.use(protect, requireRole("Finance Manager", "CEO"));
+router.use(protect, requireRole("finance_manager", "ceo"));
 
 /* ── Dashboard ─────────────────────────────────────────── */
 router.get("/dashboard", financeDashboardController.getDashboard);
@@ -41,6 +41,7 @@ router.delete("/expenses/:id", expenseController.deleteExpense);
 /* ── Invoices ──────────────────────────────────────────── */
 router.get("/invoices", invoiceController.getAllInvoices);
 router.post("/invoices", invoiceController.createInvoice);
+router.put("/invoices/:id", invoiceController.updateInvoice);
 router.put("/invoices/:id/status", invoiceController.updateInvoiceStatus);
 router.delete("/invoices/:id", invoiceController.deleteInvoice);
 
@@ -56,8 +57,7 @@ router.delete("/payments/:id", paymentController.deletePayment);
 router.get("/vendors", vendorController.getAllVendors);
 router.get("/vendors/metrics", vendorController.getVendorMetrics);
 router.get("/vendors/:id", vendorController.getVendorById);
-router.post("/vendors"
-    , vendorController.createVendor);
+router.post("/vendors", vendorController.createVendor);
 router.put("/vendors/:id", vendorController.updateVendor);
 router.patch("/vendors/:id/toggle-status", vendorController.toggleVendorStatus);
 router.delete("/vendors/:id", vendorController.deleteVendor);

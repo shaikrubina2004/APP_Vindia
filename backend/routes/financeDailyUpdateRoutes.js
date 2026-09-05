@@ -7,15 +7,15 @@ const controller = require("../controllers/financeDailyUpdateController");
 router.use(protect);
 
 /* ── Finance Manager: submit & view own history ─────────────────── */
-router.post("/", requireRole("Finance Manager"), controller.submitUpdate);
-router.get("/mine", requireRole("Finance Manager"), controller.getMyUpdates);
-router.get("/today", requireRole("Finance Manager"), controller.getTodayMine);
+router.post("/", requireRole("finance_manager"), controller.submitUpdate);
+router.get("/mine", requireRole("finance_manager"), controller.getMyUpdates);
+router.get("/today", requireRole("finance_manager"), controller.getTodayMine);
 
 /* ── CEO: review inbox ──────────────────────────────────────────── */
-router.get("/", requireRole("CEO"), controller.getAllUpdates);
-router.put("/:id/review", requireRole("CEO"), controller.reviewUpdate);
+router.get("/", requireRole("ceo"), controller.getAllUpdates);
+router.put("/:id/review", requireRole("ceo"), controller.reviewUpdate);
 
 /* ── Either role can view a single record (must stay last) ───────── */
-router.get("/:id", requireRole("Finance Manager", "CEO"), controller.getUpdateById);
+router.get("/:id", requireRole("finance_manager", "ceo"), controller.getUpdateById);
 
 module.exports = router;

@@ -245,3 +245,106 @@
 @media (max-width: 480px) {
   .fdu-grid { grid-template-columns: 1fr; }
 }
+
+/* ── CEO Review Inbox ─────────────────────────────────────── */
+.fdu-review-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.fdu-review-filter {
+  border: 1px solid var(--fdu-border2);
+  background: var(--fdu-surface);
+  color: var(--fdu-text-muted);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fdu-review-filter--active {
+  background: var(--fdu-accent);
+  color: #fff;
+  border-color: var(--fdu-accent);
+}
+
+.fdu-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fdu-review-card {
+  background: var(--fdu-bg);
+  border: 1px solid var(--fdu-border);
+  border-radius: var(--fdu-radius);
+  box-shadow: var(--fdu-shadow);
+  overflow: hidden;
+}
+
+.fdu-review-card-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--fdu-text);
+}
+
+.fdu-review-card-header-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.fdu-review-date {
+  color: var(--fdu-text-muted);
+  font-weight: 400;
+}
+
+.fdu-review-card-body {
+  padding: 0 20px 20px;
+  border-top: 1px solid var(--fdu-border);
+}
+
+.fdu-review-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 0;
+}
+
+.fdu-review-stat span {
+  font-size: 12px;
+  color: var(--fdu-text-muted);
+}
+
+.fdu-review-summary {
+  margin-top: 12px;
+  color: var(--fdu-text-muted);
+  font-size: 14px;
+  font-style: italic;
+}
+
+.fdu-review-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.fdu-review-reject-btn {
+  background: var(--fdu-critical);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+}

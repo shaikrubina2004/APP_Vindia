@@ -2,9 +2,11 @@
 const Vendor = require("../models/vendorModel");
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
 
-// GET /api/finance/vendors?status=&search=
+// GET /api/finance/vendors
+// Optional query filters: ?status=&search=
 exports.getAllVendors = asyncHandler(async (req, res) => {
-  const vendors = await Vendor.getAll(req.query);
+  const { status, search } = req.query;
+  const vendors = await Vendor.getAll({ status, search });
   res.json({ success: true, data: vendors });
 });
 
@@ -22,29 +24,41 @@ exports.getVendorById = asyncHandler(async (req, res) => {
 });
 
 // POST /api/finance/vendors
+// Body: { name, category, payment_terms?, rating?, contact_email?, contact_phone? }
 exports.createVendor = asyncHandler(async (req, res) => {
-  const { name } = req.body;
-  if (!name) throw new AppError("name is required", 400);
+  const { name, category } = req.body;
+  if (!name || !category) {
+    throw new AppError("name and category are required", 400);
+  }
+
   const vendor = await Vendor.create(req.body);
   res.status(201).json({ success: true, data: vendor });
 });
 
 // PUT /api/finance/vendors/:id
+// Body: any of { name, category, payment_terms, rating, contact_email, contact_phone }
 exports.updateVendor = asyncHandler(async (req, res) => {
+  const existing = await Vendor.getById(req.params.id);
+  if (!existing) throw new AppError("Vendor not found", 404);
+
   const vendor = await Vendor.update(req.params.id, req.body);
-  if (!vendor) throw new AppError("Vendor not found", 404);
   res.json({ success: true, data: vendor });
 });
 
 // PATCH /api/finance/vendors/:id/toggle-status
 exports.toggleVendorStatus = asyncHandler(async (req, res) => {
+  const existing = await Vendor.getById(req.params.id);
+  if (!existing) throw new AppError("Vendor not found", 404);
+
   const vendor = await Vendor.toggleStatus(req.params.id);
-  if (!vendor) throw new AppError("Vendor not found", 404);
   res.json({ success: true, data: vendor });
 });
 
 // DELETE /api/finance/vendors/:id
 exports.deleteVendor = asyncHandler(async (req, res) => {
+  const existing = await Vendor.getById(req.params.id);
+  if (!existing) throw new AppError("Vendor not found", 404);
+
   await Vendor.remove(req.params.id);
   res.json({ success: true, message: "Vendor deleted" });
 });
