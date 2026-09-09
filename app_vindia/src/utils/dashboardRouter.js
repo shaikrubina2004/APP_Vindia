@@ -64,6 +64,21 @@ export const getDashboardRoute = (role) => {
 
     case ROLES.FINANCE_MANAGER:
       return "/finance-manager/dashboard";
+     // Operations & Administration
+    case ROLES.OPERATIONS_MANAGER:
+      return "/operations/manager/dashboard";
+
+    case ROLES.OFFICE_ADMINISTRATOR:
+      return "/operations/administrator/dashboard";
+
+    case ROLES.PROCUREMENT_OFFICER:
+      return "/operations/procurement/dashboard";
+
+    case ROLES.LOGISTICS_COORDINATOR:
+      return "/operations/logistics/dashboard";
+
+    case ROLES.INVENTORY_CONTROLLER:
+      return "/operations/inventory/dashboard";
 
       
 

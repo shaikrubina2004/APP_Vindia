@@ -54,6 +54,23 @@ const getRoleDashboard = (role) => {
 
     case "3d_visualizer":
       return "/3d-visualizer/dashboard";
+    
+     // Operations & Administration
+    case "operations_manager":
+      return "/operations/manager/dashboard";
+
+    case "office_administrator":
+      return "/operations/administrator/dashboard";
+
+    case "procurement_officer":
+      return "/operations/procurement/dashboard";
+
+    case "logistics_coordinator":
+      return "/operations/logistics/dashboard";
+
+    case "inventory_controller":
+      return "/operations/inventory/dashboard";
+
 
     case "finance_manager":
       return "/finance-manager/dashboard";

@@ -98,6 +98,24 @@ import BDAAddLead from "../pages/business-development/business-development-analy
 import BDAFollowUp from "../pages/business-development/business-development-analyst/BDAFollowUp";
 import BDAReportsWithRole from "../pages/business-development/business-development-analyst/BDAReportsWithRole";
 
+/* ── OPERATIONS & ADMINISTRATION ───────────────────────── */
+
+import OperationsManagerDashboard
+  from "../pages/operations/manager/OperationsManagerDashboard";
+
+import OfficeAdministratorDashboard
+  from "../pages/operations/administrator/OfficeAdministratorDashboard";
+
+import ProcurementOfficerDashboard
+  from "../pages/operations/procurement/ProcurementOfficerDashboard";
+
+import LogisticsCoordinatorDashboard
+  from "../pages/operations/logistics/LogisticsCoordinatorDashboard";
+
+import InventoryControllerDashboard
+  from "../pages/operations/inventory/InventoryControllerDashboard";
+
+
 /* ── COMMON ──────────────────────────────────────────────── */
 import Timesheet from "../pages/timesheet/Timesheet";
 import ProtectedRoute from "./ProtectedRoute";
@@ -113,7 +131,20 @@ import QuantitySurveyorLayout from "../layouts/QuantitySurveyorLayout";
 import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
 import ArchitectLayout from "../layouts/ArchitectLayout";
 import BDALayout from "../layouts/BDALayout";
+import OperationsManagerLayout
+  from "../layouts/OperationsManagerLayout";
 
+import OfficeAdministratorLayout
+  from "../layouts/OfficeAdministratorLayout";
+
+import ProcurementOfficerLayout
+  from "../layouts/ProcurementOfficerLayout";
+
+import LogisticsCoordinatorLayout
+  from "../layouts/LogisticsCoordinatorLayout";
+
+import InventoryControllerLayout
+  from "../layouts/InventoryControllerLayout";
 /* ═══════════════════════════════════════════════════════════
    APP ROUTES
 ═════════════════════════════════════════════════════════════ */
@@ -818,6 +849,63 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* ══ OPERATIONS & ADMINISTRATION  ═════════════════════════════ */}
+
+        <Route
+        path="/operations/manager/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.OPERATIONS_MANAGER]}>
+            <OperationsManagerLayout>
+              <OperationsManagerDashboard />
+            </OperationsManagerLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+            path="/operations/administrator/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.OFFICE_ADMINISTRATOR]}>
+                <OfficeAdministratorLayout>
+                  <OfficeAdministratorDashboard />
+                </OfficeAdministratorLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/operations/procurement/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+                <ProcurementOfficerLayout>
+                  <ProcurementOfficerDashboard />
+                </ProcurementOfficerLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/operations/logistics/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
+                <LogisticsCoordinatorLayout>
+                  <LogisticsCoordinatorDashboard />
+                </LogisticsCoordinatorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/operations/inventory/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
+                <InventoryControllerLayout>
+                  <InventoryControllerDashboard />
+                </InventoryControllerLayout>
+              </ProtectedRoute>
+            }
+          />
+
 
         {/* ══ FALLBACK ══════════════════════════════════════ */}
         <Route
