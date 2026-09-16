@@ -1,0 +1,41 @@
+@import "../../../styles/opsShared.css";
+
+.im-search {
+  position: relative;
+  max-width: 320px;
+}
+.im-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+.im-search-input {
+  width: 100%;
+  padding-left: 36px;
+}
+
+.im-code { color: #94a3b8; }
+.im-name { font-weight: 500; color: #1e293b; }
+
+.im-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  color: #64748b;
+  display: inline-flex;
+  transition: all 0.15s ease;
+  margin-left: 4px;
+}
+.im-action-edit:hover { background: #eff6ff; color: #2563eb; }
+.im-action-delete:hover { background: #fef2f2; color: #dc2626; }
+
+.im-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

@@ -1,0 +1,49 @@
+@import "../../../styles/opsShared.css";
+
+.sin-amber { color: #d97706; }
+.sin-emerald { color: #059669; }
+
+.sin-pending-list { list-style: none; margin: 0; padding: 0; }
+.sin-pending-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f8fafc;
+  transition: background 0.15s ease;
+}
+.sin-pending-item:last-child { border-bottom: none; }
+.sin-pending-item:hover { background: #f8fafc; }
+
+.sin-pending-code { font-weight: 500; color: #1e293b; margin: 0; font-size: 14px; }
+.sin-pending-project { color: #94a3b8; font-weight: 400; }
+.sin-pending-meta { font-size: 12px; color: #94a3b8; margin: 2px 0 0; }
+
+.sin-grn { font-weight: 500; color: #1e293b; }
+
+.sin-form { display: flex; flex-direction: column; gap: 16px; }
+.sin-lines { display: flex; flex-direction: column; gap: 12px; }
+
+.sin-line {
+  border: 1px solid #f1f5f9;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.15s ease;
+}
+.sin-line:hover { border-color: #e2e8f0; }
+
+.sin-line-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sin-line-name { font-size: 14px; font-weight: 500; color: #1e293b; margin: 0; }
+.sin-line-meta { font-size: 12px; color: #94a3b8; margin: 0; white-space: nowrap; }
+
+.sin-line-grid { grid-template-columns: 1.4fr 1fr 1fr; }
+@media (max-width: 480px) { .sin-line-grid { grid-template-columns: 1fr; } }

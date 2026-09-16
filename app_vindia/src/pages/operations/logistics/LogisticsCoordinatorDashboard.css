@@ -1,0 +1,56 @@
+@import "../../../styles/opsShared.css";
+
+.logd-spin { animation: logd-spin 1s linear infinite; }
+@keyframes logd-spin { to { transform: rotate(360deg); } }
+
+.logd-card-arrow {
+  color: #cbd5e1;
+  transition: all 0.2s ease;
+}
+.ops-kpi-card:hover .logd-card-arrow {
+  color: #64748b;
+  transform: translateX(3px);
+}
+
+.logd-due-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 14px;
+  padding: 16px;
+  transition: background 0.2s ease;
+}
+.logd-due-strip:hover { background: #e0f2fe; }
+.logd-due-strip p { margin: 0; font-size: 14px; color: #075985; }
+.logd-due-icon { color: #0284c7; flex-shrink: 0; }
+
+.logd-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 20px;
+}
+@media (max-width: 900px) {
+  .logd-grid { grid-template-columns: 1fr; }
+}
+
+.logd-recent-list { list-style: none; margin: 0; padding: 0; }
+
+.logd-recent-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f8fafc;
+  transition: background 0.15s ease;
+}
+.logd-recent-item:last-child { border-bottom: none; }
+.logd-recent-item:hover { background: #f8fafc; }
+
+.logd-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.logd-recent-code { font-size: 14px; font-weight: 500; color: #1e293b; margin: 0; }
+.logd-recent-project { color: #94a3b8; font-weight: 400; }
+.logd-recent-meta { font-size: 12px; color: #94a3b8; margin: 2px 0 0; }

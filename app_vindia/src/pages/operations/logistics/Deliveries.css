@@ -1,0 +1,74 @@
+@import "../../../styles/opsShared.css";
+
+.del-code { font-weight: 500; color: #1e293b; }
+
+.del-stepper { display: flex; align-items: center; gap: 4px; }
+.del-step {
+  height: 6px;
+  width: 22px;
+  border-radius: 999px;
+  transition: all 0.4s ease;
+}
+.del-step-done { background: #10b981; }
+.del-step-pending { background: #e2e8f0; }
+.del-step-delayed { background: #f87171; width: 16px; }
+.del-step-cancelled { font-size: 12px; color: #94a3b8; }
+
+.del-actions { text-align: right; white-space: nowrap; }
+.del-action-btn {
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 11px;
+  border-radius: 8px;
+  margin-left: 6px;
+  font-weight: 500;
+  transition: filter 0.15s ease;
+}
+.del-action-btn:hover { filter: brightness(0.94); }
+.del-action-sky { background: #0284c7; color: #fff; }
+.del-action-indigo { background: #4f46e5; color: #fff; }
+.del-action-emerald { background: #059669; color: #fff; }
+.del-action-red { background: #fee2e2; color: #b91c1c; }
+
+.del-form { display: flex; flex-direction: column; gap: 14px; }
+
+.del-item-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.del-item-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 0.7fr auto;
+  gap: 8px;
+  align-items: center;
+}
+@media (max-width: 480px) { .del-item-row { grid-template-columns: 1fr 1fr; } }
+
+.del-item-name, .del-item-unit, .del-item-qty { padding: 7px 10px; font-size: 13px; }
+
+.del-item-remove {
+  background: none;
+  border: none;
+  color: #f87171;
+  cursor: pointer;
+  font-size: 14px;
+}
+.del-item-remove:hover { color: #dc2626; }
+
+.del-add-item {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 8px;
+  padding: 0;
+}
+.del-add-item:hover { text-decoration: underline; }
+
+.del-deliver-lines { display: flex; flex-direction: column; gap: 8px; }
+.del-deliver-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.del-deliver-name { font-size: 13px; color: #334155; }

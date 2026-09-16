@@ -1,0 +1,41 @@
+@import "../../../styles/opsShared.css";
+
+.sout-form-card {
+  padding: 20px;
+  max-width: 520px;
+}
+
+.sout-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sout-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.sout-register-search {
+  position: relative;
+}
+.sout-register-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+.sout-register-search input {
+  padding-left: 30px;
+  width: 160px;
+  font-size: 13px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.sout-item-code { color: #94a3b8; }
+.sout-qty-low { font-weight: 600; color: #dc2626; }
+.sout-qty-ok { font-weight: 600; color: #1e293b; }

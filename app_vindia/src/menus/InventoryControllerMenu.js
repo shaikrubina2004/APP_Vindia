@@ -22,10 +22,4 @@ export const inventoryControllerMenu = [
     path: "/operations/inventory/stock-out",
     icon: "arrow-up-circle",
   },
-
-  {
-    name: "Reports",
-    path: "/operations/inventory/reports",
-    icon: "bar-chart-2",
-  },
 ];

@@ -105,6 +105,12 @@ const bdaNotifRoutes = require("./routes/bdaNotificationRoutes");
 const financeRoutes = require("./routes/financeRoutes");
 const financeDailyUpdateRoutes = require("./routes/financeDailyUpdateRoutes");
 
+/* ✅ Inventory & Logistics */
+const inventoryItemRoutes = require("./routes/inventoryItemRoutes");
+const deliveryRoutes = require("./routes/deliveryRoutes");
+const goodsReceiptRoutes = require("./routes/goodsReceiptRoutes");
+const inventoryTransactionRoutes = require("./routes/inventoryTransactionRoutes");
+
 const { errorHandler } = require("./middleware/errorHandler");
 /* ═════════ APP SETUP ═════════ */
 
@@ -199,6 +205,12 @@ app.use("/api/photos", sitephotosRoutes);
 app.use("/api/labour-registry", labourRegistryRoutes);
 app.use("/api/labour-report", labourReportRoutes);
 
+
+/* ✅ Inventory & Logistics */
+app.use("/api/inventory/items", inventoryItemRoutes);
+app.use("/api/inventory", inventoryTransactionRoutes);
+app.use("/api/deliveries", deliveryRoutes);
+app.use("/api/goods-receipts", goodsReceiptRoutes);
 /* Shared */
 app.use("/api/drawings", drawingUploadRoutes);
 

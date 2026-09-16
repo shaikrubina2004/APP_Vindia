@@ -145,6 +145,11 @@ import LogisticsCoordinatorLayout
 
 import InventoryControllerLayout
   from "../layouts/InventoryControllerLayout";
+
+import ItemMaster from "../pages/operations/inventory/ItemMaster";
+import StockIn from "../pages/operations/inventory/StockIn";
+import StockOut from "../pages/operations/inventory/StockOut";
+import Deliveries from "../pages/operations/logistics/Deliveries";
 /* ═══════════════════════════════════════════════════════════
    APP ROUTES
 ═════════════════════════════════════════════════════════════ */
@@ -905,6 +910,38 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+          path="/operations/inventory"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
+              <InventoryControllerLayout><ItemMaster /></InventoryControllerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/inventory/stock-in"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
+              <InventoryControllerLayout><StockIn /></InventoryControllerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/inventory/stock-out"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
+              <InventoryControllerLayout><StockOut /></InventoryControllerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/logistics/deliveries"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
+              <LogisticsCoordinatorLayout><Deliveries /></LogisticsCoordinatorLayout>
+            </ProtectedRoute>
+          }
+        />
 
 
         {/* ══ FALLBACK ══════════════════════════════════════ */}
