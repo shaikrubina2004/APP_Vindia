@@ -42,6 +42,8 @@ import ApprovalRequests from "../pages/siteEngineer/ApprovalRequests";
 import CreatePO from "../pages/Operations/PurchaseOrders/CreatePO";
 import PurchaseOrderList from "../pages/Operations/PurchaseOrders/PurchaseOrderList";
 import PurchaseOrderDetail from "../pages/Operations/PurchaseOrders/PurchaseOrderDetail";
+import ApprovedRequests from "../pages/operations/MaterialRequests/ApprovedRequests";
+import VendorsView from "../pages/operations/procurement/VendorsView";
 /* ── SHARED COMPONENTS ───────────────────────────────────── */
 import AppShell from "../components/incidents/AppShell";
 import SharedDrawingPage from "../components/project/SharedDrawingPage";
@@ -908,6 +910,28 @@ const AppRoutes = () => {
         />
 
         <Route
+          path="/operations/procurement/purchase-requests"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <ApprovedRequests />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/operations/procurement/vendors"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <VendorsView />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/operations/logistics/dashboard"
           element={
             <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
@@ -971,7 +995,9 @@ const AppRoutes = () => {
           path="/operations/inventory/incidents"
           element={
             <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
-              <InventoryControllerLayout><AppShell key="inv-incidents" /></InventoryControllerLayout>
+              <InventoryControllerLayout>
+                <AppShell key="inv-incidents" />
+              </InventoryControllerLayout>
             </ProtectedRoute>
           }
         />
@@ -979,7 +1005,9 @@ const AppRoutes = () => {
           path="/operations/inventory/rfi"
           element={
             <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
-              <InventoryControllerLayout><RFIPage /></InventoryControllerLayout>
+              <InventoryControllerLayout>
+                <RFIPage />
+              </InventoryControllerLayout>
             </ProtectedRoute>
           }
         />
@@ -987,7 +1015,9 @@ const AppRoutes = () => {
           path="/operations/inventory/rfi/:id"
           element={
             <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
-              <InventoryControllerLayout><RFIDetailPage /></InventoryControllerLayout>
+              <InventoryControllerLayout>
+                <RFIDetailPage />
+              </InventoryControllerLayout>
             </ProtectedRoute>
           }
         />
@@ -996,7 +1026,9 @@ const AppRoutes = () => {
           path="/operations/logistics/incidents"
           element={
             <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
-              <LogisticsCoordinatorLayout><AppShell key="log-incidents" /></LogisticsCoordinatorLayout>
+              <LogisticsCoordinatorLayout>
+                <AppShell key="log-incidents" />
+              </LogisticsCoordinatorLayout>
             </ProtectedRoute>
           }
         />
@@ -1004,7 +1036,9 @@ const AppRoutes = () => {
           path="/operations/logistics/rfi"
           element={
             <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
-              <LogisticsCoordinatorLayout><RFIPage /></LogisticsCoordinatorLayout>
+              <LogisticsCoordinatorLayout>
+                <RFIPage />
+              </LogisticsCoordinatorLayout>
             </ProtectedRoute>
           }
         />
@@ -1012,7 +1046,9 @@ const AppRoutes = () => {
           path="/operations/logistics/rfi/:id"
           element={
             <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
-              <LogisticsCoordinatorLayout><RFIDetailPage /></LogisticsCoordinatorLayout>
+              <LogisticsCoordinatorLayout>
+                <RFIDetailPage />
+              </LogisticsCoordinatorLayout>
             </ProtectedRoute>
           }
         />
