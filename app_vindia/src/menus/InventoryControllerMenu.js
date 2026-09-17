@@ -22,4 +22,21 @@ export const inventoryControllerMenu = [
     path: "/operations/inventory/stock-out",
     icon: "arrow-up-circle",
   },
+  {
+    name: "Incidents",
+    path: "/operations/inventory/incidents",
+    icon: "alert-triangle",
+  },
+
+  {
+    name: "Tasks",
+    path: "/operations/inventory/incidents?page=tasks",
+    icon: "check-square",
+  },
+
+  {
+    name: "RFI",
+    path: "/operations/inventory/rfi",
+    icon: "message-square",
+  },
 ];

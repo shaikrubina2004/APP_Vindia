@@ -958,6 +958,55 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/operations/inventory/incidents"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
+              <InventoryControllerLayout><AppShell key="inv-incidents" /></InventoryControllerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/inventory/rfi"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
+              <InventoryControllerLayout><RFIPage /></InventoryControllerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/inventory/rfi/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
+              <InventoryControllerLayout><RFIDetailPage /></InventoryControllerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/operations/logistics/incidents"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
+              <LogisticsCoordinatorLayout><AppShell key="log-incidents" /></LogisticsCoordinatorLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/logistics/rfi"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
+              <LogisticsCoordinatorLayout><RFIPage /></LogisticsCoordinatorLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/logistics/rfi/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
+              <LogisticsCoordinatorLayout><RFIDetailPage /></LogisticsCoordinatorLayout>
+            </ProtectedRoute>
+          }
+        />
 
 
         {/* ══ FALLBACK ══════════════════════════════════════ */}
