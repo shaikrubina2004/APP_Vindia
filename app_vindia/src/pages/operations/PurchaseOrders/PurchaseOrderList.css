@@ -1,0 +1,147 @@
+/* ===== FILE: APP_Vindia/app_vindia/src/pages/Operations/PurchaseOrders/PurchaseOrderList.css ===== */
+
+.pol-page {
+  --primary: #0A4174;
+  --primary-light: #4E8EA2;
+  --success: #059669;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-500: #6b7280;
+  --neutral-900: #111827;
+
+  padding: 1.5rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--neutral-900);
+}
+
+.pol-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.pol-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.pol-header p {
+  margin: 0;
+  color: var(--neutral-500);
+  font-size: 0.88rem;
+}
+
+.pol-search {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  min-width: 260px;
+}
+
+.pol-filters {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.pol-filter-btn {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  cursor: pointer;
+  color: var(--neutral-500);
+}
+
+.pol-filter-btn--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.pol-empty {
+  color: var(--neutral-500);
+  font-size: 0.9rem;
+  padding: 1.5rem;
+  text-align: center;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+}
+
+.pol-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 0.88rem;
+}
+
+.pol-table th {
+  text-align: left;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--neutral-200);
+  color: var(--neutral-500);
+  font-weight: 600;
+  background: var(--neutral-100);
+}
+
+.pol-table td {
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.pol-table tbody tr {
+  cursor: pointer;
+}
+
+.pol-table tbody tr:hover {
+  background: var(--neutral-100);
+}
+
+.pol-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.pol-badge--issued { background: #dbeafe; color: var(--info); }
+.pol-badge--partially_fulfilled { background: #fef3c7; color: var(--warning); }
+.pol-badge--fulfilled { background: #dcfce7; color: var(--success); }
+.pol-badge--cancelled { background: #fee2e2; color: #dc2626; }
+
+.pol-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--neutral-500);
+}
+
+.pol-state--error {
+  color: #dc2626;
+}
+
+.pol-state--error button {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.4rem 1rem;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  background: #fff;
+  color: #dc2626;
+  cursor: pointer;
+}

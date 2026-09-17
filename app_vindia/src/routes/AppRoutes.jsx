@@ -39,7 +39,9 @@ import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
 import Reports from "../pages/projects/projectmanager/Reports";
 import Pmcostreports from "../pages/projects/projectmanager/Pmcostreports";
 import ApprovalRequests from "../pages/siteEngineer/ApprovalRequests";
-
+import CreatePO from "../pages/Operations/PurchaseOrders/CreatePO";
+import PurchaseOrderList from "../pages/Operations/PurchaseOrders/PurchaseOrderList";
+import PurchaseOrderDetail from "../pages/Operations/PurchaseOrders/PurchaseOrderDetail";
 /* ── SHARED COMPONENTS ───────────────────────────────────── */
 import AppShell from "../components/incidents/AppShell";
 import SharedDrawingPage from "../components/project/SharedDrawingPage";
@@ -84,7 +86,6 @@ import ArchitectAssign from "../pages/Architect/ArchitectAssign";
 import ArchitectProject from "../pages/Architect/ArchitectProject";
 import ArchitectSnagList from "../pages/Architect/ArchitectSnagList";
 
-
 /* ── RFI ─────────────────────────────────────────────────── */
 import RFIPage from "../pages/StructuralEngineer/RFI";
 import RFIDetailPage from "../pages/StructuralEngineer/RFIDetails";
@@ -104,21 +105,15 @@ import BDAReportsWithRole from "../pages/business-development/business-developme
 
 /* ── OPERATIONS & ADMINISTRATION ───────────────────────── */
 
-import OperationsManagerDashboard
-  from "../pages/operations/manager/OperationsManagerDashboard";
+import OperationsManagerDashboard from "../pages/operations/manager/OperationsManagerDashboard";
 
-import OfficeAdministratorDashboard
-  from "../pages/operations/administrator/OfficeAdministratorDashboard";
+import OfficeAdministratorDashboard from "../pages/operations/administrator/OfficeAdministratorDashboard";
 
-import ProcurementOfficerDashboard
-  from "../pages/operations/procurement/ProcurementOfficerDashboard";
+import ProcurementOfficerDashboard from "../pages/operations/procurement/ProcurementOfficerDashboard";
 
-import LogisticsCoordinatorDashboard
-  from "../pages/operations/logistics/LogisticsCoordinatorDashboard";
+import LogisticsCoordinatorDashboard from "../pages/operations/logistics/LogisticsCoordinatorDashboard";
 
-import InventoryControllerDashboard
-  from "../pages/operations/inventory/InventoryControllerDashboard";
-
+import InventoryControllerDashboard from "../pages/operations/inventory/InventoryControllerDashboard";
 
 /* ── COMMON ──────────────────────────────────────────────── */
 import Timesheet from "../pages/timesheet/Timesheet";
@@ -135,20 +130,15 @@ import QuantitySurveyorLayout from "../layouts/QuantitySurveyorLayout";
 import ProjectCoordinatorLayout from "../layouts/ProjectCoordinatorLayout";
 import ArchitectLayout from "../layouts/ArchitectLayout";
 import BDALayout from "../layouts/BDALayout";
-import OperationsManagerLayout
-  from "../layouts/OperationsManagerLayout";
+import OperationsManagerLayout from "../layouts/OperationsManagerLayout";
 
-import OfficeAdministratorLayout
-  from "../layouts/OfficeAdministratorLayout";
+import OfficeAdministratorLayout from "../layouts/OfficeAdministratorLayout";
 
-import ProcurementOfficerLayout
-  from "../layouts/ProcurementOfficerLayout";
+import ProcurementOfficerLayout from "../layouts/ProcurementOfficerLayout";
 
-import LogisticsCoordinatorLayout
-  from "../layouts/LogisticsCoordinatorLayout";
+import LogisticsCoordinatorLayout from "../layouts/LogisticsCoordinatorLayout";
 
-import InventoryControllerLayout
-  from "../layouts/InventoryControllerLayout";
+import InventoryControllerLayout from "../layouts/InventoryControllerLayout";
 
 import ItemMaster from "../pages/operations/inventory/ItemMaster";
 import StockIn from "../pages/operations/inventory/StockIn";
@@ -173,7 +163,6 @@ const AppRoutes = () => {
   return (
     <NotificationProvider>
       <Routes>
-
         {/* ══ AUTH ══════════════════════════════════════════ */}
         <Route path="/" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
@@ -278,17 +267,15 @@ const AppRoutes = () => {
           }
         />
         <Route
-  path="/project-manager/approvals"
-  element={
-    <ProtectedRoute
-      allowedRoles={[ROLES.PROJECT_MANAGER]}
-    >
-      <ProjectManagerLayout>
-        <ApprovalRequests />
-      </ProjectManagerLayout>
-    </ProtectedRoute>
-  }
-/>
+          path="/project-manager/approvals"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROJECT_MANAGER]}>
+              <ProjectManagerLayout>
+                <ApprovalRequests />
+              </ProjectManagerLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ══ HR ════════════════════════════════════════════ */}
         <Route
@@ -443,7 +430,7 @@ const AppRoutes = () => {
             </QuantitySurveyorLayout>
           }
         />
-                    <Route
+        <Route
           path="/quantity-surveyor/rfi"
           element={
             <QuantitySurveyorLayout>
@@ -468,15 +455,15 @@ const AppRoutes = () => {
           }
         />
         <Route
-  path="/quantity-surveyor/approvals"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
-      <QuantitySurveyorLayout>
-        <ApprovalRequests />
-      </QuantitySurveyorLayout>
-    </ProtectedRoute>
-  }
-/>
+          path="/quantity-surveyor/approvals"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+              <QuantitySurveyorLayout>
+                <ApprovalRequests />
+              </QuantitySurveyorLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ══ MEP ═══════════════════════════════════════════ */}
         <Route path="/mep/*" element={<MEPRoutes />} />
@@ -524,16 +511,16 @@ const AppRoutes = () => {
         />
 
         {/* ══ ACCOUNTANT ═══════════════════════════════════════════ */}
-<Route
-  path="/accountant/*"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ACCOUNTANT]}>
-      <AccountantLayout>
-        <AccountantRoutes />
-      </AccountantLayout>
-    </ProtectedRoute>
-  }
-/>
+        <Route
+          path="/accountant/*"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ACCOUNTANT]}>
+              <AccountantLayout>
+                <AccountantRoutes />
+              </AccountantLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ══ ARCHITECT ═════════════════════════════════════ */}
         <Route
@@ -567,15 +554,15 @@ const AppRoutes = () => {
           }
         />
         <Route
-  path="/architect/approvals"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
-      <ArchitectLayout>
-        <ApprovalRequests />
-      </ArchitectLayout>
-    </ProtectedRoute>
-  }
-/>
+          path="/architect/approvals"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
+              <ArchitectLayout>
+                <ApprovalRequests />
+              </ArchitectLayout>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/architect/designs"
           element={
@@ -645,21 +632,23 @@ const AppRoutes = () => {
           }
         />
         <Route
-  path="/architect/travelrequest"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
-      <ArchitectLayout>
-        <TravelRequest />
-      </ArchitectLayout>
-    </ProtectedRoute>
-  }
-/>
+          path="/architect/travelrequest"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ARCHITECT]}>
+              <ArchitectLayout>
+                <TravelRequest />
+              </ArchitectLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ══ 3D VISUALIZER ════════════════════════════════ */}
         <Route
           path="/3d-visualizer/dashboard"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
               <ThreeDVisualizerLayout>
                 <ThreeDVisualizerDashboard />
               </ThreeDVisualizerLayout>
@@ -669,7 +658,9 @@ const AppRoutes = () => {
         <Route
           path="/3d-visualizer/drawings"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
               <ThreeDVisualizerLayout>
                 <ArchitectDesigns />
               </ThreeDVisualizerLayout>
@@ -679,7 +670,9 @@ const AppRoutes = () => {
         <Route
           path="/3d-visualizer/tasks"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
               <ThreeDVisualizerLayout>
                 <AppShell key="viz-tasks" />
               </ThreeDVisualizerLayout>
@@ -689,7 +682,9 @@ const AppRoutes = () => {
         <Route
           path="/3d-visualizer/rfi"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
               <ThreeDVisualizerLayout>
                 <RFIPage />
               </ThreeDVisualizerLayout>
@@ -699,7 +694,9 @@ const AppRoutes = () => {
         <Route
           path="/3d-visualizer/rfi/:id"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
               <ThreeDVisualizerLayout>
                 <RFIDetailPage />
               </ThreeDVisualizerLayout>
@@ -709,7 +706,9 @@ const AppRoutes = () => {
         <Route
           path="/3d-visualizer/models"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
               <ThreeDVisualizerLayout>
                 <Model currentRole="visualizer" />
               </ThreeDVisualizerLayout>
@@ -719,7 +718,9 @@ const AppRoutes = () => {
         <Route
           path="/3d-visualizer/incidents"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}>
+            <ProtectedRoute
+              allowedRoles={[ROLES.THREE_D_VISUALIZER, ROLES.CEO]}
+            >
               <ThreeDVisualizerLayout>
                 <AppShell key="viz-incidents" />
               </ThreeDVisualizerLayout>
@@ -874,63 +875,65 @@ const AppRoutes = () => {
         {/* ══ OPERATIONS & ADMINISTRATION  ═════════════════════════════ */}
 
         <Route
-        path="/operations/manager/dashboard"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.OPERATIONS_MANAGER]}>
-            <OperationsManagerLayout>
-              <OperationsManagerDashboard />
-            </OperationsManagerLayout>
-          </ProtectedRoute>
-        }
-      />
+          path="/operations/manager/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.OPERATIONS_MANAGER]}>
+              <OperationsManagerLayout>
+                <OperationsManagerDashboard />
+              </OperationsManagerLayout>
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-            path="/operations/administrator/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.OFFICE_ADMINISTRATOR]}>
-                <OfficeAdministratorLayout>
-                  <OfficeAdministratorDashboard />
-                </OfficeAdministratorLayout>
-              </ProtectedRoute>
-            }
-          />
+        <Route
+          path="/operations/administrator/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.OFFICE_ADMINISTRATOR]}>
+              <OfficeAdministratorLayout>
+                <OfficeAdministratorDashboard />
+              </OfficeAdministratorLayout>
+            </ProtectedRoute>
+          }
+        />
 
-          <Route
-            path="/operations/procurement/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
-                <ProcurementOfficerLayout>
-                  <ProcurementOfficerDashboard />
-                </ProcurementOfficerLayout>
-              </ProtectedRoute>
-            }
-          />
+        <Route
+          path="/operations/procurement/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <ProcurementOfficerDashboard />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
 
-          <Route
-            path="/operations/logistics/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
-                <LogisticsCoordinatorLayout>
-                  <LogisticsCoordinatorDashboard />
-                </LogisticsCoordinatorLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/operations/inventory/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
-                <InventoryControllerLayout>
-                  <InventoryControllerDashboard />
-                </InventoryControllerLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
+        <Route
+          path="/operations/logistics/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
+              <LogisticsCoordinatorLayout>
+                <LogisticsCoordinatorDashboard />
+              </LogisticsCoordinatorLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/inventory/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
+              <InventoryControllerLayout>
+                <InventoryControllerDashboard />
+              </InventoryControllerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/operations/inventory"
           element={
             <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
-              <InventoryControllerLayout><ItemMaster /></InventoryControllerLayout>
+              <InventoryControllerLayout>
+                <ItemMaster />
+              </InventoryControllerLayout>
             </ProtectedRoute>
           }
         />
@@ -938,7 +941,9 @@ const AppRoutes = () => {
           path="/operations/inventory/stock-in"
           element={
             <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
-              <InventoryControllerLayout><StockIn /></InventoryControllerLayout>
+              <InventoryControllerLayout>
+                <StockIn />
+              </InventoryControllerLayout>
             </ProtectedRoute>
           }
         />
@@ -946,7 +951,9 @@ const AppRoutes = () => {
           path="/operations/inventory/stock-out"
           element={
             <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
-              <InventoryControllerLayout><StockOut /></InventoryControllerLayout>
+              <InventoryControllerLayout>
+                <StockOut />
+              </InventoryControllerLayout>
             </ProtectedRoute>
           }
         />
@@ -954,7 +961,9 @@ const AppRoutes = () => {
           path="/operations/logistics/deliveries"
           element={
             <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
-              <LogisticsCoordinatorLayout><Deliveries /></LogisticsCoordinatorLayout>
+              <LogisticsCoordinatorLayout>
+                <Deliveries />
+              </LogisticsCoordinatorLayout>
             </ProtectedRoute>
           }
         />
@@ -1008,6 +1017,38 @@ const AppRoutes = () => {
           }
         />
 
+        <Route
+          path="/operations/procurement/purchase-orders"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <PurchaseOrderList />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/operations/procurement/purchase-orders/create/:requestId"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <CreatePO />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/operations/procurement/purchase-orders/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <PurchaseOrderDetail />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ══ FALLBACK ══════════════════════════════════════ */}
         <Route
@@ -1018,7 +1059,6 @@ const AppRoutes = () => {
             </h2>
           }
         />
-
       </Routes>
     </NotificationProvider>
   );

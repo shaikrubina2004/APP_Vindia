@@ -1,0 +1,112 @@
+/* ===== FILE: APP_Vindia/app_vindia/src/pages/Operations/MaterialRequests/ApprovedRequests.css ===== */
+
+.ar-page {
+  --primary: #0A4174;
+  --primary-light: #4E8EA2;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-500: #6b7280;
+  --neutral-900: #111827;
+
+  padding: 1.5rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--neutral-900);
+}
+
+.ar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.ar-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.ar-header p {
+  margin: 0;
+  color: var(--neutral-500);
+  font-size: 0.88rem;
+}
+
+.ar-search {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  min-width: 260px;
+}
+
+.ar-empty {
+  color: var(--neutral-500);
+  font-size: 0.9rem;
+  padding: 1.5rem;
+  text-align: center;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+}
+
+.ar-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 0.88rem;
+}
+
+.ar-table th {
+  text-align: left;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--neutral-200);
+  color: var(--neutral-500);
+  font-weight: 600;
+  background: var(--neutral-100);
+}
+
+.ar-table td {
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.ar-create-po-btn {
+  padding: 0.35rem 0.85rem;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.ar-create-po-btn:hover {
+  background: var(--primary-light);
+}
+
+.ar-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--neutral-500);
+}
+
+.ar-state--error {
+  color: #dc2626;
+}
+
+.ar-state--error button {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.4rem 1rem;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  background: #fff;
+  color: #dc2626;
+  cursor: pointer;
+}

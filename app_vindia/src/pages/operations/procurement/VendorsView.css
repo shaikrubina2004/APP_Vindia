@@ -1,0 +1,134 @@
+/* ===== FILE: APP_Vindia/app_vindia/src/pages/operations/procurement/VendorsView.css ===== */
+
+.vv-page {
+  --primary: #0A4174;
+  --primary-light: #4E8EA2;
+  --success: #059669;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-500: #6b7280;
+  --neutral-900: #111827;
+
+  padding: 1.5rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--neutral-900);
+}
+
+.vv-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.vv-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.vv-header p {
+  margin: 0;
+  color: var(--neutral-500);
+  font-size: 0.88rem;
+}
+
+.vv-search {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  min-width: 260px;
+}
+
+.vv-filters {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.vv-filter-btn {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  cursor: pointer;
+  color: var(--neutral-500);
+}
+
+.vv-filter-btn--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.vv-empty {
+  color: var(--neutral-500);
+  font-size: 0.9rem;
+  padding: 1.5rem;
+  text-align: center;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+}
+
+.vv-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 0.88rem;
+}
+
+.vv-table th {
+  text-align: left;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--neutral-200);
+  color: var(--neutral-500);
+  font-weight: 600;
+  background: var(--neutral-100);
+}
+
+.vv-table td {
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.vv-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.vv-badge--active { background: #dcfce7; color: var(--success); }
+.vv-badge--inactive { background: #fee2e2; color: #dc2626; }
+
+.vv-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--neutral-500);
+}
+
+.vv-state--error {
+  color: #dc2626;
+}
+
+.vv-state--error button {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.4rem 1rem;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  background: #fff;
+  color: #dc2626;
+  cursor: pointer;
+}

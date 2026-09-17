@@ -1,0 +1,163 @@
+/* ===== FILE: APP_Vindia/app_vindia/src/pages/operations/procurement/ProcurementOfficerDashboard.css ===== */
+
+.proc-dash {
+  --primary: #0A4174;
+  --primary-light: #4E8EA2;
+  --success: #059669;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-500: #6b7280;
+  --neutral-700: #374151;
+  --neutral-900: #111827;
+
+  padding: 1.5rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--neutral-900);
+}
+
+.proc-dash-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
+.proc-dash-header p {
+  margin: 0 0 1.5rem;
+  color: var(--neutral-500);
+  font-size: 0.9rem;
+}
+
+.proc-dash-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.proc-metric-card {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.proc-metric-card--clickable {
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.proc-metric-card--clickable:hover {
+  box-shadow: 0 4px 12px rgba(10, 65, 116, 0.12);
+  transform: translateY(-1px);
+}
+
+.proc-metric-label {
+  font-size: 0.8rem;
+  color: var(--neutral-500);
+}
+
+.proc-metric-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.proc-dash-section {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.proc-dash-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.proc-dash-section-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--neutral-900);
+}
+
+.proc-link-btn {
+  background: none;
+  border: none;
+  color: var(--primary-light);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.proc-empty {
+  color: var(--neutral-500);
+  font-size: 0.9rem;
+}
+
+.proc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.proc-table th {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--neutral-200);
+  color: var(--neutral-500);
+  font-weight: 600;
+}
+
+.proc-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.proc-table tbody tr {
+  cursor: pointer;
+}
+
+.proc-table tbody tr:hover {
+  background: var(--neutral-100);
+}
+
+.po-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.po-badge--issued { background: #dbeafe; color: var(--info); }
+.po-badge--partially_fulfilled { background: #fef3c7; color: var(--warning); }
+.po-badge--fulfilled { background: #dcfce7; color: var(--success); }
+.po-badge--cancelled { background: #fee2e2; color: #dc2626; }
+
+.proc-dash-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--neutral-500);
+}
+
+.proc-dash-state--error {
+  color: #dc2626;
+}
+
+.proc-dash-state--error button {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.4rem 1rem;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  background: #fff;
+  color: #dc2626;
+  cursor: pointer;
+}

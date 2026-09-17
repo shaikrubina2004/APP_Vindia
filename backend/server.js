@@ -57,6 +57,7 @@ const activityLogRoutes = require("./routes/activityLogRoutes");
 const progressRoutes = require("./routes/progressRoutes");
 const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoutes");
 const materialRequestRoutes = require("./routes/materialRequestRoutes");
+const procurementRoutes = require("./routes/procurementRoutes");
 const snagRoutes = require("./routes/snagRoutes");
 const siteProgressRoutes = require("./routes/siteProgressRoutes");
 const sitephotosRoutes = require("./routes/sitephotosRoutes");
@@ -191,7 +192,7 @@ app.use("/api/architect-designs", architectDesignRoutes);
 app.use("/api/architect-drawings", architectDrawingUploadRoutes);
 app.use("/api/architect-assign", architectAssignRoutes);
 app.use("/api/architect-notifications", architectNotifRoutes);
-
+app.use("/api/procurement", procurementRoutes);
 /* ✅ Site Engineer */
 app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes);
 app.use("/api/ncr", ncrRoutes);

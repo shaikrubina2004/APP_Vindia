@@ -1,0 +1,143 @@
+/* ===== FILE: APP_Vindia/app_vindia/src/pages/Operations/PurchaseOrders/PurchaseOrderDetail.css ===== */
+
+.pod-page {
+  --primary: #0A4174;
+  --success: #059669;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-500: #6b7280;
+  --neutral-900: #111827;
+
+  padding: 1.5rem;
+  max-width: 800px;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--neutral-900);
+}
+
+.pod-back-btn {
+  background: none;
+  border: none;
+  color: var(--neutral-500);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 1rem;
+}
+
+.pod-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.pod-header h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.pod-created {
+  color: var(--neutral-500);
+  font-size: 0.85rem;
+}
+
+.pod-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.pod-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pod-meta-label {
+  font-size: 0.78rem;
+  color: var(--neutral-500);
+}
+
+.pod-meta-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.pod-items-section {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.pod-items-section h2 {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+}
+
+.pod-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.pod-items-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--neutral-200);
+  color: var(--neutral-500);
+  font-weight: 600;
+}
+
+.pod-items-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.pod-empty {
+  color: var(--neutral-500);
+  font-size: 0.9rem;
+}
+
+.pod-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.pod-badge--issued { background: #dbeafe; color: var(--info); }
+.pod-badge--partially_fulfilled { background: #fef3c7; color: var(--warning); }
+.pod-badge--fulfilled { background: #dcfce7; color: var(--success); }
+.pod-badge--cancelled { background: #fee2e2; color: #dc2626; }
+
+.pod-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--neutral-500);
+}
+
+.pod-state--error {
+  color: #dc2626;
+}
+
+.pod-state--error button {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.4rem 1rem;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  background: #fff;
+  color: #dc2626;
+  cursor: pointer;
+}
