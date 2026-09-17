@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowUpCircle, ArrowLeftRight, RotateCcw, SlidersHorizontal, Search } from "lucide-react";
+import { ArrowUpCircle, ArrowLeftRight, RotateCcw, SlidersHorizontal, Search, Boxes, AlertTriangle, ClipboardList } from "lucide-react";
 import { getItems, getStockRegister, issueStock, returnStock, transferStock, adjustStock } from "../../../services/inventoryService";
 import { getProjects } from "../../../services/projectService";
 import Toast from "../../../components/Toast";
@@ -77,12 +77,56 @@ const StockOut = () => {
     !registerSearch || r.item_name?.toLowerCase().includes(registerSearch.toLowerCase()) || r.project_name?.toLowerCase().includes(registerSearch.toLowerCase())
   );
 
+  const trackedCount = register.length;
+  const lowStockCount = register.filter((r) => Number(r.available_qty) <= Number(r.minimum_stock) && Number(r.available_qty) > 0).length;
+  const outOfStockCount = register.filter((r) => Number(r.available_qty) <= 0).length;
+  const healthyCount = trackedCount - lowStockCount - outOfStockCount;
+
   return (
     <div className="ops-page">
       <Toast toast={toast} onClose={() => setToast(null)} />
-      <h1 className="ops-title">Stock Out</h1>
 
-      <div className="ops-tabs">
+      <div className="ops-header">
+        <div>
+          <p className="sout-eyebrow">Inventory Controller</p>
+          <h1 className="ops-title">Stock Out</h1>
+        </div>
+      </div>
+
+      {!registerLoading && (
+        <div className="sout-stats">
+          <div className="sout-stat sout-stat-indigo">
+            <div>
+              <span className="sout-stat-value">{trackedCount}</span>
+              <span className="sout-stat-label">Tracked</span>
+            </div>
+            <Boxes size={20} className="sout-stat-icon" />
+          </div>
+          <div className="sout-stat sout-stat-emerald">
+            <div>
+              <span className="sout-stat-value">{healthyCount}</span>
+              <span className="sout-stat-label">Healthy</span>
+            </div>
+            <ClipboardList size={20} className="sout-stat-icon" />
+          </div>
+          <div className="sout-stat sout-stat-amber">
+            <div>
+              <span className="sout-stat-value">{lowStockCount}</span>
+              <span className="sout-stat-label">Low Stock</span>
+            </div>
+            <AlertTriangle size={20} className="sout-stat-icon" />
+          </div>
+          <div className="sout-stat sout-stat-red">
+            <div>
+              <span className="sout-stat-value">{outOfStockCount}</span>
+              <span className="sout-stat-label">Out of Stock</span>
+            </div>
+            <AlertTriangle size={20} className="sout-stat-icon" />
+          </div>
+        </div>
+      )}
+
+      <div className="ops-tabs sout-tabs">
         {TABS.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} className={`ops-tab ${tab === t.key ? "ops-tab-active" : ""}`}>
             <t.icon size={15} /> {t.label}
@@ -90,90 +134,94 @@ const StockOut = () => {
         ))}
       </div>
 
-      <div className="ops-card sout-form-card">
-        {error && <p className="ops-alert ops-alert-error" style={{ marginBottom: 12 }}>{error}</p>}
+      <div className="sout-layout">
+        <div className="sout-left">
+          <div className="ops-card sout-form-card">
+            {error && <p className="ops-alert ops-alert-error" style={{ marginBottom: 12 }}>{error}</p>}
 
-        <form onSubmit={submit} className="sout-form">
-          <div className="ops-form-group">
-            <label className="ops-label">Item *</label>
-            <ItemSelect value={form.item_id} onChange={(v) => set("item_id", v)} />
-          </div>
+            <form onSubmit={submit} className="sout-form">
+              <div className="ops-form-group">
+                <label className="ops-label">Item *</label>
+                <ItemSelect value={form.item_id} onChange={(v) => set("item_id", v)} />
+              </div>
 
-          {tab === "transfer" ? (
-            <div className="ops-form-row">
-              <div className="ops-form-group"><label className="ops-label">From Site *</label><ProjectSelect value={form.from_project_id} onChange={(v) => set("from_project_id", v)} /></div>
-              <div className="ops-form-group"><label className="ops-label">To Site *</label><ProjectSelect value={form.to_project_id} onChange={(v) => set("to_project_id", v)} /></div>
-            </div>
-          ) : (
-            <div className="ops-form-group">
-              <label className="ops-label">Site / Project *</label>
-              <ProjectSelect value={form.project_id} onChange={(v) => set("project_id", v)} />
-            </div>
-          )}
+              {tab === "transfer" ? (
+                <div className="ops-form-row">
+                  <div className="ops-form-group"><label className="ops-label">From Site *</label><ProjectSelect value={form.from_project_id} onChange={(v) => set("from_project_id", v)} /></div>
+                  <div className="ops-form-group"><label className="ops-label">To Site *</label><ProjectSelect value={form.to_project_id} onChange={(v) => set("to_project_id", v)} /></div>
+                </div>
+              ) : (
+                <div className="ops-form-group">
+                  <label className="ops-label">Site / Project *</label>
+                  <ProjectSelect value={form.project_id} onChange={(v) => set("project_id", v)} />
+                </div>
+              )}
 
-          <div className="ops-form-group">
-            <label className="ops-label">{tab === "adjustment" ? "Quantity Change (+ / −) *" : "Quantity *"}</label>
-            <input required type="number" step="any" className="ops-input"
-              value={tab === "adjustment" ? (form.quantity_change ?? "") : (form.quantity ?? "")}
-              onChange={(e) => set(tab === "adjustment" ? "quantity_change" : "quantity", e.target.value)} />
-          </div>
+              <div className="ops-form-group">
+                <label className="ops-label">{tab === "adjustment" ? "Quantity Change (+ / −) *" : "Quantity *"}</label>
+                <input required type="number" step="any" className="ops-input"
+                  value={tab === "adjustment" ? (form.quantity_change ?? "") : (form.quantity ?? "")}
+                  onChange={(e) => set(tab === "adjustment" ? "quantity_change" : "quantity", e.target.value)} />
+              </div>
 
-          {tab === "return" && (
-            <div className="ops-form-group">
-              <label className="ops-label">Condition</label>
-              <select className="ops-select" value={form.condition || ""} onChange={(e) => set("condition", e.target.value)}>
-                <option value="">Select…</option>
-                <option value="Good">Good</option>
-                <option value="Damaged">Damaged</option>
-                <option value="Unusable">Unusable</option>
-              </select>
-            </div>
-          )}
+              {tab === "return" && (
+                <div className="ops-form-group">
+                  <label className="ops-label">Condition</label>
+                  <select className="ops-select" value={form.condition || ""} onChange={(e) => set("condition", e.target.value)}>
+                    <option value="">Select…</option>
+                    <option value="Good">Good</option>
+                    <option value="Damaged">Damaged</option>
+                    <option value="Unusable">Unusable</option>
+                  </select>
+                </div>
+              )}
 
-          {tab === "adjustment" ? (
-            <div className="ops-form-group">
-              <label className="ops-label">Reason *</label>
-              <input required className="ops-input" placeholder="e.g. Physical stock discrepancy" value={form.reason || ""} onChange={(e) => set("reason", e.target.value)} />
-            </div>
-          ) : (
-            <div className="ops-form-group">
-              <label className="ops-label">Remarks</label>
-              <input className="ops-input" value={form.remarks || ""} onChange={(e) => set("remarks", e.target.value)} />
-            </div>
-          )}
+              {tab === "adjustment" ? (
+                <div className="ops-form-group">
+                  <label className="ops-label">Reason *</label>
+                  <input required className="ops-input" placeholder="e.g. Physical stock discrepancy" value={form.reason || ""} onChange={(e) => set("reason", e.target.value)} />
+                </div>
+              ) : (
+                <div className="ops-form-group">
+                  <label className="ops-label">Remarks</label>
+                  <input className="ops-input" value={form.remarks || ""} onChange={(e) => set("remarks", e.target.value)} />
+                </div>
+              )}
 
-          <button disabled={saving} className="ops-btn ops-btn-primary sout-submit">{saving ? "Saving…" : "Submit"}</button>
-        </form>
-      </div>
-
-      <div className="ops-card ops-table-wrap">
-        <div className="ops-card-header">
-          <h2>Stock Register</h2>
-          <div className="sout-register-search">
-            <Search size={14} className="sout-register-search-icon" />
-            <input value={registerSearch} onChange={(e) => setRegisterSearch(e.target.value)} placeholder="Filter…" className="ops-input" />
+              <button disabled={saving} className="ops-btn ops-btn-primary sout-submit">{saving ? "Saving…" : "Submit"}</button>
+            </form>
           </div>
         </div>
-        <table className="ops-table">
-          <thead><tr><th>Item</th><th>Site / Project</th><th>Available</th></tr></thead>
-          <tbody>
-            {registerLoading ? (
-              [...Array(4)].map((_, i) => (
-                <tr key={i}>{Array.from({ length: 3 }).map((__, j) => <td key={j} style={{ padding: "10px 20px" }}><div className="ops-skeleton" style={{ height: 14 }} /></td>)}</tr>
-              ))
-            ) : filteredRegister.length === 0 ? (
-              <tr><td colSpan={3} className="ops-table-empty">No stock movements recorded yet.</td></tr>
-            ) : (
-              filteredRegister.map((r, i) => (
-                <tr key={i}>
-                  <td>{r.item_name} <span className="sout-item-code">({r.item_code})</span></td>
-                  <td>{r.project_name || "Unassigned"}</td>
-                  <td className={r.available_qty <= r.minimum_stock ? "sout-qty-low" : "sout-qty-ok"}>{r.available_qty} {r.unit}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+
+        <div className="ops-card ops-table-wrap sout-register-card">
+          <div className="ops-card-header">
+            <h2>Stock Register</h2>
+            <div className="sout-register-search">
+              <Search size={14} className="sout-register-search-icon" />
+              <input value={registerSearch} onChange={(e) => setRegisterSearch(e.target.value)} placeholder="Filter…" className="ops-input" />
+            </div>
+          </div>
+          <table className="ops-table">
+            <thead><tr><th>Item</th><th>Site / Project</th><th>Available</th></tr></thead>
+            <tbody>
+              {registerLoading ? (
+                [...Array(4)].map((_, i) => (
+                  <tr key={i}>{Array.from({ length: 3 }).map((__, j) => <td key={j} style={{ padding: "10px 20px" }}><div className="ops-skeleton" style={{ height: 14 }} /></td>)}</tr>
+                ))
+              ) : filteredRegister.length === 0 ? (
+                <tr><td colSpan={3} className="ops-table-empty"><Boxes size={26} /><br />No stock movements recorded yet — issue, return or transfer something to see it here.</td></tr>
+              ) : (
+                filteredRegister.map((r, i) => (
+                  <tr key={i}>
+                    <td>{r.item_name} <span className="sout-item-code">({r.item_code})</span></td>
+                    <td>{r.project_name || "Unassigned"}</td>
+                    <td className={r.available_qty <= r.minimum_stock ? "sout-qty-low" : "sout-qty-ok"}>{r.available_qty} {r.unit}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
