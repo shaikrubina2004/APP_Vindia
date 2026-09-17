@@ -1,11 +1,14 @@
 import AppLayout from "./AppLayout";
-import { operationsManagerMenu } from "../menus/OperationsManagerMenu";
+import OperationsManagerMenu from "../menus/OperationsManagerMenu";
+import { ProjectProvider } from "../context/ProjectContext";
 
 function OperationsManagerLayout({ children }) {
   return (
-    <AppLayout menuItems={operationsManagerMenu}>
-      {children}
-    </AppLayout>
+    <ProjectProvider>
+      <AppLayout menuItems={OperationsManagerMenu}>
+        {children}
+      </AppLayout>
+    </ProjectProvider>
   );
 }
 

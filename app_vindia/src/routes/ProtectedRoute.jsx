@@ -75,6 +75,9 @@ const getRoleDashboard = (role) => {
     case "finance_manager":
       return "/finance-manager/dashboard";
 
+    case "accountant":
+  return "/accountant/dashboard";
+
     default:
       return "/";
   }

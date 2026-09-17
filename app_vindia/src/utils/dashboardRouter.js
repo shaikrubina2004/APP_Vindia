@@ -80,6 +80,9 @@ export const getDashboardRoute = (role) => {
     case ROLES.INVENTORY_CONTROLLER:
       return "/operations/inventory/dashboard";
 
+    case ROLES.ACCOUNTANT:
+  return "/accountant/dashboard";
+
       
 
     default:

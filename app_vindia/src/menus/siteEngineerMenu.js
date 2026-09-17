@@ -58,12 +58,6 @@ const siteEngineerMenu = [
   },
 
   {
-    name: "Site Instructions",
-    path: "/site-engineer/site-instructions",
-    icon: "file-text",
-  },
-
-  {
     name: "Approvals",
     path: "/site-engineer/approvals",
     icon: "check-circle",

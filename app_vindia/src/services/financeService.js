@@ -1,77 +1,204 @@
 // ===== FILE: APP_Vindia/app_vindia/src/services/financeService.js =====
+
 import api from "./api";
 
-// api.js already sets baseURL "http://localhost:5000/api" and attaches
-// the Bearer token automatically — so every call below is relative to /api
-const F = "/finance";
+// api.js should already contain:
+// baseURL: "http://localhost:5000/api"
+// and automatically attach the Bearer token.
+
+const FINANCE_BASE_URL = "/finance";
 
 const financeService = {
-  /* ── Dashboard ─────────────────────────────────────── */
+  // ============================================================
+  // DASHBOARD
+  // ============================================================
+
   getDashboard: (projectId) =>
-    api.get(`${F}/dashboard`, { params: { projectId } }),
+    api.get(`${FINANCE_BASE_URL}/dashboard`, {
+      params: projectId ? { projectId } : {},
+    }),
 
-  /* ── Cost Reporting ────────────────────────────────── */
+  // ============================================================
+  // COST REPORTING
+  // ============================================================
+
   getCostReport: (projectId) =>
-    api.get(`${F}/cost-report`, { params: { projectId } }),
+    api.get(`${FINANCE_BASE_URL}/cost-report`, {
+      params: projectId ? { projectId } : {},
+    }),
 
-  /* ── Budgets ───────────────────────────────────────── */
+  // ============================================================
+  // BUDGETS
+  // ============================================================
+
   getAllBudgets: (filters = {}) =>
-    api.get(`${F}/budgets`, { params: filters }),
+    api.get(`${FINANCE_BASE_URL}/budgets`, {
+      params: filters,
+    }),
+
   getBudgetsByProject: (projectId) =>
-    api.get(`${F}/budgets/project/${projectId}`),
-  getBudgetById: (id) => api.get(`${F}/budgets/${id}`),
-  createBudget: (data) => api.post(`${F}/budgets`, data),
-  updateBudget: (id, data) => api.put(`${F}/budgets/${id}`, data),
-  deleteBudget: (id) => api.delete(`${F}/budgets/${id}`),
+    api.get(`${FINANCE_BASE_URL}/budgets/project/${projectId}`),
 
-  /* ── Expenses ──────────────────────────────────────── */
+  getBudgetById: (id) =>
+    api.get(`${FINANCE_BASE_URL}/budgets/${id}`),
+
+  createBudget: (data) =>
+    api.post(`${FINANCE_BASE_URL}/budgets`, data),
+
+  updateBudget: (id, data) =>
+    api.put(`${FINANCE_BASE_URL}/budgets/${id}`, data),
+
+  deleteBudget: (id) =>
+    api.delete(`${FINANCE_BASE_URL}/budgets/${id}`),
+
+  // ============================================================
+  // EXPENSES
+  // ============================================================
+
   getAllExpenses: (filters = {}) =>
-    api.get(`${F}/expenses`, { params: filters }),
+    api.get(`${FINANCE_BASE_URL}/expenses`, {
+      params: filters,
+    }),
+
   getExpenseSummary: (projectId) =>
-    api.get(`${F}/expenses/summary`, { params: { projectId } }),
-  getExpenseById: (id) => api.get(`${F}/expenses/${id}`),
-  createExpense: (data) => api.post(`${F}/expenses`, data),
-  updateExpense: (id, data) => api.put(`${F}/expenses/${id}`, data),
-  deleteExpense: (id) => api.delete(`${F}/expenses/${id}`),
+    api.get(`${FINANCE_BASE_URL}/expenses/summary`, {
+      params: projectId ? { project_id: projectId } : {},
+    }),
 
-  /* ── Invoices ──────────────────────────────────────── */
+  getExpenseById: (id) =>
+    api.get(`${FINANCE_BASE_URL}/expenses/${id}`),
+
+  createExpense: (data) =>
+    api.post(`${FINANCE_BASE_URL}/expenses`, data),
+
+  updateExpense: (id, data) =>
+    api.put(`${FINANCE_BASE_URL}/expenses/${id}`, data),
+
+  deleteExpense: (id) =>
+    api.delete(`${FINANCE_BASE_URL}/expenses/${id}`),
+
+  // ============================================================
+  // INVOICES
+  // ============================================================
+
   getAllInvoices: (filters = {}) =>
-    api.get(`${F}/invoices`, { params: filters }),
-  createInvoice: (data) => api.post(`${F}/invoices`, data),
-  updateInvoice: (id, data) => api.put(`${F}/invoices/${id}`, data),
+    api.get(`${FINANCE_BASE_URL}/invoices`, {
+      params: filters,
+    }),
+
+  createInvoice: (data) =>
+    api.post(`${FINANCE_BASE_URL}/invoices`, data),
+
+  /*
+   * There is currently no generic backend route:
+   *
+   * PUT /api/finance/invoices/:id
+   *
+   * Therefore, do not use updateInvoice() until the backend
+   * controller and route are created.
+   */
+
   updateInvoiceStatus: (id, status) =>
-    api.put(`${F}/invoices/${id}/status`, { status }),
-  deleteInvoice: (id) => api.delete(`${F}/invoices/${id}`),
+    api.put(`${FINANCE_BASE_URL}/invoices/${id}/status`, {
+      status,
+    }),
 
-  /* ── Payments ──────────────────────────────────────── */
+  deleteInvoice: (id) =>
+    api.delete(`${FINANCE_BASE_URL}/invoices/${id}`),
+
+  // ============================================================
+  // RECEIVABLES AND PAYABLES
+  // ============================================================
+
+  getReceivablesPayables: (filters = {}) =>
+    api.get(`${FINANCE_BASE_URL}/receivables-payables`, {
+      params: filters,
+    }),
+
+  // ============================================================
+  // PAYMENTS
+  // ============================================================
+
   getAllPayments: (filters = {}) =>
-    api.get(`${F}/payments`, { params: filters }),
+    api.get(`${FINANCE_BASE_URL}/payments`, {
+      params: filters,
+    }),
+
   getPaymentSummary: (projectId) =>
-    api.get(`${F}/payments/summary`, { params: { projectId } }),
-  getPaymentById: (id) => api.get(`${F}/payments/${id}`),
-  createPayment: (data) => api.post(`${F}/payments`, data),
-  updatePayment: (id, data) => api.put(`${F}/payments/${id}`, data),
-  deletePayment: (id) => api.delete(`${F}/payments/${id}`),
+    api.get(`${FINANCE_BASE_URL}/payments/summary`, {
+      params: projectId ? { projectId } : {},
+    }),
 
-  /* ── Vendors ───────────────────────────────────────── */
+  getPaymentById: (id) =>
+    api.get(`${FINANCE_BASE_URL}/payments/${id}`),
+
+  createPayment: (data) =>
+    api.post(`${FINANCE_BASE_URL}/payments`, data),
+
+  updatePayment: (id, data) =>
+    api.put(`${FINANCE_BASE_URL}/payments/${id}`, data),
+
+  deletePayment: (id) =>
+    api.delete(`${FINANCE_BASE_URL}/payments/${id}`),
+
+  // ============================================================
+  // VENDORS
+  // ============================================================
+
   getAllVendors: (filters = {}) =>
-    api.get(`${F}/vendors`, { params: filters }),
-  getVendorMetrics: () => api.get(`${F}/vendors/metrics`),
-  getVendorById: (id) => api.get(`${F}/vendors/${id}`),
-  createVendor: (data) => api.post(`${F}/vendors`, data),
-  updateVendor: (id, data) => api.put(`${F}/vendors/${id}`, data),
-  toggleVendorStatus: (id) => api.patch(`${F}/vendors/${id}/toggle-status`),
-  deleteVendor: (id) => api.delete(`${F}/vendors/${id}`),
+    api.get(`${FINANCE_BASE_URL}/vendors`, {
+      params: filters,
+    }),
 
-  /* ── Settings ──────────────────────────────────────── */
-  getSettings: () => api.get(`${F}/settings`),
-  updateGeneralSettings: (data) => api.put(`${F}/settings/general`, data),
-  updateTaxSettings: (data) => api.put(`${F}/settings/tax`, data),
-  updateInvoicePrefs: (data) => api.put(`${F}/settings/invoice-prefs`, data),
+  getVendorMetrics: () =>
+    api.get(`${FINANCE_BASE_URL}/vendors/metrics`),
+
+  getVendorById: (id) =>
+    api.get(`${FINANCE_BASE_URL}/vendors/${id}`),
+
+  createVendor: (data) =>
+    api.post(`${FINANCE_BASE_URL}/vendors`, data),
+
+  updateVendor: (id, data) =>
+    api.put(`${FINANCE_BASE_URL}/vendors/${id}`, data),
+
+  toggleVendorStatus: (id) =>
+    api.patch(`${FINANCE_BASE_URL}/vendors/${id}/toggle-status`),
+
+  deleteVendor: (id) =>
+    api.delete(`${FINANCE_BASE_URL}/vendors/${id}`),
+
+  // ============================================================
+  // FINANCE SETTINGS
+  // ============================================================
+  //
+  // These routes are restricted in the backend to:
+  // - finance_manager
+  // - ceo
+  //
+  // Accountant should not call these methods.
+  // ============================================================
+
+  getSettings: () =>
+    api.get(`${FINANCE_BASE_URL}/settings`),
+
+  updateGeneralSettings: (data) =>
+    api.put(`${FINANCE_BASE_URL}/settings/general`, data),
+
+  updateTaxSettings: (data) =>
+    api.put(`${FINANCE_BASE_URL}/settings/tax`, data),
+
+  updateInvoicePrefs: (data) =>
+    api.put(`${FINANCE_BASE_URL}/settings/invoice-prefs`, data),
+
   updateGateway: (gateway, data) =>
-    api.put(`${F}/settings/gateway/${gateway}`, data),
-  addBankAccount: (data) => api.post(`${F}/settings/bank-accounts`, data),
-  deleteBankAccount: (id) => api.delete(`${F}/settings/bank-accounts/${id}`),
+    api.put(`${FINANCE_BASE_URL}/settings/gateway/${gateway}`, data),
+
+  addBankAccount: (data) =>
+    api.post(`${FINANCE_BASE_URL}/settings/bank-accounts`, data),
+
+  deleteBankAccount: (id) =>
+    api.delete(`${FINANCE_BASE_URL}/settings/bank-accounts/${id}`),
 };
 
 export default financeService;

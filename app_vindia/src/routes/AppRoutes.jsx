@@ -72,6 +72,10 @@ import StructuralRoutes from "./StructuralRoutes";
 import FinanceRoutes from "./FinanceRoutes";
 import FinanceLayout from "../layouts/FinanceManagerLayout";
 
+/* ── ACCOUNTANT ──────────────────────────────────────────── */
+import AccountantRoutes from "./AccountantRoutes";
+import AccountantLayout from "../layouts/AccountantLayout";
+
 /* ── ARCHITECT ───────────────────────────────────────────── */
 import ArchitectDashboard from "../pages/Architect/ArchitectDashboard";
 import ArchitectDailyLogins from "../pages/Architect/ArchitectDailyLogins";
@@ -518,6 +522,18 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* ══ ACCOUNTANT ═══════════════════════════════════════════ */}
+<Route
+  path="/accountant/*"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.ACCOUNTANT]}>
+      <AccountantLayout>
+        <AccountantRoutes />
+      </AccountantLayout>
+    </ProtectedRoute>
+  }
+/>
 
         {/* ══ ARCHITECT ═════════════════════════════════════ */}
         <Route

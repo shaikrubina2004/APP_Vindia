@@ -1,9 +1,26 @@
-/* ============================= */
-/* MAIN APP LAYOUT */
-/* ============================= */
-body, html {
+/* =========================================================
+   GLOBAL VARIABLES
+========================================================= */
+
+:root {
+  --navbar-height: 70px;
+  --sidebar-width: 80px;
+}
+
+/* =========================================================
+   GLOBAL RESET
+========================================================= */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
   overflow-x: hidden;
 }
+
+/* =========================================================
+   MAIN APP LAYOUT
+========================================================= */
 
 .app-layout {
   display: flex;
@@ -12,9 +29,9 @@ body, html {
   background: #f5f7fb;
 }
 
-/* ============================= */
-/* NAVBAR */
-/* ============================= */
+/* =========================================================
+   NAVBAR
+========================================================= */
 
 .navbar {
   position: fixed;
@@ -22,8 +39,9 @@ body, html {
   left: 0;
   right: 0;
 
-  height: 70px;
-  background: white;
+  height: var(--navbar-height);
+
+  background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
 
   display: flex;
@@ -31,117 +49,69 @@ body, html {
   justify-content: space-between;
 
   padding: 0 25px;
+  box-sizing: border-box;
+
   z-index: 1100;
 
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-/* ============================= */
-/* SIDEBAR */
-/* ============================= */
+/* =========================================================
+   MAIN SECTION
 
-.sidebar {
-  width: 80px;
-  background: white;
+   Sidebar is fixed, so content needs left margin.
+========================================================= */
 
-  position: fixed;
-  top: 70px; /* below navbar */
-  left: 0;
-  bottom: 0;
-
-  z-index: 1000;
-
-  transition: all 0.3s ease;
-}
-
-/* ============================= */
-/* MAIN SECTION */
-/* ============================= */
-
-/* AFTER */
 .main-section {
-  margin-left: 80px;
   flex: 1;
   min-width: 0;
   width: auto;
 
-  display: block;   /* ✅ IMPORTANT FIX */
-}
-.page-content {
-  margin-top: 70px;
-  padding: 12px 20px;
-  width: 100%;
-  box-sizing: border-box;
-  /* NO overflow-x here */
+  margin-left: var(--sidebar-width);
+
+  display: block;
 }
 
-/* ============================= */
-/* PAGE CONTAINER */
-/* ============================= */
+/* =========================================================
+   PAGE CONTENT
+
+   Navbar is fixed, so content needs top margin.
+========================================================= */
+
+.page-content {
+  width: 100%;
+  min-width: 0;
+
+  margin-top: var(--navbar-height);
+
+  padding: 12px 20px;
+  box-sizing: border-box;
+}
+
+/* =========================================================
+   COMMON PAGE CONTAINER
+========================================================= */
 
 .page-container {
   display: flex;
   flex-direction: column;
   gap: 16px;
+
+  width: 100%;
+  min-width: 0;
 }
 
-/* ============================= */
-/* MOBILE SIDEBAR */
-/* ============================= */
-
-.sidebar-toggle {
-  display: none;
-}
+/* =========================================================
+   RESPONSIVE DESIGN
+========================================================= */
 
 @media (max-width: 768px) {
-  .sidebar-toggle {
-    display: block;
-    position: fixed;
-    top: 80px;
-    left: 15px;
-    z-index: 1200;
-
-    background: #1e5a96;
-    color: white;
-    border: none;
-
-    padding: 10px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-
-  .sidebar {
-    width: 220px;
-    transform: translateX(-100%);
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
-  }
-
-  .sidebar.open {
-    transform: translateX(0);
-  }
-
-  /* overlay */
-  .sidebar::before {
-    content: "";
-    position: fixed;
-    top: 70px;
-    left: 0;
-    width: 100vw;
-    height: calc(100vh - 70px);
-    background: rgba(0, 0, 0, 0.3);
-
-    opacity: 0;
-    pointer-events: none;
-    transition: 0.3s;
-  }
-
-  .sidebar.open::before {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
   .main-section {
-    margin-left: 0;
     width: 100%;
+    margin-left: 0;
+  }
+
+  .page-content {
+    padding: 12px;
   }
 }

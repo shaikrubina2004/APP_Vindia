@@ -3,44 +3,71 @@ import feather from "feather-icons";
 import { NavLink } from "react-router-dom";
 import "../../styles/layout/Sidebar.css";
 
-export default function Sidebar({ menuItems = [], defaultOpen = false }) {
+export default function Sidebar({
+  menuItems = [],
+  defaultOpen = false,
+}) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
   const sidebarRef = useRef(null);
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
       try {
-        feather.replace();
-      } catch (e) {}
+        if (sidebarRef.current) {
+          feather.replace({
+            root: sidebarRef.current,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to load sidebar icons:", error);
+      }
     });
+
     return () => cancelAnimationFrame(raf);
   }, [menuItems, open]);
 
   useEffect(() => {
-    function onKey(e) {
-      if (e.key === "Escape") setOpen(false);
+    function onKeyDown(event) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
     }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, []);
 
   useEffect(() => {
-    function onClick(e) {
+    function onDocumentClick(event) {
       if (!open) return;
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) setOpen(false); // ✅ FIXED
+
+      if (
+        sidebarRef.current &&
+        !sidebarRef.current.contains(event.target)
+      ) {
+        setOpen(false);
+      }
     }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+
+    document.addEventListener("mousedown", onDocumentClick);
+
+    return () => {
+      document.removeEventListener("mousedown", onDocumentClick);
+    };
   }, [open]);
 
   return (
     <>
       <button
+        type="button"
         className="sidebar-toggle"
         aria-expanded={open}
         aria-controls="app-sidebar"
         aria-label={open ? "Close menu" : "Open menu"}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen((current) => !current)}
       >
         {open ? "✕" : "☰"}
       </button>
@@ -57,22 +84,28 @@ export default function Sidebar({ menuItems = [], defaultOpen = false }) {
         id="app-sidebar"
         ref={sidebarRef}
         className={`sidebar ${open ? "open" : ""}`}
-        aria-hidden={false}
+        aria-label="Main navigation"
       >
-        <ul className="sidebar__menu" role="menu" aria-label="Main navigation">
-          {menuItems.map((item, index) => ( // ✅ FIXED
+        <ul className="sidebar__menu" role="menu">
+          {menuItems.map((item, index) => (
             <li key={item.path || index} role="none">
               <NavLink
                 to={item.path}
                 role="menuitem"
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
-                  isActive ? "sidebar__link active" : "sidebar__link"
+                  isActive
+                    ? "sidebar__link active"
+                    : "sidebar__link"
                 }
-                aria-label={item.name} // ✅ FIXED
+                aria-label={item.name}
               >
-                <i data-feather={item.icon || "circle"} aria-hidden="true" />
-                <span aria-hidden="true">{item.name}</span> {/* ✅ FIXED */}
+                <i
+                  data-feather={item.icon || "circle"}
+                  aria-hidden="true"
+                />
+
+                <span>{item.name}</span>
               </NavLink>
             </li>
           ))}

@@ -1,11 +1,14 @@
 import AppLayout from "./AppLayout";
-import { officeAdministratorMenu } from "../menus/OfficeAdministratorMenu";
+import OfficeAdministratorMenu from "../menus/OfficeAdministratorMenu";
+import { ProjectProvider } from "../context/ProjectContext";
 
 function OfficeAdministratorLayout({ children }) {
   return (
-    <AppLayout menuItems={officeAdministratorMenu}>
-      {children}
-    </AppLayout>
+    <ProjectProvider>
+      <AppLayout menuItems={OfficeAdministratorMenu}>
+        {children}
+      </AppLayout>
+    </ProjectProvider>
   );
 }
 

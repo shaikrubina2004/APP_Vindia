@@ -203,16 +203,6 @@ import LabourRegistry from "../pages/siteEngineer/Labourregistry";
     />,
 
     <Route
-        key="se-site-instructions"
-        path="/site-engineer/site-instructions"
-        element={
-        <ProtectedRoute allowedRoles={SE_ROLES}>
-            <SiteEngineerLayout><SiteInstruction /></SiteEngineerLayout>
-        </ProtectedRoute>
-        }
-    />,
-
-    <Route
         key="se-qs-measurements"
         path="/site-engineer/qs-measurements"
         element={

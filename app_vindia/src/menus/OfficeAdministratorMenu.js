@@ -1,31 +1,75 @@
-export const officeAdministratorMenu = [
+const OfficeAdministratorMenu = [
   {
     name: "Dashboard",
-    path: "/operations/administrator/dashboard",
+    path: "/office-administrator/dashboard",
     icon: "home",
   },
 
   {
+    name: "Office Requests",
+    path: "/office-administrator/requests",
+    icon: "clipboard",
+  },
+
+  {
     name: "Employees",
-    path: "/operations/administrator/employees",
+    path: "/office-administrator/employees",
     icon: "users",
   },
 
   {
-    name: "Documents",
-    path: "/operations/administrator/documents",
-    icon: "file-text",
+    name: "Attendance",
+    path: "/office-administrator/attendance",
+    icon: "calendar",
   },
 
   {
-    name: "Office Management",
-    path: "/operations/administrator/office-management",
+    name: "Office Documents",
+    path: "/office-administrator/documents",
+    icon: "folder",
+  },
+
+  {
+    name: "Office Supplies",
+    path: "/office-administrator/supplies",
+    icon: "package",
+  },
+
+  {
+    name: "Facilities",
+    path: "/office-administrator/facilities",
+    icon: "building",
+  },
+
+  {
+    name: "Visitors",
+    path: "/office-administrator/visitors",
+    icon: "user",
+  },
+
+  {
+    name: "Travel & Admin",
+    path: "/office-administrator/travel",
+    icon: "map",
+  },
+
+  {
+    name: "Assets",
+    path: "/office-administrator/assets",
     icon: "briefcase",
   },
 
   {
     name: "Reports",
-    path: "/operations/administrator/reports",
+    path: "/office-administrator/reports",
     icon: "bar-chart-2",
   },
+
+  {
+    name: "Notifications",
+    path: "/office-administrator/notifications",
+    icon: "bell",
+  },
 ];
+
+export default OfficeAdministratorMenu;

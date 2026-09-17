@@ -37,3 +37,5 @@ app_vindia/.env.*
 
 # OS files
 Thumbs.db
+local-working-changes.patch
+local-staged-changes.patch

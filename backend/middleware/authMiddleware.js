@@ -14,17 +14,18 @@ const protect = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-const normalizedRole = String(decoded.role || "")
-  .trim()
-  .toLowerCase()
-  .replace(/\s+/g, "_");
+    const normalizedRole = String(decoded.role || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .replace(/-/g, "_");
 
-req.user = {
-  ...decoded,
-  role: normalizedRole,
-};
+    req.user = {
+      ...decoded,
+      role: normalizedRole,
+    };
 
-next();
+    next();
   } catch (err) {
     console.error("JWT ERROR:", err.message);
 
