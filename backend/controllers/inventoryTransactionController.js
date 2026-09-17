@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { notifyRole } = require("./operationsNotificationsController");
 
 /* GET /api/inventory/stock-register  ?project_id= */
 exports.getStockRegister = async (req, res) => {
@@ -92,6 +93,25 @@ exports.createIssue = async (req, res) => {
        RETURNING *`,
       [item_id, project_id, -qty, remarks || null, userId]
     );
+
+    // If this issue dropped stock to/below minimum, alert Inventory Controllers.
+    const remaining = available - qty;
+    const itemInfo = await pool.query(
+      "SELECT item_name, minimum_stock, unit FROM inventory_items WHERE id=$1",
+      [item_id]
+    );
+    if (itemInfo.rows.length && remaining <= Number(itemInfo.rows[0].minimum_stock)) {
+      await notifyRole(
+        "inventory_controller",
+        "low_stock",
+        `Low stock: ${itemInfo.rows[0].item_name}`,
+        `${remaining} ${itemInfo.rows[0].unit} left — at or below minimum (${itemInfo.rows[0].minimum_stock}).`,
+        "/operations/inventory/stock-out",
+        remaining <= 0 ? "critical" : "warn",
+        project_id
+      );
+    }
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("ISSUE ERROR:", err.message);

@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { notifyRole } = require("./operationsNotificationsController");
 
 const generateGrnCode = async () => {
   const result = await pool.query(`SELECT grn_code FROM goods_receipts ORDER BY id DESC LIMIT 1`);
@@ -133,6 +134,17 @@ exports.createGoodsReceipt = async (req, res) => {
        LEFT JOIN inventory_items it ON it.id = gri.item_id
        WHERE goods_receipt_id=$1`,
       [grId]
+    );
+
+    // Let Logistics know their delivery was confirmed and stocked.
+    await notifyRole(
+      "logistics_coordinator",
+      "receipt",
+      `${delivery.rows[0].delivery_code} received into stock`,
+      `Goods receipt ${grn_code} confirmed.`,
+      "/operations/logistics/deliveries",
+      "ok",
+      projectId
     );
 
     res.status(201).json({ ...gr.rows[0], items: itemsResult.rows });

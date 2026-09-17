@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { notifyRole } = require("./operationsNotificationsController");
 
 /* ─────────────────────────────
    HELPER: generate delivery code
@@ -212,6 +213,18 @@ exports.markDelivered = async (req, res) => {
        WHERE id=$5 RETURNING *`,
       [delivery_date || null, received_by_name || null, proof_document_url || null, remarks || null, id]
     );
+
+    // Tell Inventory a delivery is waiting to be verified into stock.
+    await notifyRole(
+      "inventory_controller",
+      "delivery",
+      `Delivery ${result.rows[0].delivery_code} needs receipt`,
+      `Marked delivered — verify quantities and receive it into stock.`,
+      "/operations/inventory/stock-in",
+      "warn",
+      result.rows[0].project_id
+    );
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error("MARK DELIVERED ERROR:", err.message);
@@ -233,6 +246,17 @@ exports.markDelayed = async (req, res) => {
       [delay_reason || null, new_eta || null, id]
     );
     if (!result.rows.length) return res.status(404).json({ error: "Delivery not found" });
+
+    await notifyRole(
+      "inventory_controller",
+      "delay",
+      `Delivery ${result.rows[0].delivery_code} delayed`,
+      delay_reason || "No reason given",
+      "/operations/logistics/deliveries",
+      "warn",
+      result.rows[0].project_id
+    );
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error("MARK DELAYED ERROR:", err.message);

@@ -1,49 +1,142 @@
 @import "../../../styles/opsShared.css";
 
-.sin-amber { color: #d97706; }
-.sin-emerald { color: #059669; }
-
-.sin-pending-list { list-style: none; margin: 0; padding: 0; }
-.sin-pending-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 20px;
-  border-bottom: 1px solid #f8fafc;
-  transition: background 0.15s ease;
+/* Two-column layout: form on the left, Stock Register fills the rest */
+.sout-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 20px;
+  align-items: start;
 }
-.sin-pending-item:last-child { border-bottom: none; }
-.sin-pending-item:hover { background: #f8fafc; }
+@media (max-width: 900px) {
+  .sout-layout { grid-template-columns: 1fr; }
+}
 
-.sin-pending-code { font-weight: 500; color: #1e293b; margin: 0; font-size: 14px; }
-.sin-pending-project { color: #94a3b8; font-weight: 400; }
-.sin-pending-meta { font-size: 12px; color: #94a3b8; margin: 2px 0 0; }
-
-.sin-grn { font-weight: 500; color: #1e293b; }
-
-.sin-form { display: flex; flex-direction: column; gap: 16px; }
-.sin-lines { display: flex; flex-direction: column; gap: 12px; }
-
-.sin-line {
-  border: 1px solid #f1f5f9;
-  border-radius: 12px;
-  padding: 14px;
+.sout-left {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  transition: border-color 0.15s ease;
+  gap: 16px;
+  position: sticky;
+  top: 20px;
 }
-.sin-line:hover { border-color: #e2e8f0; }
+@media (max-width: 900px) {
+  .sout-left { position: static; }
+}
 
-.sin-line-head {
+.sout-tabs {
+  width: fit-content;
+}
+
+.sout-form-card {
+  padding: 20px;
+}
+
+.sout-register-card {
+  min-width: 0; /* lets the table shrink/scroll instead of overflowing the grid column */
+}
+
+.sout-form {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sout-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.sout-register-search {
+  position: relative;
+}
+.sout-register-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+.sout-register-search input {
+  padding-left: 30px;
+  width: 160px;
+  font-size: 13px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.sout-item-code { color: #94a3b8; }
+.sout-qty-low { font-weight: 600; color: #dc2626; }
+.sout-qty-ok { font-weight: 600; color: #1e293b; }
+
+/* ── Stats strip (matches the BDA Leads card style: colored left border,
+   big number, uppercase label, icon in the corner, full width) ────── */
+.sout-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin: 0 0 4px;
+}
+
+.sout-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .sout-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 520px) {
+  .sout-stats { grid-template-columns: 1fr; }
+}
+
+.sout-stat {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-left-width: 4px;
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
-.sin-line-name { font-size: 14px; font-weight: 500; color: #1e293b; margin: 0; }
-.sin-line-meta { font-size: 12px; color: #94a3b8; margin: 0; white-space: nowrap; }
 
-.sin-line-grid { grid-template-columns: 1.4fr 1fr 1fr; }
-@media (max-width: 480px) { .sin-line-grid { grid-template-columns: 1fr; } }
+.sout-stat-value {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.sout-stat-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
+.sout-stat-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.sout-stat-indigo { border-left-color: #6366f1; }
+.sout-stat-indigo .sout-stat-value { color: #4f46e5; }
+.sout-stat-indigo .sout-stat-icon { color: #6366f1; }
+
+.sout-stat-emerald { border-left-color: #10b981; }
+.sout-stat-emerald .sout-stat-value { color: #059669; }
+.sout-stat-emerald .sout-stat-icon { color: #10b981; }
+
+.sout-stat-amber { border-left-color: #f59e0b; }
+.sout-stat-amber .sout-stat-value { color: #d97706; }
+.sout-stat-amber .sout-stat-icon { color: #f59e0b; }
+
+.sout-stat-red { border-left-color: #ef4444; }
+.sout-stat-red .sout-stat-value { color: #dc2626; }
+.sout-stat-red .sout-stat-icon { color: #ef4444; }

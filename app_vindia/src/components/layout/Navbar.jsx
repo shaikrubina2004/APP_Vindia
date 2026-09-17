@@ -8,6 +8,7 @@ import QSNotificationBell from "../../components/notifications/QSNotificationBel
 import MEPNotificationBell from "../notifications/MepNotificationBell";
 import BDANotificationBell from "../../components/notifications/BDANotificationBell";
 import ArchitectNotificationBell from "../../components/notifications/ArchitectNotificationBell";
+import OperationsNotificationBell from "../notifications/OperationsNotificationBell";
 import "../../styles/layout/Navbar.css";
 import logo from "../../assets/logo.png.png";
 
@@ -94,6 +95,32 @@ function Navbar() {
     BDA:                           ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
     "business_development":        ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
     "business_development_analyst":({ userId }) => <BDANotificationBell bdaEmail={userId} />,
+    logistics_coordinator: ({ userId }) => (
+  <OperationsNotificationBell
+    userId={userId}
+    routes={{
+      default: "/operations/logistics/dashboard",
+      delivery: "/operations/logistics/deliveries",
+      delay: "/operations/logistics/deliveries",
+      receipt: "/operations/logistics/deliveries",
+      incident: "/operations/logistics/incidents",
+      task: "/operations/logistics/incidents?page=tasks",
+    }}
+  />
+),
+inventory_controller: ({ userId }) => (
+  <OperationsNotificationBell
+    userId={userId}
+    routes={{
+      default: "/operations/inventory/dashboard",
+      delivery: "/operations/inventory/stock-in",
+      low_stock: "/operations/inventory/stock-out",
+      receipt: "/operations/inventory/stock-in",
+      incident: "/operations/inventory/incidents",
+      task: "/operations/inventory/incidents?page=tasks",
+    }}
+  />
+),
   };
 
   const RoleNotification = NOTIFICATION_COMPONENTS[user?.role];

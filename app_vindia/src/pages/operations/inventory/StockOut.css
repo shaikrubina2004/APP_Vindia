@@ -1,8 +1,37 @@
 @import "../../../styles/opsShared.css";
 
+/* Two-column layout: form on the left, Stock Register fills the rest */
+.sout-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .sout-layout { grid-template-columns: 1fr; }
+}
+
+.sout-left {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 20px;
+}
+@media (max-width: 900px) {
+  .sout-left { position: static; }
+}
+
+.sout-tabs {
+  width: fit-content;
+}
+
 .sout-form-card {
   padding: 20px;
-  max-width: 520px;
+}
+
+.sout-register-card {
+  min-width: 0; /* lets the table shrink/scroll instead of overflowing the grid column */
 }
 
 .sout-form {
@@ -39,3 +68,44 @@
 .sout-item-code { color: #94a3b8; }
 .sout-qty-low { font-weight: 600; color: #dc2626; }
 .sout-qty-ok { font-weight: 600; color: #1e293b; }
+
+/* ── Stats strip ─────────────────────────────────────── */
+.sout-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sout-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 16px;
+}
+
+.sout-stat-icon {
+  padding: 6px;
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+}
+.sout-stat-icon-indigo { background: #eef2ff; color: #6366f1; }
+.sout-stat-icon-amber { background: #fffbeb; color: #d97706; }
+.sout-stat-icon-red { background: #fef2f2; color: #dc2626; }
+
+.sout-stat-value {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.2;
+}
+.sout-stat-label {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+}
