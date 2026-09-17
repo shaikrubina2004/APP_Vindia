@@ -39,9 +39,9 @@ import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
 import Reports from "../pages/projects/projectmanager/Reports";
 import Pmcostreports from "../pages/projects/projectmanager/Pmcostreports";
 import ApprovalRequests from "../pages/siteEngineer/ApprovalRequests";
-import CreatePO from "../pages/Operations/PurchaseOrders/CreatePO";
-import PurchaseOrderList from "../pages/Operations/PurchaseOrders/PurchaseOrderList";
-import PurchaseOrderDetail from "../pages/Operations/PurchaseOrders/PurchaseOrderDetail";
+import CreatePO from "../pages/operations/PurchaseOrders/CreatePO";
+import PurchaseOrderList from "../pages/operations/PurchaseOrders/PurchaseOrderList";
+import PurchaseOrderDetail from "../pages/operations/PurchaseOrders/PurchaseOrderDetail";
 import ApprovedRequests from "../pages/operations/MaterialRequests/ApprovedRequests";
 import VendorsView from "../pages/operations/procurement/VendorsView";
 /* ── SHARED COMPONENTS ───────────────────────────────────── */
