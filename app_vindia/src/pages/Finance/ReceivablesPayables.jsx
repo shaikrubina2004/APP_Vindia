@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { useAuth } from "../../context/useAuth";
 import financeService from "../../services/financeService";
-import "./ReceivablesPayables.css";
+import "./Receivablespayables.css";
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 const num = (v) => {
