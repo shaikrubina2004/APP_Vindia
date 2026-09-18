@@ -77,11 +77,11 @@ exports.getDeliveryById = async (req, res) => {
 };
 
 /* POST /api/deliveries
-   body: { material_request_id?, project_id, vendor_id, expected_date, remarks, items: [{item_id?, item_name, unit, ordered_qty}] } */
+   body: { material_request_id?, purchase_order_id?, project_id, vendor_id, expected_date, remarks, items: [{item_id?, item_name, unit, ordered_qty}] } */
 exports.createDelivery = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { material_request_id, project_id, vendor_id, expected_date, remarks, items } = req.body;
+    const { material_request_id, purchase_order_id, project_id, vendor_id, expected_date, remarks, items } = req.body;
 
     if (!project_id || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: "project_id and at least one item are required" });
@@ -94,10 +94,10 @@ exports.createDelivery = async (req, res) => {
 
     const delivery = await client.query(
       `INSERT INTO deliveries
-        (delivery_code, material_request_id, project_id, vendor_id, expected_date, remarks, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+        (delivery_code, material_request_id, purchase_order_id, project_id, vendor_id, expected_date, remarks, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        RETURNING *`,
-      [delivery_code, material_request_id || null, project_id, vendor_id || null, expected_date || null, remarks || null, userId]
+      [delivery_code, material_request_id || null, purchase_order_id || null, project_id, vendor_id || null, expected_date || null, remarks || null, userId]
     );
 
     const deliveryId = delivery.rows[0].id;

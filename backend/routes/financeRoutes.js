@@ -77,6 +77,18 @@ const accountantAccess = requireRole(
   "ceo"
 );
 
+// Read-only vendor list access for other modules that need to pick a vendor
+// (e.g. Logistics creating a delivery) without granting them any other
+// Finance permission.
+const vendorReadAccess = requireRole(
+  "accountant",
+  "finance_manager",
+  "ceo",
+  "logistics_coordinator",
+  "inventory_controller",
+  "procurement_officer"
+);
+
 const managerAccess = requireRole(
   "finance_manager",
   "ceo"
@@ -348,7 +360,7 @@ router.delete(
 // Get all vendors
 router.get(
   "/vendors",
-  accountantAccess,
+  vendorReadAccess,
   vendorController.getAllVendors
 );
 

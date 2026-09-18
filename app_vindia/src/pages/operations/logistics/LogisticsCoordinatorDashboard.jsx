@@ -4,6 +4,7 @@ import CountUp from "react-countup";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Truck, Clock, PackageCheck, AlertTriangle, CalendarClock, RefreshCw, ArrowRight, Inbox } from "lucide-react";
 import { getLogisticsDashboard } from "../../../services/logisticsService";
+import CheckInButton from "../../../SharedResourse/CheckInButton";
 import "./LogisticsCoordinatorDashboard.css";
 
 const DashboardSkeleton = () => (
@@ -45,6 +46,10 @@ const LogisticsCoordinatorDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const employeeId = currentUser?.id || null;
+  const designation = currentUser?.designation || currentUser?.role || null;
+
   const load = (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     getLogisticsDashboard().then((res) => setData(res.data)).finally(() => { setLoading(false); setRefreshing(false); });
@@ -71,6 +76,7 @@ const LogisticsCoordinatorDashboard = () => {
           <p className="ops-subtitle">Deliveries across all active sites</p>
         </div>
         <div className="ops-flex-center">
+          <CheckInButton employeeId={employeeId} designation={designation} />
           <button className="ops-icon-btn" onClick={() => load(true)} title="Refresh">
             <RefreshCw size={16} className={refreshing ? "logd-spin" : ""} />
           </button>

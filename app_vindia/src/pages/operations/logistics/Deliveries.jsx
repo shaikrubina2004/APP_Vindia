@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Plus, X, Truck, PackageCheck, AlertTriangle, PackageX } from "lucide-react";
-import { getDeliveries, createDelivery, dispatchDelivery, markInTransit, markDelivered, markDelayed } from "../../../services/logisticsService";
+import { Plus, X, Truck, PackageCheck, AlertTriangle, PackageX, ClipboardList } from "lucide-react";
+import { getDeliveries, createDelivery, dispatchDelivery, markInTransit, markDelivered, markDelayed, getOpenPurchaseOrders } from "../../../services/logisticsService";
 import { getProjects } from "../../../services/projectService";
 import Toast from "../../../components/Toast";
 import axios from "axios";
@@ -49,6 +49,11 @@ const Deliveries = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const [sourceMode, setSourceMode] = useState("po"); // "po" | "manual"
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [selectedPoId, setSelectedPoId] = useState("");
+  const [materialRequestId, setMaterialRequestId] = useState(null);
+
   const [actionModal, setActionModal] = useState(null);
   const [actionShow, setActionShow] = useState(false);
   const [actionForm, setActionForm] = useState({});
@@ -63,10 +68,37 @@ const Deliveries = () => {
   useEffect(() => {
     getProjects().then((res) => setProjects(res.data)).catch(() => setProjects([]));
     financeApi.get("/vendors").then((res) => setVendors(res.data?.data || [])).catch(() => setVendors([]));
+    getOpenPurchaseOrders().then((res) => setPurchaseOrders(res.data)).catch(() => setPurchaseOrders([]));
   }, []);
 
-  const openCreateModal = () => { setCreateOpen(true); requestAnimationFrame(() => setCreateShow(true)); };
+  const openCreateModal = () => {
+    setCreateOpen(true);
+    setSourceMode(purchaseOrders.length ? "po" : "manual");
+    requestAnimationFrame(() => setCreateShow(true));
+  };
   const closeCreateModal = () => { setCreateShow(false); setTimeout(() => setCreateOpen(false), 150); };
+
+  const applyPurchaseOrder = (poId) => {
+    setSelectedPoId(poId);
+    const po = purchaseOrders.find((p) => String(p.id) === String(poId));
+    if (!po) return;
+    setCreateForm((f) => ({
+      ...f,
+      project_id: po.project_id || f.project_id,
+      vendor_id: po.vendor_id || f.vendor_id,
+    }));
+    setMaterialRequestId(po.material_request_id || null);
+    setCreateItems(
+      (po.items || []).map((i) => ({ item_name: i.item_name, unit: i.unit || "", ordered_qty: i.ordered_qty }))
+    );
+  };
+
+  const switchToManual = () => {
+    setSourceMode("manual");
+    setSelectedPoId("");
+    setMaterialRequestId(null);
+    setCreateItems([{ ...emptyItemRow }]);
+  };
 
   const addItemRow = () => setCreateItems((r) => [...r, { ...emptyItemRow }]);
   const updateItemRow = (idx, field, val) => setCreateItems((r) => r.map((row, i) => (i === idx ? { ...row, [field]: val } : row)));
@@ -77,12 +109,20 @@ const Deliveries = () => {
     setSaving(true);
     setError("");
     try {
-      await createDelivery({ ...createForm, items: createItems.filter((i) => i.item_name && i.ordered_qty) });
+      await createDelivery({
+        ...createForm,
+        purchase_order_id: sourceMode === "po" ? (selectedPoId || null) : null,
+        material_request_id: materialRequestId,
+        items: createItems.filter((i) => i.item_name && i.ordered_qty),
+      });
       closeCreateModal();
       setCreateForm({ project_id: "", vendor_id: "", expected_date: "", remarks: "" });
       setCreateItems([{ ...emptyItemRow }]);
+      setSelectedPoId("");
+      setMaterialRequestId(null);
       setToast({ type: "success", text: "Delivery created" });
       load();
+      getOpenPurchaseOrders().then((res) => setPurchaseOrders(res.data)).catch(() => {});
     } catch (err) {
       setError(err?.response?.data?.error || "Failed to create delivery");
     } finally {
@@ -197,6 +237,34 @@ const Deliveries = () => {
             </div>
             {error && <p className="ops-alert ops-alert-error">{error}</p>}
             <form onSubmit={submitCreate} className="del-form">
+              <div className="del-source-toggle">
+                <button type="button" className={`ops-tab ${sourceMode === "po" ? "ops-tab-active" : ""}`} onClick={() => setSourceMode("po")}>
+                  <ClipboardList size={14} /> From Purchase Order
+                </button>
+                <button type="button" className={`ops-tab ${sourceMode === "manual" ? "ops-tab-active" : ""}`} onClick={switchToManual}>
+                  Manual Entry
+                </button>
+              </div>
+
+              {sourceMode === "po" && (
+                <div className="ops-form-group">
+                  <label className="ops-label">Purchase Order *</label>
+                  {purchaseOrders.length === 0 ? (
+                    <p className="ops-alert ops-alert-info">No open purchase orders right now — switch to Manual Entry, or ask Procurement to issue one.</p>
+                  ) : (
+                    <select required className="ops-select" value={selectedPoId} onChange={(e) => applyPurchaseOrder(e.target.value)}>
+                      <option value="">Select a PO…</option>
+                      {purchaseOrders.map((po) => (
+                        <option key={po.id} value={po.id}>
+                          {po.po_code} — {po.vendor_name || "No vendor"} · {po.project_name || "No project"}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {selectedPoId && <p className="del-po-hint">Project, vendor and materials below were filled in from this PO — edit if needed.</p>}
+                </div>
+              )}
+
               <div className="ops-form-row">
                 <div className="ops-form-group">
                   <label className="ops-label">Project *</label>
@@ -219,7 +287,7 @@ const Deliveries = () => {
               </div>
 
               <div className="ops-form-group">
-                <label className="ops-label">Materials</label>
+                <label className="ops-label">Materials {sourceMode === "po" && selectedPoId && "(from PO — edit if needed)"}</label>
                 <div className="del-item-rows">
                   {createItems.map((row, idx) => (
                     <div key={idx} className="del-item-row">

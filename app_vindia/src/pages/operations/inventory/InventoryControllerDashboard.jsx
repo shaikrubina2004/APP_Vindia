@@ -4,6 +4,7 @@ import CountUp from "react-countup";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 import { Package, AlertTriangle, TrendingDown, TrendingUp, ClipboardList, Boxes, ArrowRight, RefreshCw } from "lucide-react";
 import { getInventoryDashboard } from "../../../services/inventoryService";
+import CheckInButton from "../../../SharedResourse/CheckInButton";
 import "./InventoryControllerDashboard.css";
 
 const DashboardSkeleton = () => (
@@ -35,6 +36,10 @@ const InventoryControllerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const employeeId = currentUser?.id || null;
+  const designation = currentUser?.designation || currentUser?.role || null;
 
   const load = (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -73,6 +78,7 @@ const InventoryControllerDashboard = () => {
           <p className="ops-subtitle">Live overview across all sites</p>
         </div>
         <div className="ops-flex-center">
+          <CheckInButton employeeId={employeeId} designation={designation} />
           <button className="ops-icon-btn" onClick={() => load(true)} title="Refresh">
             <RefreshCw size={16} className={refreshing ? "invd-spin" : ""} />
           </button>

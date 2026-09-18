@@ -18,3 +18,13 @@ export const markDelayed = (id, data) => API.put(`/${id}/delay`, data);
 export const cancelDelivery = (id) => API.put(`/${id}/cancel`);
 export const getPendingReceipts = () => API.get("/pending-receipt");
 export const getLogisticsDashboard = () => API.get("/dashboard");
+
+// Purchase Orders (read-only for Logistics — created by Procurement)
+const PROCUREMENT_API = axios.create({ baseURL: "http://localhost:5000/api/procurement" });
+PROCUREMENT_API.interceptors.request.use((req) => {
+  const token = localStorage.getItem("token");
+  if (token) req.headers.Authorization = `Bearer ${token}`;
+  return req;
+});
+export const getOpenPurchaseOrders = () => PROCUREMENT_API.get("/purchase-orders", { params: { status: "issued" } });
+export const getPurchaseOrder = (id) => PROCUREMENT_API.get(`/purchase-orders/${id}`);
