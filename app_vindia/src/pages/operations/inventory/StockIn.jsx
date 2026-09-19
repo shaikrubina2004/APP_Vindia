@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
-import { Truck, CheckCircle2, X, Inbox } from "lucide-react";
+import { Truck, CheckCircle2, X, Inbox, ClipboardList, RefreshCw, MapPin, Building2 } from "lucide-react";
 import { getPendingReceipts } from "../../../services/logisticsService";
 import { getItems, createGoodsReceipt, getGoodsReceipts } from "../../../services/inventoryService";
 import Toast from "../../../components/Toast";
 import "./StockIn.css";
+
+const formatDate = (d) => {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+};
 
 const StockIn = () => {
   const [pending, setPending] = useState([]);
@@ -27,6 +32,11 @@ const StockIn = () => {
   };
 
   useEffect(load, []);
+
+  const receivedThisWeek = history.filter((h) => {
+    const days = (Date.now() - new Date(h.created_at)) / 86400000;
+    return days <= 7;
+  }).length;
 
   const openReceive = (delivery) => {
     setActive(delivery);
@@ -71,10 +81,31 @@ const StockIn = () => {
     <div className="ops-page">
       <Toast toast={toast} onClose={() => setToast(null)} />
 
-      <div>
-        <h1 className="ops-title">Stock In — Goods Receipt</h1>
-        <p className="ops-subtitle">Deliveries marked "Delivered" by Logistics wait here until you verify and receive them into stock.</p>
+      <div className="ops-header">
+        <div>
+          <p className="sin-eyebrow">Inventory Controller</p>
+          <h1 className="ops-title">Stock In — Goods Receipt</h1>
+          <p className="ops-subtitle">Deliveries marked "Delivered" by Logistics wait here until you verify and receive them into stock.</p>
+        </div>
+        <button className="ops-icon-btn" onClick={load} title="Refresh"><RefreshCw size={16} /></button>
       </div>
+
+      {!loading && (
+        <div className="sin-stats">
+          <div className="sin-stat sin-stat-amber">
+            <div><span className="sin-stat-value">{pending.length}</span><span className="sin-stat-label">Pending Receipt</span></div>
+            <Truck size={20} className="sin-stat-icon" />
+          </div>
+          <div className="sin-stat sin-stat-emerald">
+            <div><span className="sin-stat-value">{receivedThisWeek}</span><span className="sin-stat-label">Received This Week</span></div>
+            <CheckCircle2 size={20} className="sin-stat-icon" />
+          </div>
+          <div className="sin-stat sin-stat-indigo">
+            <div><span className="sin-stat-value">{history.length}</span><span className="sin-stat-label">Total Receipts</span></div>
+            <ClipboardList size={20} className="sin-stat-icon" />
+          </div>
+        </div>
+      )}
 
       <div className="ops-card">
         <div className="ops-card-header"><h2><Truck size={18} className="sin-amber" /> Pending Receipt {!loading && `(${pending.length})`}</h2></div>
@@ -85,17 +116,18 @@ const StockIn = () => {
         ) : pending.length === 0 ? (
           <div className="ops-empty"><Inbox size={26} />Nothing waiting. All delivered items have been received.</div>
         ) : (
-          <ul className="sin-pending-list">
+          <div className="sin-pending-list">
             {pending.map((d) => (
-              <li key={d.id} className="sin-pending-item">
-                <div>
-                  <p className="sin-pending-code">{d.delivery_code} <span className="sin-pending-project">· {d.project_name}</span></p>
-                  <p className="sin-pending-meta">{d.vendor_name || "No vendor"} · Delivered {d.delivery_date}</p>
+              <div key={d.id} className="sin-pending-card">
+                <div className="sin-pending-icon"><Truck size={18} /></div>
+                <div className="sin-pending-body">
+                  <p className="sin-pending-code">{d.delivery_code} <span className="sin-pending-project"><MapPin size={12} /> {d.project_name}</span></p>
+                  <p className="sin-pending-meta"><Building2 size={12} /> {d.vendor_name || "No vendor"} · Delivered {formatDate(d.delivery_date)}</p>
                 </div>
                 <button onClick={() => openReceive(d)} className="ops-btn ops-btn-primary ops-btn-sm">Receive</button>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
 

@@ -22,8 +22,10 @@ const insertNotification = async (
   }
 };
 
-// ── Internal helper: notify every active user of a given role code ──
+// ── Internal helper: notify every user of a given role code ──
 // e.g. notifyRole("inventory_controller", "delivery", "Delivery arrived", ...)
+// Not filtered by account status — a pending/inactive account should still
+// see what happened while they were away once they log back in.
 const notifyRole = async (
   roleCode,
   type,
@@ -37,7 +39,7 @@ const notifyRole = async (
     const users = await pool.query(
       `SELECT u.id FROM users u
        JOIN roles r ON r.id = u.role_id
-       WHERE r.code = $1 AND u.status = 'active'`,
+       WHERE r.code = $1`,
       [roleCode]
     );
     for (const u of users.rows) {

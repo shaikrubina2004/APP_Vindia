@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, X, Truck, PackageCheck, AlertTriangle, PackageX, ClipboardList } from "lucide-react";
+import { Plus, X, Truck, PackageCheck, AlertTriangle, PackageX, ClipboardList, Clock, RefreshCw } from "lucide-react";
 import { getDeliveries, createDelivery, dispatchDelivery, markInTransit, markDelivered, markDelayed, getOpenPurchaseOrders } from "../../../services/logisticsService";
 import { getProjects } from "../../../services/projectService";
 import Toast from "../../../components/Toast";
@@ -137,12 +137,12 @@ const Deliveries = () => {
     if (type === "deliver") {
       setActionForm({
         delivery_date: "", received_by_name: "", remarks: "",
-        delivered_qtys: delivery.items.map((it) => ({ delivery_item_id: it.id, delivered_qty: it.ordered_qty, damaged_qty: 0 })),
+        delivered_qtys: (delivery.items || []).map((it) => ({ delivery_item_id: it.id, delivered_qty: it.ordered_qty, damaged_qty: 0 })),
       });
     } else if (type === "dispatch") {
       setActionForm({
         vehicle_number: "", driver_name: "", transporter: "", dispatch_date: "",
-        dispatched_qtys: delivery.items.map((it) => ({ delivery_item_id: it.id, dispatched_qty: it.ordered_qty })),
+        dispatched_qtys: (delivery.items || []).map((it) => ({ delivery_item_id: it.id, dispatched_qty: it.ordered_qty })),
       });
     } else {
       setActionForm({ delay_reason: "", new_eta: "" });
@@ -179,25 +179,65 @@ const Deliveries = () => {
     }
   };
 
+  const counts = {
+    scheduled: deliveries.filter((d) => d.status === "scheduled").length,
+    dispatched: deliveries.filter((d) => d.status === "dispatched").length,
+    in_transit: deliveries.filter((d) => d.status === "in_transit").length,
+    delivered: deliveries.filter((d) => d.status === "delivered").length,
+    delayed: deliveries.filter((d) => d.status === "delayed").length,
+  };
+
   return (
     <div className="ops-page">
       <Toast toast={toast} onClose={() => setToast(null)} />
 
       <div className="ops-header">
-        <h1 className="ops-title">Deliveries</h1>
-        <button onClick={openCreateModal} className="ops-btn ops-btn-primary"><Plus size={16} /> New Delivery</button>
+        <div>
+          <p className="del-eyebrow">Logistics Coordinator</p>
+          <h1 className="ops-title">Deliveries</h1>
+        </div>
+        <div className="ops-flex-center">
+          <button className="ops-icon-btn" onClick={load} title="Refresh"><RefreshCw size={16} /></button>
+          <button onClick={openCreateModal} className="ops-btn ops-btn-primary"><Plus size={16} /> New Delivery</button>
+        </div>
       </div>
 
-      <div className="ops-tabs">
+      {!loading && statusFilter === "all" && (
+        <div className="del-stats">
+          <div className="del-stat del-stat-gray">
+            <div><span className="del-stat-value">{counts.scheduled}</span><span className="del-stat-label">Scheduled</span></div>
+            <Clock size={20} className="del-stat-icon" />
+          </div>
+          <div className="del-stat del-stat-sky">
+            <div><span className="del-stat-value">{counts.dispatched}</span><span className="del-stat-label">Dispatched</span></div>
+            <Truck size={20} className="del-stat-icon" />
+          </div>
+          <div className="del-stat del-stat-indigo">
+            <div><span className="del-stat-value">{counts.in_transit}</span><span className="del-stat-label">In Transit</span></div>
+            <Truck size={20} className="del-stat-icon" />
+          </div>
+          <div className="del-stat del-stat-emerald">
+            <div><span className="del-stat-value">{counts.delivered}</span><span className="del-stat-label">Delivered</span></div>
+            <PackageCheck size={20} className="del-stat-icon" />
+          </div>
+          <div className="del-stat del-stat-red">
+            <div><span className="del-stat-value">{counts.delayed}</span><span className="del-stat-label">Delayed</span></div>
+            <AlertTriangle size={20} className="del-stat-icon" />
+          </div>
+        </div>
+      )}
+
+      <div className="ops-tabs del-tabs">
         {STATUS_TABS.map((s) => (
           <button key={s} onClick={() => setStatusFilter(s)} className={`ops-tab ${statusFilter === s ? "ops-tab-active" : ""}`}>
             {s.replace("_", " ")}
+            {s !== "all" && counts[s] > 0 && <span className="del-tab-count">{counts[s]}</span>}
           </button>
         ))}
       </div>
 
       <div className="ops-card ops-table-wrap">
-        <table className="ops-table">
+        <table className="ops-table del-table">
           <thead><tr><th>Delivery</th><th>Project</th><th>Vendor</th><th>Progress</th><th>Status</th><th style={{ textAlign: "right" }}>Actions</th></tr></thead>
           <tbody>
             {loading ? (
@@ -209,9 +249,9 @@ const Deliveries = () => {
             ) : (
               deliveries.map((d) => (
                 <tr key={d.id}>
-                  <td className="del-code">{d.delivery_code}</td>
+                  <td className="del-code">{d.delivery_code}{d.purchase_order_id && <span className="del-po-tag">PO</span>}</td>
                   <td>{d.project_name}</td>
-                  <td>{d.vendor_name || "—"}</td>
+                  <td>{d.vendor_name || <span className="del-muted">—</span>}</td>
                   <td><StatusStepper status={d.status} /></td>
                   <td><span className={`ops-badge ${STATUS_BADGE[d.status]}`}><span className="ops-badge-dot" />{d.status.replace("_", " ")}</span></td>
                   <td className="del-actions">
@@ -356,7 +396,7 @@ const Deliveries = () => {
                       <input className="ops-input" value={actionForm.received_by_name} onChange={(e) => setActionForm({ ...actionForm, received_by_name: e.target.value })} /></div>
                   </div>
                   <div className="del-deliver-lines">
-                    {actionModal.delivery.items.map((it, idx) => (
+                    {(actionModal.delivery.items || []).map((it, idx) => (
                       <div key={it.id} className="del-deliver-row">
                         <span className="del-deliver-name">{it.item_name}</span>
                         <input type="number" placeholder="Delivered qty" className="ops-input" value={actionForm.delivered_qtys[idx].delivered_qty}

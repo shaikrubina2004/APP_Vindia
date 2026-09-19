@@ -42,7 +42,11 @@ exports.getDeliveries = async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT d.*, p.name AS project_name, v.name AS vendor_name
+      `SELECT d.*, p.name AS project_name, v.name AS vendor_name,
+              COALESCE(
+                (SELECT json_agg(di.* ORDER BY di.id) FROM delivery_items di WHERE di.delivery_id = d.id),
+                '[]'
+              ) AS items
        FROM deliveries d
        LEFT JOIN projects p ON p.id = d.project_id
        LEFT JOIN vendors v ON v.id = d.vendor_id

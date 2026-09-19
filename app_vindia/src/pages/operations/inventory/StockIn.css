@@ -1,77 +1,6 @@
 @import "../../../styles/opsShared.css";
 
-/* Two-column layout: form on the left, Stock Register fills the rest */
-.sout-layout {
-  display: grid;
-  grid-template-columns: 380px 1fr;
-  gap: 20px;
-  align-items: start;
-}
-@media (max-width: 900px) {
-  .sout-layout { grid-template-columns: 1fr; }
-}
-
-.sout-left {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  position: sticky;
-  top: 20px;
-}
-@media (max-width: 900px) {
-  .sout-left { position: static; }
-}
-
-.sout-tabs {
-  width: fit-content;
-}
-
-.sout-form-card {
-  padding: 20px;
-}
-
-.sout-register-card {
-  min-width: 0; /* lets the table shrink/scroll instead of overflowing the grid column */
-}
-
-.sout-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.sout-submit {
-  width: 100%;
-  justify-content: center;
-  margin-top: 4px;
-}
-
-.sout-register-search {
-  position: relative;
-}
-.sout-register-search-icon {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #94a3b8;
-  pointer-events: none;
-}
-.sout-register-search input {
-  padding-left: 30px;
-  width: 160px;
-  font-size: 13px;
-  padding-top: 7px;
-  padding-bottom: 7px;
-}
-
-.sout-item-code { color: #94a3b8; }
-.sout-qty-low { font-weight: 600; color: #dc2626; }
-.sout-qty-ok { font-weight: 600; color: #1e293b; }
-
-/* ── Stats strip (matches the BDA Leads card style: colored left border,
-   big number, uppercase label, icon in the corner, full width) ────── */
-.sout-eyebrow {
+.sin-eyebrow {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -80,63 +9,110 @@
   margin: 0 0 4px;
 }
 
-.sout-stats {
+.sin-amber { color: #d97706; }
+.sin-emerald { color: #059669; }
+
+/* ── Stat cards ───────────────────────────────────────────── */
+.sin-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
-@media (max-width: 900px) {
-  .sout-stats { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 520px) {
-  .sout-stats { grid-template-columns: 1fr; }
-}
+@media (max-width: 700px) { .sin-stats { grid-template-columns: 1fr; } }
 
-.sout-stat {
+.sin-stat {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-left-width: 4px;
   border-radius: 12px;
-  padding: 18px 20px;
+  padding: 16px 18px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
+.sin-stat:hover { box-shadow: 0 8px 20px rgba(0,0,0,0.06); transform: translateY(-1px); }
 
-.sout-stat-value {
+.sin-stat-value { display: block; font-size: 24px; font-weight: 700; line-height: 1.15; }
+.sin-stat-label {
   display: block;
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.15;
-}
-.sout-stat-label {
-  display: block;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-top: 2px;
 }
+.sin-stat-icon { flex-shrink: 0; opacity: 0.7; }
 
-.sout-stat-icon {
+.sin-stat-amber { border-left-color: #f59e0b; }
+.sin-stat-amber .sin-stat-value { color: #d97706; }
+.sin-stat-amber .sin-stat-icon { color: #f59e0b; }
+
+.sin-stat-emerald { border-left-color: #10b981; }
+.sin-stat-emerald .sin-stat-value { color: #059669; }
+.sin-stat-emerald .sin-stat-icon { color: #10b981; }
+
+.sin-stat-indigo { border-left-color: #6366f1; }
+.sin-stat-indigo .sin-stat-value { color: #4f46e5; }
+.sin-stat-indigo .sin-stat-icon { color: #6366f1; }
+
+/* ── Pending receipt cards ───────────────────────────────────── */
+.sin-pending-list { display: flex; flex-direction: column; gap: 10px; padding: 16px 20px; }
+
+.sin-pending-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid #f1f5f9;
+  border-radius: 12px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.sin-pending-card:hover { border-color: #fde68a; background: #fffbeb; }
+
+.sin-pending-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #d97706;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  opacity: 0.7;
 }
 
-.sout-stat-indigo { border-left-color: #6366f1; }
-.sout-stat-indigo .sout-stat-value { color: #4f46e5; }
-.sout-stat-indigo .sout-stat-icon { color: #6366f1; }
+.sin-pending-body { flex: 1; min-width: 0; }
+.sin-pending-code { font-weight: 500; color: #1e293b; margin: 0; font-size: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sin-pending-project { color: #94a3b8; font-weight: 400; font-size: 12px; display: inline-flex; align-items: center; gap: 3px; }
+.sin-pending-meta { font-size: 12px; color: #94a3b8; margin: 3px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 
-.sout-stat-emerald { border-left-color: #10b981; }
-.sout-stat-emerald .sout-stat-value { color: #059669; }
-.sout-stat-emerald .sout-stat-icon { color: #10b981; }
+.sin-grn { font-weight: 500; color: #1e293b; }
 
-.sout-stat-amber { border-left-color: #f59e0b; }
-.sout-stat-amber .sout-stat-value { color: #d97706; }
-.sout-stat-amber .sout-stat-icon { color: #f59e0b; }
+.sin-form { display: flex; flex-direction: column; gap: 16px; }
+.sin-lines { display: flex; flex-direction: column; gap: 12px; }
 
-.sout-stat-red { border-left-color: #ef4444; }
-.sout-stat-red .sout-stat-value { color: #dc2626; }
-.sout-stat-red .sout-stat-icon { color: #ef4444; }
+.sin-line {
+  border: 1px solid #f1f5f9;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.15s ease;
+}
+.sin-line:hover { border-color: #e2e8f0; }
+
+.sin-line-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sin-line-name { font-size: 14px; font-weight: 500; color: #1e293b; margin: 0; }
+.sin-line-meta { font-size: 12px; color: #94a3b8; margin: 0; white-space: nowrap; }
+
+.sin-line-grid { grid-template-columns: 1.4fr 1fr 1fr; }
+@media (max-width: 480px) { .sin-line-grid { grid-template-columns: 1fr; } }
