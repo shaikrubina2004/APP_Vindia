@@ -183,3 +183,19 @@ exports.getDailyReportsHistory = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch daily report history" });
   }
 };
+/* ─────────────────────────────
+   MANAGER ROLLUP — every officer's daily reports
+   GET /api/procurement/daily-reports/all?from=&to=&officerId=
+   Restricted to operations_manager / ceo (see procurementRoutes.js) —
+   ready for whenever the Operations Manager role goes live.
+───────────────────────────── */
+exports.getAllDailyReportsForManager = async (req, res) => {
+  try {
+    const { from, to, officerId } = req.query;
+    const reports = await Procurement.getAllOfficersReports({ from, to, officerId });
+    res.status(200).json(reports);
+  } catch (err) {
+    console.error("GET ALL DAILY REPORTS (MANAGER) ERROR:", err.message);
+    res.status(500).json({ error: "Failed to fetch daily reports" });
+  }
+};

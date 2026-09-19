@@ -32,14 +32,7 @@ const invoiceController = require("../controllers/invoiceController");
 const paymentController = require("../controllers/paymentController");
 
 const vendorController = require("../controllers/vendorController");
-// Read-only vendor access for Procurement Officer — reuses Finance's
-// vendor list instead of duplicating vendor data/CRUD in Procurement
-const vendorReadAccess = requireRole(
-  "accountant",
-  "finance_manager",
-  "ceo",
-  "procurement_officer"
-);
+
 const financeSettingsController = require(
   "../controllers/financeSettingsController"
 );
@@ -364,7 +357,6 @@ router.delete(
 //
 // ============================================================
 
-// Get all vendors
 // Get all vendors
 router.get(
   "/vendors",
