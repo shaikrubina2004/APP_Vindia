@@ -171,6 +171,94 @@ const Procurement = {
     );
     return result.rows[0];
   },
+
+
+    /* ─────────────────────────────
+     DAILY REPORTS
+     One report per officer per day (upserted). po_followups,
+     vendor_calls, pending_approvals are officer-entered JSON arrays;
+     "POs issued" is NOT stored here — it's pulled live from
+     purchase_orders so it can never go stale vs. the real PO data.
+  ───────────────────────────── */
+
+  // Real POs this officer issued on a given date — auto-populated,
+  // never manually entered.
+  getPOsIssuedOnDate: async (officerId, date) => {
+    const result = await pool.query(
+      `SELECT po.id, po.po_code, po.status, v.name AS vendor_name, p.name AS project_name
+       FROM purchase_orders po
+       LEFT JOIN vendors v ON v.id = po.vendor_id
+       LEFT JOIN projects p ON p.id = po.project_id
+       WHERE po.created_by = $1
+         AND po.created_at::date = $2::date
+       ORDER BY po.created_at DESC`,
+      [officerId, date]
+    );
+    return result.rows;
+  },
+
+  getDailyReport: async (officerId, date) => {
+    const result = await pool.query(
+      `SELECT * FROM procurement_daily_reports
+       WHERE officer_id = $1 AND report_date = $2::date`,
+      [officerId, date]
+    );
+    return result.rows[0] || null;
+  },
+
+  upsertDailyReport: async ({
+    officerId,
+    report_date,
+    po_followups,
+    vendor_calls,
+    pending_approvals,
+    notes,
+  }) => {
+    const result = await pool.query(
+      `INSERT INTO procurement_daily_reports
+         (officer_id, report_date, po_followups, vendor_calls, pending_approvals, notes)
+       VALUES ($1, $2::date, $3::jsonb, $4::jsonb, $5::jsonb, $6)
+       ON CONFLICT (officer_id, report_date)
+       DO UPDATE SET
+         po_followups = EXCLUDED.po_followups,
+         vendor_calls = EXCLUDED.vendor_calls,
+         pending_approvals = EXCLUDED.pending_approvals,
+         notes = EXCLUDED.notes
+       RETURNING *`,
+      [
+        officerId,
+        report_date,
+        JSON.stringify(po_followups || []),
+        JSON.stringify(vendor_calls || []),
+        JSON.stringify(pending_approvals || []),
+        notes || null,
+      ]
+    );
+    return result.rows[0];
+  },
+
+  getDailyReportsHistory: async (officerId, { from, to } = {}) => {
+    const values = [officerId];
+    let where = "WHERE officer_id = $1";
+
+    if (from) {
+      values.push(from);
+      where += ` AND report_date >= $${values.length}::date`;
+    }
+    if (to) {
+      values.push(to);
+      where += ` AND report_date <= $${values.length}::date`;
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM procurement_daily_reports
+       ${where}
+       ORDER BY report_date DESC
+       LIMIT 30`,
+      values
+    );
+    return result.rows;
+  },
 };
 
 module.exports = Procurement;

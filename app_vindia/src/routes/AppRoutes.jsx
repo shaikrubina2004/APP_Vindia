@@ -44,6 +44,7 @@ import PurchaseOrderList from "../pages/operations/PurchaseOrders/PurchaseOrderL
 import PurchaseOrderDetail from "../pages/operations/PurchaseOrders/PurchaseOrderDetail";
 import ApprovedRequests from "../pages/operations/MaterialRequests/ApprovedRequests";
 import VendorsView from "../pages/operations/procurement/VendorsView";
+import ProcurementDailyReport from "../pages/operations/procurement/ProcurementDailyReport";
 /* ── SHARED COMPONENTS ───────────────────────────────────── */
 import AppShell from "../components/incidents/AppShell";
 import SharedDrawingPage from "../components/project/SharedDrawingPage";
@@ -932,6 +933,17 @@ const AppRoutes = () => {
         />
 
         <Route
+          path="/operations/procurement/daily-report"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <ProcurementDailyReport />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/operations/logistics/dashboard"
           element={
             <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
@@ -1085,6 +1097,17 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
+        <Route
+  path="/operations/procurement/incidents"
+  element={
+    <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+      <ProcurementOfficerLayout>
+        <AppShell key="proc-incidents" />
+      </ProcurementOfficerLayout>
+    </ProtectedRoute>
+  }
+/>
 
         {/* ══ FALLBACK ══════════════════════════════════════ */}
         <Route

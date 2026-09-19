@@ -24,8 +24,25 @@ export const procurementOfficerMenu = [
   },
 
   {
+    name: "Incidents",
+    path: "/operations/procurement/incidents",
+    icon: "alert-triangle",
+  },
+
+  {
+    name: "Tasks",
+    path: "/operations/procurement/incidents?page=tasks",
+    icon: "check-square",
+  },
+
+  {
     name: "Reports",
     path: "/operations/procurement/reports",
     icon: "bar-chart-2",
+  },
+  {
+    name: "Daily Report",
+    path: "/operations/procurement/daily-report",
+    icon: "clipboard",
   },
 ];

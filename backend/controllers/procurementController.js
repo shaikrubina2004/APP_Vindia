@@ -108,3 +108,78 @@ exports.getPurchaseOrderById = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch purchase order" });
   }
 };
+
+/* ─────────────────────────────
+   GET ONE DAY'S REPORT (+ the real POs issued that day)
+   GET /api/procurement/daily-reports/:date   (date = YYYY-MM-DD)
+───────────────────────────── */
+exports.getDailyReport = async (req, res) => {
+  try {
+    const { date } = req.params;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "User not authenticated" });
+
+    const [report, posIssued] = await Promise.all([
+      Procurement.getDailyReport(userId, date),
+      Procurement.getPOsIssuedOnDate(userId, date),
+    ]);
+
+    res.status(200).json({
+      report: report || null,
+      posIssued,
+    });
+  } catch (err) {
+    console.error("GET DAILY REPORT ERROR:", err.message);
+    res.status(500).json({ error: "Failed to fetch daily report" });
+  }
+};
+
+/* ─────────────────────────────
+   CREATE OR UPDATE TODAY'S (OR A PAST) REPORT
+   POST /api/procurement/daily-reports
+   Body: { report_date, po_followups, vendor_calls, pending_approvals, notes }
+───────────────────────────── */
+exports.upsertDailyReport = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "User not authenticated" });
+
+    const { report_date, po_followups, vendor_calls, pending_approvals, notes } = req.body;
+
+    if (!report_date) {
+      return res.status(400).json({ error: "report_date is required" });
+    }
+
+    const report = await Procurement.upsertDailyReport({
+      officerId: userId,
+      report_date,
+      po_followups,
+      vendor_calls,
+      pending_approvals,
+      notes,
+    });
+
+    res.status(200).json(report);
+  } catch (err) {
+    console.error("UPSERT DAILY REPORT ERROR:", err.message);
+    res.status(500).json({ error: "Failed to save daily report" });
+  }
+};
+
+/* ─────────────────────────────
+   REPORT HISTORY
+   GET /api/procurement/daily-reports?from=&to=
+───────────────────────────── */
+exports.getDailyReportsHistory = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "User not authenticated" });
+
+    const { from, to } = req.query;
+    const history = await Procurement.getDailyReportsHistory(userId, { from, to });
+    res.status(200).json(history);
+  } catch (err) {
+    console.error("GET DAILY REPORTS HISTORY ERROR:", err.message);
+    res.status(500).json({ error: "Failed to fetch daily report history" });
+  }
+};

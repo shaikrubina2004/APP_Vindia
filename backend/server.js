@@ -16,8 +16,7 @@ if (!fs.existsSync(uploadDir)) {
 /* ── Multer config ───────────────────────── */
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + "-" + file.originalname),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
 });
 const upload = multer({ storage });
 
@@ -58,6 +57,9 @@ const progressRoutes = require("./routes/progressRoutes");
 const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoutes");
 const materialRequestRoutes = require("./routes/materialRequestRoutes");
 const procurementRoutes = require("./routes/procurementRoutes");
+
+const operationsNotificationsRoutes = require("./routes/operationsNotifications");
+
 const snagRoutes = require("./routes/snagRoutes");
 const siteProgressRoutes = require("./routes/siteProgressRoutes");
 const sitephotosRoutes = require("./routes/sitephotosRoutes");
@@ -194,6 +196,7 @@ app.use("/api/architect-drawings", architectDrawingUploadRoutes);
 app.use("/api/architect-assign", architectAssignRoutes);
 app.use("/api/architect-notifications", architectNotifRoutes);
 app.use("/api/procurement", procurementRoutes);
+app.use("/api/operations-notifications", operationsNotificationsRoutes);
 /* ✅ Site Engineer */
 app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes);
 app.use("/api/ncr", ncrRoutes);
@@ -207,7 +210,6 @@ app.use("/api/site-progress", siteProgressRoutes);
 app.use("/api/photos", sitephotosRoutes);
 app.use("/api/labour-registry", labourRegistryRoutes);
 app.use("/api/labour-report", labourReportRoutes);
-
 
 /* ✅ Inventory & Logistics */
 app.use("/api/inventory/items", inventoryItemRoutes);

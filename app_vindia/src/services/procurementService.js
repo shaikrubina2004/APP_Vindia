@@ -14,6 +14,11 @@ const procurementService = {
   getAllPurchaseOrders: (filters = {}) =>
     api.get(`${P}/purchase-orders`, { params: filters }),
   getPurchaseOrderById: (id) => api.get(`${P}/purchase-orders/${id}`),
+    /* ── Daily Reports ─────────────────────────────────────── */
+  getDailyReport: (date) => api.get(`${P}/daily-reports/${date}`),
+  saveDailyReport: (data) => api.post(`${P}/daily-reports`, data),
+  getDailyReportsHistory: (filters = {}) =>
+    api.get(`${P}/daily-reports`, { params: filters }),
 };
 
 export default procurementService;

@@ -1,0 +1,198 @@
+/* ===== FILE: APP_Vindia/app_vindia/src/pages/operations/procurement/ProcurementDailyReport.css ===== */
+
+.pdr-page {
+  --primary: #0A4174;
+  --primary-light: #4E8EA2;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-500: #6b7280;
+  --neutral-900: #111827;
+
+  padding: 1.5rem;
+  max-width: 900px;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--neutral-900);
+}
+
+.pdr-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.pdr-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.pdr-header p {
+  margin: 0;
+  color: var(--neutral-500);
+  font-size: 0.88rem;
+}
+
+.pdr-date-input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.pdr-error {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.pdr-section {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.pdr-section h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.pdr-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.pdr-section-header h2 {
+  margin: 0;
+}
+
+.pdr-auto-tag {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--neutral-100);
+  color: var(--neutral-500);
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.pdr-add-btn {
+  padding: 0.3rem 0.75rem;
+  background: var(--neutral-100);
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.pdr-empty {
+  color: var(--neutral-500);
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.pdr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.pdr-table th {
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--neutral-200);
+  color: var(--neutral-500);
+  font-weight: 600;
+}
+
+.pdr-table td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.pdr-po-status {
+  text-transform: capitalize;
+}
+
+.pdr-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.pdr-row--three {
+  grid-template-columns: 1fr 1fr 1fr auto;
+}
+
+.pdr-row input {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.pdr-remove-btn {
+  background: none;
+  border: none;
+  color: #dc2626;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.pdr-notes {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.pdr-save-msg {
+  font-size: 0.85rem;
+  color: var(--primary);
+  margin-bottom: 0.75rem;
+}
+
+.pdr-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pdr-save-btn {
+  padding: 0.55rem 1.4rem;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.pdr-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pdr-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--neutral-500);
+}
+
+@media (max-width: 600px) {
+  .pdr-row, .pdr-row--three {
+    grid-template-columns: 1fr;
+  }
+}

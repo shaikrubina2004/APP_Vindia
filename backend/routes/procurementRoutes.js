@@ -15,6 +15,7 @@ router.get(
   procurementController.getApprovedRequests
 );
 
+<<<<<<< Updated upstream
 router.post(
   "/purchase-orders",
   protect,
@@ -35,5 +36,13 @@ router.get(
   requireRole("procurement_officer", "logistics_coordinator"),
   procurementController.getPurchaseOrderById
 );
+=======
+router.post("/purchase-orders", procurementController.createPurchaseOrder);
+router.get("/purchase-orders", procurementController.getPurchaseOrders);
+router.get("/purchase-orders/:id", procurementController.getPurchaseOrderById);
+router.get("/daily-reports", procurementController.getDailyReportsHistory);
+router.get("/daily-reports/:date", procurementController.getDailyReport);
+router.post("/daily-reports", procurementController.upsertDailyReport);
+>>>>>>> Stashed changes
 
 module.exports = router;
