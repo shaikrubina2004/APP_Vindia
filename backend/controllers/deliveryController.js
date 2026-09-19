@@ -158,6 +158,19 @@ exports.dispatchDelivery = async (req, res) => {
        WHERE id=$5 RETURNING *`,
       [vehicle_number || null, driver_name || null, transporter || null, dispatch_date || null, id]
     );
+
+    // Inventory can plan space/manpower for an incoming load.
+    await notifyRole(
+      "inventory_controller",
+      "delivery",
+      `${result.rows[0].delivery_code} dispatched`,
+      `On the way${vehicle_number ? ` — vehicle ${vehicle_number}` : ""}. Expect it for stock-in.`,
+      "/operations/inventory/stock-in",
+      "info",
+      result.rows[0].project_id,
+      result.rows[0].id
+    );
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error("DISPATCH ERROR:", err.message);
@@ -226,7 +239,8 @@ exports.markDelivered = async (req, res) => {
       `Marked delivered — verify quantities and receive it into stock.`,
       "/operations/inventory/stock-in",
       "warn",
-      result.rows[0].project_id
+      result.rows[0].project_id,
+      result.rows[0].id
     );
 
     res.json(result.rows[0]);
@@ -251,14 +265,28 @@ exports.markDelayed = async (req, res) => {
     );
     if (!result.rows.length) return res.status(404).json({ error: "Delivery not found" });
 
+    // A delay is owned by Logistics — they chase the vendor/transporter.
     await notifyRole(
-      "inventory_controller",
+      "logistics_coordinator",
       "delay",
       `Delivery ${result.rows[0].delivery_code} delayed`,
       delay_reason || "No reason given",
       "/operations/logistics/deliveries",
       "warn",
-      result.rows[0].project_id
+      result.rows[0].project_id,
+      result.rows[0].id
+    );
+
+    // Inventory needs the same heads-up, but pointed at their own stock-in page.
+    await notifyRole(
+      "inventory_controller",
+      "delivery",
+      `Incoming ${result.rows[0].delivery_code} delayed`,
+      `New ETA pending. ${delay_reason || "No reason given"}`,
+      "/operations/inventory/stock-in",
+      "warn",
+      result.rows[0].project_id,
+      result.rows[0].id
     );
 
     res.json(result.rows[0]);

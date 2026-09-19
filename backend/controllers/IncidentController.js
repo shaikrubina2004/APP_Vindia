@@ -8,6 +8,9 @@ const {
 const {
   insertArchitectNotification,
 } = require("./architectNotificationsController");
+const {
+  insertNotification: insertOperationsNotification,
+} = require("./operationsNotificationsController");
 /* ─── HELPERS ─────────────────────────────────────────────── */
 
 function calcDeadline(priority) {
@@ -162,6 +165,36 @@ async function notifyByRole(
         console.log(`✅ MEP Notification → user:${userId} type:${type}`);
       } catch (err) {
         console.error("MEP Notification error:", err.message);
+      }
+    } else if (
+      roleCode === "logistics_coordinator" ||
+      roleCode === "inventory_controller"
+    ) {
+      // These two roles read from operations_notifications, not pc_notifications.
+      // Without this branch their incidents/tasks were written to the PC table
+      // and never appeared in their bell.
+      try {
+        const base =
+          roleCode === "logistics_coordinator"
+            ? "/operations/logistics"
+            : "/operations/inventory";
+        const fallbackLink =
+          type === "task" ? `${base}/incidents?page=tasks` : `${base}/incidents`;
+
+        await insertOperationsNotification(
+          userId,
+          type,
+          title,
+          description,
+          link || fallbackLink,
+          severity,
+          projectId,
+          roleCode,
+          referenceId ?? null,
+        );
+        console.log(`✅ Operations Notification → user:${userId} type:${type}`);
+      } catch (err) {
+        console.error("Operations Notification error:", err.message);
       }
     } else if (roleName.includes("architect") || roleCode === "architect") {
       try {

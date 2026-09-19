@@ -15,50 +15,59 @@ import logo from "../../assets/logo.png.png";
 // ✅ Role-based quick-add menu items
 const QUICK_ADD_ITEMS = {
   project_coordinator: [
-    { label: "Add Milestone", path: "/project-coordinator/milestone" },
-    { label: "View Incident", path: "/project-coordinator/incidents" },
-    { label: "View Task", path: "/project-coordinator/incidents?page=tasks" },
+    { label: "Add Milestone",    path: "/project-coordinator/milestone" },
+    { label: "View Incident",  path: "/project-coordinator/incidents" },
+    { label: "View Task",  path: "/project-coordinator/incidents?page=tasks" },
   ],
   structural_engineer: [
-    { label: "Create Project", path: "/projects/create" },
-    { label: "Submit Expense", path: "/expenses/submit" },
+    { label: "Create Project",  path: "/projects/create" },
+    { label: "Submit Expense",  path: "/expenses/submit" },
   ],
   quantity_surveyor: [
-    { label: "Create Project", path: "/projects/create" },
-    { label: "Submit Expense", path: "/expenses/submit" },
+    { label: "Create Project",  path: "/projects/create" },
+    { label: "Submit Expense",  path: "/expenses/submit" },
   ],
   mep_engineer: [
-    { label: "Create Project", path: "/projects/create" },
-    { label: "Submit Expense", path: "/expenses/submit" },
+    { label: "Create Project",  path: "/projects/create" },
+    { label: "Submit Expense",  path: "/expenses/submit" },
   ],
   architect: [
-    { label: "Create Project", path: "/projects/create" },
-    { label: "Submit Expense", path: "/expenses/submit" },
+    { label: "Create Project",  path: "/projects/create" },
+    { label: "Submit Expense",  path: "/expenses/submit" },
   ],
   // All BDA variants get only Add Lead + Add Follow-up
-  bda: [
-    { label: "Add Lead", path: "/bda/add-lead" },
-    { label: "Add Follow-up", path: "/bda/follow-up" },
+  bda:                           [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
   ],
-  bda1: [
-    { label: "Add Lead", path: "/bda/add-lead" },
-    { label: "Add Follow-up", path: "/bda/follow-up" },
+  bda1:                          [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
   ],
-  bda2: [
-    { label: "Add Lead", path: "/bda/add-lead" },
-    { label: "Add Follow-up", path: "/bda/follow-up" },
+  bda2:                          [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
   ],
-  BDA: [
-    { label: "Add Lead", path: "/bda/add-lead" },
-    { label: "Add Follow-up", path: "/bda/follow-up" },
+  BDA:                           [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
   ],
-  business_development: [
-    { label: "Add Lead", path: "/bda/add-lead" },
-    { label: "Add Follow-up", path: "/bda/follow-up" },
+  business_development:          [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
   ],
-  business_development_analyst: [
-    { label: "Add Lead", path: "/bda/add-lead" },
-    { label: "Add Follow-up", path: "/bda/follow-up" },
+  business_development_analyst:  [
+    { label: "Add Lead",        path: "/bda/add-lead" },
+    { label: "Add Follow-up",   path: "/bda/follow-up" },
+  ],
+  logistics_coordinator: [
+    { label: "New Delivery",   path: "/operations/logistics/deliveries" },
+    { label: "View Incident",  path: "/operations/logistics/incidents" },
+  ],
+  inventory_controller: [
+    { label: "Stock In",       path: "/operations/inventory/stock-in" },
+    { label: "Stock Out",      path: "/operations/inventory/stock-out" },
+    { label: "View Incident",  path: "/operations/inventory/incidents" },
   ],
 };
 
@@ -66,6 +75,63 @@ const QUICK_ADD_ITEMS = {
 const DEFAULT_QUICK_ADD = [
   { label: "Submit Expense", path: "/expenses/submit" },
 ];
+
+/* ── Where each Operations role's notifications should navigate to ── */
+const LOGISTICS_ROUTES = {
+  default:  "/operations/logistics/dashboard",
+  delivery: "/operations/logistics/deliveries",
+  delay:    "/operations/logistics/deliveries",
+  receipt:  "/operations/logistics/deliveries",
+  incident: "/operations/logistics/incidents",
+  task:     "/operations/logistics/incidents?page=tasks",
+};
+
+const INVENTORY_ROUTES = {
+  default:   "/operations/inventory/dashboard",
+  delivery:  "/operations/inventory/stock-in",
+  low_stock: "/operations/inventory/stock-out",
+  receipt:   "/operations/inventory/stock-in",
+  incident:  "/operations/inventory/incidents",
+  task:      "/operations/inventory/incidents?page=tasks",
+};
+
+const LogisticsBell = ({ userId }) => (
+  <OperationsNotificationBell
+    userId={userId}
+    role="logistics_coordinator"
+    routes={LOGISTICS_ROUTES}
+  />
+);
+
+const InventoryBell = ({ userId }) => (
+  <OperationsNotificationBell
+    userId={userId}
+    role="inventory_controller"
+    routes={INVENTORY_ROUTES}
+  />
+);
+
+const BdaBell = ({ userId }) => <BDANotificationBell bdaEmail={userId} />;
+
+/* ✅ Role-based notification mapping.
+   Defined at module scope on purpose — when this lived inside Navbar()
+   every render created brand-new component functions, so React unmounted
+   and remounted the bell on each render, wiping its state and re-fetching. */
+const NOTIFICATION_COMPONENTS = {
+  project_coordinator: NotificationBell,
+  structural_engineer: SENotificationBell,
+  quantity_surveyor:   QSNotificationBell,
+  mep_engineer:        MEPNotificationBell,
+  architect:           ArchitectNotificationBell,
+  bda:                            BdaBell,
+  bda1:                           BdaBell,
+  bda2:                           BdaBell,
+  BDA:                            BdaBell,
+  business_development:           BdaBell,
+  business_development_analyst:   BdaBell,
+  logistics_coordinator: LogisticsBell,
+  inventory_controller:  InventoryBell,
+};
 
 function Navbar() {
   const navigate = useNavigate();
@@ -78,67 +144,9 @@ function Navbar() {
     console.log("===========================");
   }, [user]);
 
-  const [isSearchActive, setIsSearchActive] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-
-  // ✅ Role-based notification mapping
-  const NOTIFICATION_COMPONENTS = {
-    project_coordinator: NotificationBell,
-    structural_engineer: SENotificationBell,
-    quantity_surveyor: QSNotificationBell,
-    mep_engineer: MEPNotificationBell,
-    architect: ArchitectNotificationBell,
-    bda: ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-    bda1: ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-    bda2: ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-    BDA: ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-    business_development: ({ userId }) => (
-      <BDANotificationBell bdaEmail={userId} />
-    ),
-    business_development_analyst: ({ userId }) => (
-      <BDANotificationBell bdaEmail={userId} />
-    ),
-    logistics_coordinator: ({ userId }) => (
-      <OperationsNotificationBell
-        userId={userId}
-        routes={{
-          default: "/operations/logistics/dashboard",
-          delivery: "/operations/logistics/deliveries",
-          delay: "/operations/logistics/deliveries",
-          receipt: "/operations/logistics/deliveries",
-          incident: "/operations/logistics/incidents",
-          task: "/operations/logistics/incidents?page=tasks",
-        }}
-      />
-    ),
-    inventory_controller: ({ userId }) => (
-      <OperationsNotificationBell
-        userId={userId}
-        routes={{
-          default: "/operations/inventory/dashboard",
-          delivery: "/operations/inventory/stock-in",
-          low_stock: "/operations/inventory/stock-out",
-          receipt: "/operations/inventory/stock-in",
-          incident: "/operations/inventory/incidents",
-          task: "/operations/inventory/incidents?page=tasks",
-        }}
-      />
-    ),
-
-    procurement_officer: ({ userId }) => (
-      <OperationsNotificationBell
-        userId={userId}
-        routes={{
-          default: "/operations/procurement/dashboard",
-          delivery: "/operations/procurement/purchase-orders",
-          receipt: "/operations/procurement/purchase-orders",
-          incident: "/operations/procurement/incidents",
-          task: "/operations/procurement/incidents?page=tasks",
-        }}
-      />
-    ),
-  };
+  const [isSearchActive, setIsSearchActive]   = useState(false);
+  const [isProfileOpen, setIsProfileOpen]     = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen]   = useState(false);
 
   const RoleNotification = NOTIFICATION_COMPONENTS[user?.role];
 
@@ -161,15 +169,7 @@ function Navbar() {
 
       <div className={`navbar-center ${isSearchActive ? "active" : ""}`}>
         <div className="search-container">
-          <svg
-            className="search-icon"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+          <svg className="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8"></circle>
             <path d="m21 21-4.35-4.35"></path>
           </svg>
@@ -185,19 +185,8 @@ function Navbar() {
       </div>
 
       <div className="navbar-right">
-        <button
-          className="navbar-icon-btn timesheet-btn"
-          onClick={() => navigate("/timesheet")}
-          title="Timesheet"
-        >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+        <button className="navbar-icon-btn timesheet-btn" onClick={() => navigate("/timesheet")} title="Timesheet">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
           </svg>
@@ -211,14 +200,7 @@ function Navbar() {
           onMouseLeave={() => setIsQuickAddOpen(false)}
         >
           <button className="quick-add-btn">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
@@ -241,19 +223,11 @@ function Navbar() {
         </div>
 
         {/* 🔥 Role-Based Notifications */}
-        {RoleNotification &&
-          ([
-            "bda",
-            "bda1",
-            "bda2",
-            "BDA",
-            "business_development",
-            "business_development_analyst",
-          ].includes(user?.role) ? (
-            <RoleNotification userId={user.email} />
-          ) : (
-            <RoleNotification userId={user.id} />
-          ))}
+        {RoleNotification && (
+          ["bda", "bda1", "bda2", "BDA", "business_development", "business_development_analyst"].includes(user?.role)
+            ? <RoleNotification userId={user.email} />
+            : <RoleNotification userId={user.id} />
+        )}
 
         <div
           className="profile-dropdown-wrapper"
@@ -262,14 +236,7 @@ function Navbar() {
         >
           <button className="profile-btn">
             <div className="avatar">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
@@ -283,9 +250,7 @@ function Navbar() {
             <button className="dropdown-item">Profile</button>
             <button className="dropdown-item">Settings</button>
             <div className="dropdown-divider"></div>
-            <button className="dropdown-item logout" onClick={handleLogout}>
-              Logout
-            </button>
+            <button className="dropdown-item logout" onClick={handleLogout}>Logout</button>
           </div>
         </div>
       </div>

@@ -1,37 +1,14 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import pcPaymentService from "../../services/pcPaymentService";
 import "./Payment.css";
 
-/* ─── DATA ─── */
-const PROJECTS_DATA = [
-  {
-    id: 1, name: "Eiffel Tower – Paris", client: "XBC Developers",
-    contractValue: 28900000, targetProfit: 35,
-    startDate: "2025-05-01", deadline: "2025-12-15",
-    payments: [
-      { id: 1, invoiceNo: "INV-2025-001", milestone: "Foundation Completion", type: "Advance",     amount: 4200000,  dueDate: "2025-06-01", paidOn: "2025-06-12", status: "paid",    method: "Bank Transfer", remarks: "Received after foundation inspection." },
-      { id: 2, invoiceNo: "INV-2025-002", milestone: "Block A Structure",     type: "Milestone 1", amount: 8700000,  dueDate: "2025-07-15", paidOn: "2025-07-01", status: "partial", method: "Cheque",        remarks: "65% released. Balance after completion." },
-      { id: 3, invoiceNo: "INV-2025-003", milestone: "Electrical Phase 1",    type: "Milestone 2", amount: 2500000,  dueDate: "2025-08-10", paidOn: null,         status: "pending", method: "Bank Transfer", remarks: "Due after electrical phase 1 completion." },
-      { id: 4, invoiceNo: "INV-2025-007", milestone: "Project Completion",    type: "Retention",   amount: 3000000,  dueDate: "2025-12-01", paidOn: null,         status: "pending", method: "Bank Transfer", remarks: "Released after defect liability period." },
-    ],
-  },
-  {
-    id: 2, name: "NH-66", client: "Govt. of India",
-    contractValue: 38000000, targetProfit: 35,
-    startDate: "2025-03-15", deadline: "2026-03-31",
-    payments: [
-      { id: 5, invoiceNo: "INV-2025-004", milestone: "Road Base Layer",       type: "Milestone 1", amount: 12000000, dueDate: "2025-06-05", paidOn: null,         status: "overdue", method: "Bank Transfer", remarks: "Pending government release order." },
-      { id: 6, invoiceNo: "INV-2025-005", milestone: "Road Surface Layer",    type: "Milestone 2", amount: 8000000,  dueDate: "2025-09-01", paidOn: null,         status: "pending", method: "Bank Transfer", remarks: "Dependent on Milestone 1 clearance." },
-    ],
-  },
-  {
-    id: 3, name: "Tajmahal", client: "SHAJAHAAN",
-    contractValue: 8500000, targetProfit: 35,
-    startDate: "2025-06-20", deadline: "2025-12-31",
-    payments: [
-      { id: 7, invoiceNo: "INV-2025-006", milestone: "Site Clearance",        type: "Advance",     amount: 500000,   dueDate: "2025-07-10", paidOn: null,         status: "pending", method: "Cheque",        remarks: "Advance pending permit approval." },
-    ],
-  },
-];
+/* ══════════════════════════════════════════════════════════
+   Data now comes from Finance.
+
+   GET /api/pc/payments  →  the same invoices + payments the
+   Accountant maintains, filtered to this coordinator's projects
+   and to client receivables only. Nothing is hardcoded here.
+══════════════════════════════════════════════════════════ */
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -39,51 +16,63 @@ const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct"
 /* ─── helpers ─── */
 const fmt = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
 const fmtShort = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—";
-const fmtCr = (n) =>
-  n >= 10000000 ? `₹${(n/10000000).toFixed(2)}Cr`
-  : n >= 100000  ? `₹${(n/100000).toFixed(1)}L`
-  : `₹${n.toLocaleString()}`;
+const fmtCr = (n) => {
+  const v = Number(n || 0);
+  return v >= 10000000 ? `₹${(v/10000000).toFixed(2)}Cr`
+    : v >= 100000  ? `₹${(v/100000).toFixed(1)}L`
+    : `₹${v.toLocaleString("en-IN")}`;
+};
 const today       = new Date();
 const daysOverdue = (d) => Math.ceil((today - new Date(d)) / 86400000);
 const daysLeft    = (d) => Math.ceil((new Date(d) - today) / 86400000);
-const getPaid = (payments) =>
-  payments.filter(p => p.status === "paid").reduce((s, p) => s + p.amount, 0) +
-  payments.filter(p => p.status === "partial").reduce((s, p) => s + p.amount * 0.65, 0);
+
+/* Real collected amount from Finance — no more 65% guesswork. */
+const getPaid = (payments = []) =>
+  payments.reduce((s, p) => s + Number(p.paidAmount || 0), 0);
 
 const STATUS_CFG = {
-  paid:    { label: "Paid",    bg: "#f0fdf4", color: "#16a34a", border: "#86efac" },
-  partial: { label: "Partial", bg: "#eff6ff", color: "#2563eb", border: "#93c5fd" },
-  pending: { label: "Pending", bg: "#fefce8", color: "#ca8a04", border: "#fde047" },
-  overdue: { label: "Overdue", bg: "#fef2f2", color: "#dc2626", border: "#fca5a5" },
+  paid:      { label: "Paid",      bg: "#f0fdf4", color: "#16a34a", border: "#86efac" },
+  partial:   { label: "Partial",   bg: "#eff6ff", color: "#2563eb", border: "#93c5fd" },
+  pending:   { label: "Pending",   bg: "#fefce8", color: "#ca8a04", border: "#fde047" },
+  overdue:   { label: "Overdue",   bg: "#fef2f2", color: "#dc2626", border: "#fca5a5" },
+  cancelled: { label: "Cancelled", bg: "#f8fafc", color: "#64748b", border: "#cbd5e1" },
 };
 const TYPE_COLOR = {
-  "Advance": "#7c3aed", "Milestone 1": "#2563eb",
-  "Milestone 2": "#0891b2", "Milestone 3": "#0891b2", "Retention": "#6366f1",
+  "Advance": "#7c3aed", "Milestone": "#2563eb", "Milestone 1": "#2563eb",
+  "Milestone 2": "#0891b2", "Milestone 3": "#0891b2",
+  "Retention": "#6366f1", "Final": "#0f766e", "Invoice": "#475569",
 };
 
-/* ─── build all months that have any activity (for the dropdown) ─── */
-const buildActivityMonths = () => {
+/* ─── month helpers, now driven by live data ─── */
+const buildActivityMonths = (projects) => {
   const set = new Set();
-  PROJECTS_DATA.forEach(proj => {
-    [proj.startDate, proj.deadline, ...proj.payments.map(p => p.dueDate)]
+  projects.forEach((proj) => {
+    [proj.startDate, proj.deadline, ...proj.payments.map((p) => p.dueDate)]
       .filter(Boolean)
-      .forEach(d => {
+      .forEach((d) => {
         const dt = new Date(d);
-        set.add(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`);
+        if (!Number.isNaN(dt.getTime())) {
+          set.add(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`);
+        }
       });
   });
   return [...set].sort();
 };
-const ACTIVITY_MONTHS = buildActivityMonths();
 
-/* ─── get activity for a given year-month string ─── */
-const getMonthActivity = (ym) => {
+const getMonthActivity = (projects, ym) => {
   if (!ym) return null;
   const [year, month] = ym.split("-").map(Number);
   const mo = month - 1;
-  const starts    = PROJECTS_DATA.filter(p => { const d = new Date(p.startDate); return d.getFullYear() === year && d.getMonth() === mo; }).map(p => ({ project: p.name, date: p.startDate }));
-  const deadlines = PROJECTS_DATA.filter(p => { const d = new Date(p.deadline);  return d.getFullYear() === year && d.getMonth() === mo; }).map(p => ({ project: p.name, date: p.deadline }));
-  const payments  = PROJECTS_DATA.flatMap(p => p.payments.filter(pay => { const d = new Date(pay.dueDate); return d.getFullYear() === year && d.getMonth() === mo; }).map(pay => ({ ...pay, projectName: p.name })));
+  const inMonth = (d) => {
+    if (!d) return false;
+    const dt = new Date(d);
+    return dt.getFullYear() === year && dt.getMonth() === mo;
+  };
+  const starts    = projects.filter((p) => inMonth(p.startDate)).map((p) => ({ project: p.name, date: p.startDate }));
+  const deadlines = projects.filter((p) => inMonth(p.deadline)).map((p) => ({ project: p.name, date: p.deadline }));
+  const payments  = projects.flatMap((p) =>
+    p.payments.filter((pay) => inMonth(pay.dueDate)).map((pay) => ({ ...pay, projectName: p.name }))
+  );
   return { year, month: mo, starts, deadlines, payments };
 };
 
@@ -96,21 +85,20 @@ const TypeChip = ({ type }) => (
   <span className="pay-type-chip" style={{ color: TYPE_COLOR[type] || "#475569", background: `${TYPE_COLOR[type] || "#475569"}12`, border: `1px solid ${TYPE_COLOR[type] || "#475569"}30` }}>{type}</span>
 );
 
-/* ─── Month Year Picker — uses full-page overlay like notification panel ─── */
-const MonthYearPicker = ({ value, onChange }) => {
+/* ─── Month Year Picker ─── */
+const MonthYearPicker = ({ value, onChange, projects, activityMonths }) => {
   const [open, setOpen] = useState(false);
-  const [viewYear, setViewYear] = useState(() => {
-    if (value) return parseInt(value.split("-")[0]);
-    return new Date().getFullYear();
-  });
+  const [viewYear, setViewYear] = useState(() =>
+    value ? parseInt(value.split("-")[0]) : new Date().getFullYear()
+  );
 
-  const activeYears = [...new Set(ACTIVITY_MONTHS.map(m => parseInt(m.split("-")[0])))].sort();
+  const activeYears = [...new Set(activityMonths.map((m) => parseInt(m.split("-")[0])))].sort();
   const minYear = activeYears[0] || new Date().getFullYear();
   const maxYear = activeYears[activeYears.length - 1] || new Date().getFullYear();
 
-  const activeMonthsInYear = ACTIVITY_MONTHS
-    .filter(m => parseInt(m.split("-")[0]) === viewYear)
-    .map(m => parseInt(m.split("-")[1]) - 1);
+  const activeMonthsInYear = activityMonths
+    .filter((m) => parseInt(m.split("-")[0]) === viewYear)
+    .map((m) => parseInt(m.split("-")[1]) - 1);
 
   const displayLabel = value
     ? (() => { const [y, m] = value.split("-"); return `${MONTH_SHORT[parseInt(m)-1]} ${y}`; })()
@@ -154,7 +142,7 @@ const MonthYearPicker = ({ value, onChange }) => {
                 const ym = `${viewYear}-${String(i+1).padStart(2,"0")}`;
                 const hasActivity = activeMonthsInYear.includes(i);
                 const isSelected  = value === ym;
-                const act = hasActivity ? getMonthActivity(ym) : null;
+                const act = hasActivity ? getMonthActivity(projects, ym) : null;
                 const hasOverdue  = act?.payments.some(p => p.status === "overdue");
                 const hasDeadline = act?.deadlines.length > 0;
                 const hasStart    = act?.starts.length > 0;
@@ -189,8 +177,8 @@ const MonthYearPicker = ({ value, onChange }) => {
 };
 
 /* ─── Month Activity Detail ─── */
-const MonthActivityPanel = ({ ym }) => {
-  const activity = getMonthActivity(ym);
+const MonthActivityPanel = ({ projects, ym }) => {
+  const activity = getMonthActivity(projects, ym);
   if (!activity) return null;
   const { year, month, starts, deadlines, payments } = activity;
   if (!starts.length && !deadlines.length && !payments.length) return null;
@@ -254,7 +242,24 @@ const MonthActivityPanel = ({ ym }) => {
 const PaymentCard = ({ p, isOpen, onToggle }) => {
   const sc      = STATUS_CFG[p.status] || STATUS_CFG.pending;
   const overdue = p.status === "overdue";
-  const days    = overdue ? daysOverdue(p.dueDate) : p.status !== "paid" ? daysLeft(p.dueDate) : null;
+  const days    = overdue ? daysOverdue(p.dueDate) : (p.status !== "paid" && p.dueDate) ? daysLeft(p.dueDate) : null;
+
+  const balance = Math.max(Number(p.amount || 0) - Number(p.paidAmount || 0), 0);
+
+  /* Individual receipts behind this invoice, fetched on expand. */
+  const [txns, setTxns] = useState(null);
+  const [txnError, setTxnError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isOpen || txns !== null) return;
+    pcPaymentService
+      .getInvoiceTransactions(p.id)
+      .then((res) => { if (!cancelled) setTxns(res.data?.data ?? []); })
+      .catch(() => { if (!cancelled) { setTxns([]); setTxnError("Could not load payment history."); } });
+    return () => { cancelled = true; };
+  }, [isOpen, p.id, txns]);
+
   return (
     <div className={`pay-card ${isOpen ? "open" : ""} ${overdue ? "overdue" : ""}`}>
       <div className="pay-card__accent" style={{ background: sc.border }} />
@@ -298,11 +303,39 @@ const PaymentCard = ({ p, isOpen, onToggle }) => {
             <div className="pay-detail-block"><p className="pay-detail-label">Invoice No.</p><p className="pay-detail-val">{p.invoiceNo}</p></div>
             <div className="pay-detail-block"><p className="pay-detail-label">Type</p><p className="pay-detail-val">{p.type}</p></div>
             <div className="pay-detail-block"><p className="pay-detail-label">Method</p><p className="pay-detail-val">{p.method}</p></div>
+            <div className="pay-detail-block"><p className="pay-detail-label">Issued On</p><p className="pay-detail-val">{fmt(p.issueDate)}</p></div>
             <div className="pay-detail-block"><p className="pay-detail-label">Due Date</p><p className="pay-detail-val">{fmt(p.dueDate)}</p></div>
             <div className="pay-detail-block"><p className="pay-detail-label">Paid On</p><p className="pay-detail-val" style={{ color: p.paidOn ? "#16a34a" : "#94a3b8" }}>{fmt(p.paidOn)}</p></div>
-            <div className="pay-detail-block"><p className="pay-detail-label">Amount</p><p className="pay-detail-val" style={{ color: "#2563eb", fontWeight: 800 }}>{fmtCr(p.amount)}</p></div>
+            <div className="pay-detail-block"><p className="pay-detail-label">Invoice Amount</p><p className="pay-detail-val" style={{ color: "#2563eb", fontWeight: 800 }}>{fmtCr(p.amount)}</p></div>
+            <div className="pay-detail-block"><p className="pay-detail-label">Received</p><p className="pay-detail-val" style={{ color: "#16a34a", fontWeight: 800 }}>{fmtCr(p.paidAmount)}</p></div>
+            <div className="pay-detail-block"><p className="pay-detail-label">Balance</p><p className="pay-detail-val" style={{ color: balance > 0 ? "#dc2626" : "#16a34a", fontWeight: 800 }}>{fmtCr(balance)}</p></div>
             <div className="pay-detail-block pay-detail-block--wide"><p className="pay-detail-label">Remarks</p><p className="pay-detail-val">{p.remarks || "—"}</p></div>
           </div>
+
+          {/* Receipt history straight from Finance */}
+          <div className="pay-txn-section">
+            <p className="pay-detail-label">Payment History</p>
+            {txns === null ? (
+              <p className="pay-txn-empty">Loading…</p>
+            ) : txnError ? (
+              <p className="pay-txn-empty">{txnError}</p>
+            ) : txns.length === 0 ? (
+              <p className="pay-txn-empty">No payments recorded against this invoice yet.</p>
+            ) : (
+              <div className="pay-txn-list">
+                {txns.map((t) => (
+                  <div key={t.id} className="pay-txn-row">
+                    <span className="pay-txn-date">{fmt(t.payment_date)}</span>
+                    <span className="pay-txn-amt">{fmtCr(t.amount)}</span>
+                    <span className="pay-txn-method">{t.payment_method || "—"}</span>
+                    <span className="pay-txn-ref">{t.reference_number || "—"}</span>
+                    <StatusBadge status={t.status === "completed" ? "paid" : "pending"} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {overdue && <div className="pay-overdue-alert">This payment is {daysOverdue(p.dueDate)} days overdue. Follow up with Project Manager.</div>}
         </div>
       )}
@@ -314,6 +347,7 @@ const PaymentCard = ({ p, isOpen, onToggle }) => {
 const ProjectSection = ({ proj, expandedId, onToggle, filterMonth }) => {
   const payments = filterMonth
     ? proj.payments.filter(p => {
+        if (!p.dueDate) return false;
         const d = new Date(p.dueDate);
         const [y, m] = filterMonth.split("-").map(Number);
         return d.getFullYear() === y && d.getMonth() === m - 1;
@@ -322,11 +356,11 @@ const ProjectSection = ({ proj, expandedId, onToggle, filterMonth }) => {
 
   if (payments.length === 0) return null;
 
-  const totalAmount  = proj.payments.reduce((s, p) => s + p.amount, 0);
+  const totalAmount  = proj.payments.reduce((s, p) => s + Number(p.amount || 0), 0);
   const received     = getPaid(proj.payments);
-  const outstanding  = totalAmount - received;
+  const outstanding  = Math.max(totalAmount - received, 0);
   const receivedPct  = totalAmount ? Math.round((received / totalAmount) * 100) : 0;
-  const profitTarget = Math.round(proj.contractValue * (proj.targetProfit / 100));
+  const profitTarget = Math.round(Number(proj.contractValue || 0) * (Number(proj.targetProfit || 0) / 100));
   const overduePay   = proj.payments.filter(p => p.status === "overdue");
   const pendingPay   = proj.payments.filter(p => p.status === "pending");
 
@@ -354,14 +388,14 @@ const ProjectSection = ({ proj, expandedId, onToggle, filterMonth }) => {
           </div>
         ))}
         <div className="pay-project-stat pay-project-stat--profit">
-          <p className="pay-project-stat__label">Target Profit (35%)</p>
+          <p className="pay-project-stat__label">Target Profit ({proj.targetProfit}%)</p>
           <p className="pay-project-stat__val" style={{ color: "#7c3aed" }}>{fmtCr(profitTarget)}</p>
           <p className="pay-project-stat__note">View only</p>
         </div>
       </div>
       <div className="pay-proj-bar-wrap">
         <div className="pay-proj-bar-track">
-          <div className="pay-proj-bar-fill" style={{ width: `${receivedPct}%` }} />
+          <div className="pay-proj-bar-fill" style={{ width: `${Math.min(receivedPct, 100)}%` }} />
         </div>
         <span className="pay-proj-bar-pct">{receivedPct}%</span>
       </div>
@@ -383,19 +417,52 @@ const ProjectSection = ({ proj, expandedId, onToggle, filterMonth }) => {
    MAIN
 ══════════════════════════════════════════ */
 export default function Payment() {
-  const [expandedId,    setExpanded]    = useState(null);
-  const [filterMonth,   setFilterMonth]   = useState(null);
+  const [projects,    setProjects]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState(null);
+  const [expandedId,  setExpanded]    = useState(null);
+  const [filterMonth, setFilterMonth] = useState(null);
+
+  const loadPayments = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await pcPaymentService.getPayments();
+      setProjects(Array.isArray(res.data?.data) ? res.data.data : []);
+    } catch (err) {
+      console.error("Failed to load payments:", err);
+      const status = err?.response?.status;
+      setError(
+        status === 403
+          ? "You don't have permission to view payments."
+          : status === 401
+            ? "Your session expired. Please log in again."
+            : "Could not load payments from Finance. Please try again."
+      );
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadPayments(); }, [loadPayments]);
 
   const onToggle = (id) => setExpanded(prev => prev === id ? null : id);
 
-  const allPayments      = PROJECTS_DATA.flatMap(p => p.payments);
-  const totalContract    = PROJECTS_DATA.reduce((s, p) => s + p.contractValue, 0);
-  const totalReceived    = PROJECTS_DATA.reduce((s, p) => s + getPaid(p.payments), 0);
-  const totalOutstanding = totalContract - totalReceived;
-  const totalOverdue     = allPayments.filter(p => p.status === "overdue").reduce((s, p) => s + p.amount, 0);
-  const overallPct       = totalContract ? Math.round((totalReceived / totalContract) * 100) : 0;
+  const activityMonths = useMemo(() => buildActivityMonths(projects), [projects]);
 
-  const visibleProjects = PROJECTS_DATA;
+  const allPayments      = useMemo(() => projects.flatMap(p => p.payments), [projects]);
+  const totalContract    = projects.reduce((s, p) => s + Number(p.contractValue || 0), 0);
+  const totalInvoiced    = allPayments.reduce((s, p) => s + Number(p.amount || 0), 0);
+  const totalReceived    = getPaid(allPayments);
+  const totalOutstanding = Math.max(totalInvoiced - totalReceived, 0);
+  const totalOverdue     = allPayments.filter(p => p.status === "overdue").reduce((s, p) => s + Number(p.amount || 0), 0);
+  const overallPct       = totalInvoiced ? Math.round((totalReceived / totalInvoiced) * 100) : 0;
+
+  /* Reset a stale month filter when the data changes. */
+  useEffect(() => {
+    if (filterMonth && !activityMonths.includes(filterMonth)) setFilterMonth(null);
+  }, [activityMonths, filterMonth]);
 
   return (
     <div className="pay-page">
@@ -406,73 +473,109 @@ export default function Payment() {
           <p className="pay-breadcrumb">Project Coordinator / Payments</p>
           <h1 className="pay-title">Payments</h1>
         </div>
+        <button className="pay-refresh-btn" onClick={loadPayments} disabled={loading}>
+          {loading ? "Refreshing…" : "↻ Refresh"}
+        </button>
       </div>
 
-      {/* SUMMARY */}
-      <div className="pay-summary">
-        {[
-          { label: "Total Contract Value", val: fmtCr(totalContract),    color: "#0a2540" },
-          { label: "Amount Received",      val: fmtCr(totalReceived),    color: "#16a34a" },
-          { label: "Outstanding",          val: fmtCr(totalOutstanding), color: "#2563eb" },
-          { label: "Overdue Amount",        val: fmtCr(totalOverdue),     color: "#dc2626" },
-        ].map(s => (
-          <div key={s.label} className="pay-summary-card">
-            <p className="pay-summary-card__label">{s.label}</p>
-            <p className="pay-summary-card__val" style={{ color: s.color }}>{s.val}</p>
-          </div>
-        ))}
-      </div>
+      {loading && projects.length === 0 && (
+        <div className="pay-empty">Loading payments from Finance…</div>
+      )}
 
-      {/* PROGRESS */}
-      <div className="pay-progress-card">
-        <div className="pay-progress-card__top">
-          <span className="pay-progress-card__label">Overall Payment Progress — All Projects</span>
-          <span className="pay-progress-card__pct">{overallPct}% received</span>
-        </div>
-        <div className="pay-progress-track">
-          <div className="pay-progress-fill pay-progress-fill--paid" style={{ width: `${overallPct}%` }} />
-        </div>
-      </div>
-
-      {/* FILTER ROW — All Projects label + month picker */}
-      <div className="pay-filter-bar">
-        <div className="pay-all-projects-tag">
-          All Projects
-          <span className="pay-tab-count">{allPayments.length}</span>
-        </div>
-        <MonthYearPicker value={filterMonth} onChange={setFilterMonth} />
-      </div>
-
-      {/* ACTIVE FILTER CHIPS */}
-      {filterMonth && (
-        <div className="pay-active-filters">
-          <span className="pay-filter-chip">
-            {MONTH_NAMES[parseInt(filterMonth.split("-")[1]) - 1]} {filterMonth.split("-")[0]}
-            <button onClick={() => setFilterMonth(null)}>✕</button>
-          </span>
+      {error && (
+        <div className="pay-error">
+          {error}
+          <button onClick={loadPayments}>Retry</button>
         </div>
       )}
 
-      {/* MONTH ACTIVITY PANEL */}
-      {filterMonth && <MonthActivityPanel ym={filterMonth} />}
-
-      {/* PROJECT SECTIONS */}
-      {visibleProjects.map(proj => (
-        <ProjectSection key={proj.id} proj={proj}
-          expandedId={expandedId} onToggle={onToggle}
-          filterMonth={filterMonth} />
-      ))}
-
-      {filterMonth && visibleProjects.every(proj =>
-        proj.payments.filter(p => {
-          const d = new Date(p.dueDate);
-          const [y, m] = filterMonth.split("-").map(Number);
-          return d.getFullYear() === y && d.getMonth() === m - 1;
-        }).length === 0
-      ) && (
+      {!loading && !error && projects.length === 0 && (
         <div className="pay-empty">
-          No payments due in {MONTH_NAMES[parseInt(filterMonth.split("-")[1]) - 1]} {filterMonth.split("-")[0]}.
+          No projects are assigned to you yet, so there are no payments to show.
         </div>
+      )}
+
+      {projects.length > 0 && (
+        <>
+          {/* SUMMARY */}
+          <div className="pay-summary">
+            {[
+              { label: "Total Contract Value", val: fmtCr(totalContract),    color: "#0a2540" },
+              { label: "Amount Received",      val: fmtCr(totalReceived),    color: "#16a34a" },
+              { label: "Outstanding",          val: fmtCr(totalOutstanding), color: "#2563eb" },
+              { label: "Overdue Amount",       val: fmtCr(totalOverdue),     color: "#dc2626" },
+            ].map(s => (
+              <div key={s.label} className="pay-summary-card">
+                <p className="pay-summary-card__label">{s.label}</p>
+                <p className="pay-summary-card__val" style={{ color: s.color }}>{s.val}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* PROGRESS */}
+          <div className="pay-progress-card">
+            <div className="pay-progress-card__top">
+              <span className="pay-progress-card__label">Overall Payment Progress — All Projects</span>
+              <span className="pay-progress-card__pct">{overallPct}% received</span>
+            </div>
+            <div className="pay-progress-track">
+              <div className="pay-progress-fill pay-progress-fill--paid" style={{ width: `${Math.min(overallPct, 100)}%` }} />
+            </div>
+          </div>
+
+          {/* FILTER ROW */}
+          <div className="pay-filter-bar">
+            <div className="pay-all-projects-tag">
+              All Projects
+              <span className="pay-tab-count">{allPayments.length}</span>
+            </div>
+            <MonthYearPicker
+              value={filterMonth}
+              onChange={setFilterMonth}
+              projects={projects}
+              activityMonths={activityMonths}
+            />
+          </div>
+
+          {/* ACTIVE FILTER CHIPS */}
+          {filterMonth && (
+            <div className="pay-active-filters">
+              <span className="pay-filter-chip">
+                {MONTH_NAMES[parseInt(filterMonth.split("-")[1]) - 1]} {filterMonth.split("-")[0]}
+                <button onClick={() => setFilterMonth(null)}>✕</button>
+              </span>
+            </div>
+          )}
+
+          {/* MONTH ACTIVITY PANEL */}
+          {filterMonth && <MonthActivityPanel projects={projects} ym={filterMonth} />}
+
+          {/* PROJECT SECTIONS */}
+          {projects.map(proj => (
+            <ProjectSection key={proj.id} proj={proj}
+              expandedId={expandedId} onToggle={onToggle}
+              filterMonth={filterMonth} />
+          ))}
+
+          {allPayments.length === 0 && (
+            <div className="pay-empty">
+              Finance hasn't raised any invoices for your projects yet.
+            </div>
+          )}
+
+          {filterMonth && projects.every(proj =>
+            proj.payments.filter(p => {
+              if (!p.dueDate) return false;
+              const d = new Date(p.dueDate);
+              const [y, m] = filterMonth.split("-").map(Number);
+              return d.getFullYear() === y && d.getMonth() === m - 1;
+            }).length === 0
+          ) && (
+            <div className="pay-empty">
+              No payments due in {MONTH_NAMES[parseInt(filterMonth.split("-")[1]) - 1]} {filterMonth.split("-")[0]}.
+            </div>
+          )}
+        </>
       )}
 
     </div>

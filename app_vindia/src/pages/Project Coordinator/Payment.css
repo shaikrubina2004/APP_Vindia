@@ -19,6 +19,10 @@
 
 /* ── header ── */
 .pay-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 22px;
   animation: fadeUp .4s ease both;
 }
@@ -877,4 +881,84 @@
 @media (max-width: 600px) {
   .pay-filter-bar { flex-wrap: wrap; }
   .myp-panel { left: auto; right: 0; }
+}
+/* ══════════════════════════════════════════
+   Added for the live Finance-backed view
+══════════════════════════════════════════ */
+
+.pay-refresh-btn {
+  align-self: flex-start;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.pay-refresh-btn:hover:not(:disabled) { background: #dbeafe; border-color: #93c5fd; }
+.pay-refresh-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+.pay-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 14px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 10px;
+}
+.pay-error button {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: #dc2626;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+/* Payment history inside an expanded card */
+.pay-txn-section { margin-top: 18px; }
+
+.pay-txn-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pay-txn-row {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr 1fr 1.1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: 13px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.pay-txn-date   { color: #475569; font-weight: 600; }
+.pay-txn-amt    { color: #16a34a; font-weight: 800; }
+.pay-txn-method { color: #475569; }
+.pay-txn-ref    { color: #94a3b8; font-size: 12px; overflow-wrap: anywhere; }
+
+.pay-txn-empty {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+@media (max-width: 720px) {
+  .pay-txn-row { grid-template-columns: 1fr 1fr; row-gap: 6px; }
 }

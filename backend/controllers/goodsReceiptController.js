@@ -144,7 +144,8 @@ exports.createGoodsReceipt = async (req, res) => {
       `Goods receipt ${grn_code} confirmed.`,
       "/operations/logistics/deliveries",
       "ok",
-      projectId
+      projectId,
+      delivery_id
     );
 
     res.status(201).json({ ...gr.rows[0], items: itemsResult.rows });

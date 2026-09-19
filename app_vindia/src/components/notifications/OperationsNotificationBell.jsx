@@ -1,7 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import "./OperationsNotificationBell.css";
 
+const API = "http://localhost:5000/api/operations-notifications";
+
+/* Every type the Operations bell understands. */
 const TYPE_CFG = {
   delivery:  { label: "Delivery",  color: "#0ea5e9", bg: "#e0f2fe" },
   delay:     { label: "Delay",     color: "#f59e0b", bg: "#fffbeb" },
@@ -18,44 +21,82 @@ const SEV_COLOR = {
   ok: "#10b981",
 };
 
-const FILTERS = ["all", "delivery", "delay", "receipt", "low_stock", "incident", "task"];
+/* ── Only what each role actually needs in their bell ──
+   Logistics tracks movement (dispatch → delay → confirmed receipt).
+   Inventory tracks stock (incoming loads → goods receipt → low stock).
+   Keep these in sync with ROLE_TYPES in
+   backend/controllers/operationsNotificationsController.js            */
+const ROLE_FILTERS = {
+  logistics_coordinator: ["all", "delivery", "delay", "receipt", "incident", "task"],
+  inventory_controller:  ["all", "delivery", "low_stock", "receipt", "incident", "task"],
+};
+
+/* A couple of labels read better when they're role-specific. */
+const ROLE_TYPE_OVERRIDES = {
+  inventory_controller: {
+    delivery: { label: "Incoming", color: "#0ea5e9", bg: "#e0f2fe" },
+  },
+};
+
+const ROLE_TITLE = {
+  logistics_coordinator: "Logistics",
+  inventory_controller: "Inventory",
+};
+
+const DEFAULT_FILTERS = ["all", "delivery", "delay", "receipt", "low_stock", "incident", "task"];
 
 /**
  * Shared bell for Logistics Coordinator and Inventory Controller.
- * `routes` maps a notification `type` to the page it should open —
- * pass a different map per role from Navbar.jsx so the same component
- * sends each role to their own pages.
  *
- * routes = {
- *   default: "/operations/inventory/dashboard",
- *   delivery: "/operations/inventory/stock-in",
- *   low_stock: "/operations/inventory/stock-out",
- *   ...
- * }
+ * `role`   decides which filter tabs and labels are shown, so the two
+ *          roles get genuinely different bells from one component.
+ * `routes` maps a notification `type` to the page it should open —
+ *          pass a different map per role from Navbar.jsx.
  */
-export default function OperationsNotificationBell({ userId, routes = {} }) {
+export default function OperationsNotificationBell({ userId, role, routes = {} }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("all");
   const [notifs, setNotifs] = useState([]);
   const [showRead, setShowRead] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const filters = ROLE_FILTERS[role] ?? DEFAULT_FILTERS;
+  const typeCfg = useMemo(
+    () => ({ ...TYPE_CFG, ...(ROLE_TYPE_OVERRIDES[role] ?? {}) }),
+    [role]
+  );
+
+  /* Guard against stale tabs when the role changes. */
+  useEffect(() => {
+    if (!filters.includes(filter)) setFilter("all");
+  }, [filters, filter]);
 
   const fetchNotifs = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/operations-notifications/${userId}`);
+      setLoading(true);
+      const res = await fetch(`${API}/${userId}`);
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const data = await res.json();
-      setNotifs(Array.isArray(data) ? data : []);
+      // Only keep types this role should ever see, even if older rows exist.
+      const allowed = filters.filter((f) => f !== "all");
+      setNotifs(
+        Array.isArray(data) ? data.filter((n) => allowed.includes(n.type)) : []
+      );
     } catch (err) {
       console.error("Notification fetch error:", err);
+      setNotifs([]);
+    } finally {
+      setLoading(false);
     }
-  }, [userId]);
+  }, [userId, filters]);
 
   useEffect(() => { fetchNotifs(); }, [fetchNotifs]);
 
   useEffect(() => {
     if (!userId) return;
-    const interval = setInterval(fetchNotifs, 10000);
+    const interval = setInterval(fetchNotifs, 30000);
     return () => clearInterval(interval);
   }, [userId, fetchNotifs]);
 
@@ -69,14 +110,14 @@ export default function OperationsNotificationBell({ userId, routes = {} }) {
   const markRead = async (id) => {
     setNotifs((p) => p.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     try {
-      await fetch(`http://localhost:5000/api/operations-notifications/${id}/read`, { method: "PATCH" });
+      await fetch(`${API}/${id}/read`, { method: "PATCH" });
     } catch (err) { console.error(err); }
   };
 
   const markAllRead = async () => {
     setNotifs((p) => p.map((n) => ({ ...n, is_read: true })));
     try {
-      await fetch(`http://localhost:5000/api/operations-notifications/read-all/${userId}`, { method: "PATCH" });
+      await fetch(`${API}/read-all/${userId}`, { method: "PATCH" });
     } catch (err) { console.error(err); }
   };
 
@@ -89,8 +130,8 @@ export default function OperationsNotificationBell({ userId, routes = {} }) {
 
   const formatTime = (ts) => {
     const d = new Date(ts);
-    const now = new Date();
-    const diff = Math.floor((now - d) / 60000);
+    if (Number.isNaN(d.getTime())) return "";
+    const diff = Math.floor((Date.now() - d.getTime()) / 60000);
     if (diff < 1) return "Just now";
     if (diff < 60) return `${diff}m ago`;
     if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
@@ -102,7 +143,7 @@ export default function OperationsNotificationBell({ userId, routes = {} }) {
   const readList = byType.filter((n) => n.is_read);
 
   const NotifCard = ({ n, dimmed = false }) => {
-    const tc = TYPE_CFG[n.type] ?? TYPE_CFG.task;
+    const tc = typeCfg[n.type] ?? typeCfg.task;
     return (
       <div className={`notif-item ${dimmed ? "read" : "unread"}`} onClick={(e) => handleGoToPage(e, n)}>
         <div className="notif-item__dot" style={{ background: SEV_COLOR[n.severity] ?? SEV_COLOR.info }} />
@@ -138,7 +179,9 @@ export default function OperationsNotificationBell({ userId, routes = {} }) {
           <div className="notif-panel" onClick={(e) => e.stopPropagation()}>
             <div className="notif-panel__header">
               <div>
-                <h3 className="notif-panel__title">Notifications</h3>
+                <h3 className="notif-panel__title">
+                  {ROLE_TITLE[role] ? `${ROLE_TITLE[role]} notifications` : "Notifications"}
+                </h3>
                 {unreadCount > 0 && <span className="notif-panel__unread">{unreadCount} unread</span>}
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -150,13 +193,13 @@ export default function OperationsNotificationBell({ userId, routes = {} }) {
             </div>
 
             <div className="notif-filters">
-              {FILTERS.map((f) => (
+              {filters.map((f) => (
                 <button
                   key={f}
                   className={`notif-filter-btn ${filter === f ? "active" : ""}`}
                   onClick={() => setFilter(f)}
                 >
-                  {f === "all" ? "All" : (TYPE_CFG[f]?.label ?? f)}
+                  {f === "all" ? "All" : (typeCfg[f]?.label ?? f)}
                 </button>
               ))}
             </div>
@@ -164,7 +207,11 @@ export default function OperationsNotificationBell({ userId, routes = {} }) {
             <div className="notif-list">
               {unreadList.length === 0 ? (
                 <p className="notif-empty">
-                  {readList.length === 0 ? "You're all caught up ✓" : "No new notifications"}
+                  {loading
+                    ? "Loading…"
+                    : readList.length === 0
+                      ? "You're all caught up ✓"
+                      : "No new notifications"}
                 </p>
               ) : (
                 unreadList.map((n) => <NotifCard key={n.id} n={n} dimmed={false} />)

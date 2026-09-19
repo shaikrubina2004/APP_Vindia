@@ -108,7 +108,8 @@ exports.createIssue = async (req, res) => {
         `${remaining} ${itemInfo.rows[0].unit} left — at or below minimum (${itemInfo.rows[0].minimum_stock}).`,
         "/operations/inventory/stock-out",
         remaining <= 0 ? "critical" : "warn",
-        project_id
+        project_id,
+        item_id
       );
     }
 
