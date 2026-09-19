@@ -110,6 +110,7 @@ const inventoryItemRoutes = require("./routes/inventoryItemRoutes");
 const deliveryRoutes = require("./routes/deliveryRoutes");
 const goodsReceiptRoutes = require("./routes/goodsReceiptRoutes");
 const inventoryTransactionRoutes = require("./routes/inventoryTransactionRoutes");
+const operationsNotificationRoutes = require("./routes/operationsNotifications");
 
 /* ✅ Accountant */
 const accountantRoutes = require("./routes/accountantRoutes");
@@ -213,6 +214,8 @@ app.use("/api/inventory/items", inventoryItemRoutes);
 app.use("/api/inventory", inventoryTransactionRoutes);
 app.use("/api/deliveries", deliveryRoutes);
 app.use("/api/goods-receipts", goodsReceiptRoutes);
+app.use("/api/operations-notifications", operationsNotificationRoutes);
+
 /* Shared */
 app.use("/api/drawings", drawingUploadRoutes);
 
