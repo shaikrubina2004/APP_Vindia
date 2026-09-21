@@ -17,6 +17,14 @@
   color: var(--neutral-900);
 }
 
+.proc-dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .proc-dash-header h1 {
   margin: 0 0 0.25rem;
   font-size: 1.5rem;

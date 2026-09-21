@@ -36,11 +36,6 @@ export const procurementOfficerMenu = [
   },
 
   {
-    name: "Reports",
-    path: "/operations/procurement/reports",
-    icon: "bar-chart-2",
-  },
-  {
     name: "Daily Report",
     path: "/operations/procurement/daily-report",
     icon: "clipboard",

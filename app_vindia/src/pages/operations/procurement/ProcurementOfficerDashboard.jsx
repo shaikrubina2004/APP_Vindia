@@ -2,10 +2,22 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import procurementService from "../../../services/procurementService";
+import CheckInButton from "../../../SharedResourse/CheckInButton";
 import "./ProcurementOfficerDashboard.css";
 
 const ProcurementOfficerDashboard = () => {
   const navigate = useNavigate();
+
+  const [user] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  });
+
+  const employeeId = user?.employee_id || user?.employeeId || user?.id || null;
+  const designation = user?.designation || user?.role || null;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -66,8 +78,13 @@ const ProcurementOfficerDashboard = () => {
   return (
     <div className="proc-dash">
       <div className="proc-dash-header">
-        <h1>Procurement Dashboard</h1>
-        <p>Overview of material requests waiting on a PO and current purchase orders.</p>
+        <div>
+          <h1>Procurement Dashboard</h1>
+          <p>Overview of material requests waiting on a PO and current purchase orders.</p>
+        </div>
+        {employeeId && (
+          <CheckInButton employeeId={employeeId} designation={designation} />
+        )}
       </div>
 
       <div className="proc-dash-metrics">
