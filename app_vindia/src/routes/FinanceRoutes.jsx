@@ -14,27 +14,20 @@ import FinanceSettings from "../pages/Finance/FinanceSettings";
 
 import FinanceDailyUpdate from "../pages/Finance/FinanceDailyUpdate";
 import FinanceDailyUpdateReview from "../pages/Finance/FinanceDailyUpdateReview";
-
+import AppShell from "../components/incidents/AppShell";
+import RFIPage from "../pages/StructuralEngineer/RFI";
+import RFIDetailPage from "../pages/StructuralEngineer/RFIDetails";
 // Add this only if the file exists
 // import AccountantDailyUpdate from "../pages/Finance/AccountantDailyUpdate";
 
 import ProtectedRoute from "./ProtectedRoute";
 import { ROLES } from "../roles";
 
-const ACCOUNTANT_ACCESS = [
-  ROLES.ACCOUNTANT,
-  ROLES.FINANCE_MANAGER,
-  ROLES.CEO,
-];
+const ACCOUNTANT_ACCESS = [ROLES.ACCOUNTANT, ROLES.FINANCE_MANAGER, ROLES.CEO];
 
-const MANAGER_ACCESS = [
-  ROLES.FINANCE_MANAGER,
-  ROLES.CEO,
-];
+const MANAGER_ACCESS = [ROLES.FINANCE_MANAGER, ROLES.CEO];
 
-const FINANCE_MANAGER_ONLY = [
-  ROLES.FINANCE_MANAGER,
-];
+const FINANCE_MANAGER_ONLY = [ROLES.FINANCE_MANAGER];
 
 const FinanceRoutes = () => {
   return (
@@ -160,6 +153,42 @@ const FinanceRoutes = () => {
         element={
           <ProtectedRoute allowedRoles={FINANCE_MANAGER_ONLY}>
             <FinanceDailyUpdateReview />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+    INCIDENTS + TASKS
+    Shared AppShell component — same one Logistics/Inventory/
+    Procurement use. Task Queue is a tab inside it (?page=tasks).
+====================================================== */}
+      <Route
+        path="/incidents"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <AppShell key="finance-incidents" />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+    RFI
+    Shared RFIPage/RFIDetailPage — same one Logistics/Inventory
+    already use.
+====================================================== */}
+      <Route
+        path="/rfi"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <RFIPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/rfi/:id"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <RFIDetailPage />
           </ProtectedRoute>
         }
       />

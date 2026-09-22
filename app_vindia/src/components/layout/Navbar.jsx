@@ -95,6 +95,27 @@ const INVENTORY_ROUTES = {
   task:      "/operations/inventory/incidents?page=tasks",
 };
 
+const FINANCE_ROUTES = {
+  default:  "/finance-manager/dashboard",
+  incident: "/finance-manager/incidents",
+  task:     "/finance-manager/incidents?page=tasks",
+};
+
+const PROCUREMENT_ROUTES = {
+  default:  "/operations/procurement/dashboard",
+  receipt:  "/operations/procurement/purchase-orders",
+  delay:    "/operations/procurement/purchase-orders",
+  incident: "/operations/procurement/incidents",
+  task:     "/operations/procurement/incidents?page=tasks",
+};
+
+const ProcurementBell = ({ userId }) => (
+  <OperationsNotificationBell
+    userId={userId}
+    role="procurement_officer"
+    routes={PROCUREMENT_ROUTES}
+  />
+);
 const LogisticsBell = ({ userId }) => (
   <OperationsNotificationBell
     userId={userId}
@@ -111,6 +132,14 @@ const InventoryBell = ({ userId }) => (
   />
 );
 
+
+const FinanceBell = ({ userId }) => (
+  <OperationsNotificationBell
+    userId={userId}
+    role="finance_manager"
+    routes={FINANCE_ROUTES}
+  />
+);
 const BdaBell = ({ userId }) => <BDANotificationBell bdaEmail={userId} />;
 
 /* ✅ Role-based notification mapping.
@@ -131,6 +160,8 @@ const NOTIFICATION_COMPONENTS = {
   business_development_analyst:   BdaBell,
   logistics_coordinator: LogisticsBell,
   inventory_controller:  InventoryBell,
+  finance_manager:  FinanceBell,
+  
 };
 
 function Navbar() {

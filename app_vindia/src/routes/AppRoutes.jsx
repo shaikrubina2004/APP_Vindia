@@ -1099,15 +1099,35 @@ const AppRoutes = () => {
         />
 
         <Route
-  path="/operations/procurement/incidents"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
-      <ProcurementOfficerLayout>
-        <AppShell key="proc-incidents" />
-      </ProcurementOfficerLayout>
-    </ProtectedRoute>
-  }
-/>
+          path="/operations/procurement/incidents"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <AppShell key="proc-incidents" />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/procurement/rfi"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <RFIPage />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/procurement/rfi/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <RFIDetailPage />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ══ FALLBACK ══════════════════════════════════════ */}
         <Route

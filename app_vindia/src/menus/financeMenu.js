@@ -37,6 +37,21 @@ const financeMenu = [
     icon: "users",
   },
   {
+    name: "Incidents",
+    path: "/finance-manager/incidents",
+    icon: "alert-triangle",
+  },
+  {
+    name: "Tasks",
+    path: "/finance-manager/incidents?page=tasks",
+    icon: "check-square",
+  },
+  {
+    name: "RFI",
+    path: "/finance-manager/rfi",
+    icon: "message-square",
+  },
+  {
     name: "Daily Update",
     path: "/finance-manager/daily-update",
     icon: "send",

@@ -29,6 +29,9 @@ const SEV_COLOR = {
 const ROLE_FILTERS = {
   logistics_coordinator: ["all", "delivery", "delay", "receipt", "incident", "task"],
   inventory_controller:  ["all", "delivery", "low_stock", "receipt", "incident", "task"],
+  finance_manager:       ["all", "incident", "task"],
+  procurement_officer:   ["all", "receipt", "delay", "incident", "task"],
+
 };
 
 /* A couple of labels read better when they're role-specific. */
@@ -41,6 +44,10 @@ const ROLE_TYPE_OVERRIDES = {
 const ROLE_TITLE = {
   logistics_coordinator: "Logistics",
   inventory_controller: "Inventory",
+  finance_manager: "Finance",
+  procurement_officer: "Procurement",
+
+
 };
 
 const DEFAULT_FILTERS = ["all", "delivery", "delay", "receipt", "low_stock", "incident", "task"];

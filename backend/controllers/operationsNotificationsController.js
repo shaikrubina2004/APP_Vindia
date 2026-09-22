@@ -27,6 +27,13 @@ const ROLE_TYPES = {
     "incident",
     "task",
   ],
+  procurement_officer: [
+    "receipt", "delay", "incident", "task",
+  ],
+
+   finance_manager: [
+    "incident", "task",
+  ],
 };
 
 const isTypeAllowed = (roleCode, type) => {
