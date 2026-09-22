@@ -2,7 +2,7 @@ const accountantMenu = [
   {
     name: "Dashboard",
     path: "/accountant/dashboard",
-    icon: "bar-chart-2",
+    icon: "home",
   },
   {
     name: "Invoices",
@@ -10,24 +10,14 @@ const accountantMenu = [
     icon: "file-text",
   },
   {
-    name: "Budget Management",
-    path: "/accountant/budget",
-    icon: "credit-card",
-  },
-  {
     name: "Payments",
     path: "/accountant/payments",
-    icon: "dollar-sign",
+    icon: "credit-card",
   },
   {
     name: "Expenses",
     path: "/accountant/expenses",
-    icon: "trending-down",
-  },
-  {
-    name: "Cost Analysis",
-    path: "/accountant/cost-analysis",
-    icon: "trending-up",
+    icon: "file-text",
   },
   {
     name: "Vendor Management",
@@ -35,14 +25,19 @@ const accountantMenu = [
     icon: "users",
   },
   {
-    name: "Receivables & Payables",
-    path: "/accountant/receivables-payables",
-    icon: "repeat",
+    name: "Journal Entries",
+    path: "/accountant/journal-entries",
+    icon: "book-open",
   },
   {
-    name: "Daily Update",
-    path: "/accountant/daily-update",
-    icon: "send",
+    name: "Bank Reconciliation",
+    path: "/accountant/bank-reconciliation",
+    icon: "credit-card",
+  },
+  {
+    name: "Reports",
+    path: "/accountant/reports",
+    icon: "pie-chart",
   },
 ];
 

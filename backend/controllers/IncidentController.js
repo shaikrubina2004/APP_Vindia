@@ -11,6 +11,9 @@ const {
 const {
   insertNotification: insertOperationsNotification,
 } = require("./operationsNotificationsController");
+const {
+  insertNotification: insertSiteEngineerNotification,
+} = require("./siteEngineerNotificationsController");
 /* ─── HELPERS ─────────────────────────────────────────────── */
 
 function calcDeadline(priority) {
@@ -210,6 +213,25 @@ async function notifyByRole(
         console.log(`✅ Architect Notification → user:${userId} type:${type}`);
       } catch (err) {
         console.error("Architect Notification error:", err.message);
+      }
+    } else if (
+      roleCode === "site_engineer" ||
+      roleName.includes("site engineer")
+    ) {
+      // Site Engineer reads from site_engineer_notifications, not pc_notifications.
+      try {
+        await insertSiteEngineerNotification(
+          userId,
+          type,
+          title,
+          description,
+          link && link.startsWith("/site-engineer") ? link : null,
+          severity,
+          projectId,
+        );
+        console.log(`✅ Site Engineer Notification → user:${userId} type:${type}`);
+      } catch (err) {
+        console.error("Site Engineer Notification error:", err.message);
       }
     } else {
       await safeNotify(
@@ -419,6 +441,12 @@ exports.createIncident = async (req, res) => {
     project_id,
   } = req.body;
   const created_by = req.user?.id ?? null;
+
+  if (!title?.trim())
+    return res
+      .status(400)
+      .json({ success: false, message: "Title is required" });
+
   await createSENotification({
     message: `New Incident Assigned`,
     description: title,
@@ -431,11 +459,6 @@ exports.createIncident = async (req, res) => {
     assigned_to_user_id,
     created_by,
   });
-
-  if (!title?.trim())
-    return res
-      .status(400)
-      .json({ success: false, message: "Title is required" });
 
   try {
     const deadline_at = calcDeadline(priority);

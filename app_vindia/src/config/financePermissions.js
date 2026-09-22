@@ -14,7 +14,7 @@ export const FINANCE_PERMISSIONS = {
 
     vendors: ["view", "create", "edit"],
 
-    journalEntries: ["view", "create", "edit", "post"],
+    journalEntries: ["view", "create", "edit", "submit"],
 
     ledger: ["view"],
 
@@ -42,7 +42,7 @@ export const FINANCE_PERMISSIONS = {
 
     vendors: ["view", "approve", "reject"],
 
-    journalEntries: ["view", "approve", "post", "reverse"],
+    journalEntries: ["view", "approve", "post", "reverse"], // approve: submitted->approved, post: approved->posted
 
     ledger: ["view", "export"],
 

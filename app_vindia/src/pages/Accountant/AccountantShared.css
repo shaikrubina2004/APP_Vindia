@@ -1,0 +1,311 @@
+/* =========================================================
+   ACCOUNTANT SHARED STYLES — v2, polished
+   Used by every new Accountant page. Self-contained — does not
+   touch Finance Manager CSS.
+========================================================= */
+
+.acs-root {
+  --acs-primary: #1a5f8a;
+  --acs-primary-dark: #0e3f5e;
+  --acs-primary-light: #eaf3fa;
+  --acs-text: #16232e;
+  --acs-muted: #64778c;
+  --acs-border: #e3e9f0;
+  --acs-bg: #f5f8fb;
+  --acs-white: #ffffff;
+  --acs-danger: #d64550;
+  --acs-danger-bg: #fdecee;
+  --acs-success: #1e8e5a;
+  --acs-success-bg: #e7f6ee;
+  --acs-warn: #b8860b;
+  --acs-warn-bg: #fdf3dc;
+  --acs-info: #2a5da8;
+  --acs-info-bg: #e8eefb;
+  --acs-radius: 16px;
+  --acs-radius-sm: 10px;
+  --acs-shadow: 0 1px 2px rgba(22, 35, 46, 0.04), 0 8px 24px rgba(22, 35, 46, 0.06);
+
+  padding: 28px 32px 48px;
+  background: var(--acs-bg);
+  min-height: 100%;
+  color: var(--acs-text);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Header ───────────────────────────────────────────── */
+
+.acs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.acs-header h1 {
+  margin: 0 0 6px;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.acs-header p {
+  margin: 0;
+  color: var(--acs-muted);
+  font-size: 0.92rem;
+  max-width: 620px;
+  line-height: 1.5;
+}
+
+/* ── Buttons ──────────────────────────────────────────── */
+
+.acs-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 9px;
+  background: var(--acs-primary);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.87rem;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+.acs-btn:hover { background: var(--acs-primary-dark); }
+.acs-btn:active { transform: translateY(1px); }
+.acs-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.acs-btn-secondary {
+  background: var(--acs-white);
+  color: var(--acs-primary);
+  border: 1px solid var(--acs-border);
+}
+.acs-btn-secondary:hover { background: var(--acs-primary-light); }
+.acs-btn-danger { background: var(--acs-danger); }
+.acs-btn-danger:hover { background: #b8353f; }
+.acs-btn-success { background: var(--acs-success); }
+.acs-btn-success:hover { background: #166b44; }
+.acs-btn-sm { padding: 6px 14px; font-size: 0.78rem; border-radius: 7px; }
+
+/* ── States (loading / error) ────────────────────────── */
+
+.acs-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 56px 16px;
+  background: var(--acs-white);
+  border: 1px solid var(--acs-border);
+  border-radius: var(--acs-radius);
+  text-align: center;
+  box-shadow: var(--acs-shadow);
+}
+.acs-state p { margin: 0; color: var(--acs-muted); font-size: 0.92rem; }
+.acs-state-error p { color: var(--acs-danger); font-weight: 500; }
+
+.acs-spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--acs-border);
+  border-top-color: var(--acs-primary);
+  border-radius: 50%;
+  animation: acs-spin 0.8s linear infinite;
+}
+@keyframes acs-spin { to { transform: rotate(360deg); } }
+
+/* ── Panel / table ────────────────────────────────────── */
+
+.acs-panel {
+  background: var(--acs-white);
+  border: 1px solid var(--acs-border);
+  border-radius: var(--acs-radius);
+  overflow: hidden;
+  box-shadow: var(--acs-shadow);
+}
+
+.acs-table-wrap { overflow-x: auto; }
+
+.acs-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.acs-table th {
+  text-align: left;
+  padding: 13px 18px;
+  background: #f7fafc;
+  color: var(--acs-muted);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--acs-border);
+  white-space: nowrap;
+}
+.acs-table td {
+  padding: 13px 18px;
+  border-top: 1px solid var(--acs-border);
+  vertical-align: middle;
+}
+.acs-table tbody tr { transition: background 0.1s ease; }
+.acs-table tbody tr:hover { background: #f9fbfd; }
+.acs-table tbody tr:nth-child(even) { background: #fbfcfe; }
+.acs-table tbody tr:nth-child(even):hover { background: #f4f8fb; }
+
+/* ── Badges ───────────────────────────────────────────── */
+
+.acs-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  line-height: 1.4;
+}
+.acs-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.acs-badge-draft, .acs-badge-pending, .acs-badge-in_progress {
+  background: var(--acs-warn-bg); color: var(--acs-warn);
+}
+.acs-badge-submitted {
+  background: var(--acs-info-bg); color: var(--acs-info);
+}
+.acs-badge-approved {
+  background: #eaf5ea; color: #3a8a3a;
+}
+.acs-badge-posted, .acs-badge-completed, .acs-badge-reconciled,
+.acs-badge-active, .acs-badge-paid, .acs-badge-filed {
+  background: var(--acs-success-bg); color: var(--acs-success);
+}
+.acs-badge-reversed, .acs-badge-rejected, .acs-badge-inactive,
+.acs-badge-overdue {
+  background: var(--acs-danger-bg); color: var(--acs-danger);
+}
+.acs-badge-partially-paid {
+  background: #fdf3dc; color: var(--acs-warn);
+}
+
+/* ── Empty state ──────────────────────────────────────── */
+
+.acs-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--acs-muted);
+  font-size: 0.9rem;
+}
+
+/* ── Create/filter form ──────────────────────────────── */
+
+.acs-form {
+  background: var(--acs-white);
+  border: 1px solid var(--acs-border);
+  border-radius: var(--acs-radius);
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  align-items: end;
+  box-shadow: var(--acs-shadow);
+}
+.acs-field { display: flex; flex-direction: column; gap: 5px; }
+.acs-field label { font-size: 0.74rem; color: var(--acs-muted); font-weight: 600; letter-spacing: 0.01em; }
+.acs-field input, .acs-field select, .acs-field textarea {
+  padding: 9px 11px;
+  border: 1px solid var(--acs-border);
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-family: inherit;
+  color: var(--acs-text);
+  background: var(--acs-white);
+  transition: border-color 0.15s ease;
+}
+.acs-field input:focus, .acs-field select:focus, .acs-field textarea:focus {
+  outline: none;
+  border-color: var(--acs-primary);
+  box-shadow: 0 0 0 3px var(--acs-primary-light);
+}
+.acs-form-actions { grid-column: 1 / -1; display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+
+.acs-error-text { color: var(--acs-danger); font-size: 0.82rem; margin: 8px 0 0; font-weight: 500; }
+
+/* ── Summary cards ────────────────────────────────────── */
+
+.acs-summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.acs-summary-card {
+  background: var(--acs-white);
+  border: 1px solid var(--acs-border);
+  border-radius: var(--acs-radius-sm);
+  padding: 16px 18px;
+  box-shadow: var(--acs-shadow);
+}
+.acs-summary-card .acs-summary-label {
+  font-size: 0.72rem;
+  color: var(--acs-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.acs-summary-card .acs-summary-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-top: 6px;
+  letter-spacing: -0.01em;
+}
+
+/* ── Section blocks (Reports/Cost Analysis) ──────────── */
+
+.acs-section {
+  background: var(--acs-white);
+  border: 1px solid var(--acs-border);
+  border-radius: var(--acs-radius);
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  box-shadow: var(--acs-shadow);
+}
+.acs-section h3 {
+  margin: 0 0 4px;
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+.acs-section .acs-section-sub {
+  margin: 0 0 16px;
+  font-size: 0.82rem;
+  color: var(--acs-muted);
+}
+
+/* ── Progress bar (Cost Analysis budget-vs-actual) ───── */
+
+.acs-progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #eef2f6;
+  overflow: hidden;
+}
+.acs-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--acs-primary);
+  transition: width 0.3s ease;
+}
+.acs-progress-fill.acs-progress-over { background: var(--acs-danger); }
+.acs-progress-fill.acs-progress-warn { background: var(--acs-warn); }
+
+/* ── Responsive ───────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .acs-root { padding: 18px 16px 32px; }
+  .acs-form { grid-template-columns: 1fr; }
+  .acs-table th, .acs-table td { padding: 10px 12px; }
+}
