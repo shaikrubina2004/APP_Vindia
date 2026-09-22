@@ -2,6 +2,9 @@ const pool = require("../config/db");
 const createSENotification = require(
   "../utils/createSENotification"
 );
+const {
+  insertNotification: insertSiteEngineerNotification,
+} = require("../controllers/siteEngineerNotificationsController");
 exports.createRFI = async (req, res) => {
   try {
     const raised_by = req.user?.id; // Extract from auth middleware
@@ -97,6 +100,20 @@ exports.updateRFI = async (req, res) => {
     }
 
     res.json(result.rows[0]);
+
+    // Notify the site engineer who raised this RFI that it moved forward
+    const updated = result.rows[0];
+    if (updated.raised_by) {
+      await insertSiteEngineerNotification(
+        updated.raised_by,
+        "rfi",
+        `RFI update: ${updated.title || "RFI #" + updated.id}`,
+        response || `Status changed to ${status || updated.status}`,
+        "/site-engineer/rfi",
+        status === "closed" ? "ok" : "info",
+        updated.project_id ?? null,
+      );
+    }
   } catch (err) {
     console.error("RFI Update Error:", err.message);
     res.status(500).json({ error: err.message });

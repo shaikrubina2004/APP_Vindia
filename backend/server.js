@@ -51,12 +51,12 @@ const pcNotificationsRouter = require("./routes/pcNotifications");
 const pcPaymentRoutes = require("./routes/pcPaymentRoutes");
 
 /* ✅ Site Engineer */
-const siteEngineerRfiRoutes = require("./routes/siteEngineerRfiRoutes");
 const ncrRoutes = require("./routes/ncrRoutes");
 const siteDiaryRoutes = require("./routes/siteDiaryRoutes");
 const activityLogRoutes = require("./routes/activityLogRoutes");
 const progressRoutes = require("./routes/progressRoutes");
 const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoutes");
+const siteEngineerNotificationRoutes = require("./routes/siteEngineerNotificationRoutes");
 const materialRequestRoutes = require("./routes/materialRequestRoutes");
 const procurementRoutes = require("./routes/procurementRoutes");
 const snagRoutes = require("./routes/snagRoutes");
@@ -197,12 +197,12 @@ app.use("/api/architect-assign", architectAssignRoutes);
 app.use("/api/architect-notifications", architectNotifRoutes);
 app.use("/api/procurement", procurementRoutes);
 /* ✅ Site Engineer */
-app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes);
 app.use("/api/ncr", ncrRoutes);
 app.use("/api/diary", siteDiaryRoutes);
 app.use("/api/activity-log", activityLogRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/site-engineer-dashboard", siteEngineerDashboardRoutes);
+app.use("/api/site-engineer-notifications", siteEngineerNotificationRoutes);
 app.use("/api/material-request", materialRequestRoutes);
 app.use("/api/snags", snagRoutes);
 app.use("/api/site-progress", siteProgressRoutes);

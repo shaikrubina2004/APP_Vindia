@@ -11,6 +11,14 @@ const EMPTY_VENDOR = {
   contact_phone: "",
 };
 
+const formatCurrency = (amount) => {
+  const value = Number(amount || 0);
+
+  return `₹${value.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  })}`;
+};
+
 const VendorManagement = () => {
   /* ── Logged-in user ───────────────────────────────────── */
 
@@ -497,12 +505,7 @@ const VendorManagement = () => {
             </p>
 
             <p className="metric-value">
-              ₹
-              {(
-                Number(metrics.totalSpent || 0) /
-                100000
-              ).toFixed(1)}
-              L
+              {formatCurrency(metrics.totalSpent)}
             </p>
           </div>
 
@@ -815,14 +818,7 @@ const VendorManagement = () => {
                       </td>
 
                       <td className="vendor-spent">
-                        ₹
-                        {(
-                          Number(
-                            vendor.totalSpent ||
-                              0
-                          ) / 1000
-                        ).toFixed(0)}
-                        K
+                        {formatCurrency(vendor.totalSpent)}
                       </td>
 
                       <td className="vendor-status">

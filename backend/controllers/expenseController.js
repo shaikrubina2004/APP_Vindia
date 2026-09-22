@@ -5,6 +5,26 @@ const { asyncHandler, AppError } = require("../middleware/errorHandler");
 
 // GET /api/finance/expenses
 // Optional query filters: ?project_id=&expense_type=&category=&status=
+
+// Statuses an accountant is allowed to set directly. 'approved'/'paid'
+// represent Finance Manager's approval action per financePermissions.js
+// (Accountant: view/create/edit/verify — not approve). This restriction
+// applies only to the 'accountant' role; finance_manager/ceo are
+// completely unaffected, so Finance Manager's existing behavior does
+// not change.
+const ACCOUNTANT_ALLOWED_STATUSES = ["pending"];
+
+function blockPrivilegedStatusForAccountant(req) {
+  if (req.user?.role !== "accountant") return null;
+  if (req.body.status && !ACCOUNTANT_ALLOWED_STATUSES.includes(req.body.status)) {
+    return new AppError(
+      `Accountant cannot set expense status to '${req.body.status}'. Only Finance Manager can approve or mark expenses paid.`,
+      403
+    );
+  }
+  return null;
+}
+
 exports.getAllExpenses = asyncHandler(async (req, res) => {
   const { project_id, expense_type, category, status } = req.query;
   const expenses = await Expense.getAll({ project_id, expense_type, category, status });
@@ -50,6 +70,12 @@ exports.createExpense = asyncHandler(async (req, res) => {
 // Body: any of { category, description, amount, vendor_id, expense_date,
 //                 payment_method, status, receipt_url }
 exports.updateExpense = asyncHandler(async (req, res) => {
+  // Authorization checked BEFORE any DB round-trip — fail fast, and
+  // don't leak whether the record exists to a caller who isn't even
+  // allowed to perform this particular change.
+  const statusError = blockPrivilegedStatusForAccountant(req);
+  if (statusError) throw statusError;
+
   const existing = await Expense.getById(req.params.id);
   if (!existing) throw new AppError("Expense not found", 404);
 

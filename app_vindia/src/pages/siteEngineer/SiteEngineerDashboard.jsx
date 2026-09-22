@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import { useNotifications } from "../../context/Notificationcontext";
 import { useAutoReminders } from "../../hooks/useAutoReminders";
-import NotificationBell from "../../components/notifications/NotificationBell";
+import CheckInButton from "../../SharedResourse/CheckInButton";
 import "../../styles/siteEngineer.css";
 
 /* ── helpers ─────────────────────────────────────────────── */
@@ -123,6 +123,11 @@ export default function SiteEngineerDashboard() {
   useAutoReminders(); // fires deadline/RFI/task reminders automatically
   const navigate = useNavigate();
   const { notifications, unreadCount } = useNotifications();
+
+  // ── Current user, for the check-in button and notification bell ──
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const employeeId  = currentUser?.employee_id || currentUser?.id || null;
+  const designation = currentUser?.designation || currentUser?.role || null;
 
   // ── state ──────────────────────────────────────────────────
   const [time, setTime]             = useState(new Date());
@@ -467,10 +472,12 @@ const pendingMeasurements = useMemo(
           </div>
 
           <div className="dash-hero-right">
-            {/* Notification bell in hero */}
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-              <NotificationBell />
-            </div>
+            {/* Check-in / check-out — the notification bell already lives in the top navbar */}
+            {employeeId && (
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                <CheckInButton employeeId={employeeId} designation={designation} />
+              </div>
+            )}
 
             {/* Weather */}
             <div className="dash-weather">

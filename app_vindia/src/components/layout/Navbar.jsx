@@ -9,6 +9,7 @@ import MEPNotificationBell from "../notifications/MepNotificationBell";
 import BDANotificationBell from "../../components/notifications/BDANotificationBell";
 import ArchitectNotificationBell from "../../components/notifications/ArchitectNotificationBell";
 import OperationsNotificationBell from "../notifications/OperationsNotificationBell";
+import SiteEngineerNotificationBell from "../notifications/SiteEngineerNotificationBell";
 import "../../styles/layout/Navbar.css";
 import logo from "../../assets/logo.png.png";
 
@@ -116,6 +117,20 @@ const ProcurementBell = ({ userId }) => (
     routes={PROCUREMENT_ROUTES}
   />
 );
+/* ── Where the Site Engineer's notifications should navigate to ──
+   (no rfi / si entries — Site Engineer no longer has those modules) */
+const SITE_ENGINEER_ROUTES = {
+  default:     "/site-engineer/dashboard",
+  incident:    "/site-engineer/incidents",
+  task:        "/site-engineer/activity",
+  approval:    "/site-engineer/approvals",
+  material:    "/site-engineer/materials",
+  snag:        "/site-engineer/snag-list",
+  work:        "/site-engineer/daily-diary",
+  measurement: "/site-engineer/qs-measurements",
+};
+
+
 const LogisticsBell = ({ userId }) => (
   <OperationsNotificationBell
     userId={userId}
@@ -133,6 +148,7 @@ const InventoryBell = ({ userId }) => (
 );
 
 
+
 const FinanceBell = ({ userId }) => (
   <OperationsNotificationBell
     userId={userId}
@@ -140,6 +156,15 @@ const FinanceBell = ({ userId }) => (
     routes={FINANCE_ROUTES}
   />
 );
+
+const SiteEngineerBell = ({ userId }) => (
+  <SiteEngineerNotificationBell
+    userId={userId}
+    routes={SITE_ENGINEER_ROUTES}
+  />
+);
+
+
 const BdaBell = ({ userId }) => <BDANotificationBell bdaEmail={userId} />;
 
 /* ✅ Role-based notification mapping.
@@ -162,6 +187,7 @@ const NOTIFICATION_COMPONENTS = {
   inventory_controller:  InventoryBell,
   finance_manager:  FinanceBell,
   
+  site_engineer:         SiteEngineerBell,
 };
 
 function Navbar() {

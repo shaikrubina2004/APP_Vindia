@@ -41,9 +41,26 @@ exports.updateInvoice = asyncHandler(async (req, res) => {
 
 // PUT /api/finance/invoices/:id/status
 // Body: { status: "pending" | "paid" | "overdue" | ... }
+// Accountant permission per financePermissions.js is view/create/edit —
+// not a status-change/approval action. This endpoint is reachable from
+// BOTH /api/finance/invoices/:id/status (accountantAccess, pre-existing)
+// and previously was reachable from /api/accountant too (that mount was
+// already removed from accountantRoutes.js in the prior hardening pass).
+// The residual gap was that this shared controller itself had no guard,
+// so the /api/finance path still let an accountant token through.
+// Fixed here, checked BEFORE any DB call. Finance Manager/CEO behavior
+// is completely unchanged — this only adds a new rejection for the
+// accountant role.
 exports.updateInvoiceStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
   if (!status) throw new AppError("status is required", 400);
+
+  if (req.user?.role === "accountant") {
+    throw new AppError(
+      "Accountant cannot change invoice status. This is a Finance Manager action.",
+      403
+    );
+  }
 
   const existing = await Invoice.getById(req.params.id);
   if (!existing) throw new AppError("Invoice not found", 404);
