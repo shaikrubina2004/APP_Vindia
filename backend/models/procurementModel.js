@@ -172,8 +172,7 @@ const Procurement = {
     return result.rows[0];
   },
 
-
-    /* ─────────────────────────────
+  /* ─────────────────────────────
      DAILY REPORTS
      One report per officer per day (upserted). po_followups,
      vendor_calls, pending_approvals are officer-entered JSON arrays;
@@ -199,7 +198,8 @@ const Procurement = {
 
   getDailyReport: async (officerId, date) => {
     const result = await pool.query(
-      `SELECT * FROM procurement_daily_reports
+      `SELECT id, officer_id, TO_CHAR(report_date, 'YYYY-MM-DD') AS report_date, po_followups, vendor_calls, pending_approvals, notes, created_at
+       FROM procurement_daily_reports
        WHERE officer_id = $1 AND report_date = $2::date`,
       [officerId, date]
     );
@@ -224,7 +224,8 @@ const Procurement = {
          vendor_calls = EXCLUDED.vendor_calls,
          pending_approvals = EXCLUDED.pending_approvals,
          notes = EXCLUDED.notes
-       RETURNING *`,
+       RETURNING id, officer_id, TO_CHAR(report_date, 'YYYY-MM-DD') AS report_date,
+                 po_followups, vendor_calls, pending_approvals, notes, created_at`,
       [
         officerId,
         report_date,
@@ -251,10 +252,44 @@ const Procurement = {
     }
 
     const result = await pool.query(
-      `SELECT * FROM procurement_daily_reports
+      `SELECT id, officer_id, TO_CHAR(report_date, 'YYYY-MM-DD') AS report_date, po_followups, vendor_calls, pending_approvals, notes, created_at
+       FROM procurement_daily_reports
        ${where}
        ORDER BY report_date DESC
        LIMIT 30`,
+      values
+    );
+    return result.rows;
+  },
+
+  // Rollup across every Procurement Officer — for Operations Manager / CEO,
+  // once that role exists. Not scoped to a single officer_id.
+  getAllOfficersReports: async ({ from, to, officerId } = {}) => {
+    const values = [];
+    let where = "WHERE 1=1";
+
+    if (officerId) {
+      values.push(officerId);
+      where += ` AND pdr.officer_id = $${values.length}`;
+    }
+    if (from) {
+      values.push(from);
+      where += ` AND pdr.report_date >= $${values.length}::date`;
+    }
+    if (to) {
+      values.push(to);
+      where += ` AND pdr.report_date <= $${values.length}::date`;
+    }
+
+    const result = await pool.query(
+      `SELECT pdr.id, pdr.officer_id, TO_CHAR(pdr.report_date, 'YYYY-MM-DD') AS report_date,
+              pdr.po_followups, pdr.vendor_calls, pdr.pending_approvals, pdr.notes, pdr.created_at,
+              u.name AS officer_name
+       FROM procurement_daily_reports pdr
+       LEFT JOIN users u ON u.id = pdr.officer_id
+       ${where}
+       ORDER BY pdr.report_date DESC, u.name ASC
+       LIMIT 100`,
       values
     );
     return result.rows;

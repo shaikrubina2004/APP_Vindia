@@ -13,7 +13,6 @@ import MEPUpload from "../pages/MEP Engineer/MEPUploads";
 import MEPCoordination from "../pages/MEP Engineer/MEPCoordination";
 import ApprovalRequests from "../pages/siteEngineer/ApprovalRequests";
 
-
 function StructuralRoutes() {
   return (
     <Routes>
@@ -32,16 +31,7 @@ function StructuralRoutes() {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="coordination" element={<MEPCoordination />} />
         <Route path="upload" element={<MEPUpload />} />
-        <Route
-  path="/structural-engineer/approvals"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.STRUCTURAL_ENGINEER]}>
-      <StructuralEngineerLayout>
-        <ApprovalRequests />
-      </StructuralEngineerLayout>
-    </ProtectedRoute>
-  }
-/>
+        <Route path="approvals" element={<ApprovalRequests />} />
       </Route>
     </Routes>
   );

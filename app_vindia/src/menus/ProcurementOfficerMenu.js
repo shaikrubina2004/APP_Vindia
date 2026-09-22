@@ -40,6 +40,7 @@ export const procurementOfficerMenu = [
     path: "/operations/procurement/rfi",
     icon: "message-square",
   },
+
   {
     name: "Daily Report",
     path: "/operations/procurement/daily-report",

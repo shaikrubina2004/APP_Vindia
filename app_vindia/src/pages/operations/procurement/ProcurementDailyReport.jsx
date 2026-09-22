@@ -22,6 +22,26 @@ const ProcurementDailyReport = () => {
   const [pendingApprovals, setPendingApprovals] = useState([{ ...EMPTY_APPROVAL }]);
   const [notes, setNotes] = useState("");
 
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await procurementService.getDailyReportsHistory();
+      setHistory(res.data);
+    } catch {
+      // Non-blocking — the form itself still works without history.
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -80,6 +100,7 @@ const ProcurementDailyReport = () => {
         notes: notes.trim() || null,
       });
       setSaveMsg("Saved.");
+      loadHistory();
     } catch (err) {
       setSaveMsg(err.response?.data?.error || "Failed to save report");
     } finally {
@@ -90,6 +111,7 @@ const ProcurementDailyReport = () => {
   if (loading) return <div className="pdr-state">Loading…</div>;
 
   return (
+    <div className="pdr-layout">
     <div className="pdr-page">
       <div className="pdr-header">
         <div>
@@ -230,6 +252,44 @@ const ProcurementDailyReport = () => {
           {saving ? "Saving…" : "Save Report"}
         </button>
       </div>
+    </div>
+
+    <div className="pdr-history-panel">
+      <h2>Recent Reports</h2>
+      {historyLoading ? (
+        <p className="pdr-empty">Loading…</p>
+      ) : history.length === 0 ? (
+        <p className="pdr-empty">No past reports yet.</p>
+      ) : (
+        <ul className="pdr-history-list">
+          {history.map((r) => {
+            const followupCount = r.po_followups?.length || 0;
+            const callCount = r.vendor_calls?.length || 0;
+            const approvalCount = r.pending_approvals?.length || 0;
+            return (
+              <li key={r.id}>
+                <button
+                  className={`pdr-history-item ${r.report_date === date ? "pdr-history-item--active" : ""}`}
+                  onClick={() => setDate(r.report_date)}
+                >
+                  <span className="pdr-history-date">
+                    {new Date(r.report_date).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                  <span className="pdr-history-summary">
+                    {followupCount} follow-up{followupCount !== 1 ? "s" : ""} · {callCount} call
+                    {callCount !== 1 ? "s" : ""} · {approvalCount} pending
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
     </div>
   );
 };

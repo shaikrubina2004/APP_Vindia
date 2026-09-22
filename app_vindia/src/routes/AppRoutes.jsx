@@ -499,8 +499,14 @@ const AppRoutes = () => {
         />
 
         {/* ══ STRUCTURAL ════════════════════════════════════ */}
-        <Route path="/structural-engineer/*" element={<StructuralRoutes />} />
-
+        <Route
+          path="/structural-engineer/*"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STRUCTURAL_ENGINEER]}>
+              <StructuralRoutes />
+            </ProtectedRoute>
+          }
+        />
         {/* ══ FINANCE ═══════════════════════════════════════ */}
         <Route
           path="/finance-manager/*"
