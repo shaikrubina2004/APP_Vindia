@@ -1,0 +1,116 @@
+/* src/pages/3DVisualizer/ModelViewer3D.css */
+
+.mv3d-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  border-radius: 12px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.mv3d-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  border-radius: 12px;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+}
+
+.mv3d-fallback__icon {
+  color: #64748b;
+}
+
+.mv3d-fallback__title {
+  font-size: 13px;
+  color: #475569;
+  margin: 0;
+  font-weight: 600;
+}
+
+.mv3d-fallback__hint {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.mv3d-fallback__download {
+  margin-top: 4px;
+  padding: 8px 16px;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.mv3d-fallback__download:hover {
+  background: #1d4ed8;
+}
+
+.mv3d-canvas-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #0f172a, #1e293b);
+  position: relative;
+}
+
+.mv3d-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(15, 23, 42, 0.55);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+/* Loader shown inside the <Canvas> while the GLTF streams in */
+.mv3d-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #2563eb;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mv3d-loader__spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid #dbeafe;
+  border-top-color: #2563eb;
+  animation: mv3d-spin 0.8s linear infinite;
+}
+
+@keyframes mv3d-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error state (bad/missing GLTF file) */
+.mv3d-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 24px;
+  text-align: center;
+}

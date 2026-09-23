@@ -1,0 +1,303 @@
+/* src/pages/business-development/digital-marketing/Campaigns.css
+   Extends DigitalMarketing.css (dm-* classes) with styles specific
+   to the Campaigns page: status pills and the create/edit modal. */
+
+/* ── Status pill colors (per campaign status) ───────────────── */
+.camp-pill-draft     { background: #f1f5f9; color: #475569; }
+.camp-pill-scheduled { background: #dbeafe; color: #1d4ed8; }
+.camp-pill-active    { background: #dcfce7; color: #15803d; }
+.camp-pill-paused    { background: #fef3c7; color: #92400e; }
+.camp-pill-completed { background: #ede9fe; color: #6d28d9; }
+
+.camp-status-select {
+  border: none;
+  cursor: pointer;
+}
+
+/* ── Row action buttons ──────────────────────────────────────── */
+.camp-row-actions { white-space: nowrap; }
+
+.camp-btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.camp-btn-delete {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* ── Modal (create/edit campaign) ───────────────────────────── */
+.camp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.camp-modal {
+  background: #fff;
+  border-radius: 14px;
+  padding: 24px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.camp-modal h2 {
+  margin-top: 0;
+}
+
+.camp-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.camp-field-grid--full {
+  grid-column: 1 / -1;
+}
+
+.camp-field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 4px;
+}
+
+.camp-input {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.camp-input--textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+
+.camp-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.camp-btn-cancel {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* ── Clickable stat cards ────────────────────────────────────── */
+.camp-stat-clickable {
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.camp-stat-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.camp-stat-clickable:active {
+  transform: translateY(0);
+}
+
+/* ── Table search box ────────────────────────────────────────── */
+.camp-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.camp-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.camp-search-wrap i.ti-search {
+  position: absolute;
+  left: 10px;
+  color: #94a3b8;
+  font-size: 15px;
+  pointer-events: none;
+}
+
+.camp-search-input {
+  padding: 7px 32px 7px 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  min-width: 240px;
+}
+
+.camp-search-clear {
+  position: absolute;
+  right: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 4px;
+  display: flex;
+}
+
+.camp-search-clear:hover {
+  color: #475569;
+}
+
+/* ── Sortable table headers ─────────────────────────────────── */
+.camp-th-sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.camp-th-sortable:hover {
+  color: #1d4ed8;
+}
+
+.camp-sort-icon {
+  margin-left: 4px;
+  font-size: 13px;
+  color: #2563eb;
+}
+
+/* ── Clickable table rows ───────────────────────────────────── */
+.camp-row-clickable {
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.camp-row-clickable:hover {
+  background: #f8fafc;
+}
+
+/* ── Detail modal (opened on row click) ─────────────────────── */
+.camp-detail-modal {
+  max-width: 620px;
+}
+
+.camp-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.camp-detail-header h2 {
+  margin: 0 0 6px 0;
+}
+
+.camp-detail-close {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.camp-detail-close:hover {
+  background: #e2e8f0;
+}
+
+.camp-detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.camp-detail-metric {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.camp-detail-metric span {
+  display: block;
+  font-size: 17px;
+  font-weight: 800;
+  color: #1e3a5f;
+}
+
+.camp-detail-metric label {
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.camp-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.camp-detail-row label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.camp-detail-row span {
+  font-size: 13px;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.camp-detail-description {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 6px;
+}
+
+.camp-detail-description label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.camp-detail-description p {
+  margin: 0;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.5;
+}

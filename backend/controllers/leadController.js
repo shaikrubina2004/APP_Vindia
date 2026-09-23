@@ -3,6 +3,7 @@ const XLSX = require("xlsx");
 const path = require("path");
 const fs   = require("fs");
 const { notifyNewLead, notifyFollowUp } = require("./bdaNotificationsController");
+const { notifyNewMarketingLead } = require("./digitalMarketingNotificationsController");
 
 /* ══════════════════════════════════════
    DASHBOARD SUMMARY
@@ -128,7 +129,7 @@ exports.createLead = async (req, res) => {
     call_status, building_type, floors, measurement, sqft,
     budget, assigned_to, quotation_sent, project_start,
     snooze_until, description, date_and_time, search_category,
-    area, designs_sent,
+    area, designs_sent, campaign_id, platform, medium,
   } = req.body;
 
   if (!name || !phone)
@@ -144,11 +145,11 @@ exports.createLead = async (req, res) => {
         building_type,floors,measurement,sqft,budget,assigned_to,
         quotation_sent,project_start,snooze_until,description,
         date_and_time,search_category,area,designs_sent,
-        converted_at,deleted_by_admin
+        converted_at,deleted_by_admin,campaign_id,platform,medium
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
         $13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-        $23,false
+        $23,false,$24,$25,$26
       ) RETURNING id`,
       [
         name, phone, whatsapp || phone, email || null,
@@ -161,6 +162,7 @@ exports.createLead = async (req, res) => {
         search_category || null, area || null,
         parseInt(designs_sent) || 0,
         isConverted ? new Date() : null, // ✅ set converted_at if created as converted
+        campaign_id || null, platform || null, medium || null,
       ]
     );
 
@@ -172,6 +174,14 @@ exports.createLead = async (req, res) => {
       source: source || "Manual",
       phone,
     }).catch(err => console.error("Notify new lead error:", err.message));
+
+    if (campaign_id) {
+      pool.query("SELECT name FROM marketing_campaigns WHERE id = $1", [campaign_id])
+        .then(({ rows: c }) => notifyNewMarketingLead({
+          leadId: newLeadId, name, campaignId: campaign_id, campaignName: c[0]?.name,
+        }))
+        .catch(err => console.error("Notify new marketing lead error:", err.message));
+    }
 
     res.json({ success: true, leadId: newLeadId });
   } catch (err) {
@@ -194,6 +204,7 @@ exports.updateLead = async (req, res) => {
     "floors","measurement","sqft","budget","assigned_to",
     "quotation_sent","project_start","snooze_until","description",
     "date_and_time","search_category","area","designs_sent",
+    "campaign_id","platform","medium",
   ];
 
   const setClauses = [];
@@ -319,6 +330,36 @@ exports.addFollowUp = async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error("Add followup error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ══════════════════════════════════════
+   GET ALL FOLLOW UPS (aggregate, across leads)
+   Used by dashboards (e.g. Digital Marketing) that need
+   the full follow-up list rather than a single lead's.
+   Supports the same role/name scoping as getAllLeads.
+══════════════════════════════════════ */
+exports.getAllFollowUps = async (req, res) => {
+  try {
+    const { role, name } = req.query;
+    const isBda = role === "bda";
+    const filter = isBda ? "AND (l.assigned_to = $1 OR l.assigned_to IS NULL)" : "";
+    const vals = isBda ? [name] : [];
+
+    const { rows } = await pool.query(
+      `SELECT f.*, l.name, l.phone, l.city, l.status, l.source, l.assigned_to,
+              l.campaign_id, l.platform
+       FROM followups f
+       JOIN leads l ON f.lead_id = l.id
+       WHERE l.deleted_by_admin = false ${filter}
+       ORDER BY f.created_at DESC
+       LIMIT 500`,
+      vals
+    );
+    res.json({ followUps: rows });
+  } catch (err) {
+    console.error("Get all followups error:", err.message);
     res.status(500).json({ error: err.message });
   }
 };

@@ -27,6 +27,12 @@ export const ArchitectMenu = [
     path: "/architect/designs", 
     icon: "file" 
   },
+  {
+    /* Review 3D models submitted by the 3D Visualizer role */
+    name: "3D Models",
+    path: "/architect/3d-models",
+    icon: "box",
+  },
   { 
     /* Official approvals and milestones */
     name: "assign", 

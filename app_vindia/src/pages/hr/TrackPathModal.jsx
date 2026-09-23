@@ -16,9 +16,6 @@ const pinIcon = L.icon({
 
 const fmtTime = (iso) => {
   if (!iso) return "—";
-  // Postgres often returns timestamps without a timezone marker, which
-  // JS then misreads as local time instead of UTC. Appending "Z" forces
-  // correct UTC parsing so it converts properly to the viewer's local time.
   const withZ = iso.endsWith("Z") ? iso : `${iso}Z`;
   return new Date(withZ).toLocaleTimeString("en-US", {
     hour: "numeric",

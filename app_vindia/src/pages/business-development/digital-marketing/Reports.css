@@ -1,0 +1,86 @@
+/* src/pages/business-development/digital-marketing/Reports.css
+   Extends DigitalMarketing.css (dm-* classes) with styles specific
+   to the Reports page: the filter bar and the horizontal bar-list charts. */
+
+/* ── Filter bar ──────────────────────────────────────────────── */
+.rpt-filter-card {
+  margin-bottom: 16px;
+}
+
+.rpt-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.rpt-filter-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.rpt-input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  min-width: 140px;
+}
+
+/* ── Report content spacing ──────────────────────────────────── */
+.rpt-skeleton {
+  height: 200px;
+}
+
+.rpt-row2 {
+  margin-top: 16px;
+}
+
+/* ── Horizontal bar-list chart ──────────────────────────────── */
+.rpt-barlist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rpt-barlist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rpt-barlist-label {
+  width: 110px;
+  font-size: 12px;
+  color: #475569;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rpt-barlist-track {
+  flex: 1;
+  height: 10px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.rpt-barlist-fill {
+  height: 100%;
+  background: #2563eb;
+  border-radius: 6px;
+}
+
+.rpt-barlist-value {
+  width: 34px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e3a5f;
+}

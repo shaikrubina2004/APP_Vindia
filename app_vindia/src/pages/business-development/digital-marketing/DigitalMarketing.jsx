@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import api from "../../../services/api";
 import CheckInButton from "../../../SharedResourse/CheckInButton";
 // ^ This import assumes DigitalMarketing.jsx sits alongside BDADashboard.jsx
 // at src/pages/business-development/digital-marketing/DigitalMarketing.jsx
 // (3 folders under src/). If Vite complains the file doesn't exist,
 // recount the folders to src/ and adjust the "../".
 import "./DigitalMarketing.css";
-
-const API = "http://localhost:5000/api";
 
 /* ─── helpers ─── */
 function formatDate(d) {
@@ -186,8 +184,8 @@ const DigitalMarketing = () => {
     setLoading(true); setError(null);
     try {
       const [lr, fr] = await Promise.all([
-        axios.get(`${API}/leads`),
-        axios.get(`${API}/leads/followups`).catch(() => ({ data: [] })),
+        api.get(`/leads`),
+        api.get(`/leads/followups`).catch(() => ({ data: [] })),
       ]);
       setLeads(lr.data.leads || []);
       const fu = fr.data.followUps || fr.data || [];

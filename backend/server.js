@@ -51,12 +51,12 @@ const pcNotificationsRouter = require("./routes/pcNotifications");
 const pcPaymentRoutes = require("./routes/pcPaymentRoutes");
 
 /* ✅ Site Engineer */
+const siteEngineerRfiRoutes = require("./routes/siteEngineerRfiRoutes");
 const ncrRoutes = require("./routes/ncrRoutes");
 const siteDiaryRoutes = require("./routes/siteDiaryRoutes");
 const activityLogRoutes = require("./routes/activityLogRoutes");
 const progressRoutes = require("./routes/progressRoutes");
 const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoutes");
-const siteEngineerNotificationRoutes = require("./routes/siteEngineerNotificationRoutes");
 const materialRequestRoutes = require("./routes/materialRequestRoutes");
 const procurementRoutes = require("./routes/procurementRoutes");
 const snagRoutes = require("./routes/snagRoutes");
@@ -115,6 +115,14 @@ const operationsNotificationRoutes = require("./routes/operationsNotifications")
 
 /* ✅ Accountant */
 const accountantRoutes = require("./routes/accountantRoutes");
+
+/* ✅ 3D Visualizer */
+const threeDModelRoutes = require("./routes/threeDModelRoutes");
+
+/* ✅ Digital Marketing */
+const campaignRoutes = require("./routes/campaignRoutes");
+const marketingRoutes = require("./routes/marketingRoutes");
+const digitalMarketingNotificationRoutes = require("./routes/digitalMarketingNotificationRoutes");
 const { errorHandler } = require("./middleware/errorHandler");
 /* ═════════ APP SETUP ═════════ */
 
@@ -197,12 +205,12 @@ app.use("/api/architect-assign", architectAssignRoutes);
 app.use("/api/architect-notifications", architectNotifRoutes);
 app.use("/api/procurement", procurementRoutes);
 /* ✅ Site Engineer */
+app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes);
 app.use("/api/ncr", ncrRoutes);
 app.use("/api/diary", siteDiaryRoutes);
 app.use("/api/activity-log", activityLogRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/site-engineer-dashboard", siteEngineerDashboardRoutes);
-app.use("/api/site-engineer-notifications", siteEngineerNotificationRoutes);
 app.use("/api/material-request", materialRequestRoutes);
 app.use("/api/snags", snagRoutes);
 app.use("/api/site-progress", siteProgressRoutes);
@@ -231,6 +239,14 @@ app.use("/api/finance", financeRoutes);
 app.use("/api/finance-daily-updates", financeDailyUpdateRoutes);
 
 app.use("/api/accountant", accountantRoutes);
+
+/* ✅ 3D Visualizer */
+app.use("/api/3d-models", threeDModelRoutes);
+
+/* ✅ Digital Marketing */
+app.use("/api/campaigns", campaignRoutes);
+app.use("/api/marketing", marketingRoutes);
+app.use("/api/dm-notifications", digitalMarketingNotificationRoutes);
 /* ═════════ ERROR HANDLING ═════════ */
 
 app.use(errorHandler);

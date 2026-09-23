@@ -1,248 +1,155 @@
 // src/services/modelsService.js
-// Mock backend service for 3D Models workflow
-// Replace localStorage calls with real API (axios/fetch) when backend is ready
+// Real backend-backed service for the 3D Models workflow.
+// Uses the project's centralized authenticated Axios instance (src/services/api.js)
+// so the JWT is always attached — no localStorage is used for model data.
+import api from "./api";
+import { getDrawings } from "./architectDesignService";
 
-const KEYS = {
-  MODELS: "threed_models",
-  DRAWINGS: "threed_drawings",
-};
+// ─── Helpers: map backend row -> the shape Model.jsx already expects ──────
+const mapModel = (m) => ({
+  id: m.id,
+  title: m.title,
+  description: m.description,
+  drawingId: m.drawing_id,
+  drawingTitle: m.drawing_name || "—",
+  projectId: m.project_id,
+  projectName: m.project_name || "—",
+  status: m.status,
+  version: m.version || 1,
+  fileName: m.file_name,
+  fileUrl: m.file_url,
+  fileType: m.file_type,
+  fileSize: m.file_size,
+  notes: m.notes,
+  thumbnailColor: "#1e40af",
+  createdBy: m.created_by,
+  createdByName: m.created_by_name || "—",
+  createdAt: m.created_at,
+  updatedAt: m.updated_at,
+  submittedAt: m.submitted_at,
+  reviewedByName: m.reviewed_by_name || null,
+  reviewedAt: m.reviewed_at,
+  architectComment: m.architect_feedback,
+});
 
-// ─── Seed demo data on first load ────────────────────────────────
-const seedData = () => {
-  if (!localStorage.getItem(KEYS.DRAWINGS)) {
-    localStorage.setItem(
-      KEYS.DRAWINGS,
-      JSON.stringify([
-        {
-          id: "drw-001",
-          title: "Floor Plan — Block A",
-          description: "Ground floor layout with structural grid",
-          fileName: "block_a_floor_plan.dwg",
-          sentByName: "John (Architect)",
-          sentAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-          projectName: "Skyline Tower Project",
-        },
-        {
-          id: "drw-002",
-          title: "Elevation — East Wing",
-          description: "East elevation with facade details",
-          fileName: "east_elevation.dwg",
-          sentByName: "John (Architect)",
-          sentAt: new Date(Date.now() - 5 * 86400000).toISOString(),
-          projectName: "Skyline Tower Project",
-        },
-        {
-          id: "drw-003",
-          title: "Section Detail — Core",
-          description: "Vertical section through the building core",
-          fileName: "core_section.pdf",
-          sentByName: "Sarah (Architect)",
-          sentAt: new Date(Date.now() - 86400000).toISOString(),
-          projectName: "Metro Mall Renovation",
-        },
-      ])
-    );
-  }
+const mapDrawing = (d) => ({
+  id: d.id,
+  title: d.name || d.drawing_name || "Untitled drawing",
+  description: d.description || "",
+  fileName: d.file_name,
+  fileUrl: d.file_url,
+  sentByName: d.created_by_name || "Architect",
+  sentAt: d.created_at,
+  projectId: d.project_id,
+  projectName: d.project_name || "—",
+});
 
-  if (!localStorage.getItem(KEYS.MODELS)) {
-    localStorage.setItem(
-      KEYS.MODELS,
-      JSON.stringify([
-        {
-          id: "mdl-001",
-          title: "Block A — 3D Model v1",
-          description: "Initial 3D model based on the floor plan drawing",
-          drawingId: "drw-001",
-          drawingTitle: "Floor Plan — Block A",
-          projectName: "Skyline Tower Project",
-          status: "approved",
-          version: 1,
-          fileName: "block_a_v1.fbx",
-          thumbnailColor: "#1e40af",
-          createdByName: "Mike (3D Visualizer)",
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          submittedAt: new Date(Date.now() - 72000000).toISOString(),
-          reviewedByName: "John (Architect)",
-          reviewedAt: new Date(Date.now() - 36000000).toISOString(),
-          architectComment: "Excellent work! Matches the drawing perfectly.",
-        },
-        {
-          id: "mdl-002",
-          title: "East Wing Elevation Model",
-          description: "3D model of east wing with full facade detail",
-          drawingId: "drw-002",
-          drawingTitle: "Elevation — East Wing",
-          projectName: "Skyline Tower Project",
-          status: "pending_review",
-          version: 1,
-          fileName: "east_wing.obj",
-          thumbnailColor: "#1d4ed8",
-          createdByName: "Mike (3D Visualizer)",
-          createdAt: new Date(Date.now() - 10800000).toISOString(),
-          submittedAt: new Date(Date.now() - 3600000).toISOString(),
-          reviewedByName: null,
-          reviewedAt: null,
-          architectComment: null,
-        },
-        {
-          id: "mdl-003",
-          title: "Core Section Draft",
-          description: "Rough 3D section through building core",
-          drawingId: "drw-003",
-          drawingTitle: "Section Detail — Core",
-          projectName: "Metro Mall Renovation",
-          status: "draft",
-          version: 1,
-          fileName: "core_draft.fbx",
-          thumbnailColor: "#1e3a8a",
-          createdByName: "Mike (3D Visualizer)",
-          createdAt: new Date(Date.now() - 1800000).toISOString(),
-          submittedAt: null,
-          reviewedByName: null,
-          reviewedAt: null,
-          architectComment: null,
-        },
-      ])
-    );
-  }
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────
-const genId = (prefix) =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-
-const delay = (ms = 400) => new Promise((r) => setTimeout(r, ms));
-
-const getAll = (key) => {
-  try {
-    return JSON.parse(localStorage.getItem(key) || "[]");
-  } catch {
-    return [];
-  }
-};
-
-const saveAll = (key, data) =>
-  localStorage.setItem(key, JSON.stringify(data));
-
-// ─── Drawings API ─────────────────────────────────────────────────
+// ─── Drawings API (drawings shared with the 3D Visualizer) ────────────────
 export const drawingsApi = {
-  /** Get all drawings sent by architect */
   getAll: async () => {
-    await delay();
-    return getAll(KEYS.DRAWINGS);
+    const res = await getDrawings();
+    const rows = res?.data?.data || res?.data || [];
+    return (Array.isArray(rows) ? rows : []).map(mapDrawing);
   },
-
   getById: async (id) => {
-    await delay(200);
-    return getAll(KEYS.DRAWINGS).find((d) => d.id === id) || null;
+    const all = await drawingsApi.getAll();
+    return all.find((d) => String(d.id) === String(id)) || null;
   },
 };
 
-// ─── Models API ───────────────────────────────────────────────────
+// ─── Models API ─────────────────────────────────────────────────────────
 export const modelsApi = {
-  /** Get all models */
-  getAll: async () => {
-    await delay();
-    return getAll(KEYS.MODELS);
+  getAll: async (params = {}) => {
+    const res = await api.get("/3d-models", { params });
+    return (res.data?.models || []).map(mapModel);
   },
 
   getById: async (id) => {
-    await delay(200);
-    return getAll(KEYS.MODELS).find((m) => m.id === id) || null;
+    const res = await api.get(`/3d-models/${id}`);
+    return {
+      ...mapModel(res.data.model),
+      history: (res.data.history || []).map((h) => ({
+        version: h.version,
+        fileName: h.file_name,
+        fileUrl: h.file_url,
+        status: h.status,
+        note: h.note,
+        createdByName: h.created_by_name,
+        createdAt: h.created_at,
+      })),
+    };
   },
 
-  /** 3D Visualizer creates a new draft model */
+  getStatsSummary: async () => {
+    const res = await api.get("/3d-models/stats/summary");
+    return res.data.summary;
+  },
+
+  /** Upload the actual model file first; returns { file_url, file_name, file_type, file_size } */
+  uploadFile: async (file, onProgress) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await api.post("/3d-models/upload", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: onProgress
+        ? (evt) => onProgress(Math.round((evt.loaded * 100) / (evt.total || 1)))
+        : undefined,
+    });
+    return res.data;
+  },
+
+  /** 3D Visualizer creates a new draft model. payload must include an already-uploaded file_url. */
   createModel: async (payload) => {
-    await delay(600);
-    const model = {
-      id: genId("mdl"),
-      ...payload,
-      status: "draft",
-      version: 1,
-      createdAt: new Date().toISOString(),
-      submittedAt: null,
-      reviewedByName: null,
-      reviewedAt: null,
-      architectComment: null,
-    };
-    const all = getAll(KEYS.MODELS);
-    all.unshift(model);
-    saveAll(KEYS.MODELS, all);
-    return model;
+    const res = await api.post("/3d-models", {
+      title: payload.title,
+      description: payload.description,
+      project_id: payload.projectId || null,
+      drawing_id: payload.drawingId || null,
+      file_name: payload.fileName,
+      file_url: payload.fileUrl,
+      file_type: payload.fileType,
+      file_size: payload.fileSize,
+      notes: payload.notes,
+    });
+    return mapModel(res.data.model);
+  },
+
+  /** Visualizer edits a draft/rejected model; if a new file is passed, this creates a new version */
+  updateModel: async (id, updates) => {
+    const res = await api.patch(`/3d-models/${id}`, {
+      title: updates.title,
+      description: updates.description,
+      project_id: updates.projectId,
+      drawing_id: updates.drawingId,
+      file_name: updates.fileName,
+      file_url: updates.fileUrl,
+      file_type: updates.fileType,
+      file_size: updates.fileSize,
+      notes: updates.notes,
+    });
+    return mapModel(res.data.model);
   },
 
   /** 3D Visualizer submits model for architect review */
   submitForReview: async (id) => {
-    await delay(500);
-    const all = getAll(KEYS.MODELS);
-    const idx = all.findIndex((m) => m.id === id);
-    if (idx === -1) throw new Error("Model not found");
-    if (!["draft", "rejected"].includes(all[idx].status))
-      throw new Error("Only draft or rejected models can be submitted");
-    all[idx].status = "pending_review";
-    all[idx].submittedAt = new Date().toISOString();
-    saveAll(KEYS.MODELS, all);
-    return all[idx];
+    const res = await api.post(`/3d-models/${id}/submit`);
+    return mapModel(res.data.model);
   },
 
   /** Architect approves a model */
   approveModel: async (id, comment = "") => {
-    await delay(600);
-    const all = getAll(KEYS.MODELS);
-    const idx = all.findIndex((m) => m.id === id);
-    if (idx === -1) throw new Error("Model not found");
-    if (all[idx].status !== "pending_review")
-      throw new Error("Model is not pending review");
-    all[idx].status = "approved";
-    all[idx].reviewedAt = new Date().toISOString();
-    all[idx].architectComment = comment || "Approved.";
-    all[idx].reviewedByName = "John (Architect)";
-    saveAll(KEYS.MODELS, all);
-    return all[idx];
+    const res = await api.post(`/3d-models/${id}/approve`, { comment });
+    return mapModel(res.data.model);
   },
 
   /** Architect rejects a model (comment required) */
   rejectModel: async (id, comment) => {
-    await delay(600);
-    if (!comment?.trim()) throw new Error("Rejection comment is required");
-    const all = getAll(KEYS.MODELS);
-    const idx = all.findIndex((m) => m.id === id);
-    if (idx === -1) throw new Error("Model not found");
-    if (all[idx].status !== "pending_review")
-      throw new Error("Model is not pending review");
-    all[idx].status = "rejected";
-    all[idx].reviewedAt = new Date().toISOString();
-    all[idx].architectComment = comment;
-    all[idx].reviewedByName = "John (Architect)";
-    saveAll(KEYS.MODELS, all);
-    return all[idx];
-  },
-
-  /** Visualizer updates a rejected model before resubmitting */
-  updateModel: async (id, updates) => {
-    await delay(400);
-    const all = getAll(KEYS.MODELS);
-    const idx = all.findIndex((m) => m.id === id);
-    if (idx === -1) throw new Error("Model not found");
-    all[idx] = {
-      ...all[idx],
-      ...updates,
-      version: (all[idx].version || 1) + 1,
-      status: "draft",
-      reviewedAt: null,
-      architectComment: null,
-    };
-    saveAll(KEYS.MODELS, all);
-    return all[idx];
+    const res = await api.post(`/3d-models/${id}/reject`, { comment });
+    return mapModel(res.data.model);
   },
 
   deleteModel: async (id) => {
-    await delay(300);
-    const filtered = getAll(KEYS.MODELS).filter((m) => m.id !== id);
-    saveAll(KEYS.MODELS, filtered);
+    await api.delete(`/3d-models/${id}`);
     return { success: true };
   },
 };
-
-// Initialize seed data
-seedData();

@@ -1,6 +1,8 @@
 // src/pages/3DVisualizer/Models.jsx
 import { useState, useEffect, useCallback } from "react";
 import { modelsApi, drawingsApi } from "../../services/modelsService";
+import { useAuth } from "../../context/useAuth";
+import ModelViewer3D from "./ModelViewer3D";
 import "./Model.css";
 
 // ─── SVG Icons ────────────────────────────────────────────────────
@@ -161,11 +163,13 @@ function Modal({ isOpen, onClose, title, wide, children }) {
 }
 
 // ─── ModelCard ────────────────────────────────────────────────────
-function ModelCard({ model, currentRole, onView, onSubmit, onDelete }) {
+function ModelCard({ model, currentRole, onView, onSubmit, onDelete, onEdit }) {
   const isViz = currentRole === "visualizer";
   const isArch = currentRole === "architect";
   const canSubmit = isViz && ["draft", "rejected"].includes(model.status);
+  const canEdit = isViz && ["draft", "rejected"].includes(model.status);
   const canReview = isArch && model.status === "pending_review";
+  const canDownload = model.status === "approved" && model.fileUrl;
 
   const feedbackBg = model.status === "approved" ? "#ecfdf5" : "#fef2f2";
   const feedbackBorder = model.status === "approved" ? "#6ee7b7" : "#fca5a5";
@@ -224,6 +228,12 @@ function ModelCard({ model, currentRole, onView, onSubmit, onDelete }) {
             <Ico.Eye /> View
           </button>
 
+          {canEdit && (
+            <button className="btn btn-outline" style={{ fontSize: 12, padding: "7px 12px" }} onClick={() => onEdit(model)}>
+              Edit
+            </button>
+          )}
+
           {canSubmit && (
             <button className="btn btn-primary" style={{ fontSize: 12, padding: "7px 12px" }} onClick={() => onSubmit(model)}>
               <Ico.Send />
@@ -235,6 +245,12 @@ function ModelCard({ model, currentRole, onView, onSubmit, onDelete }) {
             <button className="btn btn-success" style={{ fontSize: 12, padding: "7px 12px" }} onClick={() => onView(model)}>
               <Ico.Check /> Review
             </button>
+          )}
+
+          {canDownload && (
+            <a className="btn btn-outline" style={{ fontSize: 12, padding: "7px 12px", textDecoration: "none" }} href={model.fileUrl} target="_blank" rel="noreferrer" download={model.fileName}>
+              Download
+            </a>
           )}
 
           {isViz && model.status === "draft" && (
@@ -268,41 +284,83 @@ function StatsBar({ models }) {
   );
 }
 
-// ─── Create Model Modal ───────────────────────────────────────────
-function CreateModelModal({ isOpen, onClose, drawings, onCreated, toast }) {
-  const [form, setForm] = useState({ title: "", description: "", drawingId: "", fileName: "", notes: "" });
+// ─── Create / Edit Model Modal ─────────────────────────────────────
+function CreateModelModal({ isOpen, onClose, drawings, onSaved, toast, editingModel }) {
+  const isEdit = !!editingModel;
+  const [form, setForm] = useState({ title: "", description: "", drawingId: "", notes: "" });
+  const [file, setFile] = useState(null);
+  const [uploadPct, setUploadPct] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [uploadedMeta, setUploadedMeta] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setForm({
+        title: editingModel?.title || "",
+        description: editingModel?.description || "",
+        drawingId: editingModel?.drawingId ? String(editingModel.drawingId) : "",
+        notes: editingModel?.notes || "",
+      });
+      setFile(null);
+      setUploadPct(0);
+      setUploadedMeta(null);
+    }
+  }, [isOpen, editingModel]);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return toast("Title is required", "error");
-    if (!form.drawingId) return toast("Please select a drawing", "error");
+    if (!isEdit && !file) return toast("Please attach a 3D model file (.glb, .gltf, .fbx, .obj, .zip)", "error");
+    if (!form.drawingId) return toast("Please select the drawing this model is based on", "error");
+
     setLoading(true);
     try {
-      const drawing = drawings.find((d) => d.id === form.drawingId);
-      const colors = ["#1e40af", "#1d4ed8", "#1e3a8a", "#0f4c81", "#1a5276"];
-      await modelsApi.createModel({
-        ...form,
-        fileName: form.fileName || "model.fbx",
-        drawingTitle: drawing?.title || "Unknown",
-        projectName: drawing?.projectName || "",
-        createdByName: "Mike (3D Visualizer)",
-        thumbnailColor: colors[Math.floor(Math.random() * colors.length)],
-      });
-      toast("Model created successfully!", "success");
-      setForm({ title: "", description: "", drawingId: "", fileName: "", notes: "" });
-      onCreated();
+      let fileMeta = uploadedMeta;
+      if (file) {
+        setUploadPct(1);
+        fileMeta = await modelsApi.uploadFile(file, setUploadPct);
+        setUploadedMeta(fileMeta);
+      }
+
+      const drawing = drawings.find((d) => String(d.id) === String(form.drawingId));
+
+      if (isEdit) {
+        await modelsApi.updateModel(editingModel.id, {
+          title: form.title,
+          description: form.description,
+          drawingId: form.drawingId,
+          projectId: drawing?.projectId,
+          notes: form.notes,
+          ...(fileMeta ? { fileName: fileMeta.file_name, fileUrl: fileMeta.file_url, fileType: fileMeta.file_type, fileSize: fileMeta.file_size } : {}),
+        });
+        toast("Model updated successfully!", "success");
+      } else {
+        await modelsApi.createModel({
+          title: form.title,
+          description: form.description,
+          drawingId: form.drawingId,
+          projectId: drawing?.projectId,
+          notes: form.notes,
+          fileName: fileMeta.file_name,
+          fileUrl: fileMeta.file_url,
+          fileType: fileMeta.file_type,
+          fileSize: fileMeta.file_size,
+        });
+        toast("Model created successfully!", "success");
+      }
+
+      onSaved();
       onClose();
     } catch (e) {
-      toast(e.message, "error");
+      toast(e?.response?.data?.error || e.message, "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create New 3D Model">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? "Edit 3D Model" : "Create New 3D Model"}>
       <div className="modal-body">
         <div className="field-group">
           <label className="field-label">Model Title *</label>
@@ -325,8 +383,24 @@ function CreateModelModal({ isOpen, onClose, drawings, onCreated, toast }) {
         </div>
 
         <div className="field-group">
-          <label className="field-label">File Name</label>
-          <input className="field-input" placeholder="model_v1.fbx" value={form.fileName} onChange={set("fileName")} />
+          <label className="field-label">
+            {isEdit ? "Replace 3D Model File (optional)" : "3D Model File *"}
+          </label>
+          <input
+            className="field-input"
+            type="file"
+            accept=".glb,.gltf,.fbx,.obj,.zip"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
+          <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+            Supported: .glb, .gltf (previewable), .fbx, .obj, .zip · max 200MB
+            {isEdit && " — leaving this empty keeps the current file"}
+          </p>
+          {uploadPct > 0 && uploadPct < 100 && (
+            <div style={{ height: 6, background: "#e2e8f0", borderRadius: 4, marginTop: 6, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${uploadPct}%`, background: "#2563eb", transition: "width .2s" }} />
+            </div>
+          )}
         </div>
 
         <div className="field-group">
@@ -337,7 +411,7 @@ function CreateModelModal({ isOpen, onClose, drawings, onCreated, toast }) {
       <div className="modal-footer">
         <button className="btn btn-outline" onClick={onClose} disabled={loading}>Cancel</button>
         <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-          <Ico.Cube /> {loading ? "Creating..." : "Create Model"}
+          <Ico.Cube /> {loading ? (uploadPct > 0 && uploadPct < 100 ? `Uploading ${uploadPct}%...` : "Saving...") : (isEdit ? "Save Changes" : "Create Model")}
         </button>
       </div>
     </Modal>
@@ -348,9 +422,19 @@ function CreateModelModal({ isOpen, onClose, drawings, onCreated, toast }) {
 function ViewModelModal({ isOpen, model, onClose, currentRole, onRefresh, toast }) {
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState([]);
 
   const isArch = currentRole === "architect";
   const isViz = currentRole === "visualizer";
+
+  useEffect(() => {
+    if (isOpen && model?.id) {
+      modelsApi.getById(model.id).then((full) => setHistory(full.history || [])).catch(() => setHistory([]));
+    } else {
+      setHistory([]);
+    }
+    setComment("");
+  }, [isOpen, model?.id]);
 
   const handleApprove = async () => {
     setLoading(true);
@@ -418,15 +502,13 @@ function ViewModelModal({ isOpen, model, onClose, currentRole, onRefresh, toast 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Model Details" wide>
       <div className="modal-body">
-        {/* Coloured header */}
-        <div
-          className="detail-thumb"
-          style={{ background: `linear-gradient(135deg, ${model.thumbnailColor || "#1e40af"}, #3b82f6)` }}
-        >
-          <div className="detail-thumb__icon"><Ico.Cube /></div>
+        {/* 3D preview / thumbnail */}
+        <ModelViewer3D fileUrl={model.fileUrl} fileType={model.fileType} fileName={model.fileName} height={360} />
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
           <div>
-            <h3 className="detail-thumb__title">{model.title}</h3>
-            <div className="detail-thumb__badges">
+            <h3 className="detail-thumb__title" style={{ margin: 0 }}>{model.title}</h3>
+            <div className="detail-thumb__badges" style={{ marginTop: 6 }}>
               <StatusBadge status={model.status} />
               {(model.version || 1) > 1 && (
                 <span className="detail-thumb__version">v{model.version}</span>
@@ -497,6 +579,29 @@ function ViewModelModal({ isOpen, model, onClose, currentRole, onRefresh, toast 
             </button>
           </div>
         )}
+
+        {/* Version / model history */}
+        {history.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div className="review-box__title" style={{ marginBottom: 8 }}>
+              <Ico.Clock /> Model History
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {history.map((h) => (
+                <div key={h.version} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  fontSize: 12, padding: "8px 10px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0",
+                }}>
+                  <span style={{ fontWeight: 700, color: "#1e40af" }}>v{h.version}</span>
+                  <span style={{ color: "#475569", flex: 1, marginLeft: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {h.fileName || "—"}
+                  </span>
+                  <span style={{ color: "#94a3b8" }}>{fmtDate(h.createdAt)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </Modal>
   );
@@ -512,16 +617,21 @@ const TABS = [
 ];
 
 // ─── Main Page Component ──────────────────────────────────────────
-// Props:
-//   currentRole: "visualizer" | "architect"
-//   Pass from your auth context: currentRole={user.role === "architect" ? "architect" : "visualizer"}
-const Models = ({ currentRole = "visualizer" }) => {
+// currentRole is normally derived from the authenticated user; an explicit
+// prop is still honoured so the Architect-side review page can force
+// currentRole="architect" without depending on which account is logged in
+// in a given test session.
+const Models = ({ currentRole: roleOverride }) => {
+  const { user } = useAuth();
+  const currentRole = roleOverride || (user?.role === "architect" ? "architect" : "visualizer");
+
   const [models, setModels]   = useState([]);
   const [drawings, setDrawings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState("all");
   const [toasts, setToasts]   = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingModel, setEditingModel] = useState(null);
   const [viewModel, setViewModel] = useState(null);
 
   // ── Toast helper ──────────────────────────────────────────────
@@ -559,16 +669,26 @@ const Models = ({ currentRole = "visualizer" }) => {
       toast("Model submitted for architect review!", "success");
       fetchAll();
     } catch (e) {
-      toast(e.message, "error");
+      toast(e?.response?.data?.error || e.message, "error");
     }
   };
 
   // ── Delete model ──────────────────────────────────────────────
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this draft model?")) return;
-    await modelsApi.deleteModel(id);
-    toast("Model deleted.", "info");
-    fetchAll();
+    try {
+      await modelsApi.deleteModel(id);
+      toast("Model deleted.", "info");
+      fetchAll();
+    } catch (e) {
+      toast(e?.response?.data?.error || e.message, "error");
+    }
+  };
+
+  // ── Edit model ───────────────────────────────────────────────
+  const handleEdit = (model) => {
+    setEditingModel(model);
+    setCreateOpen(true);
   };
 
   const tabCount = (key) =>
@@ -603,7 +723,7 @@ const Models = ({ currentRole = "visualizer" }) => {
                   <Ico.Refresh /> Refresh
                 </button>
                 {currentRole === "visualizer" && (
-                  <button className="btn btn-white" onClick={() => setCreateOpen(true)}>
+                  <button className="btn btn-white" onClick={() => { setEditingModel(null); setCreateOpen(true); }}>
                     <Ico.Plus /> New Model
                   </button>
                 )}
@@ -645,7 +765,7 @@ const Models = ({ currentRole = "visualizer" }) => {
                   : "No models match this filter"}
               </p>
               {currentRole === "visualizer" && (
-                <button className="btn btn-primary" style={{ margin: "0 auto" }} onClick={() => setCreateOpen(true)}>
+                <button className="btn btn-primary" style={{ margin: "0 auto" }} onClick={() => { setEditingModel(null); setCreateOpen(true); }}>
                   <Ico.Plus /> Create Model
                 </button>
               )}
@@ -660,6 +780,7 @@ const Models = ({ currentRole = "visualizer" }) => {
                   onView={setViewModel}
                   onSubmit={handleSubmit}
                   onDelete={handleDelete}
+                  onEdit={handleEdit}
                 />
               ))}
             </div>
@@ -667,13 +788,14 @@ const Models = ({ currentRole = "visualizer" }) => {
         </div>
       </div>
 
-      {/* ── Create Modal ────────────────────────────────────── */}
+      {/* ── Create / Edit Modal ─────────────────────────────── */}
       <CreateModelModal
         isOpen={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => { setCreateOpen(false); setEditingModel(null); }}
         drawings={drawings}
-        onCreated={fetchAll}
+        onSaved={fetchAll}
         toast={toast}
+        editingModel={editingModel}
       />
 
       {/* ── View / Review Modal ──────────────────────────────── */}

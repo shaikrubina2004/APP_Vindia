@@ -42,6 +42,12 @@ router.get("/export", lead.exportLeadsToExcel);
 router.get("/follow-ups/today",   lead.getTodaysFollowUps);
 router.get("/follow-ups/pending", lead.getPendingFollowUps);
 
+/* ── FOLLOW UPS (aggregate list) ──────────────────────────
+   IMPORTANT: this MUST be registered before GET "/:id",
+   otherwise "followups" is parsed as the :id parameter and
+   this request 404s / hits the wrong handler. */
+router.get("/followups", lead.getAllFollowUps);
+
 /* ── LEADS CRUD ── */
 router.get("/",    lead.getAllLeads);
 router.post("/",   lead.createLead);
