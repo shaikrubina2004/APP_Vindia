@@ -12,6 +12,7 @@ router.get(
   procurementController.getApprovedRequests
 );
 
+<<<<<<< Updated upstream
 // Only Procurement Officers can create purchase orders.
 router.post(
   "/purchase-orders",
@@ -71,5 +72,13 @@ router.post(
   requireRole("procurement_officer"),
   procurementController.upsertDailyReport
 );
+=======
+router.post("/purchase-orders", procurementController.createPurchaseOrder);
+router.get("/purchase-orders", procurementController.getPurchaseOrders);
+router.get("/purchase-orders/:id", procurementController.getPurchaseOrderById);
+router.get("/daily-reports", procurementController.getDailyReportsHistory);
+router.get("/daily-reports/:date", procurementController.getDailyReport);
+router.post("/daily-reports", procurementController.upsertDailyReport);
+>>>>>>> Stashed changes
 
 module.exports = router;
