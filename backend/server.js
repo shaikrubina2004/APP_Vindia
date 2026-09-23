@@ -120,6 +120,7 @@ const accountantRoutes = require("./routes/accountantRoutes");
 
 /* ✅ 3D Visualizer */
 const threeDModelRoutes = require("./routes/threeDModelRoutes");
+const threeDNotificationRoutes = require("./routes/threeDNotificationsRoutes");
 
 /* ✅ Digital Marketing */
 const campaignRoutes = require("./routes/campaignRoutes");
@@ -244,6 +245,7 @@ app.use("/api/accountant", accountantRoutes);
 
 /* ✅ 3D Visualizer */
 app.use("/api/3d-models", threeDModelRoutes);
+app.use("/api/3d-notifications", threeDNotificationRoutes);
 
 /* ✅ Digital Marketing */
 app.use("/api/campaigns", campaignRoutes);

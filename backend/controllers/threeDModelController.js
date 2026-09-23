@@ -1,6 +1,7 @@
-
 // backend/controllers/threeDModelController.js
 const pool = require("../config/db");
+const { insertThreeDNotification } = require("./threeDNotificationsController");
+const { insertArchitectNotification } = require("./architectNotificationsController");
 
 /* ─────────────────────────────────────────────
    Helpers
@@ -258,7 +259,34 @@ exports.submitModel = async (req, res) => {
       [id]
     );
 
-    res.json({ success: true, model: rows[0] });
+    const updated = rows[0];
+
+    // Notify the project's architect that a model is waiting on their review.
+    if (updated.project_id) {
+      try {
+        const proj = await pool.query(
+          "SELECT architect_id FROM projects WHERE id = $1",
+          [updated.project_id]
+        );
+        const architectId = proj.rows[0]?.architect_id;
+        if (architectId) {
+          // Goes into the architect's own notifications table/bell (already wired up).
+          await insertArchitectNotification(
+            architectId,
+            "design",
+            `New 3D model submitted: ${updated.title}`,
+            `A 3D model was submitted for your review.`,
+            "/architect/3d-models",
+            "info",
+            updated.id
+          );
+        }
+      } catch (notifyErr) {
+        console.error("submitModel notify error:", notifyErr.message);
+      }
+    }
+
+    res.json({ success: true, model: updated });
   } catch (err) {
     handleDbError(res, err, "Failed to submit model");
   }
@@ -293,7 +321,19 @@ exports.approveModel = async (req, res) => {
       [userId, comment || "Approved.", id]
     );
 
-    res.json({ success: true, model: rows[0] });
+    const updated = rows[0];
+
+    await insertThreeDNotification(
+      updated.created_by,
+      "review",
+      `Model approved: ${updated.title}`,
+      comment || "Your 3D model was approved.",
+      "/3d-visualizer/models",
+      "ok",
+      updated.id
+    );
+
+    res.json({ success: true, model: updated });
   } catch (err) {
     handleDbError(res, err, "Failed to approve model");
   }
@@ -331,7 +371,19 @@ exports.rejectModel = async (req, res) => {
       [userId, comment.trim(), id]
     );
 
-    res.json({ success: true, model: rows[0] });
+    const updated = rows[0];
+
+    await insertThreeDNotification(
+      updated.created_by,
+      "review",
+      `Model needs changes: ${updated.title}`,
+      comment.trim(),
+      "/3d-visualizer/models",
+      "warn",
+      updated.id
+    );
+
+    res.json({ success: true, model: updated });
   } catch (err) {
     handleDbError(res, err, "Failed to reject model");
   }

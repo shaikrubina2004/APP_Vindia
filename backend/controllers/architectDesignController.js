@@ -155,6 +155,45 @@ if (!userId || !role) {
         ORDER BY d.created_at DESC
       `, [roleLabel]);
 
+    } else if (role === "3d_visualizer" || role === "3dvisualizer") {
+      // "Send to 3D Visualizer" on the Architect side sends BY ROLE, not to a
+      // specific user_id (recipient row has user_id = NULL, role = '3D Visualizer').
+      // Match on role like the QS/PC branch above, not on user_id, or every
+      // role-sent drawing is invisible to the visualizer (empty dropdown).
+      result = await pool.query(`
+        SELECT
+          d.*,
+          p.name  AS project_name,
+          r.file_url,
+          r.file_name,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'role',    rec.role,
+                'user_id', rec.user_id,
+                'sent_at', rec.sent_at
+              )
+            ) FILTER (WHERE rec.id IS NOT NULL),
+            '[]'
+          ) AS recipients
+        FROM architect_drawings d
+        LEFT JOIN projects p ON p.id = d.project_id
+        LEFT JOIN LATERAL (
+          SELECT * FROM architect_drawing_revisions
+          WHERE drawing_id = d.id
+          ORDER BY created_at DESC LIMIT 1
+        ) r ON true
+        JOIN architect_drawing_recipients rq
+          ON rq.drawing_id = d.id
+          AND (
+            rq.role = '3D Visualizer'
+            OR (rq.user_id = $1 AND rq.user_id IS NOT NULL)
+          )
+        LEFT JOIN architect_drawing_recipients rec ON rec.drawing_id = d.id
+        GROUP BY d.id, p.name, r.file_url, r.file_name
+        ORDER BY d.created_at DESC
+      `, [userId]);
+
     } else {
       result = await pool.query(`
         SELECT

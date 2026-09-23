@@ -2124,49 +2124,40 @@ export default function DrawingManagementSystem() {
     const detailMine = filterDrawingsForRole("3D Visualizer").filter(
       (d) => d.drawingType !== "Planning"
     );
-    const pendingCount = mySubmissions.filter((s) => s.status === "Pending").length;
-    const totalDrawings = planningMine.length + detailMine.length;
 
-    const SECTION_TABS = [
-      { key: "Drawings",    label: `Drawings (${totalDrawings})` },
-      { key: "Requests",    label: "Requests", count: myRequestsSent.length },
-      { key: "Submissions", label: "Submissions", count: pendingCount },
-    ];
-
+    // View-only for the 3D Visualizer role: drawings received from the
+    // Architect are shown here for reference only. Uploading/submitting
+    // 3D models happens on the real "My Models" page instead, so there's
+    // no tab switcher or write actions here anymore — just the list.
     return (
       <div>
-        <div className="dms-role-bar">
-          {SECTION_TABS.map((s) => (
-            <button key={s.key}
-              className={`dms-role-btn${visualizerSection === s.key ? " active" : ""}`}
-              onClick={() => setVisualizerSection(s.key)}>
-              {s.label}
-              {!!s.count && <span className="dms-notif-badge" style={{ marginLeft: 6 }}>{s.count}</span>}
-            </button>
-          ))}
+        <div className="dms-vizinfo-banner">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          <span>
+            This view is read-only — drawings your Architect sends you appear here for reference.
+            To upload or submit a 3D model, go to{" "}
+            <a href="/3d-visualizer/models">My Models</a>.
+          </span>
         </div>
 
-        {visualizerSection === "Drawings" && (
-          <div>
-            <div className="dms-section-heading">
-              <h2 className="dms-section-heading-title">
+        <div>
+          <div className="dms-section-heading">
+            <h2 className="dms-section-heading-title">
                 Planning Drawings <span className="dms-count-chip">{planningMine.length}</span>
               </h2>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button className="dms-btn dms-btn-ghost" onClick={() => setModal("visualizerRequest")}>
-                  + Request Planning Drawing
-                </button>
-                <button className="dms-btn dms-btn-purple" onClick={() => setModal("sendToArchitect")}>
-                  Upload Drawing
-                </button>
-              </div>
+              {/* "Request Planning Drawing" / "Upload Drawing" removed for the
+                  3D Visualizer role: drawings here are view-only (received from
+                  the Architect). Model uploads happen on the "My Models" page
+                  (/3d-visualizer/models), which has a real, working backend. */}
             </div>
 
             {loading ? (
               <div className="dms-empty-box">Loading drawings…</div>
             ) : planningMine.length === 0 ? (
               <div className="dms-empty-box">
-                No planning drawings assigned yet. Use <strong>+ Request Planning Drawing</strong> to request one.
+                No planning drawings assigned yet. Your architect will send drawings here as they become available.
               </div>
             ) : (
               <div className="dms-card-grid">
@@ -2268,75 +2259,7 @@ export default function DrawingManagementSystem() {
               </>
             )}
           </div>
-        )}
 
-        {visualizerSection === "Requests" && (
-          <div>
-            <div className="dms-section-heading">
-              <h2 className="dms-section-heading-title">
-                My Requests <span className="dms-count-chip">{myRequestsSent.length}</span>
-              </h2>
-              <button className="dms-btn dms-btn-purple" onClick={() => setModal("visualizerRequest")}>
-                + Request Planning Drawing
-              </button>
-            </div>
-            {myRequestsSent.length === 0 ? (
-              <div className="dms-empty-box">
-                You haven't requested any planning drawings this session. Use <strong>+ Request Planning Drawing</strong> above.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {myRequestsSent.map((r) => (
-                  <div key={r.id} className="dms-req-card">
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", marginBottom: 4 }}>
-                        Request sent to Architect
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
-                        Project: <span style={{ color: "var(--amber)", fontWeight: 600 }}>{r.projectName || "—"}</span>
-                      </div>
-                      {r.note && (
-                        <div style={{ fontSize: 12, color: "var(--ink-muted)", marginTop: 4, fontStyle: "italic" }}>
-                          "{r.note.slice(0, 80)}{r.note.length > 80 ? "…" : ""}"
-                        </div>
-                      )}
-                      <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 4 }}>{fmt(r.sentAt)}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {visualizerSection === "Submissions" && (
-          <div>
-            <div className="dms-section-heading">
-              <h2 className="dms-section-heading-title">
-                My Submissions
-                {pendingCount > 0 && <span className="dms-count-chip dms-count-chip-alert">{pendingCount} awaiting review</span>}
-              </h2>
-              <button className="dms-btn dms-btn-primary" onClick={() => setModal("sendToArchitect")}>
-                🎨 Upload Drawing
-              </button>
-            </div>
-
-            {mySubmissions.length === 0 ? (
-              <div className="dms-empty-box">No renders submitted yet.</div>
-            ) : (
-              <div className="dms-card-grid">
-                {mySubmissions.map((sub) => (
-                  <SubmissionCard
-                    key={sub.id}
-                    sub={sub}
-                    showSubmitter={false}
-                    onView={(s) => { setModal("viewMySubmission"); setSelectedRequest(null); setReviewTarget(s); }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     );
   };

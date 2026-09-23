@@ -495,6 +495,31 @@
 }
 
 /* ── Empty state ─────────────────────────────────────────────────── */
+.dms-vizinfo-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.dms-vizinfo-banner svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.dms-vizinfo-banner a {
+  color: #1d4ed8;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .dms-empty-box {
   text-align: center; 
   padding: 42px 20px; 

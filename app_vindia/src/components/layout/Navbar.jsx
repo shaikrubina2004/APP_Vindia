@@ -10,6 +10,8 @@ import BDANotificationBell from "../../components/notifications/BDANotificationB
 import ArchitectNotificationBell from "../../components/notifications/ArchitectNotificationBell";
 import OperationsNotificationBell from "../notifications/OperationsNotificationBell";
 import SiteEngineerNotificationBell from "../notifications/SiteEngineerNotificationBell";
+import ThreeDVisualizerNotificationBell from "../notifications/ThreeDVisualizerNotificationBell";
+import DigitalMarketingNotificationBell from "../notifications/DigitalMarketingNotificationBell";
 import "../../styles/layout/Navbar.css";
 import logo from "../../assets/logo.png.png";
 
@@ -188,6 +190,8 @@ const NOTIFICATION_COMPONENTS = {
   finance_manager:  FinanceBell,
   procurement_officer: ProcurementBell,
   site_engineer:         SiteEngineerBell,
+  "3d_visualizer":     ThreeDVisualizerNotificationBell,
+  digital_marketing:   DigitalMarketingNotificationBell,
 };
 
 function Navbar() {
