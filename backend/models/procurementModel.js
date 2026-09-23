@@ -172,12 +172,7 @@ const Procurement = {
     return result.rows[0];
   },
 
-<<<<<<< Updated upstream
   /* ─────────────────────────────
-=======
-
-    /* ─────────────────────────────
->>>>>>> Stashed changes
      DAILY REPORTS
      One report per officer per day (upserted). po_followups,
      vendor_calls, pending_approvals are officer-entered JSON arrays;
@@ -203,12 +198,8 @@ const Procurement = {
 
   getDailyReport: async (officerId, date) => {
     const result = await pool.query(
-<<<<<<< Updated upstream
       `SELECT id, officer_id, TO_CHAR(report_date, 'YYYY-MM-DD') AS report_date, po_followups, vendor_calls, pending_approvals, notes, created_at
        FROM procurement_daily_reports
-=======
-      `SELECT * FROM procurement_daily_reports
->>>>>>> Stashed changes
        WHERE officer_id = $1 AND report_date = $2::date`,
       [officerId, date]
     );
@@ -233,12 +224,8 @@ const Procurement = {
          vendor_calls = EXCLUDED.vendor_calls,
          pending_approvals = EXCLUDED.pending_approvals,
          notes = EXCLUDED.notes
-<<<<<<< Updated upstream
        RETURNING id, officer_id, TO_CHAR(report_date, 'YYYY-MM-DD') AS report_date,
                  po_followups, vendor_calls, pending_approvals, notes, created_at`,
-=======
-       RETURNING *`,
->>>>>>> Stashed changes
       [
         officerId,
         report_date,
@@ -265,12 +252,8 @@ const Procurement = {
     }
 
     const result = await pool.query(
-<<<<<<< Updated upstream
       `SELECT id, officer_id, TO_CHAR(report_date, 'YYYY-MM-DD') AS report_date, po_followups, vendor_calls, pending_approvals, notes, created_at
        FROM procurement_daily_reports
-=======
-      `SELECT * FROM procurement_daily_reports
->>>>>>> Stashed changes
        ${where}
        ORDER BY report_date DESC
        LIMIT 30`,
@@ -278,7 +261,6 @@ const Procurement = {
     );
     return result.rows;
   },
-<<<<<<< Updated upstream
 
   // Rollup across every Procurement Officer — for Operations Manager / CEO,
   // once that role exists. Not scoped to a single officer_id.
@@ -312,8 +294,6 @@ const Procurement = {
     );
     return result.rows;
   },
-=======
->>>>>>> Stashed changes
 };
 
 module.exports = Procurement;

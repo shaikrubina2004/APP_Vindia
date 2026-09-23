@@ -182,8 +182,8 @@ exports.getDailyReportsHistory = async (req, res) => {
     console.error("GET DAILY REPORTS HISTORY ERROR:", err.message);
     res.status(500).json({ error: "Failed to fetch daily report history" });
   }
-<<<<<<< Updated upstream
 };
+
 /* ─────────────────────────────
    MANAGER ROLLUP — every officer's daily reports
    GET /api/procurement/daily-reports/all?from=&to=&officerId=
@@ -199,6 +199,4 @@ exports.getAllDailyReportsForManager = async (req, res) => {
     console.error("GET ALL DAILY REPORTS (MANAGER) ERROR:", err.message);
     res.status(500).json({ error: "Failed to fetch daily reports" });
   }
-=======
->>>>>>> Stashed changes
 };

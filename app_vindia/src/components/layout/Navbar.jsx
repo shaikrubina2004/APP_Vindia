@@ -186,7 +186,7 @@ const NOTIFICATION_COMPONENTS = {
   logistics_coordinator: LogisticsBell,
   inventory_controller:  InventoryBell,
   finance_manager:  FinanceBell,
-  
+  procurement_officer: ProcurementBell,
   site_engineer:         SiteEngineerBell,
 };
 
@@ -205,67 +205,6 @@ function Navbar() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
-<<<<<<< Updated upstream
-=======
-  // ✅ Role-based notification mapping
-  const NOTIFICATION_COMPONENTS = {
-    project_coordinator: NotificationBell,
-    structural_engineer: SENotificationBell,
-    quantity_surveyor: QSNotificationBell,
-    mep_engineer: MEPNotificationBell,
-    architect: ArchitectNotificationBell,
-    bda: ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-    bda1: ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-    bda2: ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-    BDA: ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
-    business_development: ({ userId }) => (
-      <BDANotificationBell bdaEmail={userId} />
-    ),
-    business_development_analyst: ({ userId }) => (
-      <BDANotificationBell bdaEmail={userId} />
-    ),
-    logistics_coordinator: ({ userId }) => (
-      <OperationsNotificationBell
-        userId={userId}
-        routes={{
-          default: "/operations/logistics/dashboard",
-          delivery: "/operations/logistics/deliveries",
-          delay: "/operations/logistics/deliveries",
-          receipt: "/operations/logistics/deliveries",
-          incident: "/operations/logistics/incidents",
-          task: "/operations/logistics/incidents?page=tasks",
-        }}
-      />
-    ),
-    inventory_controller: ({ userId }) => (
-      <OperationsNotificationBell
-        userId={userId}
-        routes={{
-          default: "/operations/inventory/dashboard",
-          delivery: "/operations/inventory/stock-in",
-          low_stock: "/operations/inventory/stock-out",
-          receipt: "/operations/inventory/stock-in",
-          incident: "/operations/inventory/incidents",
-          task: "/operations/inventory/incidents?page=tasks",
-        }}
-      />
-    ),
-
-    procurement_officer: ({ userId }) => (
-      <OperationsNotificationBell
-        userId={userId}
-        routes={{
-          default: "/operations/procurement/dashboard",
-          delivery: "/operations/procurement/purchase-orders",
-          receipt: "/operations/procurement/purchase-orders",
-          incident: "/operations/procurement/incidents",
-          task: "/operations/procurement/incidents?page=tasks",
-        }}
-      />
-    ),
-  };
-
->>>>>>> Stashed changes
   const RoleNotification = NOTIFICATION_COMPONENTS[user?.role];
 
   // ✅ Get quick-add items for current role

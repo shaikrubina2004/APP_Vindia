@@ -36,21 +36,9 @@ export const procurementOfficerMenu = [
   },
 
   {
-<<<<<<< Updated upstream
     name: "RFI",
     path: "/operations/procurement/rfi",
     icon: "message-square",
-  },
-
-  {
-    name: "Daily Report",
-    path: "/operations/procurement/daily-report",
-    icon: "clipboard",
-=======
-    name: "Reports",
-    path: "/operations/procurement/reports",
-    icon: "bar-chart-2",
->>>>>>> Stashed changes
   },
   {
     name: "Daily Report",

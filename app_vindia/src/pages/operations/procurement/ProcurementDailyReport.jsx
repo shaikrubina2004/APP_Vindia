@@ -22,7 +22,6 @@ const ProcurementDailyReport = () => {
   const [pendingApprovals, setPendingApprovals] = useState([{ ...EMPTY_APPROVAL }]);
   const [notes, setNotes] = useState("");
 
-<<<<<<< Updated upstream
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
@@ -42,9 +41,6 @@ const ProcurementDailyReport = () => {
     loadHistory();
   }, [loadHistory]);
 
-
-=======
->>>>>>> Stashed changes
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -103,10 +99,7 @@ const ProcurementDailyReport = () => {
         notes: notes.trim() || null,
       });
       setSaveMsg("Saved.");
-<<<<<<< Updated upstream
       loadHistory();
-=======
->>>>>>> Stashed changes
     } catch (err) {
       setSaveMsg(err.response?.data?.error || "Failed to save report");
     } finally {
@@ -117,10 +110,7 @@ const ProcurementDailyReport = () => {
   if (loading) return <div className="pdr-state">Loading…</div>;
 
   return (
-<<<<<<< Updated upstream
     <div className="pdr-layout">
-=======
->>>>>>> Stashed changes
     <div className="pdr-page">
       <div className="pdr-header">
         <div>
@@ -262,7 +252,6 @@ const ProcurementDailyReport = () => {
         </button>
       </div>
     </div>
-<<<<<<< Updated upstream
 
     <div className="pdr-history-panel">
       <h2>Recent Reports</h2>
@@ -301,8 +290,6 @@ const ProcurementDailyReport = () => {
       )}
     </div>
     </div>
-=======
->>>>>>> Stashed changes
   );
 };
 
