@@ -12,8 +12,11 @@ import api from "../../services/api";
 import "./ThreeDVisualizerNotificationBell.css";
 
 const TYPE_CFG = {
-  review: { label: "Review", color: "#7c3aed", bg: "#f5f3ff" },
-  model:  { label: "Model",  color: "#0891b2", bg: "#ecfeff" },
+  review:   { label: "Review",   color: "#7c3aed", bg: "#f5f3ff" },
+  model:    { label: "Model",    color: "#0891b2", bg: "#ecfeff" },
+  incident: { label: "Incident", color: "#dc2626", bg: "#fef2f2" },
+  task:     { label: "Task",     color: "#d97706", bg: "#fffbeb" },
+  rfi:      { label: "RFI",      color: "#2563eb", bg: "#eff6ff" },
 };
 
 const SEV_COLOR = {
@@ -23,11 +26,14 @@ const SEV_COLOR = {
   ok:       "#10b981",
 };
 
-const FILTERS = ["all", "review", "model"];
+const FILTERS = ["all", "review", "model", "incident", "task", "rfi"];
 
 const ROUTES = {
-  review: "/3d-visualizer/models",
-  model:  "/3d-visualizer/models",
+  review:   "/3d-visualizer/models",
+  model:    "/3d-visualizer/models",
+  incident: "/3d-visualizer/incidents",
+  task:     "/3d-visualizer/incidents?page=tasks",
+  rfi:      "/3d-visualizer/rfi",
 };
 
 function formatTime(ts) {

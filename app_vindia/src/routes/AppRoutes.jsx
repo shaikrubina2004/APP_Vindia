@@ -906,6 +906,36 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/digital-marketing/incidents"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.DIGITAL_MARKETING, ROLES.CEO]}>
+              <DigitalMarketingLayout>
+                <AppShell key="dm-incidents" />
+              </DigitalMarketingLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/digital-marketing/rfi"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.DIGITAL_MARKETING, ROLES.CEO]}>
+              <DigitalMarketingLayout>
+                <RFIPage />
+              </DigitalMarketingLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/digital-marketing/rfi/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.DIGITAL_MARKETING, ROLES.CEO]}>
+              <DigitalMarketingLayout>
+                <RFIDetailPage />
+              </DigitalMarketingLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ══ OPERATIONS & ADMINISTRATION  ═════════════════════════════ */}
 

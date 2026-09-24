@@ -176,10 +176,10 @@ export const ROLE_OPTIONS = [
   { value: "qc_engineer", label: "QC Engineer" },
   { value: "safety_officer", label: "Safety Officer" },
   { value: "hr_manager", label: "HR Manager" },
+  { value: "3d_visualizer", label: "3D Visualizer" },
+  { value: "digital_marketing", label: "Digital Marketing" },
 ];
 
 export const ROLE_LABELS = Object.fromEntries(
   ROLE_OPTIONS.map((r) => [r.value, r.label]),
 );
-
-

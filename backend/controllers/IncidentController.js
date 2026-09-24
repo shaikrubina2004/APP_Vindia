@@ -14,6 +14,12 @@ const {
 const {
   insertNotification: insertSiteEngineerNotification,
 } = require("./siteEngineerNotificationsController");
+const {
+  insertThreeDNotification,
+} = require("./threeDNotificationsController");
+const {
+  insertNotification: insertDigitalMarketingNotification,
+} = require("./digitalMarketingNotificationsController");
 /* ─── HELPERS ─────────────────────────────────────────────── */
 
 function calcDeadline(priority) {
@@ -232,6 +238,51 @@ async function notifyByRole(
         console.log(`✅ Site Engineer Notification → user:${userId} type:${type}`);
       } catch (err) {
         console.error("Site Engineer Notification error:", err.message);
+      }
+    } else if (
+      roleCode === "3d_visualizer" ||
+      roleCode === "3dvisualizer" ||
+      roleName.includes("3d visualizer")
+    ) {
+      // 3D Visualizer reads from three_d_notifications, not pc_notifications.
+      try {
+        const fallbackLink =
+          type === "task" ? "/3d-visualizer/incidents?page=tasks" : "/3d-visualizer/incidents";
+        // NOTE: every call site above hardcodes `link` to a QS-specific path
+        // (e.g. "/quantity-surveyor/incident"); always use our own link here
+        // rather than `link || fallbackLink`, or a 3D Visualizer's notification
+        // would send them to the QS incidents page.
+        await insertThreeDNotification(
+          userId,
+          type,
+          title,
+          description,
+          fallbackLink,
+          severity,
+          referenceId ?? null,
+        );
+        console.log(`✅ 3D Visualizer Notification → user:${userId} type:${type}`);
+      } catch (err) {
+        console.error("3D Visualizer Notification error:", err.message);
+      }
+    } else if (roleCode === "digital_marketing" || roleName.includes("digital marketing")) {
+      // Digital Marketing reads from digital_marketing_notifications (team-wide feed),
+      // not pc_notifications.
+      try {
+        const fallbackLink =
+          type === "task" ? "/digital-marketing/incidents?page=tasks" : "/digital-marketing/incidents";
+        await insertDigitalMarketingNotification(
+          userId,
+          type,
+          title,
+          description,
+          fallbackLink,
+          severity,
+          referenceId ?? null,
+        );
+        console.log(`✅ Digital Marketing Notification → user:${userId} type:${type}`);
+      } catch (err) {
+        console.error("Digital Marketing Notification error:", err.message);
       }
     } else {
       await safeNotify(

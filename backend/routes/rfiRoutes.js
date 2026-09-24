@@ -7,6 +7,8 @@ const multer  = require("multer");
 const path    = require("path");
 const protect = require("../middleware/authMiddleware");
 const createSENotification = require("../utils/createSENotification");
+const { insertThreeDNotification } = require("../controllers/threeDNotificationsController");
+const { insertNotification: insertDigitalMarketingNotification } = require("../controllers/digitalMarketingNotificationsController");
 
 // ── Multer ────────────────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
@@ -29,7 +31,52 @@ const ROLE_LABELS = {
   qc_engineer:          "QC Engineer",
   safety_officer:       "Safety Officer",
   hr_manager:           "HR Manager",
+  "3d_visualizer":      "3D Visualizer",
+  digital_marketing:    "Digital Marketing",
 };
+
+// ── Notify whoever an RFI is actually assigned to ───────────────────────────
+// Previously this only ever notified the Structural Engineer, regardless of
+// assigned_to_role — every other role's RFI assignments were silently
+// dropped. This routes to each role's own bell, the same way
+// IncidentController.notifyByRole does for incidents/tasks.
+async function getUserIdsByRoleCode(roleCode) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id WHERE r.code = $1`,
+      [roleCode]
+    );
+    return rows.map((r) => r.id);
+  } catch (err) {
+    console.error("getUserIdsByRoleCode error:", err.message);
+    return [];
+  }
+}
+
+async function notifyRFIRecipients(assignedToRole, assignedToUserId, { title, description, severity = "info" }) {
+  const role = (assignedToRole || "").toLowerCase();
+  try {
+    if (role === "structural_engineer") {
+      await createSENotification({ type: "rfi", severity, title, description });
+      return;
+    }
+
+    if (role === "3d_visualizer" || role === "3dvisualizer") {
+      const targets = assignedToUserId ? [assignedToUserId] : await getUserIdsByRoleCode("3d_visualizer");
+      for (const uid of targets) {
+        await insertThreeDNotification(uid, "rfi", title, description, "/3d-visualizer/rfi", severity, null);
+      }
+      return;
+    }
+
+    if (role === "digital_marketing") {
+      await insertDigitalMarketingNotification(assignedToUserId ?? null, "rfi", title, description, "/digital-marketing/rfi", severity, null);
+      return;
+    }
+  } catch (err) {
+    console.error("notifyRFIRecipients error:", err.message);
+  }
+}
 
 // ── KEY HELPER ────────────────────────────────────────────────────────────────
 // Resolves a user's TRUE role code + name from DB using their user ID.
@@ -206,13 +253,12 @@ router.post("/", protect, upload.single("file"), async (req, res) => {
       );
     }
 
-    if (assigned_to_role?.toLowerCase() === "structural_engineer") {
+    if (assigned_to_role) {
       try {
-        await createSENotification({
-          type:        "rfi",
-          severity:    ["critical","high"].includes(priority) ? "critical" : "warn",
-          title:       `New RFI: ${subject}`,
+        await notifyRFIRecipients(assigned_to_role, assigned_to_user_id, {
+          title: `New RFI: ${subject}`,
           description: `${ROLE_LABELS[raisedByCode] || raisedByCode} raised an RFI to you: "${subject}"`,
+          severity: ["critical", "high"].includes(priority) ? "critical" : "warn",
         });
       } catch (e) { console.error("Notify err:", e.message); }
     }
@@ -265,13 +311,13 @@ router.post("/:id/respond", protect, upload.single("file"), async (req, res) => 
       await pool.query(`UPDATE rfis SET status='responded', updated_at=NOW() WHERE id=$1`, [id]);
 
     const otherRole = rfi.raised_by_role === code ? rfi.assigned_to_role : rfi.raised_by_role;
-    if (otherRole?.toLowerCase() === "structural_engineer" && code?.toLowerCase() !== "structural_engineer") {
+    const otherUserId = rfi.raised_by_role === code ? rfi.assigned_to_user_id : rfi.raised_by_id;
+    if (otherRole && otherRole.toLowerCase() !== code?.toLowerCase()) {
       try {
-        await createSENotification({
-          type:        "rfi",
-          severity:    "info",
-          title:       `RFI Response: ${rfi.subject}`,
+        await notifyRFIRecipients(otherRole, otherUserId, {
+          title: `RFI Response: ${rfi.subject}`,
           description: `${ROLE_LABELS[code] || code} responded to your RFI "${rfi.subject}"`,
+          severity: "info",
         });
       } catch (e) { console.error("Notify err:", e.message); }
     }

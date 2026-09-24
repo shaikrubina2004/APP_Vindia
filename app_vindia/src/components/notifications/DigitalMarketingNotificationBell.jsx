@@ -18,15 +18,32 @@ const TYPE_CFG = {
   campaign_started:         { label: "Campaign",  color: "#0891b2", bg: "#ecfeff" },
   campaign_completed:       { label: "Campaign",  color: "#0891b2", bg: "#ecfeff" },
   campaign_budget_warning:  { label: "Budget",    color: "#dc2626", bg: "#fef2f2" },
+  incident:                 { label: "Incident",  color: "#dc2626", bg: "#fef2f2" },
+  task:                     { label: "Task",      color: "#7c3aed", bg: "#f5f3ff" },
+  rfi:                      { label: "RFI",       color: "#2563eb", bg: "#eff6ff" },
 };
 
-const FILTERS = ["all", "new_marketing_lead", "campaign_started", "campaign_completed", "campaign_budget_warning"];
+// Filter chips are grouped by *label*, not raw type — several types (e.g.
+// campaign_started / campaign_completed) share the "Campaign" label, and
+// without grouping the chip bar rendered two identical "Campaign" buttons.
+const FILTER_GROUPS = [
+  { key: "all",      label: "All",      types: null },
+  { key: "lead",     label: "New Lead", types: ["new_marketing_lead"] },
+  { key: "campaign", label: "Campaign", types: ["campaign_started", "campaign_completed"] },
+  { key: "budget",   label: "Budget",   types: ["campaign_budget_warning"] },
+  { key: "incident", label: "Incident", types: ["incident"] },
+  { key: "task",     label: "Task",     types: ["task"] },
+  { key: "rfi",      label: "RFI",      types: ["rfi"] },
+];
 
 const ROUTES = {
   new_marketing_lead:       "/digital-marketing/campaigns",
   campaign_started:         "/digital-marketing/campaigns",
   campaign_completed:       "/digital-marketing/campaigns",
   campaign_budget_warning:  "/digital-marketing/campaigns",
+  incident:                 "/digital-marketing/incidents",
+  task:                     "/digital-marketing/incidents?page=tasks",
+  rfi:                      "/digital-marketing/rfi",
 };
 
 function formatTime(ts) {
@@ -99,7 +116,9 @@ export default function DigitalMarketingNotificationBell({ userId }) {
     navigate(ROUTES[n.type] || "/digital-marketing/dashboard");
   };
 
-  const byType = filter === "all" ? notifs : notifs.filter((n) => n.type === filter);
+  const byType = filter === "all"
+    ? notifs
+    : notifs.filter((n) => (FILTER_GROUPS.find((g) => g.key === filter)?.types || []).includes(n.type));
   const unreadList = byType.filter((n) => !n.is_read);
   const readList = byType.filter((n) => n.is_read);
 
@@ -158,13 +177,13 @@ export default function DigitalMarketingNotificationBell({ userId }) {
             </div>
 
             <div className="dm-notif-filters">
-              {FILTERS.map((f) => (
+              {FILTER_GROUPS.map((g) => (
                 <button
-                  key={f}
-                  className={`dm-notif-filter-btn ${filter === f ? "active" : ""}`}
-                  onClick={() => setFilter(f)}
+                  key={g.key}
+                  className={`dm-notif-filter-btn ${filter === g.key ? "active" : ""}`}
+                  onClick={() => setFilter(g.key)}
                 >
-                  {f === "all" ? "All" : (TYPE_CFG[f]?.label ?? f)}
+                  {g.label}
                 </button>
               ))}
             </div>

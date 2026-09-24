@@ -12,6 +12,25 @@ async function createNotification({ type, title, message, lead_id = null, campai
 }
 exports.createNotification = createNotification;
 
+/* Generic notification insert — used by the shared incident/task/RFI notify
+   dispatcher (IncidentController.notifyByRole, rfiRoutes.js) so Digital
+   Marketing gets the same "assigned to you" notifications every other role
+   gets. digital_marketing_notifications is a team-wide feed (no user_id
+   column), so userId is accepted only for signature-compatibility with the
+   other role notifiers and isn't stored. */
+exports.insertNotification = async (userId, type, title, description, link, severity, referenceId) => {
+  try {
+    await createNotification({
+      type,
+      title,
+      message: description || title,
+    });
+    console.log(`✅ Digital Marketing Notification → type:${type} title:${title}`);
+  } catch (err) {
+    console.error("DM generic notification insert error:", err.message);
+  }
+};
+
 /* GET /api/dm-notifications */
 exports.getNotifications = async (req, res) => {
   try {
