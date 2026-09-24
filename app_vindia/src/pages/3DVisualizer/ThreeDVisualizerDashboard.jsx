@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getProjects } from "../../services/projectService";
+import api from "../../services/api";
 import CheckInButton from "../../SharedResourse/CheckInButton";
 import "./ThreeDVisualizerDashboard.css";
 
@@ -142,22 +143,31 @@ export default function ThreeDVisualizerDashboard() {
       const data    = projRes.data || [];
       setProjects(data);
 
+      // NOTE: these three previously used raw fetch() with no Authorization
+      // header, against a couple of wrong URLs — /api/architect-drawings
+      // doesn't exist (the real route is /api/architect-designs), and both
+      // /api/rfis and /api/incidents require a Bearer token (all three
+      // silently returned empty results because of this, not because there
+      // was no real data). Using the shared `api` instance attaches the
+      // token automatically and getDrawings already scopes by req.user
+      // internally, so no userId/role query params are needed either.
       const [drawRes, rfiRes, incRes] = await Promise.allSettled([
-        fetch(`/api/architect-drawings?userId=${userId}&role=3d_visualizer`).then(r => r.json()),
-        fetch("/api/rfis").then(r => r.json()),
-        fetch("/api/incidents").then(r => r.json()),
+        api.get("/architect-designs"),
+        api.get("/rfis"),
+        api.get("/incidents"),
       ]);
 
       if (drawRes.status === "fulfilled") {
-        const d = drawRes.value?.data ?? drawRes.value ?? [];
+        const d = drawRes.value.data;
         setDrawings(Array.isArray(d) ? d : []);
       }
       if (rfiRes.status === "fulfilled") {
-        const d = rfiRes.value?.data ?? rfiRes.value ?? [];
+        // GET /api/rfis responds { success, rfis: [...] }, not { data: [...] }.
+        const d = rfiRes.value.data?.rfis ?? [];
         setRfis(Array.isArray(d) ? d : []);
       }
       if (incRes.status === "fulfilled") {
-        const d = incRes.value?.data ?? incRes.value ?? [];
+        const d = incRes.value.data?.data ?? [];
         setIncidents(Array.isArray(d) ? d : []);
       }
     } catch (err) {

@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { insertThreeDNotification } = require("./threeDNotificationsController");
 
 /* ─────────────────────────────────────────────
    DB HELPER — wraps pool.query with timeout
@@ -267,6 +268,52 @@ exports.sendDrawing = async (req, res) => {
        VALUES ($1, 'SENT', $2, $3)`,
       [drawingId, role, sentBy]
     );
+
+    // Notify the 3D Visualizer(s) so a shared drawing shows up in their bell,
+    // not just as a silent row in the "Based on drawing" dropdown.
+    const normRole = (role || "").toLowerCase().replace(/[\s_-]/g, "");
+    if (normRole === "3dvisualizer") {
+      try {
+        const drawingRes = await pool.query(
+          `SELECT d.name, p.name AS project_name
+           FROM architect_drawings d
+           LEFT JOIN projects p ON p.id = d.project_id
+           WHERE d.id = $1`,
+          [drawingId]
+        );
+        const drawing = drawingRes.rows[0];
+        const drawingLabel = drawing?.name
+          ? `${drawing.name}${drawing.project_name ? ` (${drawing.project_name})` : ""}`
+          : "a drawing";
+
+        let targetUserIds = [];
+        if (user_id) {
+          targetUserIds = [user_id];
+        } else {
+          const usersRes = await pool.query(
+            `SELECT u.id, r.name, r.code FROM users u JOIN roles r ON r.id = u.role_id`
+          );
+          const norm = (s) => (s || "").toLowerCase().replace(/[\s_-]/g, "");
+          targetUserIds = usersRes.rows
+            .filter((r) => norm(r.code) === "3dvisualizer" || norm(r.name) === "3dvisualizer")
+            .map((r) => r.id);
+        }
+
+        for (const uid of targetUserIds) {
+          await insertThreeDNotification(
+            uid,
+            "model",
+            `New drawing shared: ${drawingLabel}`,
+            "The architect shared a drawing you can now base a 3D model on.",
+            "/3d-visualizer/models",
+            "info",
+            drawingId
+          );
+        }
+      } catch (notifyErr) {
+        console.error("sendDrawing (3D notify) error:", notifyErr.message);
+      }
+    }
 
     res.json({ success: true });
   });

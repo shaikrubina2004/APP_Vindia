@@ -144,6 +144,15 @@ async function notifyByRole(
     );
     const roleName = (rows[0]?.name ?? "").toLowerCase();
     const roleCode = (rows[0]?.code ?? "").toLowerCase();
+    // Normalized (no spaces/underscores/hyphens) comparison — the `name` and
+    // `code` columns aren't consistently formatted across roles (e.g. Digital
+    // Marketing matches on `code`, but 3D Visualizer's `code` column doesn't
+    // equal "digital_marketing"-style strings, only `name` does), so an exact
+    // "roleName.includes('3d visualizer')" (space) style check silently missed
+    // "3d_visualizer" (underscore). Normalizing both sides avoids that class of bug.
+    const norm = (s) => (s || "").replace(/[\s_-]/g, "");
+    const roleNameNorm = norm(roleName);
+    const roleCodeNorm = norm(roleCode);
 
     if (
       roleName.includes("quantity") ||
@@ -240,9 +249,8 @@ async function notifyByRole(
         console.error("Site Engineer Notification error:", err.message);
       }
     } else if (
-      roleCode === "3d_visualizer" ||
-      roleCode === "3dvisualizer" ||
-      roleName.includes("3d visualizer")
+      roleCodeNorm === "3dvisualizer" ||
+      roleNameNorm === "3dvisualizer"
     ) {
       // 3D Visualizer reads from three_d_notifications, not pc_notifications.
       try {
@@ -265,7 +273,7 @@ async function notifyByRole(
       } catch (err) {
         console.error("3D Visualizer Notification error:", err.message);
       }
-    } else if (roleCode === "digital_marketing" || roleName.includes("digital marketing")) {
+    } else if (roleCodeNorm === "digitalmarketing" || roleNameNorm === "digitalmarketing") {
       // Digital Marketing reads from digital_marketing_notifications (team-wide feed),
       // not pc_notifications.
       try {
@@ -285,6 +293,9 @@ async function notifyByRole(
         console.error("Digital Marketing Notification error:", err.message);
       }
     } else {
+      console.log(
+        `ℹ️ notifyByRole → no specific bell for user:${userId} (role name="${roleName}" code="${roleCode}") — falling back to PC notifications`
+      );
       await safeNotify(
         userId,
         type,

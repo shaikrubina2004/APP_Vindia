@@ -40,36 +40,42 @@ const ROLE_LABELS = {
 // assigned_to_role — every other role's RFI assignments were silently
 // dropped. This routes to each role's own bell, the same way
 // IncidentController.notifyByRole does for incidents/tasks.
-async function getUserIdsByRoleCode(roleCode) {
+const normRole = (s) => (s || "").toLowerCase().replace(/[\s_-]/g, "");
+
+async function getUserIdsByNormalizedRole(normalizedTarget) {
   try {
     const { rows } = await pool.query(
-      `SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id WHERE r.code = $1`,
-      [roleCode]
+      `SELECT u.id, r.name, r.code FROM users u JOIN roles r ON r.id = u.role_id`
     );
-    return rows.map((r) => r.id);
+    return rows
+      .filter((r) => normRole(r.code) === normalizedTarget || normRole(r.name) === normalizedTarget)
+      .map((r) => r.id);
   } catch (err) {
-    console.error("getUserIdsByRoleCode error:", err.message);
+    console.error("getUserIdsByNormalizedRole error:", err.message);
     return [];
   }
 }
 
 async function notifyRFIRecipients(assignedToRole, assignedToUserId, { title, description, severity = "info" }) {
-  const role = (assignedToRole || "").toLowerCase();
+  const role = normRole(assignedToRole);
   try {
-    if (role === "structural_engineer") {
+    if (role === "structuralengineer") {
       await createSENotification({ type: "rfi", severity, title, description });
       return;
     }
 
-    if (role === "3d_visualizer" || role === "3dvisualizer") {
-      const targets = assignedToUserId ? [assignedToUserId] : await getUserIdsByRoleCode("3d_visualizer");
+    if (role === "3dvisualizer") {
+      // `code`/`name` columns aren't consistently formatted (underscore vs
+      // space vs hyphen) across roles, so match by normalized name/code
+      // rather than assuming the exact DB code string.
+      const targets = assignedToUserId ? [assignedToUserId] : await getUserIdsByNormalizedRole("3dvisualizer");
       for (const uid of targets) {
         await insertThreeDNotification(uid, "rfi", title, description, "/3d-visualizer/rfi", severity, null);
       }
       return;
     }
 
-    if (role === "digital_marketing") {
+    if (role === "digitalmarketing") {
       await insertDigitalMarketingNotification(assignedToUserId ?? null, "rfi", title, description, "/digital-marketing/rfi", severity, null);
       return;
     }

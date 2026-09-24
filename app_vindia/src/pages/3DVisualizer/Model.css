@@ -97,6 +97,18 @@
   padding: 9px 16px;
 }
 
+/* None of this page's inline <svg> icons declare width/height, so without
+   an explicit size here they fall back to the browser's default replaced-
+   element box (~300x150) and get crushed by flexbox to near-zero width.
+   That's invisible on text buttons (the label still shows) but collapses
+   icon-only buttons — like the delete/trash button — down to just their
+   padding, rendering as a tiny colored sliver instead of a full button. */
+.btn svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
 .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -174,6 +186,9 @@
   color: #dc2626;
   border: 1px solid #fca5a5;
   padding: 8px 10px;
+  flex-shrink: 0;
+  min-width: 34px;
+  min-height: 34px;
 }
 
 .btn-icon-danger:hover:not(:disabled) {
