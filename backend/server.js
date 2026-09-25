@@ -120,7 +120,6 @@ const accountantRoutes = require("./routes/accountantRoutes");
 
 /* ✅ 3D Visualizer */
 const threeDModelRoutes = require("./routes/threeDModelRoutes");
-const threeDNotificationRoutes = require("./routes/threeDNotificationsRoutes");
 
 /* ✅ Digital Marketing */
 const campaignRoutes = require("./routes/campaignRoutes");
@@ -245,7 +244,6 @@ app.use("/api/accountant", accountantRoutes);
 
 /* ✅ 3D Visualizer */
 app.use("/api/3d-models", threeDModelRoutes);
-app.use("/api/3d-notifications", threeDNotificationRoutes);
 
 /* ✅ Digital Marketing */
 app.use("/api/campaigns", campaignRoutes);
@@ -254,6 +252,26 @@ app.use("/api/dm-notifications", digitalMarketingNotificationRoutes);
 /* ═════════ ERROR HANDLING ═════════ */
 
 app.use(errorHandler);
+
+/* ═════════ BDA FOLLOW-UP CRON JOBS ═════════
+   Runs once a day at 08:00 (server local time):
+     1. generateFollowUpNotifications — reminds BDAs about
+        today's / overdue / tomorrow's follow-ups.
+     2. escalateOverdueFollowUps — the "missed follow-up
+        goes to the backup BDA" behaviour, configured in
+        backend/config/bdaEscalation.js.
+   Previously neither of these was ever scheduled — the
+   functions existed but nothing called cron.schedule(). */
+const cron = require("node-cron");
+const {
+  generateFollowUpNotifications,
+  escalateOverdueFollowUps,
+} = require("./controllers/bdaNotificationsController");
+
+cron.schedule("0 8 * * *", async () => {
+  await generateFollowUpNotifications();
+  await escalateOverdueFollowUps();
+});
 
 /* ═════════ START ═════════ */
 

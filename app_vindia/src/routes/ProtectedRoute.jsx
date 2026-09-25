@@ -43,7 +43,7 @@ const getRoleDashboard = (role) => {
     case "project_coordinator":
       return "/project-coordinator/dashboard";
 
-    case "business_development_analyst":
+    case "bda":
       return "/business-development/dashboard";
 
     // NEW ROLES

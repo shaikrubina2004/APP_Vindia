@@ -10,12 +10,13 @@ const { notifyNewMarketingLead } = require("./digitalMarketingNotificationsContr
 ══════════════════════════════════════ */
 exports.getDashboardSummary = async (req, res) => {
   try {
-    const { role, name } = req.query;
+    const role = req.user?.role || null;
+    const name = req.user?.name || null;
     const isBda = role === "bda";
 
     // Base clause + params, reused across all queries
     const leadFilter = isBda
-      ? "AND (assigned_to = $1 OR assigned_to IS NULL) AND status != 'JUNK_REQUESTED'"
+      ? "AND (LOWER(TRIM(assigned_to)) = LOWER(TRIM($1)) OR assigned_to IS NULL) AND status != 'JUNK_REQUESTED'"
       : "";
     const leadVals = isBda ? [name] : [];
 
@@ -50,7 +51,7 @@ exports.getDashboardSummary = async (req, res) => {
     ]);
 
     // Follow-ups: join to leads so we can apply the same assigned_to filter
-    const fuFilter = isBda ? "AND (l.assigned_to = $1 OR l.assigned_to IS NULL)" : "";
+    const fuFilter = isBda ? "AND (LOWER(TRIM(l.assigned_to)) = LOWER(TRIM($1)) OR l.assigned_to IS NULL)" : "";
 
     const [todayFU, pendingFU] = await Promise.all([
       pool.query(
@@ -89,13 +90,14 @@ exports.getDashboardSummary = async (req, res) => {
 ══════════════════════════════════════ */
 exports.getAllLeads = async (req, res) => {
   try {
-    const { role, name } = req.query;
+    const role = req.user?.role || null;
+    const name = req.user?.name || null;
     let sql = "SELECT * FROM leads WHERE deleted_by_admin = false";
     const vals = [];
 
     if (role === "bda") {
       vals.push(name);
-      sql += ` AND (assigned_to = $${vals.length} OR assigned_to IS NULL) AND status != 'JUNK_REQUESTED'`;
+      sql += ` AND (LOWER(TRIM(assigned_to)) = LOWER(TRIM($${vals.length})) OR assigned_to IS NULL) AND status != 'JUNK_REQUESTED'`;
     }
 
     sql += " ORDER BY created_at DESC";
@@ -342,9 +344,10 @@ exports.addFollowUp = async (req, res) => {
 ══════════════════════════════════════ */
 exports.getAllFollowUps = async (req, res) => {
   try {
-    const { role, name } = req.query;
+    const role = req.user?.role || null;
+    const name = req.user?.name || null;
     const isBda = role === "bda";
-    const filter = isBda ? "AND (l.assigned_to = $1 OR l.assigned_to IS NULL)" : "";
+    const filter = isBda ? "AND (LOWER(TRIM(l.assigned_to)) = LOWER(TRIM($1)) OR l.assigned_to IS NULL)" : "";
     const vals = isBda ? [name] : [];
 
     const { rows } = await pool.query(
@@ -581,9 +584,10 @@ exports.permanentDeleteLead = async (req, res) => {
 ══════════════════════════════════════ */
 exports.getTodaysFollowUps = async (req, res) => {
   try {
-    const { role, name } = req.query;
+    const role = req.user?.role || null;
+    const name = req.user?.name || null;
     const isBda  = role === "bda";
-    const filter = isBda ? "AND (l.assigned_to = $1 OR l.assigned_to IS NULL)" : "";
+    const filter = isBda ? "AND (LOWER(TRIM(l.assigned_to)) = LOWER(TRIM($1)) OR l.assigned_to IS NULL)" : "";
     const vals   = isBda ? [name] : [];
 
     const { rows } = await pool.query(
@@ -607,9 +611,10 @@ exports.getTodaysFollowUps = async (req, res) => {
 ══════════════════════════════════════ */
 exports.getPendingFollowUps = async (req, res) => {
   try {
-    const { role, name } = req.query;
+    const role = req.user?.role || null;
+    const name = req.user?.name || null;
     const isBda  = role === "bda";
-    const filter = isBda ? "AND (l.assigned_to = $1 OR l.assigned_to IS NULL)" : "";
+    const filter = isBda ? "AND (LOWER(TRIM(l.assigned_to)) = LOWER(TRIM($1)) OR l.assigned_to IS NULL)" : "";
     const vals   = isBda ? [name] : [];
 
     const { rows } = await pool.query(
