@@ -14,6 +14,20 @@ import {
 } from "recharts";
 
 /* ── Helpers ── */
+
+/* This page uses plain fetch() rather than axios, so it never
+   picked up the global Authorization header added in main.jsx.
+   The project/cost-summary backend routes now require a logged-in
+   user, so every request here needs to carry the token. */
+const authFetch = (url, options = {}) =>
+  fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+
 const fmt = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
 
 const fmtDate = (d) =>
@@ -229,7 +243,7 @@ function ProjectManagement() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/projects")
+    authFetch("http://localhost:5000/api/projects")
       .then((res) => res.json())
       .then((data) => {
         setProjects(data);
@@ -244,7 +258,7 @@ function ProjectManagement() {
 
   const [siteEngineers, setSiteEngineers] = useState([]);
   useEffect(() => {
-    fetch("http://localhost:5000/api/projects/site-engineers")
+    authFetch("http://localhost:5000/api/projects/site-engineers")
       .then((res) => res.json())
       .then((data) => setSiteEngineers(data))
       .catch(console.error);
@@ -252,7 +266,7 @@ function ProjectManagement() {
 
   const [managers, setManagers] = useState([]);
   useEffect(() => {
-    fetch("http://localhost:5000/api/projects/managers")
+    authFetch("http://localhost:5000/api/projects/managers")
       .then((res) => res.json())
       .then((data) => setManagers(data))
       .catch(console.error);
@@ -262,17 +276,17 @@ function ProjectManagement() {
   const [architects, setArchitects] = useState([]);
   const [clients, setClients] = useState([]);
   useEffect(() => {
-    fetch("http://localhost:5000/api/projects/coordinators")
+    authFetch("http://localhost:5000/api/projects/coordinators")
       .then((res) => res.json())
       .then((data) => setCoordinators(data))
       .catch(console.error);
 
-    fetch("http://localhost:5000/api/projects/architects")
+    authFetch("http://localhost:5000/api/projects/architects")
       .then((res) => res.json())
       .then((data) => setArchitects(Array.isArray(data) ? data : []))
       .catch(console.error);
 
-    fetch("http://localhost:5000/api/projects/clients")
+    authFetch("http://localhost:5000/api/projects/clients")
       .then((res) => res.json())
       .then((data) => setClients(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -283,7 +297,7 @@ function ProjectManagement() {
 
   useEffect(() => {
     if (!selectedProject?.id) return;
-    fetch(`http://localhost:5000/api/cost-summary/${selectedProject.id}`)
+    authFetch(`http://localhost:5000/api/cost-summary/${selectedProject.id}`)
       .then((res) => res.json())
       .then((data) => setCostSummary(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -409,7 +423,7 @@ function ProjectManagement() {
         alert("Please fill required fields");
         return;
       }
-      const res = await fetch("http://localhost:5000/api/projects", {
+      const res = await authFetch("http://localhost:5000/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

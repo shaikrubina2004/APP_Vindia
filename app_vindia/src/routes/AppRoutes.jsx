@@ -149,6 +149,16 @@ import ItemMaster from "../pages/operations/inventory/ItemMaster";
 import StockIn from "../pages/operations/inventory/StockIn";
 import StockOut from "../pages/operations/inventory/StockOut";
 import Deliveries from "../pages/operations/logistics/Deliveries";
+
+/* ── REPORTS / ANALYTICS / SETTINGS (NEW) ───────────────── */
+// NOTE: "SharedResource" must match your folder name EXACTLY as VS Code shows it
+// (in your screenshot it may be spelled "SharedResourse"). If it differs,
+// change it in the two lines below.
+import ManagerReports from "../SharedResourse/ManagerReports";
+import Settings from "../SharedResourse/Settings";
+import ReportsInbox from "../pages/ceo/ReportsInbox";
+import Analytics from "../pages/ceo/Analytics";
+import RoleLayout from "../layouts/RoleLayout";
 /* ═══════════════════════════════════════════════════════════
    APP ROUTES
 ═════════════════════════════════════════════════════════════ */
@@ -176,7 +186,7 @@ const AppRoutes = () => {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR]}>
+            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.HR_MANAGER]}>
               <CEOLayout>
                 <Dashboard />
               </CEOLayout>
@@ -383,6 +393,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
         {/* ══ SITE ENGINEER ═════════════════════════════════ */}
         {SiteEngineerRoutes}
 
@@ -814,7 +825,7 @@ const AppRoutes = () => {
           path="/timesheet"
           element={
             <ProtectedRoute
-              allowedRoles={[ROLES.CEO, ROLES.HR, ...PROJECT_ROLES]}
+              allowedRoles={[ROLES.CEO, ROLES.HR_MANAGER, ...PROJECT_ROLES]}
             >
               <CEOLayout>
                 <Timesheet />
@@ -1161,15 +1172,91 @@ const AppRoutes = () => {
         />
 
         <Route
-  path="/operations/procurement/incidents"
-  element={
-    <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
-      <ProcurementOfficerLayout>
-        <AppShell key="proc-incidents" />
-      </ProcurementOfficerLayout>
-    </ProtectedRoute>
-  }
-/>
+          path="/operations/procurement/incidents"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <AppShell key="proc-incidents" />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/operations/procurement/rfi"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <RFIPage />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/procurement/rfi/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <RFIDetailPage />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ══ CEO: REPORTS INBOX + ANALYTICS (NEW) ══════════ */}
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+              <CEOLayout>
+                <ReportsInbox />
+              </CEOLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+              <CEOLayout>
+                <Analytics />
+              </CEOLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ══ MANAGERS: REPORT TO CEO (NEW) ═════════════════ */}
+        <Route
+          path="/my-reports"
+          element={
+            <ProtectedRoute
+              allowedRoles={[
+                ROLES.PROJECT_MANAGER,
+                ROLES.HR_MANAGER,
+                ROLES.FINANCE_MANAGER,
+                ROLES.OPERATIONS_MANAGER,
+                ROLES.BDA,
+                ROLES.BD_MANAGER,
+              ]}
+            >
+              <RoleLayout>
+                <ManagerReports />
+              </RoleLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ══ SETTINGS — every logged-in role (NEW) ═════════ */}
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute allowedRoles={Object.values(ROLES)}>
+              <RoleLayout>
+                <Settings />
+              </RoleLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ══ FALLBACK ══════════════════════════════════════ */}
         <Route

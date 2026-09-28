@@ -236,7 +236,17 @@ exports.generateFollowUpNotifications = async () => {
      });
 ══════════════════════════════════════ */
 exports.escalateOverdueFollowUps = async () => {
-  const { ESCALATION_GRACE_DAYS } = require("../config/bdaEscalation");
+  const { ESCALATION_GRACE_DAYS: DEFAULT_GRACE_DAYS } = require("../config/bdaEscalation");
+  const { getSetting } = require("./settingsController");
+
+  // CEO-editable from Settings → "Lead follow-up escalation".
+  // Falls back to config/bdaEscalation.js if the settings table isn't there yet.
+  if ((await getSetting("escalation_enabled", "true")) !== "true") {
+    console.log("⏸️  Escalation disabled in Settings — skipping");
+    return { escalated: 0, skipped: true };
+  }
+  const parsed = parseInt(await getSetting("escalation_grace_days", String(DEFAULT_GRACE_DAYS)), 10);
+  const ESCALATION_GRACE_DAYS = Number.isNaN(parsed) ? DEFAULT_GRACE_DAYS : parsed;
   const ACTIVE_STATUSES_EXCLUDED = "'converted', 'junk', 'junk_requested', 'not interested'";
 
   try {

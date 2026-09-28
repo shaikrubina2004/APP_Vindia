@@ -48,6 +48,9 @@ const pcDailyUpdateRoutes = require("./routes/pcDailyUpdateRoutes");
 const templateRoutes = require("./routes/templateRoutes");
 const pcNotificationsRouter = require("./routes/pcNotifications");
 const pcPaymentRoutes = require("./routes/pcPaymentRoutes");
+const managerReportsRoutes = require("./routes/managerReportsRoutes");
+const analyticsRoutes      = require("./routes/analyticsRoutes");
+const settingsRoutes       = require("./routes/settingsRoutes");
 
 /* ✅ Site Engineer */
 const siteEngineerRfiRoutes = require("./routes/siteEngineerRfiRoutes");
@@ -169,6 +172,9 @@ app.use("/api/structural", structuralRoutes);
 app.use("/api/se-daily-reports", seDailyRoutes);
 app.use("/api/rfis", rfiRoutes);
 app.use("/api/se-notifications", seNotificationRoutes);
+app.use("/api/manager-reports", managerReportsRoutes);
+app.use("/api/analytics",       analyticsRoutes);
+app.use("/api/settings",        settingsRoutes);
 
 /* ✅ QS */
 app.use("/api/qs/notifications", qsNotifRoutes);

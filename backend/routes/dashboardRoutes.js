@@ -2,7 +2,16 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/db");
 
-router.get("/", async (req, res) => {
+/* ── AUTH ──
+   Previously no auth at all — anyone could pull employee counts,
+   attendance breakdowns, and a list of employee names/DOBs
+   (birthdays) with no login required. This backs the CEO/HR
+   dashboard, so restrict it to those two roles. */
+const authMiddleware = require("../middleware/authMiddleware");
+const { requireRole } = authMiddleware;
+const CAN_VIEW = requireRole("ceo", "hr_manager");
+
+router.get("/", authMiddleware, CAN_VIEW, async (req, res) => {
   try {
     // ✅ Total Employees
     const totalEmployeesRes = await pool.query(

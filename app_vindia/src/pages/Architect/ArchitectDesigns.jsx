@@ -1801,7 +1801,9 @@ export default function DrawingManagementSystem() {
       try {
         let users = [];
         for (const roleKey of ["3D Visualizer", "3d_visualizer", "3dvisualizer"]) {
-          const res  = await fetch(`/api/users/by-role/${encodeURIComponent(roleKey)}`);
+          const res  = await fetch(`/api/users/by-role/${encodeURIComponent(roleKey)}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          });
           const data = await res.json();
           users = data?.data || data || [];
           if (users.length > 0) break;

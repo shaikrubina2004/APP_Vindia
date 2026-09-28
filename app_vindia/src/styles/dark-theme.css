@@ -1,0 +1,15 @@
+/* Dark mode — applied when <html data-theme="dark">.
+   The app's colors are hard-coded across ~100 stylesheets, so instead of
+   rewriting each one this inverts the whole page and then flips images/video
+   back so photos and the logo look normal. invert(.92) gives a soft dark
+   grey instead of pure black. */
+html[data-theme="dark"] {
+  filter: invert(0.92) hue-rotate(180deg);
+  background: #fff;
+}
+html[data-theme="dark"] img,
+html[data-theme="dark"] video,
+html[data-theme="dark"] iframe,
+html[data-theme="dark"] [style*="background-image"] {
+  filter: invert(1) hue-rotate(180deg);
+}

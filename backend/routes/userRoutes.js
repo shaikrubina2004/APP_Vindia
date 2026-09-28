@@ -2,12 +2,25 @@ const express = require("express");
 const router = express.Router();
 
 const pool = require("../config/db");
-
 const { getUsersByRole } = require("../controllers/userController");
-/* GET USERS BY ROLE */
-router.get("/by-role/:role", getUsersByRole);
+
+/* ── AUTH ──
+   This file previously had NO auth on any route — anyone, logged in
+   or not, could list every user, change any user's role/status
+   (including handing themselves CEO access), or delete any account.
+   Locked to CEO only, since this is the User Management module. */
+const authMiddleware = require("../middleware/authMiddleware");
+const { requireRole } = authMiddleware;
+const CEO_ONLY = requireRole("ceo");
+
+/* GET USERS BY ROLE — used for assignee dropdowns across several
+   modules (e.g. Architect Designs), not just CEO's User Management.
+   Any logged-in user can call it; only returns names/emails for a
+   given role, not the sensitive account-management data below. */
+router.get("/by-role/:role", authMiddleware, getUsersByRole);
+
 /* GET USERS */
-router.get("/", async (req, res) => {
+router.get("/", authMiddleware, CEO_ONLY, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
@@ -28,7 +41,7 @@ router.get("/", async (req, res) => {
 });
 
 /* GET DEPARTMENTS */
-router.get("/departments", async (req, res) => {
+router.get("/departments", authMiddleware, CEO_ONLY, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT id, name FROM departments ORDER BY name",
@@ -40,7 +53,7 @@ router.get("/departments", async (req, res) => {
 });
 
 /* GET ROLES */
-router.get("/roles/:deptId", async (req, res) => {
+router.get("/roles/:deptId", authMiddleware, CEO_ONLY, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT id, name FROM roles WHERE department_id = $1",
@@ -53,7 +66,7 @@ router.get("/roles/:deptId", async (req, res) => {
 });
 
 /* UPDATE USER */
-router.put("/:id", async (req, res) => {
+router.put("/:id", authMiddleware, CEO_ONLY, async (req, res) => {
   const { role_id, status } = req.body;
 
   try {
@@ -75,7 +88,7 @@ router.put("/:id", async (req, res) => {
 });
 
 /* DELETE USER */
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", authMiddleware, CEO_ONLY, async (req, res) => {
   try {
     await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]);
     res.json({ message: "User deleted" });

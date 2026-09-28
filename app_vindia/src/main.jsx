@@ -5,6 +5,7 @@ import App from "./App";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/useAuth"; // ✅ FIXED
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import "./utils/theme";
 
 import "./styles/global.css";
 import "./styles/Layout.css";

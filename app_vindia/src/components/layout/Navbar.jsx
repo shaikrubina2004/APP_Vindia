@@ -350,7 +350,7 @@ function Navbar() {
               <small>{user?.email}</small>
             </div>
             <button className="dropdown-item">Profile</button>
-            <button className="dropdown-item">Settings</button>
+            <button className="dropdown-item" onClick={() => { setIsProfileOpen(false); navigate("/settings"); }}>Settings</button>
             <div className="dropdown-divider"></div>
             <button className="dropdown-item logout" onClick={handleLogout}>
               Logout

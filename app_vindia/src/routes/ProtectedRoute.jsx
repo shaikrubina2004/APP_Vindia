@@ -10,7 +10,7 @@ const getRoleDashboard = (role) => {
     case "ceo":
       return "/dashboard";
 
-    case "hr":
+    case "hr_manager":
       return "/hr";
 
     case "site_engineer":
