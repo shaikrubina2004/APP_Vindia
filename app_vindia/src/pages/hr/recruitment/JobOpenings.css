@@ -1,0 +1,319 @@
+/* ===== FILE: APP_Vindia/app_vindia/src/pages/hr/recruitment/JobOpenings.css ===== */
+
+.jo-page {
+  --primary: #0A4174;
+  --primary-light: #4E8EA2;
+  --success: #059669;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-500: #6b7280;
+  --neutral-900: #111827;
+
+  padding: 1.5rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--neutral-900);
+}
+
+.jo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.jo-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.jo-header p {
+  margin: 0;
+  color: var(--neutral-500);
+  font-size: 0.88rem;
+}
+
+.jo-primary-btn {
+  padding: 0.55rem 1.2rem;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.jo-primary-btn:hover:not(:disabled) {
+  background: var(--primary-light);
+}
+
+.jo-primary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.jo-inline-error {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.jo-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.jo-stat-card {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.jo-stat-label {
+  font-size: 0.8rem;
+  color: var(--neutral-500);
+}
+
+.jo-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.jo-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.jo-filters {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.jo-filter-btn {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  cursor: pointer;
+  color: var(--neutral-500);
+}
+
+.jo-filter-btn--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.jo-search {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  min-width: 260px;
+}
+
+.jo-empty {
+  color: var(--neutral-500);
+  font-size: 0.9rem;
+  padding: 1.5rem;
+  text-align: center;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+}
+
+.jo-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 0.88rem;
+}
+
+.jo-table th {
+  text-align: left;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--neutral-200);
+  color: var(--neutral-500);
+  font-weight: 600;
+  background: var(--neutral-100);
+}
+
+.jo-table td {
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.jo-table tbody tr {
+  cursor: pointer;
+}
+
+.jo-table tbody tr:hover {
+  background: var(--neutral-100);
+}
+
+.jo-title-cell {
+  font-weight: 600;
+}
+
+.jo-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.jo-badge--open { background: #dcfce7; color: var(--success); }
+.jo-badge--closed { background: #e5e7eb; color: var(--neutral-500); }
+
+.jo-toggle-btn {
+  padding: 0.3rem 0.75rem;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.jo-toggle-btn:hover:not(:disabled) {
+  background: var(--neutral-100);
+}
+
+.jo-toggle-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Create modal ─────────────────────────────────────── */
+
+.jo-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.jo-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.jo-modal h2 {
+  margin: 0 0 1rem;
+  font-size: 1.15rem;
+  color: var(--primary);
+}
+
+.jo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--neutral-500);
+  margin-bottom: 0.9rem;
+  flex: 1;
+}
+
+.jo-field input,
+.jo-field select,
+.jo-field textarea {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  color: var(--neutral-900);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.jo-field textarea {
+  resize: vertical;
+}
+
+.jo-field-row {
+  display: flex;
+  gap: 0.9rem;
+}
+
+.jo-form-error {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin: 0 0 0.9rem;
+}
+
+.jo-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.jo-cancel-btn {
+  padding: 0.55rem 1.2rem;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.jo-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.jo-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--neutral-500);
+}
+
+.jo-state--error {
+  color: #dc2626;
+}
+
+.jo-state--error button {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.4rem 1rem;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  background: #fff;
+  color: #dc2626;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .jo-field-row {
+    flex-direction: column;
+    gap: 0;
+  }
+}

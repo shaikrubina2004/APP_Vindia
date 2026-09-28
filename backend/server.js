@@ -25,7 +25,7 @@ const upload = multer({ storage });
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
-
+const recruitmentRoutes = require("./routes/recruitmentRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const rolesRoutes = require("./routes/rolesRoutes");
@@ -156,7 +156,7 @@ app.get("/", async (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/employees", employeeRoutes);
-
+app.use("/api/recruitment", recruitmentRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/roles", rolesRoutes);

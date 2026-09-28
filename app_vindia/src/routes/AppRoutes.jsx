@@ -24,6 +24,7 @@ import Leaves from "../pages/hr/Leaves";
 import Payroll from "../pages/hr/Payroll";
 import Travel from "../pages/hr/Travel";
 import TravelRequest from "../pages/hr/TravelRequest";
+import JobOpenings from "../pages/hr/recruitment/JobOpenings";
 /* ── DIGITAL MARKETING ───────────────────────────────────── */
 import DigitalMarketing from "../pages/business-development/digital-marketing/DigitalMarketing";
 import DMCampaigns from "../pages/business-development/digital-marketing/Campaigns";
@@ -392,6 +393,17 @@ const AppRoutes = () => {
             <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
               <HRLayout>
                 <TravelRequest />
+              </HRLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hr/recruitment/job-openings"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
+              <HRLayout>
+                <JobOpenings />
               </HRLayout>
             </ProtectedRoute>
           }
