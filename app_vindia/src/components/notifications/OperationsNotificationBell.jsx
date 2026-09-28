@@ -12,6 +12,7 @@ const TYPE_CFG = {
   low_stock: { label: "Low Stock", color: "#dc2626", bg: "#fef2f2" },
   incident:  { label: "Incident",  color: "#dc2626", bg: "#fef2f2" },
   task:      { label: "Task",      color: "#7c3aed", bg: "#f5f3ff" },
+  daily_update: { label: "Daily Update", color: "#0891b2", bg: "#ecfeff" },
 };
 
 const SEV_COLOR = {
@@ -27,8 +28,9 @@ const SEV_COLOR = {
    Keep these in sync with ROLE_TYPES in
    backend/controllers/operationsNotificationsController.js            */
 const ROLE_FILTERS = {
-  logistics_coordinator: ["all", "delivery", "delay", "receipt", "incident", "task"],
-  inventory_controller:  ["all", "delivery", "low_stock", "receipt", "incident", "task"],
+  logistics_coordinator: ["all", "delivery", "delay", "receipt", "incident", "task", "daily_update"],
+  inventory_controller:  ["all", "delivery", "low_stock", "receipt", "incident", "task", "daily_update"],
+  operations_manager:    ["all", "daily_update", "incident", "task"],
   finance_manager:       ["all", "incident", "task"],
   procurement_officer:   ["all", "receipt", "delay", "incident", "task"],
 
@@ -46,6 +48,7 @@ const ROLE_TITLE = {
   inventory_controller: "Inventory",
   finance_manager: "Finance",
   procurement_officer: "Procurement",
+  operations_manager: "Operations",
 
 
 };

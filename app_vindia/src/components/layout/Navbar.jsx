@@ -83,6 +83,7 @@ const DEFAULT_QUICK_ADD = [
 const LOGISTICS_ROUTES = {
   default:  "/operations/logistics/dashboard",
   delivery: "/operations/logistics/deliveries",
+  daily_update: "/operations/logistics/daily-update",
   delay:    "/operations/logistics/deliveries",
   receipt:  "/operations/logistics/deliveries",
   incident: "/operations/logistics/incidents",
@@ -92,6 +93,7 @@ const LOGISTICS_ROUTES = {
 const INVENTORY_ROUTES = {
   default:   "/operations/inventory/dashboard",
   delivery:  "/operations/inventory/stock-in",
+  daily_update: "/operations/inventory/daily-update",
   low_stock: "/operations/inventory/stock-out",
   receipt:   "/operations/inventory/stock-in",
   incident:  "/operations/inventory/incidents",
@@ -132,6 +134,21 @@ const SITE_ENGINEER_ROUTES = {
   measurement: "/site-engineer/qs-measurements",
 };
 
+
+const OPERATIONS_MANAGER_ROUTES = {
+  default:      "/operations/manager/dashboard",
+  daily_update: "/operations/manager/daily-updates",
+  incident:     "/operations/manager/dashboard",
+  task:         "/operations/manager/tasks",
+};
+
+const OperationsManagerBell = ({ userId }) => (
+  <OperationsNotificationBell
+    userId={userId}
+    role="operations_manager"
+    routes={OPERATIONS_MANAGER_ROUTES}
+  />
+);
 
 const LogisticsBell = ({ userId }) => (
   <OperationsNotificationBell
@@ -186,6 +203,7 @@ const NOTIFICATION_COMPONENTS = {
   business_development:           BdaBell,
   business_development_analyst:   BdaBell,
   logistics_coordinator: LogisticsBell,
+  operations_manager:    OperationsManagerBell,
   inventory_controller:  InventoryBell,
   finance_manager:  FinanceBell,
   procurement_officer: ProcurementBell,

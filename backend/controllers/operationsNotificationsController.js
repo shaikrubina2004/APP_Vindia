@@ -19,6 +19,7 @@ const ROLE_TYPES = {
     "receipt",    // inventory confirmed goods into stock
     "incident",   // incident raised or assigned to them
     "task",       // task assigned to them
+    "daily_update", // Operations Manager reviewed their daily update
   ],
   inventory_controller: [
     "delivery",   // delivery arrived, waiting to be received into stock
@@ -26,6 +27,7 @@ const ROLE_TYPES = {
     "receipt",    // goods receipt posted
     "incident",
     "task",
+    "daily_update", // Operations Manager reviewed their daily update
   ],
   procurement_officer: [
     "receipt", "delay", "incident", "task",

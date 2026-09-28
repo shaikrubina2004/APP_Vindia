@@ -23,6 +23,11 @@ export const inventoryControllerMenu = [
     icon: "arrow-up-circle",
   },
   {
+    name: "Daily Update",
+    path: "/operations/inventory/daily-update",
+    icon: "send",
+  },
+  {
     name: "Incidents",
     path: "/operations/inventory/incidents",
     icon: "alert-triangle",

@@ -82,6 +82,12 @@ const OperationsManagerMenu = [
     path: "/operations-manager/daily-update",
     icon: "send",
   },
+
+  {
+    name: "Team Daily Updates",
+    path: "/operations/manager/daily-updates",
+    icon: "clipboard",
+  },
 ];
 
 export default OperationsManagerMenu;

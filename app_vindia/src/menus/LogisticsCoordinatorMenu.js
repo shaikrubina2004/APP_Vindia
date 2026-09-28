@@ -11,6 +11,11 @@ export const logisticsCoordinatorMenu = [
     icon: "truck",
   },
   {
+    name: "Daily Update",
+    path: "/operations/logistics/daily-update",
+    icon: "send",
+  },
+  {
     name: "Incidents",
     path: "/operations/logistics/incidents",
     icon: "alert-triangle",

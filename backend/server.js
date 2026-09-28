@@ -111,6 +111,7 @@ const bdaNotifRoutes = require("./routes/bdaNotificationRoutes");
 /* ✅ Finance Manager */
 const financeRoutes = require("./routes/financeRoutes");
 const financeDailyUpdateRoutes = require("./routes/financeDailyUpdateRoutes");
+const operationsDailyUpdateRoutes = require("./routes/operationsDailyUpdateRoutes");
 /* ✅ Inventory & Logistics */
 const inventoryItemRoutes = require("./routes/inventoryItemRoutes");
 const deliveryRoutes = require("./routes/deliveryRoutes");
@@ -245,6 +246,7 @@ app.use("/api/bda-notifications", bdaNotifRoutes);
 /* ✅ Finance Manager */
 app.use("/api/finance", financeRoutes);
 app.use("/api/finance-daily-updates", financeDailyUpdateRoutes);
+app.use("/api/ops-daily-updates", operationsDailyUpdateRoutes);
 
 app.use("/api/accountant", accountantRoutes);
 

@@ -1,0 +1,66 @@
+/* Extra styles for the Operations daily update pages.
+   Base look comes from "Project Coordinator/DailyUpdates.css" (du-*). */
+
+.ops-review-note {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.ops-review-note--rejected {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #ef4444;
+}
+
+/* ── Operations Manager review page ── */
+.opsr-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.opsr-chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.opsr-chip {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.opsr-chip.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+.opsr-sep { width: 1px; height: 22px; background: #e5e7eb; }
+
+.opsr-role-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.opsr-role-tag--inventory_controller  { background: #ede9fe; color: #6d28d9; }
+.opsr-role-tag--logistics_coordinator { background: #cffafe; color: #0e7490; }
+
+.opsr-review-box {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #d1d5db;
+}
+.opsr-review-actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.opsr-btn {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.opsr-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.opsr-btn--approve { background: #10b981; color: #fff; }
+.opsr-btn--reject  { background: #fff; color: #dc2626; border: 1.5px solid #ef4444; }
+.opsr-reviewed { font-size: 12.5px; color: #6b7280; margin-top: 12px; }

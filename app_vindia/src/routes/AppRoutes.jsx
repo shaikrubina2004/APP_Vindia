@@ -149,6 +149,9 @@ import ItemMaster from "../pages/operations/inventory/ItemMaster";
 import StockIn from "../pages/operations/inventory/StockIn";
 import StockOut from "../pages/operations/inventory/StockOut";
 import Deliveries from "../pages/operations/logistics/Deliveries";
+import InventoryDailyUpdate from "../pages/operations/inventory/InventoryDailyUpdate";
+import LogisticsDailyUpdate from "../pages/operations/logistics/LogisticsDailyUpdate";
+import OperationsDailyUpdatesReview from "../pages/operations/manager/OperationsDailyUpdatesReview";
 
 /* ── REPORTS / ANALYTICS / SETTINGS (NEW) ───────────────── */
 // NOTE: "SharedResource" must match your folder name EXACTLY as VS Code shows it
@@ -1063,6 +1066,36 @@ const AppRoutes = () => {
               <InventoryControllerLayout>
                 <StockOut />
               </InventoryControllerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/inventory/daily-update"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.INVENTORY_CONTROLLER]}>
+              <InventoryControllerLayout>
+                <InventoryDailyUpdate />
+              </InventoryControllerLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/logistics/daily-update"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.LOGISTICS_COORDINATOR]}>
+              <LogisticsCoordinatorLayout>
+                <LogisticsDailyUpdate />
+              </LogisticsCoordinatorLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations/manager/daily-updates"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.OPERATIONS_MANAGER]}>
+              <OperationsManagerLayout>
+                <OperationsDailyUpdatesReview />
+              </OperationsManagerLayout>
             </ProtectedRoute>
           }
         />
