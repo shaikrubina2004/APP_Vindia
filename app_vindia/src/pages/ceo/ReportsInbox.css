@@ -1,0 +1,25 @@
+/* ReportsInbox.css — page-specific styles (tokens from CEOTheme.css) */
+.ri-kpis { margin-bottom: 20px; }
+.ri-tabs { margin-bottom: 14px; }
+.ri-count { display: inline-block; margin-left: 4px; min-width: 20px; padding: 0 6px; border-radius: 99px; background: rgba(100, 116, 139, .15); font-size: .72rem; }
+.ceo-chip.active .ri-count { background: rgba(255, 255, 255, .28); }
+.ri-row { border: 1px solid var(--c-border); border-left: 4px solid #cbd5e1; border-radius: 14px; margin-bottom: 12px; background: #fff; transition: box-shadow .2s, border-color .2s; }
+.ri-row:hover { box-shadow: var(--c-shadow); }
+.ri-row.submitted { border-left-color: var(--c-primary); }
+.ri-row.needs_changes { border-left-color: var(--c-warn); }
+.ri-row.reviewed { border-left-color: var(--c-ok); }
+.ri-top { display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; }
+.ri-avatar { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #fff; font-weight: 700; font-size: .85rem; flex-shrink: 0; }
+.ri-main { flex: 1; min-width: 0; }
+.ri-main h4 { margin: 0 0 2px; font-size: .98rem; }
+.ri-meta { color: var(--c-muted); font-size: .78rem; }
+.ri-type { text-transform: capitalize; font-weight: 600; color: var(--c-primary); }
+.ri-chev { color: var(--c-muted); font-size: .7rem; }
+.ri-detail { padding: 4px 18px 18px 72px; animation: ceoFade .25s ease both; }
+.ri-sec { margin-bottom: 12px; padding: 10px 14px; background: #f8fafd; border-radius: 10px; }
+.ri-sec b { display: block; font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; color: var(--c-muted); margin-bottom: 3px; }
+.ri-sec p { margin: 0; white-space: pre-wrap; font-size: .9rem; line-height: 1.5; }
+.ri-sec.good { background: #f0fdf4; } .ri-sec.risk { background: #fef2f2; }
+.ri-review label { display: block; font-size: .8rem; font-weight: 600; margin: 8px 0 6px; }
+.ri-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+@media (max-width: 640px) { .ri-detail { padding: 4px 14px 16px; } .ri-avatar { display: none; } }

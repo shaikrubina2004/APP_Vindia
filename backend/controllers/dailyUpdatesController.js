@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { notifyCEO } = require("./ceoNotificationsController");
 
 /* =========================================================
    ➕ CREATE MANUAL REPORT (PM or others)
@@ -34,6 +35,16 @@ exports.createReport = async (req, res) => {
         JSON.stringify(data || {})
       ]
     );
+
+    // 🔔 Project Manager daily update → CEO
+    await notifyCEO({
+      type: "daily_update",
+      title: `Project update: ${project_name}`,
+      description: `${submitted_by || "Project Manager"} · ${overall_status || "on-track"}${phase ? " · " + phase : ""}`,
+      link: "/ceo/manager-updates",
+      severity: overall_status && overall_status !== "on-track" ? "warning" : "info",
+      referenceId: result.rows[0].id,
+    });
 
     res.status(201).json(result.rows[0]);
 

@@ -1,0 +1,30 @@
+/* ManagerUpdates.css — page-specific styles (tokens from CEOTheme.css) */
+.mu-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.mu-pill { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--c-border); border-radius: 12px; background: #fff; cursor: pointer; font: inherit; font-size: .86rem; font-weight: 600; text-align: left; transition: all .15s; }
+.mu-pill:hover { border-color: var(--c-primary); box-shadow: var(--c-shadow-hover); }
+.mu-pill small { flex: 1 1 100%; margin-left: 18px; font-weight: 400; color: var(--c-muted); font-size: .74rem; margin-top: -4px; }
+.mu-pill em { margin-left: auto; font-style: normal; font-size: .74rem; color: var(--c-warn); }
+.mu-pill.done em { color: var(--c-ok); }
+.mu-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c-warn); }
+.mu-pill.done .mu-dot { background: var(--c-ok); box-shadow: 0 0 0 4px rgba(22, 163, 74, .15); }
+
+.mu-filters { margin: 20px 0 14px; }
+.mu-card { background: #fff; border: 1px solid var(--c-border); border-left: 4px solid var(--c-ok); border-radius: 14px; margin-bottom: 12px; box-shadow: var(--c-shadow); }
+.mu-card.attention { border-left-color: var(--c-warn); }
+.mu-card.critical, .mu-card.delayed { border-left-color: var(--c-bad); }
+.mu-top { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; flex-wrap: wrap; }
+.mu-avatar { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #fff; font-weight: 700; font-size: .85rem; }
+.mu-main { flex: 1; min-width: 180px; }
+.mu-main h4 { margin: 0 0 2px; font-size: .96rem; }
+.mu-meta { color: var(--c-muted); font-size: .78rem; }
+.mu-body { padding: 0 18px 18px 70px; animation: ceoFade .25s ease both; }
+.mu-sec { margin-bottom: 10px; padding: 10px 14px; background: #f8fafd; border-radius: 10px; }
+.mu-sec.good { background: #f0fdf4; } .mu-sec.risk { background: #fef2f2; }
+.mu-sec b { display: block; font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; color: var(--c-muted); margin-bottom: 3px; }
+.mu-sec p { margin: 0; white-space: pre-wrap; font-size: .9rem; line-height: 1.5; }
+.mu-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.mu-metrics div { background: #f4f8ff; border-radius: 10px; padding: 10px 12px; }
+.mu-metrics span { display: block; font-size: .72rem; color: var(--c-muted); }
+.mu-metrics b { font-size: 1.05rem; color: var(--c-primary-dark); }
+.mu-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+@media (max-width: 640px) { .mu-body { padding: 0 14px 16px; } .mu-avatar { display: none; } }

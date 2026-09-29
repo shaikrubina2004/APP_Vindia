@@ -1,0 +1,150 @@
+/* ═══════════════════════════════════════════════════════════
+   CEOTheme.css — shared design tokens & primitives for every
+   CEO page (Dashboard, Analytics, Reports Inbox, Manager
+   Updates, Settings). Matches the BDA / Finance dashboards:
+   soft blue-grey canvas, white rounded cards, blue accent.
+   Dark mode is handled globally by styles/dark-theme.css
+   (invert filter), so only the light palette is defined here.
+   ═══════════════════════════════════════════════════════════ */
+.ceo-page {
+  --c-bg: #f0f4fa;
+  --c-card: #ffffff;
+  --c-border: #e2e8f0;
+  --c-text: #0f172a;
+  --c-muted: #64748b;
+  --c-primary: #2563eb;
+  --c-primary-dark: #1e3a8a;
+  --c-ok: #16a34a;
+  --c-warn: #f59e0b;
+  --c-bad: #dc2626;
+  --c-violet: #7c3aed;
+  --c-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 4px 14px rgba(15, 23, 42, .06);
+  --c-shadow-hover: 0 8px 26px rgba(37, 99, 235, .16);
+
+  background: var(--c-bg);
+  color: var(--c-text);
+  min-height: 100%;
+  padding: 24px 28px 40px;
+  box-sizing: border-box;
+  font-family: inherit;
+  animation: ceoFade .35s ease both;
+}
+.ceo-page *, .ceo-page *::before, .ceo-page *::after { box-sizing: border-box; }
+@keyframes ceoFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ── Hero banner ── */
+.ceo-hero {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%);
+  color: #fff;
+  border-radius: 18px;
+  padding: 24px 28px;
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, .25);
+  position: relative; overflow: hidden;
+  margin-bottom: 22px;
+}
+.ceo-hero::after {
+  content: ""; position: absolute; right: -60px; top: -80px; width: 260px; height: 260px;
+  border-radius: 50%; background: rgba(255, 255, 255, .08);
+}
+.ceo-hero h1 { margin: 0 0 4px; font-size: 1.55rem; font-weight: 700; letter-spacing: -.01em; }
+.ceo-hero p  { margin: 0; opacity: .85; font-size: .92rem; }
+.ceo-hero-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; position: relative; z-index: 1; }
+
+/* ── Buttons ── */
+.ceo-btn {
+  border: 0; border-radius: 10px; padding: 9px 16px; font-size: .88rem; font-weight: 600;
+  cursor: pointer; background: var(--c-primary); color: #fff; transition: transform .15s, box-shadow .15s, background .15s;
+}
+.ceo-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(37, 99, 235, .3); }
+.ceo-btn:disabled { opacity: .55; cursor: not-allowed; }
+.ceo-btn.ghost { background: rgba(255, 255, 255, .16); color: #fff; border: 1px solid rgba(255, 255, 255, .3); }
+.ceo-btn.ghost:hover:not(:disabled) { background: rgba(255, 255, 255, .26); box-shadow: none; }
+.ceo-btn.outline { background: #fff; color: var(--c-primary); border: 1px solid var(--c-border); }
+.ceo-btn.ok   { background: var(--c-ok); }
+.ceo-btn.warn { background: var(--c-warn); }
+.ceo-btn.bad  { background: var(--c-bad); }
+
+/* ── Cards ── */
+.ceo-card {
+  background: var(--c-card); border: 1px solid var(--c-border); border-radius: 16px;
+  padding: 20px; box-shadow: var(--c-shadow);
+  transition: box-shadow .2s, transform .2s;
+}
+.ceo-card h3 { margin: 0 0 2px; font-size: 1.02rem; font-weight: 700; }
+.ceo-card .ceo-sub { color: var(--c-muted); font-size: .82rem; margin-bottom: 14px; }
+.ceo-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.ceo-card-head .ceo-sub { margin-bottom: 0; }
+
+.ceo-grid { display: grid; gap: 18px; }
+.ceo-grid.two   { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ceo-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ceo-grid.kpi   { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.ceo-section-title { margin: 26px 0 12px; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.ceo-section-title::after { content: ""; flex: 1; height: 1px; background: var(--c-border); }
+
+/* ── KPI tiles ── */
+.ceo-kpi {
+  background: var(--c-card); border: 1px solid var(--c-border); border-radius: 16px; padding: 18px;
+  display: flex; gap: 14px; align-items: center; box-shadow: var(--c-shadow);
+  transition: transform .2s, box-shadow .2s, border-color .2s; position: relative; overflow: hidden;
+  text-align: left; width: 100%; font: inherit; color: inherit;
+}
+.ceo-kpi.clickable { cursor: pointer; }
+.ceo-kpi.clickable:hover { transform: translateY(-3px); box-shadow: var(--c-shadow-hover); border-color: #bfd3fb; }
+.ceo-kpi-icon { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; font-size: 1.3rem; flex-shrink: 0; color: #fff; }
+.ceo-kpi span.ceo-kpi-label { display: block; color: var(--c-muted); font-size: .8rem; font-weight: 500; }
+.ceo-kpi strong { display: block; font-size: 1.55rem; line-height: 1.2; font-weight: 700; letter-spacing: -.01em; }
+.ceo-kpi small { display: block; margin-top: 2px; font-size: .74rem; color: var(--c-muted); }
+
+/* ── Badges & chips ── */
+.ceo-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; white-space: nowrap; background: #e2e8f0; color: #475569; }
+.ceo-badge.ok, .ceo-badge.approved, .ceo-badge.reviewed, .ceo-badge.on-track, .ceo-badge.active { background: #dcfce7; color: #15803d; }
+.ceo-badge.warn, .ceo-badge.pending, .ceo-badge.attention, .ceo-badge.submitted { background: #fef3c7; color: #b45309; }
+.ceo-badge.bad, .ceo-badge.rejected, .ceo-badge.needs_changes, .ceo-badge.critical, .ceo-badge.delayed { background: #fee2e2; color: #b91c1c; }
+.ceo-badge.info { background: #dbeafe; color: #1d4ed8; }
+
+.ceo-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.ceo-chip {
+  border: 1px solid var(--c-border); background: #fff; color: var(--c-muted); border-radius: 999px;
+  padding: 6px 14px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s;
+}
+.ceo-chip:hover { border-color: var(--c-primary); color: var(--c-primary); }
+.ceo-chip.active { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+
+/* ── Inputs ── */
+.ceo-input, .ceo-select, .ceo-textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--c-border); border-radius: 10px;
+  background: #fff; color: var(--c-text); font: inherit; font-size: .9rem; transition: border-color .15s, box-shadow .15s;
+}
+.ceo-input:focus, .ceo-select:focus, .ceo-textarea:focus { outline: 0; border-color: var(--c-primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, .15); }
+.ceo-textarea { min-height: 80px; resize: vertical; }
+.ceo-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.ceo-toolbar .ceo-input, .ceo-toolbar .ceo-select { width: auto; min-width: 160px; }
+.ceo-hero .ceo-select { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .3); color: #fff; width: auto; }
+.ceo-hero .ceo-select option { color: #0f172a; }
+
+/* ── Progress ── */
+.ceo-bar { height: 8px; background: #e8eef8; border-radius: 99px; overflow: hidden; }
+.ceo-bar > i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #3b82f6, #2563eb); transition: width .8s cubic-bezier(.2, .8, .2, 1); }
+.ceo-bar > i.ok { background: linear-gradient(90deg, #4ade80, #16a34a); }
+.ceo-bar > i.warn { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.ceo-bar > i.bad { background: linear-gradient(90deg, #f87171, #dc2626); }
+
+/* ── States ── */
+.ceo-empty { text-align: center; color: var(--c-muted); padding: 28px 12px; font-size: .9rem; }
+.ceo-msg { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: .86rem; }
+.ceo-msg.ok  { background: #dcfce7; color: #166534; }
+.ceo-msg.err { background: #fee2e2; color: #991b1b; }
+.ceo-skeleton { border-radius: 12px; background: linear-gradient(90deg, #e8eef8 25%, #f4f7fc 50%, #e8eef8 75%); background-size: 200% 100%; animation: ceoShimmer 1.3s infinite; }
+@keyframes ceoShimmer { to { background-position: -200% 0; } }
+
+/* ── Responsive ── */
+@media (max-width: 1000px) { .ceo-grid.two, .ceo-grid.three { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .ceo-page { padding: 14px 12px 30px; }
+  .ceo-hero { padding: 18px; border-radius: 14px; }
+  .ceo-hero h1 { font-size: 1.25rem; }
+  .ceo-toolbar .ceo-input, .ceo-toolbar .ceo-select { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .ceo-page, .ceo-skeleton, .ceo-bar > i { animation: none; transition: none; } }

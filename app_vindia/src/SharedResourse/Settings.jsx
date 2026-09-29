@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/useAuth";
 import API from "../services/authService";
 import { getTheme, setTheme } from "../utils/theme";
+import CEOSettings from "../pages/ceo/CEOSettings";
 import "../styles/portalPages.css";
 
 const cap = (s) => String(s || "").replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
@@ -120,6 +121,7 @@ function SystemSettings() {
 
 export default function Settings() {
   const { user } = useAuth();
+  if (user?.role === "ceo") return <CEOSettings />;   // CEO has its own Settings page
   return (
     <div className="pp-page">
       <div className="pp-head"><h1>Settings</h1><p>Manage your account and preferences.</p></div>

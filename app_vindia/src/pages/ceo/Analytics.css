@@ -1,0 +1,14 @@
+/* Analytics.css — page-specific styles (tokens from CEOTheme.css) */
+.an-tabs { margin: 22px 0 16px; }
+.an-card { min-height: 340px; }
+.an-donut { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.an-donut-chart { position: relative; width: 210px; height: 210px; flex-shrink: 0; }
+.an-donut-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
+.an-donut-center strong { font-size: 1.7rem; color: var(--c-primary-dark); line-height: 1.1; }
+.an-donut-center span { font-size: .74rem; color: var(--c-muted); max-width: 90px; }
+.an-legend { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 180px; }
+.an-legend li { display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-radius: 8px; font-size: .87rem; cursor: default; transition: background .12s; }
+.an-legend li:hover { background: #f4f8ff; }
+.an-legend i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.an-legend b { margin-left: auto; }
+.an-legend small { width: 36px; text-align: right; color: var(--c-muted); }

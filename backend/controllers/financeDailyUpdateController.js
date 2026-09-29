@@ -3,6 +3,7 @@
 const FinanceDailyUpdate = require("../models/financeDailyUpdateModel");
 
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
+const { notifyCEO } = require("./ceoNotificationsController");
 
 
 /*
@@ -22,6 +23,19 @@ exports.submitUpdate = asyncHandler(async (req, res) => {
     ...req.body,
     date,
   });
+
+  // 🔔 Finance MANAGER's own update goes to the CEO for review
+  // (accountant updates go to the Finance Manager, not the CEO)
+  if (req.user.role === "finance_manager") {
+    await notifyCEO({
+      type: "daily_update",
+      title: `Finance daily update from ${req.user.name || "Finance Manager"}`,
+      description: req.body.summary || "Awaiting your review",
+      link: "/ceo/manager-updates",
+      severity: req.body.overall_status && req.body.overall_status !== "on-track" ? "warning" : "info",
+      referenceId: update && update.id,
+    });
+  }
 
   res.status(201).json({
     success: true,

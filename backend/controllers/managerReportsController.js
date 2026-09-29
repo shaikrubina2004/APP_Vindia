@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { notifyCEO } = require("./ceoNotificationsController");
 
 /* Roles allowed to submit reports to the CEO.
    BDA is included because the BD team has no separate manager. */
@@ -31,6 +32,16 @@ exports.submitReport = async (req, res) => {
        highlights || null, issues || null, next_steps || null,
        req.user.id, req.user.role]
     );
+    // 🔔 Tell the CEO a manager just submitted a report
+    const who = req.user.name || req.user.email || req.user.role;
+    await notifyCEO({
+      type: type === "daily" ? "daily_update" : "report",
+      title: `${type === "daily" ? "Daily update" : "New " + type + " report"} from ${who}`,
+      description: title.trim(),
+      link: type === "daily" ? "/ceo/manager-updates" : "/reports",
+      severity: issues && issues.trim() ? "warning" : "info",
+      referenceId: rows[0].id,
+    });
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error("submitReport:", err.message);

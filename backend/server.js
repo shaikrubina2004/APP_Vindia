@@ -49,8 +49,8 @@ const templateRoutes = require("./routes/templateRoutes");
 const pcNotificationsRouter = require("./routes/pcNotifications");
 const pcPaymentRoutes = require("./routes/pcPaymentRoutes");
 const managerReportsRoutes = require("./routes/managerReportsRoutes");
-const analyticsRoutes      = require("./routes/analyticsRoutes");
-const settingsRoutes       = require("./routes/settingsRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
+const settingsRoutes = require("./routes/settingsRoutes");
 
 /* ✅ Site Engineer */
 const siteEngineerRfiRoutes = require("./routes/siteEngineerRfiRoutes");
@@ -112,6 +112,7 @@ const bdaNotifRoutes = require("./routes/bdaNotificationRoutes");
 const financeRoutes = require("./routes/financeRoutes");
 const financeDailyUpdateRoutes = require("./routes/financeDailyUpdateRoutes");
 const operationsDailyUpdateRoutes = require("./routes/operationsDailyUpdateRoutes");
+
 /* ✅ Inventory & Logistics */
 const inventoryItemRoutes = require("./routes/inventoryItemRoutes");
 const deliveryRoutes = require("./routes/deliveryRoutes");
@@ -130,6 +131,7 @@ const campaignRoutes = require("./routes/campaignRoutes");
 const marketingRoutes = require("./routes/marketingRoutes");
 const digitalMarketingNotificationRoutes = require("./routes/digitalMarketingNotificationRoutes");
 const { errorHandler } = require("./middleware/errorHandler");
+
 /* ═════════ APP SETUP ═════════ */
 
 const app = express();
@@ -174,8 +176,12 @@ app.use("/api/se-daily-reports", seDailyRoutes);
 app.use("/api/rfis", rfiRoutes);
 app.use("/api/se-notifications", seNotificationRoutes);
 app.use("/api/manager-reports", managerReportsRoutes);
-app.use("/api/analytics",       analyticsRoutes);
-app.use("/api/settings",        settingsRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/settings", settingsRoutes);
+
+/* ✅ CEO */
+app.use("/api/ceo", require("./routes/ceoRoutes"));
+app.use("/api/ceo-notifications", require("./routes/ceoNotificationRoutes"));
 
 /* ✅ QS */
 app.use("/api/qs/notifications", qsNotifRoutes);
@@ -214,6 +220,7 @@ app.use("/api/architect-assign", architectAssignRoutes);
 app.use("/api/architect-notifications", architectNotifRoutes);
 app.use("/api/procurement", procurementRoutes);
 app.use("/api/operations-notifications", operationsNotificationsRoutes);
+
 /* ✅ Site Engineer */
 app.use("/api/site-engineer/rfi", siteEngineerRfiRoutes);
 app.use("/api/ncr", ncrRoutes);
@@ -243,6 +250,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/pm-reports", pmReportRoutes);
 app.use("/api/meta", metaRoutes);
 app.use("/api/bda-notifications", bdaNotifRoutes);
+
 /* ✅ Finance Manager */
 app.use("/api/finance", financeRoutes);
 app.use("/api/finance-daily-updates", financeDailyUpdateRoutes);
@@ -257,6 +265,7 @@ app.use("/api/3d-models", threeDModelRoutes);
 app.use("/api/campaigns", campaignRoutes);
 app.use("/api/marketing", marketingRoutes);
 app.use("/api/dm-notifications", digitalMarketingNotificationRoutes);
+
 /* ═════════ ERROR HANDLING ═════════ */
 
 app.use(errorHandler);

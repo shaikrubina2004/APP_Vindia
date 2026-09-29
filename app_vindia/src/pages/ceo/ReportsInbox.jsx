@@ -1,6 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { reviewManagerReport, cap, fmtDateTime } from "../../services/ceoService";
 import API from "../../services/authService";
-import "../../styles/portalPages.css";
+import "./CEOTheme.css";
+import "./ReportsInbox.css";
 
 const ROLE_LABEL = {
   project_manager: "Project Manager", hr_manager: "HR Manager",
@@ -8,11 +10,11 @@ const ROLE_LABEL = {
   bda: "Business Development", bd_manager: "BD Manager",
 };
 const STATUS_LABEL = { submitted: "New", reviewed: "Reviewed", needs_changes: "Needs changes" };
-const fmt = (d) => new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+const initials = (n = "") => n.split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
 
-function Section({ label, text }) {
+function Section({ label, text, tone }) {
   if (!text) return null;
-  return <><b>{label}</b>{text}</>;
+  return <div className={`ri-sec ${tone || ""}`}><b>{label}</b><p>{text}</p></div>;
 }
 
 function ReportRow({ r, onReviewed }) {
@@ -23,45 +25,42 @@ function ReportRow({ r, onReviewed }) {
 
   const review = async (status) => {
     setBusy(true); setErr(null);
-    try {
-      await API.put(`/manager-reports/${r.id}/review`, { status, ceo_comment: comment });
-      onReviewed();
-    } catch (e) {
-      setErr(e.response?.data?.message || "Could not save review.");
-    } finally { setBusy(false); }
+    try { await reviewManagerReport(r.id, status, comment); onReviewed(); }
+    catch (e) { setErr(e.response?.data?.message || "Could not save review."); }
+    finally { setBusy(false); }
   };
 
   return (
-    <div className="pp-row">
-      <div className="pp-row-top" style={{ cursor: "pointer" }} onClick={() => setOpen((o) => !o)}>
-        <div>
+    <div className={`ri-row ${r.status} ${open ? "open" : ""}`}>
+      <div className="ri-top" onClick={() => setOpen((o) => !o)}>
+        <div className="ri-avatar">{initials(r.submitter_name)}</div>
+        <div className="ri-main">
           <h4>{r.title}</h4>
-          <div className="pp-meta">
-            {r.submitter_name} · {ROLE_LABEL[r.submitter_role] || r.submitter_role} · {r.report_type}
-            {r.period_label ? ` · ${r.period_label}` : ""} · {fmt(r.created_at)}
+          <div className="ri-meta">
+            {r.submitter_name} · {ROLE_LABEL[r.submitter_role] || cap(r.submitter_role)} · <span className="ri-type">{r.report_type}</span>
+            {r.period_label ? ` · ${r.period_label}` : ""} · {fmtDateTime(r.created_at)}
           </div>
         </div>
-        <span className={`pp-badge ${r.status}`}>{STATUS_LABEL[r.status] || r.status}</span>
+        <span className={`ceo-badge ${r.status}`}>{STATUS_LABEL[r.status] || r.status}</span>
+        <span className="ri-chev">{open ? "▲" : "▼"}</span>
       </div>
 
       {open && (
-        <>
-          <div className="pp-body">
-            <Section label="Summary" text={r.summary} />
-            <Section label="Highlights" text={r.highlights} />
-            <Section label="Issues / risks" text={r.issues} />
-            <Section label="Next steps" text={r.next_steps} />
-          </div>
-          <div className="pp-field" style={{ marginTop: 12 }}>
+        <div className="ri-detail">
+          <Section label="Summary" text={r.summary} />
+          <Section label="Highlights" text={r.highlights} tone="good" />
+          <Section label="Issues / risks" text={r.issues} tone="risk" />
+          <Section label="Next steps" text={r.next_steps} />
+          <div className="ri-review">
             <label>Your comment (optional)</label>
-            <textarea value={comment} onChange={(e) => setComment(e.target.value)} />
+            <textarea className="ceo-textarea" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Write feedback for the manager…" />
+            <div className="ri-actions">
+              <button className="ceo-btn ok" disabled={busy} onClick={() => review("reviewed")}>✓ Mark reviewed</button>
+              <button className="ceo-btn warn" disabled={busy} onClick={() => review("needs_changes")}>↺ Request changes</button>
+            </div>
+            {err && <div className="ceo-msg err">{err}</div>}
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button className="pp-btn ok" disabled={busy} onClick={() => review("reviewed")}>Mark reviewed</button>
-            <button className="pp-btn warn" disabled={busy} onClick={() => review("needs_changes")}>Request changes</button>
-          </div>
-          {err && <div className="pp-msg err">{err}</div>}
-        </>
+        </div>
       )}
     </div>
   );
@@ -72,6 +71,7 @@ export default function ReportsInbox() {
   const [summary, setSummary] = useState({ submitted: 0, reviewed: 0, needs_changes: 0 });
   const [status, setStatus] = useState("");
   const [role, setRole] = useState("");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -85,43 +85,54 @@ export default function ReportsInbox() {
         API.get("/manager-reports/summary"),
       ]);
       setReports(list.data); setSummary(sum.data); setError(null);
-    } catch {
-      setError("Could not load reports.");
-    } finally { setLoading(false); }
+    } catch { setError("Could not load reports."); }
+    finally { setLoading(false); }
   }, [status, role]);
 
   useEffect(() => { load(); }, [load]);
 
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? reports.filter((r) => `${r.title} ${r.submitter_name} ${r.summary}`.toLowerCase().includes(q)) : reports;
+  }, [reports, search]);
+
+  const tabs = [
+    { key: "", label: "All", n: summary.submitted + summary.reviewed + summary.needs_changes },
+    { key: "submitted", label: "New", n: summary.submitted },
+    { key: "needs_changes", label: "Needs changes", n: summary.needs_changes },
+    { key: "reviewed", label: "Reviewed", n: summary.reviewed },
+  ];
+
   return (
-    <div className="pp-page">
-      <div className="pp-head">
-        <h1>Manager Reports</h1>
-        <p>Reports submitted to you by your managers.</p>
+    <div className="ceo-page">
+      <div className="ceo-hero">
+        <div><h1>Manager Reports</h1><p>Reports submitted to you by your managers.</p></div>
+        <div className="ceo-hero-actions"><button className="ceo-btn ghost" onClick={load}>↻ Refresh</button></div>
       </div>
 
-      <div className="pp-grid kpi" style={{ marginBottom: 18 }}>
-        <div className="pp-kpi"><span>New</span><strong>{summary.submitted}</strong></div>
-        <div className="pp-kpi"><span>Needs changes</span><strong>{summary.needs_changes}</strong></div>
-        <div className="pp-kpi"><span>Reviewed</span><strong>{summary.reviewed}</strong></div>
+      <div className="ceo-grid kpi ri-kpis">
+        <div className="ceo-kpi"><div className="ceo-kpi-icon" style={{ background: "#2563eb" }}>📥</div><div><span className="ceo-kpi-label">New</span><strong>{summary.submitted}</strong></div></div>
+        <div className="ceo-kpi"><div className="ceo-kpi-icon" style={{ background: "#f59e0b" }}>↺</div><div><span className="ceo-kpi-label">Needs changes</span><strong>{summary.needs_changes}</strong></div></div>
+        <div className="ceo-kpi"><div className="ceo-kpi-icon" style={{ background: "#16a34a" }}>✓</div><div><span className="ceo-kpi-label">Reviewed</span><strong>{summary.reviewed}</strong></div></div>
       </div>
 
-      <div className="pp-card">
-        <div className="pp-filters">
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All statuses</option>
-            <option value="submitted">New</option>
-            <option value="needs_changes">Needs changes</option>
-            <option value="reviewed">Reviewed</option>
-          </select>
-          <select value={role} onChange={(e) => setRole(e.target.value)}>
+      <div className="ceo-card">
+        <div className="ceo-chips ri-tabs">
+          {tabs.map((t) => (
+            <button key={t.key} className={`ceo-chip ${status === t.key ? "active" : ""}`} onClick={() => setStatus(t.key)}>{t.label} <span className="ri-count">{t.n}</span></button>
+          ))}
+        </div>
+        <div className="ceo-toolbar">
+          <input className="ceo-input" placeholder="Search title, manager or summary…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select className="ceo-select" value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="">All roles</option>
             {Object.entries(ROLE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
-        {error && <div className="pp-msg err">{error}</div>}
-        {loading ? <div className="pp-empty">Loading…</div>
-          : reports.length === 0 ? <div className="pp-empty">No reports match these filters.</div>
-          : reports.map((r) => <ReportRow key={r.id} r={r} onReviewed={load} />)}
+        {error && <div className="ceo-msg err">{error}</div>}
+        {loading ? <div className="ceo-skeleton" style={{ height: 120 }} />
+          : shown.length === 0 ? <div className="ceo-empty">📭 No reports match these filters.</div>
+          : shown.map((r) => <ReportRow key={r.id} r={r} onReviewed={load} />)}
       </div>
     </div>
   );

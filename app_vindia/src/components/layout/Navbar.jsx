@@ -9,6 +9,7 @@ import MEPNotificationBell from "../notifications/MepNotificationBell";
 import BDANotificationBell from "../../components/notifications/BDANotificationBell";
 import ArchitectNotificationBell from "../../components/notifications/ArchitectNotificationBell";
 import OperationsNotificationBell from "../notifications/OperationsNotificationBell";
+import CEONotificationBell from "../notifications/CEONotificationBell";
 import SiteEngineerNotificationBell from "../notifications/SiteEngineerNotificationBell";
 import ThreeDVisualizerNotificationBell from "../notifications/ThreeDVisualizerNotificationBell";
 import DigitalMarketingNotificationBell from "../notifications/DigitalMarketingNotificationBell";
@@ -17,6 +18,11 @@ import logo from "../../assets/logo.png.png";
 
 // ✅ Role-based quick-add menu items
 const QUICK_ADD_ITEMS = {
+  ceo: [
+    { label: "Manager Updates", path: "/ceo/manager-updates" },
+    { label: "Manager Reports", path: "/reports" },
+    { label: "Analytics", path: "/analytics" },
+  ],
   project_coordinator: [
     { label: "Add Milestone", path: "/project-coordinator/milestone" },
     { label: "View Incident", path: "/project-coordinator/incidents" },
@@ -206,6 +212,7 @@ const NOTIFICATION_COMPONENTS = {
   operations_manager:    OperationsManagerBell,
   inventory_controller:  InventoryBell,
   finance_manager:  FinanceBell,
+  ceo:              CEONotificationBell,
   procurement_officer: ProcurementBell,
   site_engineer:         SiteEngineerBell,
   "3d_visualizer":     ThreeDVisualizerNotificationBell,
