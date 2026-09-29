@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import recruitmentService from "../../services/recruitmentService";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   createEmployee,
@@ -17,6 +18,7 @@ export default function AddEmployee() {
   const navigate = useNavigate();
   const location = useLocation();
   const editingEmployee = location.state;
+  const isEditingExisting = !!editingEmployee?.id;
 
   const [form, setForm] = useState({
     name: "",
@@ -52,7 +54,7 @@ export default function AddEmployee() {
   const [roles, setRoles] = useState([]);
   const [managerId, setManagerId] = useState("");
   const [errors, setErrors] = useState({});
-  const [autoCode, setAutoCode] = useState("");   // ← auto-generated employee code
+  const [autoCode, setAutoCode] = useState(""); // ← auto-generated employee code
 
   // ─── Toast state ─────────────────────────────────────────────────────────────
   const [toast, setToast] = useState({
@@ -73,7 +75,7 @@ export default function AddEmployee() {
   useEffect(() => {
     fetchEmployees();
     fetchRoles();
-    if (!editingEmployee) {
+    if (!isEditingExisting) {
       fetchNextCode();
     }
   }, []);
@@ -112,7 +114,10 @@ export default function AddEmployee() {
       setForm({
         name: editingEmployee.name || "",
         email: editingEmployee.email || "",
-        phone: (editingEmployee.phone === "N/A" || !editingEmployee.phone) ? "" : editingEmployee.phone,
+        phone:
+          editingEmployee.phone === "N/A" || !editingEmployee.phone
+            ? ""
+            : editingEmployee.phone,
         department: editingEmployee.department || "",
         role: editingEmployee.designation || "",
         joining_date: editingEmployee.join_date?.split("T")[0] || "",
@@ -156,7 +161,10 @@ export default function AddEmployee() {
         if (/^[6-9][0-9]{9}$/.test(capped)) {
           setErrors((prev) => ({ ...prev, phone: "" }));
         } else {
-          setErrors((prev) => ({ ...prev, phone: "Phone must start with 6-9" }));
+          setErrors((prev) => ({
+            ...prev,
+            phone: "Phone must start with 6-9",
+          }));
         }
       } else {
         setErrors((prev) => ({
@@ -394,7 +402,10 @@ export default function AddEmployee() {
       formData.append("gender", form.gender || "");
       formData.append("marital_status", form.marital_status || "");
       formData.append("nationality", form.nationality || "");
-      formData.append("employee_code", editingEmployee ? (form.employee_code || "") : autoCode);
+      formData.append(
+        "employee_code",
+        isEditingExisting ? form.employee_code || "" : autoCode,
+      );
       formData.append("employment_type", form.employment_type || "");
       formData.append("work_location", form.work_location || "");
       formData.append("shift_timing", form.shift_timing || "");
@@ -414,15 +425,33 @@ export default function AddEmployee() {
       if (form.certificates instanceof File)
         formData.append("certificates", form.certificates);
 
-      if (editingEmployee) {
+      if (isEditingExisting) {
         await updateEmployee(editingEmployee.id, formData);
         showToast("Employee updated successfully", "success");
       } else {
-        await createEmployee(formData);
+        const createRes = await createEmployee(formData);
         showToast(
           `Employee added! Login: ${form.email} / Password: Vindia@123`,
-          "success"
+          "success",
         );
+
+        // If this employee came from Recruitment, close the loop:
+        // link the candidate to the new employee and flip their stage
+        // to "hired". Non-fatal if it fails — the employee is already
+        // created either way, so this only logs rather than blocking.
+        if (
+          editingEmployee?._fromCandidateId &&
+          createRes?.data?.employee?.id
+        ) {
+          try {
+            await recruitmentService.markHired(
+              editingEmployee._fromCandidateId,
+              createRes.data.employee.id,
+            );
+          } catch (hireErr) {
+            console.error("Failed to mark candidate as hired:", hireErr);
+          }
+        }
       }
 
       setTimeout(() => navigate("/hr/employees"), 2000);
@@ -500,13 +529,17 @@ export default function AddEmployee() {
         </div>
       )}
 
-      <h2>{editingEmployee ? "Edit Employee" : "Add Employee"}</h2>
+      <h2>{isEditingExisting ? "Edit Employee" : "Add Employee"}</h2>
 
       {/* DEV HELPER — remove before production */}
-      {!editingEmployee && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
-         
-        </div>
+      {!isEditingExisting && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: "1rem",
+          }}
+        ></div>
       )}
 
       <form className="employee-form" onSubmit={handleSubmit}>
@@ -695,38 +728,55 @@ export default function AddEmployee() {
           <div className="grid">
             {/* Auto-generated employee code — read only */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 500, marginBottom: 2 }}>
+              <label
+                style={{
+                  fontSize: 11,
+                  color: "#6b7280",
+                  fontWeight: 500,
+                  marginBottom: 2,
+                }}
+              >
                 Employee Code (Auto-generated)
               </label>
-              <div style={{
-                padding: "9px 14px",
-                background: "#f0fdf4",
-                border: "1.5px solid #86efac",
-                borderRadius: 8,
-                fontWeight: 700,
-                color: "#15803d",
-                fontSize: 14,
-                letterSpacing: 1,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                  stroke="#16a34a" strokeWidth="2.5">
-                  <path d="M20 12V22H4V12" /><path d="M22 7H2v5h20V7z" />
-                  <path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+              <div
+                style={{
+                  padding: "9px 14px",
+                  background: "#f0fdf4",
+                  border: "1.5px solid #86efac",
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  color: "#15803d",
+                  fontSize: 14,
+                  letterSpacing: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#16a34a"
+                  strokeWidth="2.5"
+                >
+                  <path d="M20 12V22H4V12" />
+                  <path d="M22 7H2v5h20V7z" />
+                  <path d="M12 22V7" />
+                  <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
                   <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
                 </svg>
-                {editingEmployee
-                  ? (editingEmployee.employee_code || "—")
-                  : (autoCode || "Generating…")}
+                {isEditingExisting
+                  ? editingEmployee.employee_code || "—"
+                  : autoCode || "Generating…"}
               </div>
             </div>
             <select
               name="employment_type"
               value={form.employment_type}
               onChange={handleChange}
-            > 
+            >
               <option value="">Employment Type</option>
               <option value="Full-Time">Full-Time</option>
               <option value="Part-Time">Part-Time</option>
@@ -849,7 +899,12 @@ export default function AddEmployee() {
               {editingEmployee &&
                 form.profile_photo &&
                 typeof form.profile_photo === "string" &&
-                !["default-profile.png","default-id.pdf","default-offer.pdf","default-cert.pdf"].includes(form.profile_photo) && (
+                ![
+                  "default-profile.png",
+                  "default-id.pdf",
+                  "default-offer.pdf",
+                  "default-cert.pdf",
+                ].includes(form.profile_photo) && (
                   <a
                     href={`http://localhost:5000/uploads/${form.profile_photo}`}
                     target="_blank"
@@ -884,7 +939,12 @@ export default function AddEmployee() {
               {editingEmployee &&
                 form.id_proof &&
                 typeof form.id_proof === "string" &&
-                !["default-profile.png","default-id.pdf","default-offer.pdf","default-cert.pdf"].includes(form.id_proof) && (
+                ![
+                  "default-profile.png",
+                  "default-id.pdf",
+                  "default-offer.pdf",
+                  "default-cert.pdf",
+                ].includes(form.id_proof) && (
                   <a
                     href={`http://localhost:5000/uploads/${form.id_proof}`}
                     target="_blank"
@@ -916,7 +976,12 @@ export default function AddEmployee() {
               {editingEmployee &&
                 form.offer_letter &&
                 typeof form.offer_letter === "string" &&
-                !["default-profile.png","default-id.pdf","default-offer.pdf","default-cert.pdf"].includes(form.offer_letter) && (
+                ![
+                  "default-profile.png",
+                  "default-id.pdf",
+                  "default-offer.pdf",
+                  "default-cert.pdf",
+                ].includes(form.offer_letter) && (
                   <a
                     href={`http://localhost:5000/uploads/${form.offer_letter}`}
                     target="_blank"
@@ -948,7 +1013,12 @@ export default function AddEmployee() {
               {editingEmployee &&
                 form.certificates &&
                 typeof form.certificates === "string" &&
-                !["default-profile.png","default-id.pdf","default-offer.pdf","default-cert.pdf"].includes(form.certificates) && (
+                ![
+                  "default-profile.png",
+                  "default-id.pdf",
+                  "default-offer.pdf",
+                  "default-cert.pdf",
+                ].includes(form.certificates) && (
                   <a
                     href={`http://localhost:5000/uploads/${form.certificates}`}
                     target="_blank"
@@ -973,7 +1043,7 @@ export default function AddEmployee() {
         </div>
 
         <button className="primary-btn" type="submit">
-          {editingEmployee ? "Update Employee" : "Save Employee"}
+          {isEditingExisting ? "Update Employee" : "Save Employee"}
         </button>
       </form>
     </div>
