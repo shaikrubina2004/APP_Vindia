@@ -1,0 +1,311 @@
+/* ===== FILE: APP_Vindia/app_vindia/src/pages/hr/recruitment/JobOpeningDetail.css ===== */
+
+.jod-page {
+  --primary: #0A4174;
+  --primary-light: #4E8EA2;
+  --success: #059669;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-500: #6b7280;
+  --neutral-900: #111827;
+
+  padding: 1.5rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--neutral-900);
+}
+
+.jod-back-btn {
+  background: none;
+  border: none;
+  color: var(--neutral-500);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 1rem;
+}
+
+.jod-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.jod-header h1 {
+  display: inline;
+  margin: 0 0.6rem 0 0;
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.jod-primary-btn {
+  padding: 0.55rem 1.2rem;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.jod-primary-btn:hover:not(:disabled) {
+  background: var(--primary-light);
+}
+
+.jod-primary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.jod-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  vertical-align: middle;
+}
+
+.jod-badge--open { background: #dcfce7; color: var(--success); }
+.jod-badge--closed { background: #e5e7eb; color: var(--neutral-500); }
+
+.jod-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+}
+
+.jod-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.jod-meta-label {
+  font-size: 0.78rem;
+  color: var(--neutral-500);
+}
+
+.jod-meta-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.jod-description {
+  color: var(--neutral-500);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin: 0 0 1.25rem;
+}
+
+.jod-filters {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.jod-filter-btn {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  cursor: pointer;
+  color: var(--neutral-500);
+}
+
+.jod-filter-btn--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.jod-inline-error {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.jod-empty {
+  color: var(--neutral-500);
+  font-size: 0.9rem;
+  padding: 1.5rem;
+  text-align: center;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+}
+
+.jod-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 0.88rem;
+}
+
+.jod-table th {
+  text-align: left;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--neutral-200);
+  color: var(--neutral-500);
+  font-weight: 600;
+  background: var(--neutral-100);
+}
+
+.jod-table td {
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.jod-table tbody tr {
+  cursor: pointer;
+}
+
+.jod-table tbody tr:hover {
+  background: var(--neutral-100);
+}
+
+.jod-name-cell {
+  font-weight: 600;
+}
+
+.jod-stage-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.jod-stage-badge--applied { background: var(--neutral-100); color: var(--neutral-500); }
+.jod-stage-badge--screening { background: #fef3c7; color: var(--warning); }
+.jod-stage-badge--interview { background: #dbeafe; color: var(--info); }
+.jod-stage-badge--offer { background: #ede9fe; color: #7c3aed; }
+.jod-stage-badge--hired { background: #dcfce7; color: var(--success); }
+.jod-stage-badge--rejected { background: #fee2e2; color: #dc2626; }
+
+/* ── Add-candidate modal ─────────────────────────────────── */
+
+.jod-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.jod-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.jod-modal h2 {
+  margin: 0 0 1rem;
+  font-size: 1.15rem;
+  color: var(--primary);
+}
+
+.jod-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--neutral-500);
+  margin-bottom: 0.9rem;
+  flex: 1;
+}
+
+.jod-field input,
+.jod-field select {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  color: var(--neutral-900);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.jod-field-row {
+  display: flex;
+  gap: 0.9rem;
+}
+
+.jod-form-error {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin: 0 0 0.9rem;
+}
+
+.jod-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.jod-cancel-btn {
+  padding: 0.55rem 1.2rem;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.jod-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.jod-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--neutral-500);
+}
+
+.jod-state--error {
+  color: #dc2626;
+}
+
+.jod-state--error button {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.4rem 1rem;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  background: #fff;
+  color: #dc2626;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .jod-field-row {
+    flex-direction: column;
+    gap: 0;
+  }
+}

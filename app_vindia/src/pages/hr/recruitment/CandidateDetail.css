@@ -1,0 +1,318 @@
+/* ===== FILE: APP_Vindia/app_vindia/src/pages/hr/recruitment/CandidateDetail.css ===== */
+
+.cd-page {
+  --primary: #0A4174;
+  --primary-light: #4E8EA2;
+  --success: #059669;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-500: #6b7280;
+  --neutral-900: #111827;
+
+  padding: 1.5rem;
+  max-width: 900px;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--neutral-900);
+}
+
+.cd-back-btn {
+  background: none;
+  border: none;
+  color: var(--neutral-500);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 1rem;
+}
+
+.cd-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cd-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.cd-subtitle {
+  margin: 0;
+  color: var(--neutral-500);
+  font-size: 0.88rem;
+}
+
+.cd-stage-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.cd-stage-badge--applied { background: var(--neutral-100); color: var(--neutral-500); }
+.cd-stage-badge--screening { background: #fef3c7; color: var(--warning); }
+.cd-stage-badge--interview { background: #dbeafe; color: var(--info); }
+.cd-stage-badge--offer { background: #ede9fe; color: #7c3aed; }
+.cd-stage-badge--hired { background: #dcfce7; color: var(--success); }
+.cd-stage-badge--rejected { background: #fee2e2; color: #dc2626; }
+
+.cd-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+}
+
+.cd-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cd-meta-label {
+  font-size: 0.78rem;
+  color: var(--neutral-500);
+}
+
+.cd-meta-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.cd-rejected-note {
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  margin-bottom: 1rem;
+}
+
+.cd-hired-note {
+  background: #dcfce7;
+  color: #15803d;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.cd-inline-error {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.cd-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.cd-action-btn {
+  padding: 0.5rem 1.1rem;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.cd-action-btn:hover:not(:disabled) {
+  background: var(--neutral-100);
+}
+
+.cd-primary-btn {
+  padding: 0.5rem 1.1rem;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.cd-primary-btn:hover:not(:disabled) {
+  background: var(--primary-light);
+}
+
+.cd-reject-btn {
+  padding: 0.5rem 1.1rem;
+  background: #fff;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.cd-reject-btn:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+.cd-action-btn:disabled,
+.cd-primary-btn:disabled,
+.cd-reject-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cd-section {
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.cd-section h2 {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+}
+
+.cd-empty {
+  color: var(--neutral-500);
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.cd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.cd-table th {
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--neutral-200);
+  color: var(--neutral-500);
+  font-weight: 600;
+}
+
+.cd-table td {
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--neutral-100);
+  vertical-align: top;
+}
+
+.cd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--neutral-500);
+  margin-bottom: 0.9rem;
+  flex: 1;
+}
+
+.cd-field input,
+.cd-field select,
+.cd-field textarea {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  color: var(--neutral-900);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.cd-field textarea {
+  resize: vertical;
+}
+
+.cd-field-row {
+  display: flex;
+  gap: 0.9rem;
+}
+
+.cd-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.cd-cancel-btn {
+  padding: 0.5rem 1.1rem;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.cd-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cd-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.cd-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.cd-modal h2 {
+  margin: 0 0 1rem;
+  font-size: 1.15rem;
+  color: var(--primary);
+}
+
+.cd-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--neutral-500);
+}
+
+.cd-state--error {
+  color: #dc2626;
+}
+
+.cd-state--error button {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.4rem 1rem;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  background: #fff;
+  color: #dc2626;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .cd-field-row {
+    flex-direction: column;
+    gap: 0;
+  }
+}
