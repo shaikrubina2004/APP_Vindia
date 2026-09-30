@@ -56,11 +56,7 @@ const financeMenu = [
     path: "/finance-manager/daily-update",
     icon: "send",
   },
-  {
-    name: "Report to CEO",
-    path: "/my-reports",
-    icon: "send",
-  },
+  
   {
     name: "Daily Update Review",
     path: "/finance-manager/daily-updates/review",
