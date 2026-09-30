@@ -1407,12 +1407,7 @@ const AppRoutes = () => {
           }
         />
 
-<<<<<<< Updated upstream
 
-        {/* ══ CEO REPORTS / ANALYTICS ═══════════════════════ */}
-=======
-        {/* ══ CEO REPORTS / ANALYTICS / MANAGER UPDATES ═════ */}
->>>>>>> Stashed changes
 
         <Route
           path="/reports"
@@ -1424,6 +1419,37 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+
+                {/* ══ CEO REPORTS / ANALYTICS / MANAGER UPDATES ═════ */}
+
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+              <CEOLayout>
+                <ReportsInbox />
+              </CEOLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Old links / notifications → the single Reports page */}
+        <Route
+          path="/ceo/manager-updates"
+          element={<Navigate to="/reports?tab=daily" replace />}
+        />
+
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+              <CEOLayout>
+                <Analytics />
+              </CEOLayout>
+            </ProtectedRoute>
+          }
+        />
+
 
         {/* Old links / notifications → the single Reports page */}
         <Route
