@@ -33,7 +33,7 @@ const ROLE_FILTERS = {
   operations_manager:    ["all", "daily_update", "incident", "task"],
   finance_manager:       ["all", "incident", "task"],
   procurement_officer:   ["all", "receipt", "delay", "incident", "task"],
-
+  hr_manager: ["all", "incident", "task"],
 };
 
 /* A couple of labels read better when they're role-specific. */
@@ -49,6 +49,7 @@ const ROLE_TITLE = {
   finance_manager: "Finance",
   procurement_officer: "Procurement",
   operations_manager: "Operations",
+  hr_manager: "HR",
 
 
 };

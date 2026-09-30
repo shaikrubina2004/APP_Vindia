@@ -69,13 +69,13 @@ const QUICK_ADD_ITEMS = {
     { label: "Add Follow-up", path: "/bda/follow-up" },
   ],
   logistics_coordinator: [
-    { label: "New Delivery",   path: "/operations/logistics/deliveries" },
-    { label: "View Incident",  path: "/operations/logistics/incidents" },
+    { label: "New Delivery", path: "/operations/logistics/deliveries" },
+    { label: "View Incident", path: "/operations/logistics/incidents" },
   ],
   inventory_controller: [
-    { label: "Stock In",       path: "/operations/inventory/stock-in" },
-    { label: "Stock Out",      path: "/operations/inventory/stock-out" },
-    { label: "View Incident",  path: "/operations/inventory/incidents" },
+    { label: "Stock In", path: "/operations/inventory/stock-in" },
+    { label: "Stock Out", path: "/operations/inventory/stock-out" },
+    { label: "View Incident", path: "/operations/inventory/incidents" },
   ],
 };
 
@@ -86,37 +86,50 @@ const DEFAULT_QUICK_ADD = [
 
 /* ── Where each Operations role's notifications should navigate to ── */
 const LOGISTICS_ROUTES = {
-  default:  "/operations/logistics/dashboard",
+  default: "/operations/logistics/dashboard",
   delivery: "/operations/logistics/deliveries",
   daily_update: "/operations/logistics/daily-update",
-  delay:    "/operations/logistics/deliveries",
-  receipt:  "/operations/logistics/deliveries",
+  delay: "/operations/logistics/deliveries",
+  receipt: "/operations/logistics/deliveries",
   incident: "/operations/logistics/incidents",
-  task:     "/operations/logistics/incidents?page=tasks",
+  task: "/operations/logistics/incidents?page=tasks",
+};
+const HR_ROUTES = {
+  default: "/hr",
+  incident: "/hr/incidents",
+  task: "/hr/incidents?page=tasks",
 };
 
+const HRBell = ({ userId }) => (
+  <OperationsNotificationBell
+    userId={userId}
+    role="hr_manager"
+    routes={HR_ROUTES}
+  />
+);
+
 const INVENTORY_ROUTES = {
-  default:   "/operations/inventory/dashboard",
-  delivery:  "/operations/inventory/stock-in",
+  default: "/operations/inventory/dashboard",
+  delivery: "/operations/inventory/stock-in",
   daily_update: "/operations/inventory/daily-update",
   low_stock: "/operations/inventory/stock-out",
-  receipt:   "/operations/inventory/stock-in",
-  incident:  "/operations/inventory/incidents",
-  task:      "/operations/inventory/incidents?page=tasks",
+  receipt: "/operations/inventory/stock-in",
+  incident: "/operations/inventory/incidents",
+  task: "/operations/inventory/incidents?page=tasks",
 };
 
 const FINANCE_ROUTES = {
-  default:  "/finance-manager/dashboard",
+  default: "/finance-manager/dashboard",
   incident: "/finance-manager/incidents",
-  task:     "/finance-manager/incidents?page=tasks",
+  task: "/finance-manager/incidents?page=tasks",
 };
 
 const PROCUREMENT_ROUTES = {
-  default:  "/operations/procurement/dashboard",
-  receipt:  "/operations/procurement/purchase-orders",
-  delay:    "/operations/procurement/purchase-orders",
+  default: "/operations/procurement/dashboard",
+  receipt: "/operations/procurement/purchase-orders",
+  delay: "/operations/procurement/purchase-orders",
   incident: "/operations/procurement/incidents",
-  task:     "/operations/procurement/incidents?page=tasks",
+  task: "/operations/procurement/incidents?page=tasks",
 };
 
 const ProcurementBell = ({ userId }) => (
@@ -129,22 +142,21 @@ const ProcurementBell = ({ userId }) => (
 /* ── Where the Site Engineer's notifications should navigate to ──
    (no rfi / si entries — Site Engineer no longer has those modules) */
 const SITE_ENGINEER_ROUTES = {
-  default:     "/site-engineer/dashboard",
-  incident:    "/site-engineer/incidents",
-  task:        "/site-engineer/activity",
-  approval:    "/site-engineer/approvals",
-  material:    "/site-engineer/materials",
-  snag:        "/site-engineer/snag-list",
-  work:        "/site-engineer/daily-diary",
+  default: "/site-engineer/dashboard",
+  incident: "/site-engineer/incidents",
+  task: "/site-engineer/activity",
+  approval: "/site-engineer/approvals",
+  material: "/site-engineer/materials",
+  snag: "/site-engineer/snag-list",
+  work: "/site-engineer/daily-diary",
   measurement: "/site-engineer/qs-measurements",
 };
 
-
 const OPERATIONS_MANAGER_ROUTES = {
-  default:      "/operations/manager/dashboard",
+  default: "/operations/manager/dashboard",
   daily_update: "/operations/manager/daily-updates",
-  incident:     "/operations/manager/dashboard",
-  task:         "/operations/manager/tasks",
+  incident: "/operations/manager/dashboard",
+  task: "/operations/manager/tasks",
 };
 
 const OperationsManagerBell = ({ userId }) => (
@@ -171,8 +183,6 @@ const InventoryBell = ({ userId }) => (
   />
 );
 
-
-
 const FinanceBell = ({ userId }) => (
   <OperationsNotificationBell
     userId={userId}
@@ -182,12 +192,8 @@ const FinanceBell = ({ userId }) => (
 );
 
 const SiteEngineerBell = ({ userId }) => (
-  <SiteEngineerNotificationBell
-    userId={userId}
-    routes={SITE_ENGINEER_ROUTES}
-  />
+  <SiteEngineerNotificationBell userId={userId} routes={SITE_ENGINEER_ROUTES} />
 );
-
 
 const BdaBell = ({ userId }) => <BDANotificationBell bdaEmail={userId} />;
 
@@ -198,24 +204,25 @@ const BdaBell = ({ userId }) => <BDANotificationBell bdaEmail={userId} />;
 const NOTIFICATION_COMPONENTS = {
   project_coordinator: NotificationBell,
   structural_engineer: SENotificationBell,
-  quantity_surveyor:   QSNotificationBell,
-  mep_engineer:        MEPNotificationBell,
-  architect:           ArchitectNotificationBell,
-  bda:                            BdaBell,
-  bda1:                           BdaBell,
-  bda2:                           BdaBell,
-  BDA:                            BdaBell,
-  business_development:           BdaBell,
-  business_development_analyst:   BdaBell,
+  quantity_surveyor: QSNotificationBell,
+  mep_engineer: MEPNotificationBell,
+  architect: ArchitectNotificationBell,
+  bda: BdaBell,
+  bda1: BdaBell,
+  bda2: BdaBell,
+  BDA: BdaBell,
+  business_development: BdaBell,
+  business_development_analyst: BdaBell,
   logistics_coordinator: LogisticsBell,
-  operations_manager:    OperationsManagerBell,
-  inventory_controller:  InventoryBell,
-  finance_manager:  FinanceBell,
-  ceo:              CEONotificationBell,
+  operations_manager: OperationsManagerBell,
+  inventory_controller: InventoryBell,
+  finance_manager: FinanceBell,
+  ceo: CEONotificationBell,
   procurement_officer: ProcurementBell,
-  site_engineer:         SiteEngineerBell,
-  "3d_visualizer":     ThreeDVisualizerNotificationBell,
-  digital_marketing:   DigitalMarketingNotificationBell,
+  site_engineer: SiteEngineerBell,
+  "3d_visualizer": ThreeDVisualizerNotificationBell,
+  digital_marketing: DigitalMarketingNotificationBell,
+  hr_manager: HRBell,
 };
 
 function Navbar() {
@@ -374,7 +381,15 @@ function Navbar() {
               <small>{user?.email}</small>
             </div>
             <button className="dropdown-item">Profile</button>
-            <button className="dropdown-item" onClick={() => { setIsProfileOpen(false); navigate("/settings"); }}>Settings</button>
+            <button
+              className="dropdown-item"
+              onClick={() => {
+                setIsProfileOpen(false);
+                navigate("/settings");
+              }}
+            >
+              Settings
+            </button>
             <div className="dropdown-divider"></div>
             <button className="dropdown-item logout" onClick={handleLogout}>
               Logout
