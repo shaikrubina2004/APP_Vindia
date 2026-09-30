@@ -6,7 +6,6 @@ import {
 import "./CEONotificationBell.css";
 
 const POLL_MS = 30000;
-const ICONS = { daily_update: "📋", report: "📄", incident: "⚠️", task: "✅", alert: "🔔" };
 const TABS = [
   { key: "all", label: "All" },
   { key: "daily_update", label: "Daily updates" },
@@ -19,8 +18,6 @@ export default function CEONotificationBell() {
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("all");
-  const [ring, setRing] = useState(false);
-  const prevUnread = useRef(0);
   const wrapRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -35,12 +32,6 @@ export default function CEONotificationBell() {
 
   const unread = items.filter((n) => !n.is_read).length;
 
-  // shake the bell when something new arrives
-  useEffect(() => {
-    if (unread > prevUnread.current) { setRing(true); const t = setTimeout(() => setRing(false), 1000); return () => clearTimeout(t); }
-    prevUnread.current = unread;
-  }, [unread]);
-  useEffect(() => { prevUnread.current = unread; });
 
   // close on outside click
   useEffect(() => {
@@ -67,7 +58,7 @@ export default function CEONotificationBell() {
 
   return (
     <div className="ceo-bell" ref={wrapRef}>
-      <button className={`ceo-bell-btn ${open ? "open" : ""} ${ring ? "ring" : ""}`} onClick={() => setOpen((o) => !o)} aria-label="Notifications">
+      <button className={`ceo-bell-btn ${open ? "open" : ""}`} onClick={() => setOpen((o) => !o)} aria-label="Notifications">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
@@ -87,10 +78,10 @@ export default function CEONotificationBell() {
           </div>
           <div className="ceo-bell-list">
             {visible.length === 0 ? (
-              <div className="ceo-bell-empty">🎉 You're all caught up</div>
+              <div className="ceo-bell-empty">You are all caught up</div>
             ) : visible.map((n) => (
               <div key={n.id} className={`ceo-bell-item ${n.is_read ? "" : "unread"} ${n.severity || ""}`} onClick={() => openItem(n)}>
-                <div className="ceo-bell-ico">{ICONS[n.type] || "🔔"}</div>
+                <span className="ceo-bell-dot" />
                 <div className="ceo-bell-txt">
                   <strong>{n.title}</strong>
                   {n.description && <p>{n.description}</p>}
@@ -100,7 +91,7 @@ export default function CEONotificationBell() {
             ))}
           </div>
           <div className="ceo-bell-foot">
-            <button onClick={() => { setOpen(false); navigate("/ceo/manager-updates"); }}>View all manager updates →</button>
+            <button onClick={() => { setOpen(false); navigate("/reports?tab=daily"); }}>Open reports</button>
           </div>
         </div>
       )}

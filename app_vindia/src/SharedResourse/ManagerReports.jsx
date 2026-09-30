@@ -8,7 +8,7 @@ const TYPES = [
   { v: "other", l: "Other" },
 ];
 const STATUS_LABEL = { submitted: "Submitted", reviewed: "Reviewed", needs_changes: "Needs changes" };
-const EMPTY = { title: "", report_type: "weekly", period_label: "", summary: "", highlights: "", issues: "", next_steps: "" };
+const EMPTY = { title: "", report_type: "daily", period_label: "", summary: "", highlights: "", issues: "", next_steps: "" };
 
 const fmt = (d) => new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
@@ -63,7 +63,7 @@ export default function ManagerReports() {
         <div className="pp-sub">Fields marked * are required.</div>
         <div className="pp-grid two">
           <div className="pp-field"><label>Title *</label>
-            <input value={form.title} onChange={set("title")} placeholder="e.g. Weekly site progress" /></div>
+            <input value={form.title} onChange={set("title")} placeholder="e.g. Daily update, 29 Sep" /></div>
           <div className="pp-field"><label>Type</label>
             <select value={form.report_type} onChange={set("report_type")}>
               {TYPES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}

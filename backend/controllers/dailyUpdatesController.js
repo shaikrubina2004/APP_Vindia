@@ -41,7 +41,7 @@ exports.createReport = async (req, res) => {
       type: "daily_update",
       title: `Project update: ${project_name}`,
       description: `${submitted_by || "Project Manager"} · ${overall_status || "on-track"}${phase ? " · " + phase : ""}`,
-      link: "/ceo/manager-updates",
+      link: "/reports?tab=daily",
       severity: overall_status && overall_status !== "on-track" ? "warning" : "info",
       referenceId: result.rows[0].id,
     });

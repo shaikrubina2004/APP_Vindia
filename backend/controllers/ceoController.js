@@ -18,8 +18,7 @@ const MANAGER_ROLES = [
   { code: "hr_manager",         label: "HR Manager" },
   { code: "finance_manager",    label: "Finance Manager" },
   { code: "operations_manager", label: "Operations Manager" },
-  { code: "bd_manager",         label: "BD Manager" },
-  { code: "bda",                label: "Business Dev. Analyst" },
+  { code: "bda",                label: "Business Development" },
 ];
 const ROLE_LABEL = Object.fromEntries(MANAGER_ROLES.map((r) => [r.code, r.label]));
 
@@ -29,6 +28,11 @@ const ROLE_MATCH = `(
 )`;
 
 const num = (v) => Number(v) || 0;
+
+/* Tiny in-memory cache so refreshing / several tabs don't re-run ~15 queries.
+   ?fresh=1 (the Refresh button) bypasses it. */
+const CACHE_MS = 20000;
+const cache = new Map();
 
 async function section(name, fn, fallback) {
   try {
@@ -44,179 +48,130 @@ async function section(name, fn, fallback) {
    ══════════════════════════════════════════════════════════ */
 exports.getDashboard = async (req, res) => {
   const projectId = req.query.projectId ? Number(req.query.projectId) : null;
+  const key = String(projectId || "all");
+  const hit = cache.get(key);
+  if (!req.query.fresh && hit && Date.now() - hit.at < CACHE_MS) return res.json(hit.data);
 
-  /* ── Finance snapshot (same definitions as Finance Manager dashboard:
-        revenue = PAID invoices, expenses = approved/paid) ── */
-  const finance = await section("finance", async () => {
-    const inv = await pool.query(
-      `SELECT
-         COALESCE(SUM(amount) FILTER (WHERE LOWER(status)='paid'),0)    AS revenue,
-         COALESCE(SUM(amount) FILTER (WHERE LOWER(status)<>'paid'),0)   AS receivable,
-         COUNT(*) FILTER (WHERE LOWER(status)='overdue')                AS overdue
-       FROM invoices
-       WHERE ($1::int IS NULL OR project_id = $1)`,
-      [projectId]
-    );
-    const exp = await pool.query(
-      `SELECT COALESCE(SUM(amount),0) AS expenses
-       FROM expenses
-       WHERE LOWER(status) IN ('approved','paid')
-         AND ($1::int IS NULL OR project_id = $1)`,
-      [projectId]
-    );
-    const revenue = num(inv.rows[0].revenue);
-    const expenses = num(exp.rows[0].expenses);
-    return {
-      revenue,
-      expenses,
-      profit: revenue - expenses,
-      receivable: num(inv.rows[0].receivable),
-      overdueInvoices: num(inv.rows[0].overdue),
-    };
-  }, { revenue: 0, expenses: 0, profit: 0, receivable: 0, overdueInvoices: 0 });
+  const q = (sql, params) => pool.query(sql, params);
 
-  /* ── Monthly income vs expense, last 6 months ── */
-  const monthly = await section("monthly", async () => {
-    const { rows } = await pool.query(
-      `WITH months AS (
-         SELECT date_trunc('month', CURRENT_DATE) - (n || ' month')::interval AS m
-         FROM generate_series(0,5) n
-       )
-       SELECT to_char(m.m,'Mon') AS label,
-              to_char(m.m,'YYYY-MM') AS key,
-              COALESCE((SELECT SUM(i.amount) FROM invoices i
-                         WHERE LOWER(i.status)='paid'
-                           AND date_trunc('month', i.created_at)=m.m
-                           AND ($1::int IS NULL OR i.project_id=$1)),0) AS income,
-              COALESCE((SELECT SUM(e.amount) FROM expenses e
-                         WHERE LOWER(e.status) IN ('approved','paid')
-                           AND date_trunc('month', e.expense_date)=m.m
-                           AND ($1::int IS NULL OR e.project_id=$1)),0) AS expense
-       FROM months m
-       ORDER BY m.m ASC`,
-      [projectId]
-    );
-    return rows.map((r) => ({ label: r.label, key: r.key, income: num(r.income), expense: num(r.expense) }));
-  }, []);
+  /* Every section runs AT THE SAME TIME (was: one after another). */
+  const [finance, monthly, projects, wbsCost, wbsOverview, hr, leads, managers, pendingReports, pendingFinanceUpdates] =
+    await Promise.all([
+      /* Finance snapshot – revenue = PAID invoices, expenses = approved/paid (same as Finance dashboard) */
+      section("finance", async () => {
+        const [inv, exp] = await Promise.all([
+          q(`SELECT COALESCE(SUM(amount) FILTER (WHERE LOWER(status)='paid'),0)  AS revenue,
+                    COALESCE(SUM(amount) FILTER (WHERE LOWER(status)<>'paid'),0) AS receivable,
+                    COUNT(*) FILTER (WHERE LOWER(status)='overdue')              AS overdue
+             FROM invoices WHERE ($1::int IS NULL OR project_id=$1)`, [projectId]),
+          q(`SELECT COALESCE(SUM(amount),0) AS expenses FROM expenses
+             WHERE LOWER(status) IN ('approved','paid') AND ($1::int IS NULL OR project_id=$1)`, [projectId]),
+        ]);
+        const revenue = num(inv.rows[0].revenue), expenses = num(exp.rows[0].expenses);
+        return { revenue, expenses, profit: revenue - expenses,
+                 receivable: num(inv.rows[0].receivable), overdueInvoices: num(inv.rows[0].overdue) };
+      }, { revenue: 0, expenses: 0, profit: 0, receivable: 0, overdueInvoices: 0 }),
 
-  /* ── Projects with progress & spend ── */
-  const projects = await section("projects", async () => {
-    const { rows } = await pool.query(
-      `SELECT p.id, p.name, p.client, p.status, p.start_date, p.end_date,
-              COALESCE(p.budget,0) AS budget,
-              COALESCE((SELECT ROUND(AVG(w.progress)) FROM wbs w
-                         WHERE w.project_id=p.id AND w.parent_id IS NULL),0) AS progress,
-              COALESCE((SELECT SUM(e.amount) FROM expenses e
-                         WHERE e.project_id=p.id AND LOWER(e.status) IN ('approved','paid')),0) AS spent
-       FROM projects p
-       ORDER BY p.id DESC
-       LIMIT 50`
-    );
-    return rows.map((r) => ({
-      id: r.id, name: r.name, client: r.client, status: r.status,
-      startDate: r.start_date, endDate: r.end_date,
-      budget: num(r.budget), spent: num(r.spent), progress: num(r.progress),
-    }));
-  }, []);
+      /* Monthly trend – two grouped scans instead of 12 correlated sub-queries */
+      section("monthly", async () => {
+        const [inc, exp] = await Promise.all([
+          q(`SELECT to_char(date_trunc('month',created_at),'YYYY-MM') AS k, SUM(amount) AS v FROM invoices
+             WHERE LOWER(status)='paid' AND created_at >= date_trunc('month',CURRENT_DATE) - interval '5 month'
+               AND ($1::int IS NULL OR project_id=$1) GROUP BY 1`, [projectId]),
+          q(`SELECT to_char(date_trunc('month',expense_date),'YYYY-MM') AS k, SUM(amount) AS v FROM expenses
+             WHERE LOWER(status) IN ('approved','paid') AND expense_date >= date_trunc('month',CURRENT_DATE) - interval '5 month'
+               AND ($1::int IS NULL OR project_id=$1) GROUP BY 1`, [projectId]),
+        ]);
+        const I = new Map(inc.rows.map((r) => [r.k, num(r.v)])), E = new Map(exp.rows.map((r) => [r.k, num(r.v)]));
+        const out = [], now = new Date();
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          out.push({ key: k, label: d.toLocaleString("en-US", { month: "short" }), income: I.get(k) || 0, expense: E.get(k) || 0 });
+        }
+        return out;
+      }, []),
 
-  /* ── WBS cost breakdown (labour / material / equipment / misc) ── */
-  const wbsCost = await section("wbsCost", async () => {
-    const q = (tbl, col) =>
-      pool.query(
-        `SELECT COALESCE(SUM(t.${col}),0) AS v
-         FROM ${tbl} t JOIN wbs w ON w.id = t.task_id
-         WHERE ($1::int IS NULL OR w.project_id=$1)`,
-        [projectId]
-      );
-    const [l, m, e, x] = await Promise.all([
-      q("wbs_labour", "cost"), q("wbs_material", "total"),
-      q("wbs_equipment", "cost"), q("wbs_miscellaneous", "cost"),
+      /* Projects – progress & spend via one grouped join each (no per-row sub-queries) */
+      section("projects", async () => {
+        const { rows } = await q(
+          `SELECT p.id, p.name, p.client, p.status, p.start_date, p.end_date, COALESCE(p.budget,0) AS budget,
+                  COALESCE(w.progress,0) AS progress, COALESCE(e.spent,0) AS spent
+           FROM projects p
+           LEFT JOIN (SELECT project_id, ROUND(AVG(progress)) AS progress FROM wbs WHERE parent_id IS NULL GROUP BY project_id) w ON w.project_id=p.id
+           LEFT JOIN (SELECT project_id, SUM(amount) AS spent FROM expenses WHERE LOWER(status) IN ('approved','paid') GROUP BY project_id) e ON e.project_id=p.id
+           ORDER BY p.id DESC LIMIT 50`);
+        return rows.map((r) => ({ id: r.id, name: r.name, client: r.client, status: r.status,
+          startDate: r.start_date, endDate: r.end_date, budget: num(r.budget), spent: num(r.spent), progress: num(r.progress) }));
+      }, []),
+
+      /* WBS cost breakdown */
+      section("wbsCost", async () => {
+        const one = (tbl, col) => q(`SELECT COALESCE(SUM(t.${col}),0) AS v FROM ${tbl} t JOIN wbs w ON w.id=t.task_id
+                                     WHERE ($1::int IS NULL OR w.project_id=$1)`, [projectId]);
+        const [l, m, e, x] = await Promise.all([one("wbs_labour","cost"), one("wbs_material","total"), one("wbs_equipment","cost"), one("wbs_miscellaneous","cost")]);
+        return [
+          { key: "labour", label: "Labour", value: num(l.rows[0].v) }, { key: "material", label: "Material", value: num(m.rows[0].v) },
+          { key: "equipment", label: "Equipment", value: num(e.rows[0].v) }, { key: "misc", label: "Miscellaneous", value: num(x.rows[0].v) },
+        ];
+      }, []),
+
+      section("wbsOverview", async () => {
+        const { rows } = await q(
+          `SELECT COUNT(*) AS total,
+                  COUNT(*) FILTER (WHERE LOWER(status) LIKE 'complet%')   AS completed,
+                  COUNT(*) FILTER (WHERE LOWER(status) LIKE '%progress%') AS in_progress,
+                  COALESCE(ROUND(AVG(progress)),0) AS avg_progress
+           FROM wbs WHERE ($1::int IS NULL OR project_id=$1)`, [projectId]);
+        const r = rows[0];
+        return { total: num(r.total), completed: num(r.completed), inProgress: num(r.in_progress), avgProgress: num(r.avg_progress) };
+      }, { total: 0, completed: 0, inProgress: 0, avgProgress: 0 }),
+
+      /* HR snapshot – four small counts in parallel */
+      section("hr", async () => {
+        const [emp, att, lv, pend] = await Promise.all([
+          q(`SELECT COUNT(*) AS c FROM employees`),
+          q(`SELECT COUNT(DISTINCT employee_id) AS c FROM attendance WHERE date=CURRENT_DATE AND LOWER(status) IN ('present','late','wfh')`),
+          q(`SELECT COUNT(DISTINCT employee_id) AS c FROM leaves WHERE LOWER(status)='approved' AND CURRENT_DATE BETWEEN from_date AND to_date`),
+          q(`SELECT COUNT(*) AS c FROM leaves WHERE LOWER(status)='pending'`),
+        ]);
+        return { employees: num(emp.rows[0].c), presentToday: num(att.rows[0].c), onLeave: num(lv.rows[0].c), pendingLeaves: num(pend.rows[0].c) };
+      }, { employees: 0, presentToday: 0, onLeave: 0, pendingLeaves: 0 }),
+
+      section("leads", async () => {
+        const { rows } = await q(`SELECT COALESCE(status,'New') AS status, COUNT(*) AS c FROM leads
+                                  WHERE COALESCE(deleted_by_admin,false)=false GROUP BY 1 ORDER BY 2 DESC`);
+        return rows.map((r) => ({ status: r.status, count: num(r.c) }));
+      }, []),
+
+      section("managers", () => buildTodayStatus(), []),
+
+      section("pendingReports", async () => {
+        const { rows } = await q(`SELECT COUNT(*) AS c FROM manager_reports WHERE status='submitted'`);
+        return num(rows[0].c);
+      }, 0),
+
+      section("pendingFin", async () => {
+        const { rows } = await q(
+          `SELECT COUNT(*) AS c FROM finance_daily_updates f
+           JOIN users u ON u.id=f.submitted_by JOIN roles r ON r.id=u.role_id
+           WHERE f.status='pending' AND ${ROLE_MATCH}`, [["finance_manager"]]);
+        return num(rows[0].c);
+      }, 0),
     ]);
-    return [
-      { key: "labour",    label: "Labour",    value: num(l.rows[0].v) },
-      { key: "material",  label: "Material",  value: num(m.rows[0].v) },
-      { key: "equipment", label: "Equipment", value: num(e.rows[0].v) },
-      { key: "misc",      label: "Misc",      value: num(x.rows[0].v) },
-    ];
-  }, []);
 
-  /* ── WBS status overview (top-level milestones) ── */
-  const wbsOverview = await section("wbsOverview", async () => {
-    const { rows } = await pool.query(
-      `SELECT COUNT(*)                                                     AS total,
-              COUNT(*) FILTER (WHERE LOWER(status) LIKE 'complet%')        AS completed,
-              COUNT(*) FILTER (WHERE LOWER(status) LIKE '%progress%')      AS in_progress,
-              COALESCE(ROUND(AVG(progress)),0)                             AS avg_progress
-       FROM wbs
-       WHERE ($1::int IS NULL OR project_id=$1)`,
-      [projectId]
-    );
-    const r = rows[0];
-    return {
-      total: num(r.total), completed: num(r.completed),
-      inProgress: num(r.in_progress), avgProgress: num(r.avg_progress),
-    };
-  }, { total: 0, completed: 0, inProgress: 0, avgProgress: 0 });
-
-  /* ── HR snapshot ── */
-  const hr = await section("hr", async () => {
-    const emp = await pool.query(`SELECT COUNT(*) AS c FROM employees`);
-    const att = await pool.query(
-      `SELECT COUNT(DISTINCT employee_id) AS c FROM attendance
-       WHERE date = CURRENT_DATE AND LOWER(status) IN ('present','late','wfh')`
-    );
-    const lv = await pool.query(
-      `SELECT COUNT(DISTINCT employee_id) AS c FROM leaves
-       WHERE LOWER(status)='approved'
-         AND CURRENT_DATE BETWEEN from_date AND to_date`
-    );
-    const pend = await pool.query(`SELECT COUNT(*) AS c FROM leaves WHERE LOWER(status)='pending'`);
-    return {
-      employees: num(emp.rows[0].c),
-      presentToday: num(att.rows[0].c),
-      onLeave: num(lv.rows[0].c),
-      pendingLeaves: num(pend.rows[0].c),
-    };
-  }, { employees: 0, presentToday: 0, onLeave: 0, pendingLeaves: 0 });
-
-  /* ── Lead pipeline ── */
-  const leads = await section("leads", async () => {
-    const { rows } = await pool.query(
-      `SELECT COALESCE(status,'New') AS status, COUNT(*) AS c
-       FROM leads
-       WHERE COALESCE(deleted_by_admin,false)=false
-       GROUP BY 1 ORDER BY 2 DESC`
-    );
-    return rows.map((r) => ({ status: r.status, count: num(r.c) }));
-  }, []);
-
-  /* ── Manager reporting health ── */
-  const managers = await section("managers", () => buildTodayStatus(), []);
-  const pendingReports = await section("pendingReports", async () => {
-    const { rows } = await pool.query(`SELECT COUNT(*) AS c FROM manager_reports WHERE status='submitted'`);
-    return num(rows[0].c);
-  }, 0);
-  const pendingFinanceUpdates = await section("pendingFin", async () => {
-    const { rows } = await pool.query(
-      `SELECT COUNT(*) AS c FROM finance_daily_updates f
-       JOIN users u ON u.id=f.submitted_by JOIN roles r ON r.id=u.role_id
-       WHERE f.status='pending' AND ${ROLE_MATCH}`,
-      [["finance_manager"]]
-    );
-    return num(rows[0].c);
-  }, 0);
-
-  res.json({
+  const data = {
     generatedAt: new Date().toISOString(),
     finance, monthly, projects, wbsCost, wbsOverview, hr, leads,
     managers: {
       list: managers,
       submittedToday: managers.filter((m) => m.submittedToday).length,
       total: managers.length,
-      pendingReports,
-      pendingFinanceUpdates,
+      pendingReports, pendingFinanceUpdates,
     },
-  });
+  };
+  cache.set(key, { at: Date.now(), data });
+  res.json(data);
 };
 
 /* ══════════════════════════════════════════════════════════
@@ -238,29 +193,25 @@ async function buildTodayStatus() {
     [codes]
   );
 
-  const mr = await section("today.mr", async () => {
-    const { rows } = await pool.query(
-      `SELECT submitted_by, MAX(created_at) AS at FROM manager_reports
-       WHERE report_type='daily' AND created_at::date = CURRENT_DATE
-       GROUP BY submitted_by`
-    );
-    return new Map(rows.map((r) => [r.submitted_by, r.at]));
-  }, new Map());
-
-  const fin = await section("today.fin", async () => {
-    const { rows } = await pool.query(
-      `SELECT submitted_by, MAX(updated_at) AS at FROM finance_daily_updates
-       WHERE date = CURRENT_DATE GROUP BY submitted_by`
-    );
-    return new Map(rows.map((r) => [r.submitted_by, r.at]));
-  }, new Map());
-
-  const pmAt = await section("today.pm", async () => {
-    const { rows } = await pool.query(
-      `SELECT MAX(submission_time) AS at, COUNT(*) AS c FROM daily_reports WHERE date::date = CURRENT_DATE`
-    );
-    return num(rows[0].c) > 0 ? rows[0].at || true : null;
-  }, null);
+  const [mr, fin, pmAt] = await Promise.all([
+    section("today.mr", async () => {
+      const { rows } = await pool.query(
+        `SELECT submitted_by, MAX(created_at) AS at FROM manager_reports
+         WHERE report_type='daily' AND created_at::date = CURRENT_DATE GROUP BY submitted_by`);
+      return new Map(rows.map((r) => [r.submitted_by, r.at]));
+    }, new Map()),
+    section("today.fin", async () => {
+      const { rows } = await pool.query(
+        `SELECT submitted_by, MAX(updated_at) AS at FROM finance_daily_updates
+         WHERE date = CURRENT_DATE GROUP BY submitted_by`);
+      return new Map(rows.map((r) => [r.submitted_by, r.at]));
+    }, new Map()),
+    section("today.pm", async () => {
+      const { rows } = await pool.query(
+        `SELECT MAX(submission_time) AS at, COUNT(*) AS c FROM daily_reports WHERE date::date = CURRENT_DATE`);
+      return num(rows[0].c) > 0 ? rows[0].at || true : null;
+    }, null),
+  ]);
 
   return users.map((u) => {
     const at = mr.get(u.id) || fin.get(u.id) || (u.role === "project_manager" ? pmAt : null);
@@ -290,7 +241,7 @@ exports.getManagerUpdates = async (req, res) => {
   const codes = MANAGER_ROLES.map((r) => r.code);
 
   /* 1 ─ Manager → CEO daily reports (all manager roles) */
-  const fromReports = await section("feed.reports", async () => {
+  const [fromReports, fromFinance, fromPM] = await Promise.all([section("feed.reports", async () => {
     const { rows } = await pool.query(
       `SELECT m.*, u.name AS submitter_name
        FROM manager_reports m JOIN users u ON u.id = m.submitted_by
@@ -309,10 +260,9 @@ exports.getManagerUpdates = async (req, res) => {
       ceoComment: r.ceo_comment,
       reviewable: true,
     }));
-  }, []);
+  }, []),
 
-  /* 2 ─ Finance Manager's own daily updates ("Pending CEO review") */
-  const fromFinance = await section("feed.finance", async () => {
+  section("feed.finance", async () => {
     const { rows } = await pool.query(
       `SELECT f.*, u.name AS submitter_name
        FROM finance_daily_updates f
@@ -337,10 +287,9 @@ exports.getManagerUpdates = async (req, res) => {
       ceoComment: r.review_note,
       reviewable: true,
     }));
-  }, []);
+  }, []),
 
-  /* 3 ─ Project Manager site updates (daily_reports) */
-  const fromPM = await section("feed.pm", async () => {
+  section("feed.pm", async () => {
     const { rows } = await pool.query(
       `SELECT * FROM daily_reports
        WHERE date::date >= CURRENT_DATE - ($1 || ' day')::interval`,
@@ -356,7 +305,7 @@ exports.getManagerUpdates = async (req, res) => {
       status: r.approved ? "approved" : "pending",
       reviewable: false,
     }));
-  }, []);
+  }, [])]);
 
   let items = [...fromReports, ...fromFinance, ...fromPM].filter((i) => codes.includes(i.role) || !i.role);
   if (roleFilter) items = items.filter((i) => i.role === roleFilter);

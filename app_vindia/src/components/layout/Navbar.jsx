@@ -19,8 +19,7 @@ import logo from "../../assets/logo.png.png";
 // ✅ Role-based quick-add menu items
 const QUICK_ADD_ITEMS = {
   ceo: [
-    { label: "Manager Updates", path: "/ceo/manager-updates" },
-    { label: "Manager Reports", path: "/reports" },
+    { label: "Reports", path: "/reports" },
     { label: "Analytics", path: "/analytics" },
   ],
   project_coordinator: [

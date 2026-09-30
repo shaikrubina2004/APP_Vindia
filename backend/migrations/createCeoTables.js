@@ -83,6 +83,21 @@ async function migrate() {
         ON operations_notifications (user_id, is_read, created_at DESC);
     `);
     console.log("✅ operations_notifications ready (CEO bell uses role_code = 'ceo')");
+
+    /* Indexes that make the CEO dashboard fast. Each is optional: a failure
+       (e.g. a table you don't have yet) is skipped, not fatal. */
+    const indexes = [
+      "CREATE INDEX IF NOT EXISTS idx_ceo_invoices_status  ON invoices (status, project_id, created_at)",
+      "CREATE INDEX IF NOT EXISTS idx_ceo_expenses_status  ON expenses (status, project_id, expense_date)",
+      "CREATE INDEX IF NOT EXISTS idx_ceo_wbs_project      ON wbs (project_id, parent_id)",
+      "CREATE INDEX IF NOT EXISTS idx_ceo_attendance_date  ON attendance (date, status)",
+      "CREATE INDEX IF NOT EXISTS idx_ceo_leaves_status    ON leaves (status, from_date, to_date)",
+      "CREATE INDEX IF NOT EXISTS idx_ceo_findaily_date    ON finance_daily_updates (date, status)",
+    ];
+    for (const sql of indexes) {
+      try { await pool.query(sql); } catch (e) { console.warn("⚠️  skipped index:", e.message); }
+    }
+    console.log("✅ dashboard indexes ready");
   } catch (err) {
     console.error("❌ Migration failed:", err.message);
   } finally {

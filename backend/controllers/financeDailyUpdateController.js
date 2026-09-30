@@ -31,7 +31,7 @@ exports.submitUpdate = asyncHandler(async (req, res) => {
       type: "daily_update",
       title: `Finance daily update from ${req.user.name || "Finance Manager"}`,
       description: req.body.summary || "Awaiting your review",
-      link: "/ceo/manager-updates",
+      link: "/reports?tab=daily",
       severity: req.body.overall_status && req.body.overall_status !== "on-track" ? "warning" : "info",
       referenceId: update && update.id,
     });

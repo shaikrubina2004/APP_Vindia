@@ -1,7 +1,7 @@
 // src/routes/AppRoutes.jsx
 // FINAL MERGED VERSION
 
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 /* ── AUTH ────────────────────────────────────────────────── */
 import SignIn from "../pages/SignIn";
@@ -161,7 +161,6 @@ import ManagerReports from "../SharedResourse/ManagerReports";
 import Settings from "../SharedResourse/Settings";
 import ReportsInbox from "../pages/ceo/ReportsInbox";
 import Analytics from "../pages/ceo/Analytics";
-import ManagerUpdates from "../pages/ceo/ManagerUpdates";
 import RoleLayout from "../layouts/RoleLayout";
 
 /* ═══════════════════════════════════════════════════════════
@@ -1557,7 +1556,7 @@ const AppRoutes = () => {
         />
 
 
-        {/* ══ CEO REPORTS / ANALYTICS / MANAGER UPDATES ═════ */}
+        {/* ══ CEO REPORTS / ANALYTICS ═══════════════════════ */}
 
         <Route
           path="/reports"
@@ -1570,15 +1569,10 @@ const AppRoutes = () => {
           }
         />
 
+        {/* Old links / notifications → the single Reports page */}
         <Route
           path="/ceo/manager-updates"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-              <CEOLayout>
-                <ManagerUpdates />
-              </CEOLayout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/reports?tab=daily" replace />}
         />
 
         <Route

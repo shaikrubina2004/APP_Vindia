@@ -2,8 +2,8 @@
 // All CEO-only API calls in one place (JWT is added by the shared axios client).
 import API from "./authService";
 
-export const getCeoDashboard = (projectId) =>
-  API.get("/ceo/dashboard", { params: projectId ? { projectId } : {} }).then((r) => r.data);
+export const getCeoDashboard = (projectId, fresh) =>
+  API.get("/ceo/dashboard", { params: { ...(projectId ? { projectId } : {}), ...(fresh ? { fresh: 1 } : {}) } }).then((r) => r.data);
 
 export const getManagerUpdates = (params = {}) =>
   API.get("/ceo/manager-updates", { params }).then((r) => r.data);
