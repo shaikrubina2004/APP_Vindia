@@ -131,6 +131,9 @@ const campaignRoutes = require("./routes/campaignRoutes");
 const marketingRoutes = require("./routes/marketingRoutes");
 const digitalMarketingNotificationRoutes = require("./routes/digitalMarketingNotificationRoutes");
 const { errorHandler } = require("./middleware/errorHandler");
+const ceoDailyReportRoutes = require("./routes/ceoDailyReportRoutes");
+const ceoAlertRoutes       = require("./routes/ceoAlertRoutes");
+const ceoInsightsRoutes    = require("./routes/ceoInsightsRoutes");
 
 /* ═════════ APP SETUP ═════════ */
 
@@ -265,6 +268,9 @@ app.use("/api/3d-models", threeDModelRoutes);
 app.use("/api/campaigns", campaignRoutes);
 app.use("/api/marketing", marketingRoutes);
 app.use("/api/dm-notifications", digitalMarketingNotificationRoutes);
+app.use("/api/ceo-daily-reports", ceoDailyReportRoutes);
+app.use("/api/ceo-alerts",        ceoAlertRoutes);
+app.use("/api/ceo-insights",      ceoInsightsRoutes);
 
 /* ═════════ ERROR HANDLING ═════════ */
 

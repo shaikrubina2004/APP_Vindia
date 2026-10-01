@@ -1,0 +1,61 @@
+/* ManagerReports.css — Daily Update page for HR / BDA / Operations managers.
+   Same look as the Finance daily update (FinanceDailyUpdate.css). */
+.mdu-root {
+  --mdu-bg: #ffffff; --mdu-surface: #f5f7fa; --mdu-border: rgba(0, 0, 0, 0.08); --mdu-border2: rgba(0, 0, 0, 0.13);
+  --mdu-text: #1a2638; --mdu-muted: #5a7184; --mdu-accent: #0A4174;
+  --mdu-ok: #10b981; --mdu-warn: #f59e0b; --mdu-critical: #ef4444; --mdu-radius: 14px; --mdu-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  font-family: "DM Sans", sans-serif; color: var(--mdu-text); max-width: 960px; margin: 0 auto; padding: 28px 24px 60px;
+}
+.mdu-root *, .mdu-root *::before, .mdu-root *::after { box-sizing: border-box; }
+.mdu-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+.mdu-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase; color: var(--mdu-accent); margin: 0 0 5px; }
+.mdu-title { font-size: 1.8rem; font-weight: 700; margin: 0; letter-spacing: -0.5px; }
+.mdu-sub { margin: 4px 0 0; color: var(--mdu-muted); font-size: 13px; }
+
+.mdu-badge { padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 700; white-space: nowrap; height: fit-content; }
+.mdu-badge--sent { background: rgba(16, 185, 129, 0.12); color: var(--mdu-ok); }
+.mdu-badge--none { background: rgba(245, 158, 11, 0.12); color: var(--mdu-warn); }
+
+.mdu-toast { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: var(--mdu-ok); padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 13px; font-weight: 600; }
+.mdu-error { background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: var(--mdu-critical); padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 13px; }
+
+.mdu-tabs { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.mdu-pill { border: 1px solid var(--mdu-border2); background: var(--mdu-surface); color: var(--mdu-muted); padding: 8px 16px; border-radius: 100px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.mdu-pill:hover { border-color: var(--pill-color, var(--mdu-accent)); }
+.mdu-pill--active { background: var(--pill-color, var(--mdu-accent)); border-color: var(--pill-color, var(--mdu-accent)); color: #fff; }
+
+.mdu-form { background: var(--mdu-bg); border: 1px solid var(--mdu-border); border-radius: var(--mdu-radius); box-shadow: var(--mdu-shadow); padding: 24px; }
+.mdu-section { margin-bottom: 22px; }
+.mdu-section-title { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--mdu-accent); margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--mdu-border); }
+.mdu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.mdu-grid.two { grid-template-columns: repeat(2, 1fr); }
+.mdu-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--mdu-muted); }
+.mdu-field--full { grid-column: 1 / -1; }
+.mdu-field input, .mdu-field textarea, .mdu-field select {
+  font-family: "DM Sans", sans-serif; font-size: 14px; font-weight: 500; color: var(--mdu-text); background: var(--mdu-surface);
+  border: 1px solid var(--mdu-border2); border-radius: 8px; padding: 10px 12px; outline: none; transition: border-color 0.2s; width: 100%;
+}
+.mdu-field textarea { min-height: 76px; resize: vertical; }
+.mdu-field input:focus, .mdu-field textarea:focus, .mdu-field select:focus { border-color: var(--mdu-accent); }
+
+.mdu-status-row { margin: 4px 0 22px; }
+.mdu-status-label { display: block; font-size: 12px; font-weight: 600; color: var(--mdu-muted); margin-bottom: 8px; }
+.mdu-status-options { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.mdu-submit { background: var(--mdu-accent); color: #fff; border: none; padding: 12px 28px; border-radius: 8px; font-family: "DM Sans", sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; transition: opacity 0.2s; }
+.mdu-submit:hover:not(:disabled) { opacity: 0.88; }
+.mdu-submit:disabled { opacity: 0.6; cursor: default; }
+
+.mdu-history { margin-top: 32px; }
+.mdu-history h2 { font-size: 1.1rem; margin-bottom: 12px; }
+.mdu-empty { color: var(--mdu-muted); font-size: 13px; }
+.mdu-table { width: 100%; border-collapse: collapse; background: var(--mdu-bg); border: 1px solid var(--mdu-border); border-radius: var(--mdu-radius); overflow: hidden; font-size: 13px; }
+.mdu-table th { text-align: left; background: var(--mdu-surface); color: var(--mdu-muted); font-weight: 600; padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.mdu-table td { padding: 10px 14px; border-top: 1px solid var(--mdu-border); vertical-align: top; }
+.mdu-note { display: block; margin-top: 4px; font-size: 12px; color: var(--mdu-muted); }
+.mdu-chip { padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.mdu-chip--on-track, .mdu-chip--reviewed { background: rgba(16, 185, 129, 0.12); color: var(--mdu-ok); }
+.mdu-chip--attention, .mdu-chip--submitted { background: rgba(245, 158, 11, 0.12); color: var(--mdu-warn); }
+.mdu-chip--critical, .mdu-chip--needs_changes { background: rgba(239, 68, 68, 0.12); color: var(--mdu-critical); }
+
+@media (max-width: 720px) { .mdu-grid, .mdu-grid.two { grid-template-columns: 1fr; } .mdu-root { padding: 18px 14px 40px; } }

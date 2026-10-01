@@ -9,6 +9,7 @@ router.use(protect);
 router.use(requireRole("ceo"));
 
 router.get("/", c.getNotifications);
+router.get("/debug", c.debug);
 router.patch("/read-all", c.markAllRead); // must stay above /:id/read
 router.patch("/:id/read", c.markOneRead);
 

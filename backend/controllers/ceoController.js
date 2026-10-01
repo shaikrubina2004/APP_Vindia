@@ -29,6 +29,57 @@ const ROLE_MATCH = `(
 
 const num = (v) => Number(v) || 0;
 
+/* ── Role-specific field builders ─────────────────────────────
+   Every manager's daily update has different fields. The CEO page just
+   renders a generic list of { section, label, value, kind } — so each source
+   converts its own data into that shape here. */
+const keep = (f) => f && f.label && f.value !== "" && f.value != null;
+
+const fieldsFromDetails = (d) => {
+  try {
+    const o = typeof d === "string" ? JSON.parse(d) : d;
+    return Array.isArray(o && o.fields) ? o.fields.filter(keep) : [];
+  } catch { return []; }
+};
+const statusFromDetails = (d) => {
+  try { const o = typeof d === "string" ? JSON.parse(d) : d; return o && o.status; } catch { return null; }
+};
+
+const financeFields = (r) => [
+  { section: "Cash", label: "Cash position", value: num(r.cash_position), kind: "money" },
+  { section: "Cash", label: "Collections today", value: num(r.todays_collections), kind: "money" },
+  { section: "Cash", label: "Expenses today", value: num(r.todays_expenses), kind: "money" },
+  { section: "Activity", label: "Invoices raised", value: num(r.invoices_raised) },
+  { section: "Activity", label: "Payments made", value: num(r.payments_made) },
+  { section: "Activity", label: "Pending approvals", value: num(r.pending_approvals) },
+];
+
+const pmFields = (d = {}) => {
+  const arr = (x) => (Array.isArray(x) ? x : []);
+  const sum = (a, k) => a.reduce((n, i) => n + (Number(i && i[k]) || 0), 0);
+  const work = arr(d.workItems).filter((w) => w && w.activity);
+  const men = arr(d.manpower);
+  const planned = sum(men, "planned"), present = sum(men, "present");
+  const iss = arr(d.issues).filter((i) => i && i.issue);
+  const p = d.progress || {};
+  const pct = (v) => (v !== "" && v != null ? `${v}%` : "");
+  return [
+    { section: "Site", label: "Project", value: d.projectName },
+    { section: "Site", label: "Phase", value: d.phase },
+    { section: "Site", label: "Weather", value: [d.weather, d.weatherTemp ? `${d.weatherTemp}°C` : ""].filter(Boolean).join(" · ") },
+    { section: "Progress", label: "Overall", value: pct(p.overall) },
+    { section: "Progress", label: "Structural", value: pct(p.structural) },
+    { section: "Progress", label: "Finishing", value: pct(p.finishing) },
+    { section: "Progress", label: "MEP electrical", value: pct(p.mepElec) },
+    { section: "Progress", label: "MEP plumbing", value: pct(p.mepPlumb) },
+    { section: "Work", label: "Work items done", value: work.length ? `${work.filter((w) => w.status === "done").length} of ${work.length}` : "" },
+    { section: "Work", label: "Manpower present / planned", value: planned || present ? `${present} / ${planned}` : "" },
+    { section: "Work", label: "Equipment on site", value: arr(d.equipment).filter((e) => e && e.name).length || "" },
+    { section: "Risks", label: "Open issues", value: iss.length },
+    { section: "Safety", label: "Safety observation", value: d.safetyObs },
+  ].filter(keep);
+};
+
 /* Tiny in-memory cache so refreshing / several tabs don't re-run ~15 queries.
    ?fresh=1 (the Refresh button) bypasses it. */
 const CACHE_MS = 20000;
@@ -208,7 +259,7 @@ async function buildTodayStatus() {
     }, new Map()),
     section("today.pm", async () => {
       const { rows } = await pool.query(
-        `SELECT MAX(submission_time) AS at, COUNT(*) AS c FROM daily_reports WHERE date::date = CURRENT_DATE`);
+        `SELECT MAX(sent_to_ceo_at) AS at, COUNT(*) AS c FROM daily_reports WHERE date::date = CURRENT_DATE AND sent_to_ceo = TRUE`);
       return num(rows[0].c) > 0 ? rows[0].at || true : null;
     }, null),
   ]);
@@ -240,77 +291,77 @@ exports.getManagerUpdates = async (req, res) => {
   const statusFilter = req.query.status || "";
   const codes = MANAGER_ROLES.map((r) => r.code);
 
-  /* 1 ─ Manager → CEO daily reports (all manager roles) */
-  const [fromReports, fromFinance, fromPM] = await Promise.all([section("feed.reports", async () => {
-    const { rows } = await pool.query(
-      `SELECT m.*, u.name AS submitter_name
-       FROM manager_reports m JOIN users u ON u.id = m.submitted_by
-       WHERE m.report_type='daily'
-         AND m.created_at >= NOW() - ($1 || ' day')::interval`,
-      [String(days)]
-    );
-    return rows.map((r) => ({
-      uid: `mr-${r.id}`, source: "report", id: r.id,
-      role: r.submitter_role, roleLabel: ROLE_LABEL[r.submitter_role] || r.submitter_role,
-      manager: r.submitter_name,
-      date: r.created_at, title: r.title,
-      summary: r.summary, highlights: r.highlights, issues: r.issues, nextSteps: r.next_steps,
-      health: r.issues && r.issues.trim() ? "attention" : "on-track",
-      status: r.status === "submitted" ? "pending" : r.status,   // reviewed | needs_changes
-      ceoComment: r.ceo_comment,
-      reviewable: true,
-    }));
-  }, []),
+  const [fromReports, fromFinance, fromPM] = await Promise.all([
+    /* 1 ─ HR / Operations / BDA daily updates (role-specific `details`) */
+    section("feed.reports", async () => {
+      const { rows } = await pool.query(
+        `SELECT m.*, u.name AS submitter_name
+         FROM manager_reports m JOIN users u ON u.id = m.submitted_by
+         WHERE m.report_type='daily' AND m.created_at >= NOW() - ($1 || ' day')::interval`,
+        [String(days)]
+      );
+      return rows.map((r) => ({
+        uid: `mr-${r.id}`, source: "report", id: r.id,
+        role: r.submitter_role, roleLabel: ROLE_LABEL[r.submitter_role] || r.submitter_role,
+        manager: r.submitter_name, date: r.created_at, title: r.title,
+        summary: r.summary, highlights: r.highlights, issues: r.issues, nextSteps: r.next_steps,
+        fields: fieldsFromDetails(r.details),
+        health: statusFromDetails(r.details) || (r.issues && r.issues.trim() ? "attention" : "on-track"),
+        status: r.status === "submitted" ? "pending" : r.status,
+        ceoComment: r.ceo_comment, reviewable: true,
+      }));
+    }, []),
 
-  section("feed.finance", async () => {
-    const { rows } = await pool.query(
-      `SELECT f.*, u.name AS submitter_name
-       FROM finance_daily_updates f
-       JOIN users u ON u.id = f.submitted_by JOIN roles r ON r.id = u.role_id
-       WHERE ${ROLE_MATCH}
-         AND f.date >= CURRENT_DATE - ($2 || ' day')::interval`,
-      [["finance_manager"], String(days)]
-    );
-    return rows.map((r) => ({
-      uid: `fin-${r.id}`, source: "finance", id: r.id,
-      role: "finance_manager", roleLabel: "Finance Manager",
-      manager: r.submitter_name, date: r.date,
-      title: "Finance daily update",
-      summary: r.summary || "",
-      metrics: {
-        "Cash position": num(r.cash_position), "Collections": num(r.todays_collections),
-        "Expenses": num(r.todays_expenses), "Invoices raised": num(r.invoices_raised),
-        "Payments made": num(r.payments_made), "Pending approvals": num(r.pending_approvals),
-      },
-      health: r.overall_status || "on-track",
-      status: r.status || "pending",            // pending | approved | rejected
-      ceoComment: r.review_note,
-      reviewable: true,
-    }));
-  }, []),
+    /* 2 ─ Finance Manager's own daily update ("Pending CEO review") */
+    section("feed.finance", async () => {
+      const { rows } = await pool.query(
+        `SELECT f.*, u.name AS submitter_name
+         FROM finance_daily_updates f
+         JOIN users u ON u.id = f.submitted_by JOIN roles r ON r.id = u.role_id
+         WHERE ${ROLE_MATCH} AND f.date >= CURRENT_DATE - ($2 || ' day')::interval`,
+        [["finance_manager"], String(days)]
+      );
+      return rows.map((r) => ({
+        uid: `fin-${r.id}`, source: "finance", id: r.id,
+        role: "finance_manager", roleLabel: "Finance Manager",
+        manager: r.submitter_name, date: r.date, title: "Finance daily update",
+        summary: r.summary || "", fields: financeFields(r),
+        health: r.overall_status || "on-track",
+        status: r.status || "pending", ceoComment: r.review_note, reviewable: true,
+      }));
+    }, []),
 
-  section("feed.pm", async () => {
-    const { rows } = await pool.query(
-      `SELECT * FROM daily_reports
-       WHERE date::date >= CURRENT_DATE - ($1 || ' day')::interval`,
-      [String(days)]
-    );
-    return rows.map((r) => ({
-      uid: `pm-${r.id}`, source: "project", id: r.id,
-      role: "project_manager", roleLabel: "Project Manager",
-      manager: r.submitted_by || "Project Manager",
-      date: r.date, title: r.project_name || "Project daily update",
-      summary: r.phase ? `Phase: ${r.phase}` : "Daily site update submitted",
-      health: r.overall_status || "on-track",
-      status: r.approved ? "approved" : "pending",
-      reviewable: false,
-    }));
-  }, [])]);
+    /* 3 ─ Project Manager reports, only once the PM pressed "Send to CEO" */
+    section("feed.pm", async () => {
+      const { rows } = await pool.query(
+        `SELECT * FROM daily_reports
+         WHERE sent_to_ceo = TRUE AND date::date >= CURRENT_DATE - ($1 || ' day')::interval`,
+        [String(days)]
+      );
+      return rows.map((r) => {
+        const d = typeof r.data === "string" ? JSON.parse(r.data || "{}") : (r.data || {});
+        const iss = (Array.isArray(d.issues) ? d.issues : []).filter((i) => i && i.issue);
+        const plan = (Array.isArray(d.tomorrowPlan) ? d.tomorrowPlan : []).filter((t) => t && t.activity);
+        return {
+          uid: `pm-${r.id}`, source: "project", id: r.id,
+          role: "project_manager", roleLabel: "Project Manager",
+          manager: r.submitted_by || "Project Manager", date: r.sent_to_ceo_at || r.date,
+          title: r.project_name || "Project daily update",
+          summary: d.pmRemarks || (r.phase ? `Phase: ${r.phase}` : "Daily site update"),
+          issues: iss.map((i) => `• ${i.issue}${i.impact ? " (" + i.impact + ")" : ""}`).join("\n"),
+          nextSteps: plan.map((t) => `• ${t.activity}${t.location ? " — " + t.location : ""}`).join("\n"),
+          fields: pmFields({ ...d, projectName: d.projectName || r.project_name, phase: d.phase || r.phase }),
+          health: r.overall_status || "on-track",
+          status: r.approved ? "approved" : "pending", reviewable: false,
+        };
+      });
+    }, []),
+  ]);
 
   let items = [...fromReports, ...fromFinance, ...fromPM].filter((i) => codes.includes(i.role) || !i.role);
   if (roleFilter) items = items.filter((i) => i.role === roleFilter);
   if (statusFilter) items = items.filter((i) => i.status === statusFilter);
-  items.sort((a, b) => new Date(b.date) - new Date(a.date));
+  items.sort((x, y) => new Date(y.date) - new Date(x.date));
 
   res.json({
     items,

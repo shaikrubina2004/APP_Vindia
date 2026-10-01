@@ -78,7 +78,7 @@ const OperationsManagerMenu = [
   },
 
   {
-    name: "Report to CEO",
+    name: "Daily Update",
     path: "/my-reports",
     icon: "send",
   },

@@ -15,8 +15,8 @@ const pool = require("../config/db");
 
 /* Matches CEO users whether the roles table stores it as name or code. */
 const CEO_MATCH = `(
-  LOWER(REPLACE(REPLACE(COALESCE(r.name,''),' ','_'),'-','_')) = 'ceo'
-  OR LOWER(COALESCE(r.code,'')) = 'ceo'
+  LOWER(REPLACE(REPLACE(TRIM(COALESCE(r.name,'')),' ','_'),'-','_')) IN ('ceo','chief_executive_officer')
+  OR LOWER(TRIM(COALESCE(r.code,''))) IN ('ceo','chief_executive_officer')
 )`;
 
 /* Types the CEO bell understands (keep in sync with CEONotificationBell.jsx) */
@@ -42,7 +42,8 @@ const notifyCEO = async ({
        WHERE ${CEO_MATCH}`
     );
     if (!rows.length) {
-      console.warn("notifyCEO: no CEO user found");
+      console.warn("⚠️  notifyCEO: no user with the CEO role was found — notification NOT created. "
+        + "Run: node scripts/checkCeoNotifications.js");
       return;
     }
 
@@ -64,7 +65,8 @@ const notifyCEO = async ({
       );
     }
   } catch (err) {
-    console.error("notifyCEO failed:", err.message);
+    console.error("❌ notifyCEO failed (notification NOT created):", err.message,
+      "\n   → run: node migrations/createCeoTables.js   and   node scripts/checkCeoNotifications.js");
   }
 };
 
@@ -83,6 +85,21 @@ const getNotifications = async (req, res) => {
     console.error("GET ceo notifications:", err.message);
     res.json([]); // keep the bell rendering
   }
+};
+
+/* GET /api/ceo-notifications/debug — quick self-check, CEO only */
+const debug = async (req, res) => {
+  try {
+    const ceos = await pool.query(
+      `SELECT u.id, u.email, r.name AS role_name, r.code AS role_code FROM users u
+       JOIN roles r ON r.id = u.role_id WHERE ${CEO_MATCH}`
+    );
+    const mine = await pool.query(
+      `SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE NOT is_read)::int AS unread
+       FROM operations_notifications WHERE user_id=$1 AND role_code='ceo'`, [req.user.id]
+    );
+    res.json({ loggedInAs: { id: req.user.id, role: req.user.role }, ceoUsersFound: ceos.rows, mine: mine.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 };
 
 /* PATCH /api/ceo-notifications/read-all */
@@ -115,4 +132,4 @@ const markOneRead = async (req, res) => {
   }
 };
 
-module.exports = { CEO_MATCH, notifyCEO, getNotifications, markAllRead, markOneRead };
+module.exports = { CEO_MATCH, notifyCEO, getNotifications, markAllRead, markOneRead, debug };

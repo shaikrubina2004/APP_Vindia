@@ -8,9 +8,9 @@ import {
 import "./CEOBase.css";
 import "./ReportsInbox.css";
 
-/* One "Reports" page for the CEO:
-     Daily updates  – every manager's daily update + who has reported today
-     Other reports  – weekly / monthly / incident / other reports from managers */
+/* One "Reports" page for the CEO.
+     Daily updates  – each manager's daily update, with that role's own fields
+     Other reports  – weekly / monthly / incident / other reports */
 
 const ROLES = [
   ["", "All managers"], ["project_manager", "Project Manager"], ["hr_manager", "HR Manager"],
@@ -18,15 +18,28 @@ const ROLES = [
 ];
 const ROLE_LABEL = Object.fromEntries(ROLES.filter(([v]) => v));
 const STATUSES = [["", "Any status"], ["pending", "Awaiting review"], ["reviewed", "Reviewed"], ["approved", "Approved"], ["needs_changes", "Needs changes"], ["rejected", "Rejected"]];
-const SOURCE = { report: "Daily report", finance: "Finance update", project: "Site update" };
+const SOURCE = { report: "Daily update", finance: "Finance update", project: "Site update" };
 const STATUS_TEXT = { pending: "Awaiting review", submitted: "Awaiting review", reviewed: "Reviewed", approved: "Approved", needs_changes: "Needs changes", rejected: "Rejected" };
 const STATUS_TONE = { pending: "warn", submitted: "warn", reviewed: "ok", approved: "ok", needs_changes: "bad", rejected: "bad" };
+const HEALTH_TONE = { "on-track": "ok", attention: "warn", critical: "bad" };
+const ini = (n = "") => n.split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
 
 function Sec({ label, text, risk }) {
   return text ? <div className={`rp-sec ${risk ? "risk" : ""}`}><b>{label}</b><p>{text}</p></div> : null;
 }
 
-/* ── One expandable item (used by both tabs) ── */
+/* role-specific fields, grouped by section */
+function Fields({ fields }) {
+  if (!fields?.length) return null;
+  const groups = fields.reduce((m, f) => { const k = f.section || "Details"; (m[k] = m[k] || []).push(f); return m; }, {});
+  return Object.entries(groups).map(([sec, list]) => (
+    <div className="rp-group" key={sec}>
+      <div className="rp-glabel">{sec}</div>
+      <div className="rp-tiles">{list.map((f) => <div key={f.label}><span>{f.label}</span><b>{f.kind === "money" ? inr(f.value) : String(f.value)}</b></div>)}</div>
+    </div>
+  ));
+}
+
 function Item({ it, onDone }) {
   const [open, setOpen] = useState(it.status === "pending");
   const [note, setNote] = useState(it.ceoComment || "");
@@ -44,25 +57,22 @@ function Item({ it, onDone }) {
   };
 
   return (
-    <div className={`rp-item ${open ? "open" : ""}`}>
-      <div className="rp-top" onClick={() => setOpen((o) => !o)}>
+    <div className="rp-item">
+      <div className="rp-head" onClick={() => setOpen((o) => !o)}>
+        <span className="cx-avatar">{ini(it.manager)}</span>
         <div className="rp-main">
           <h4>{it.title}</h4>
-          <div className="rp-meta">{it.manager} · {it.roleLabel} · {it.tag === "time" ? fmtDateTime(it.date) : fmtDate(it.date)}</div>
+          <div className="rp-meta">{it.manager} · {it.roleLabel} · {it.source === "report" || it.source === "manager" ? fmtDateTime(it.date) : fmtDate(it.date)}</div>
         </div>
-        {it.tag && it.tag !== "time" && <span className="rp-tag">{it.tag}</span>}
-        {it.health && it.health !== "on-track" && <span className={`cx-status ${it.health === "attention" ? "warn" : "bad"}`}>{cap(it.health)}</span>}
-        <span className={`cx-status ${STATUS_TONE[it.status] || ""}`}>{STATUS_TEXT[it.status] || cap(it.status)}</span>
+        {it.tag && <span className="cx-tag info">{it.tag}</span>}
+        {it.health && <span className={`cx-status ${HEALTH_TONE[it.health] || "warn"}`}>{cap(it.health)}</span>}
+        <span className={`cx-tag ${STATUS_TONE[it.status] || ""}`}>{STATUS_TEXT[it.status] || cap(it.status)}</span>
       </div>
 
       {open && (
         <div className="rp-body">
           <Sec label="Summary" text={it.summary} />
-          {it.metrics && (
-            <div className="rp-metrics">
-              {Object.entries(it.metrics).map(([k, v]) => <div key={k}><span>{k}</span><b>{/cash|collect|expens/i.test(k) ? inr(v) : v}</b></div>)}
-            </div>
-          )}
+          <Fields fields={it.fields} />
           <Sec label="Highlights" text={it.highlights} />
           <Sec label="Issues / risks" text={it.issues} risk />
           <Sec label="Next steps" text={it.nextSteps} />
@@ -73,23 +83,22 @@ function Item({ it, onDone }) {
               <textarea className="cx-textarea" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a comment (optional)" />
               <div className="row">
                 {it.source === "finance" ? (
-                  <><button className="cx-btn" disabled={busy} onClick={() => act("approved")}>Approve</button>
-                    <button className="cx-btn danger" disabled={busy} onClick={() => act("rejected")}>Reject</button></>
+                  <><button className="cx-pill primary" disabled={busy} onClick={() => act("approved")}>Approve</button>
+                    <button className="cx-pill" disabled={busy} onClick={() => act("rejected")}>Reject</button></>
                 ) : (
-                  <><button className="cx-btn" disabled={busy} onClick={() => act("reviewed")}>Mark reviewed</button>
-                    <button className="cx-btn outline" disabled={busy} onClick={() => act("needs_changes")}>Request changes</button></>
+                  <><button className="cx-pill primary" disabled={busy} onClick={() => act("reviewed")}>Mark reviewed</button>
+                    <button className="cx-pill" disabled={busy} onClick={() => act("needs_changes")}>Request changes</button></>
                 )}
               </div>
-              {err && <div className="cx-msg err">{err}</div>}
+              {err && <div className="cx-msg err" style={{ marginTop: 10 }}>{err}</div>}
             </div>
-          ) : <div className="cx-card-sub" style={{ marginTop: 12 }}>Site updates are approved through the project flow. Read-only here.</div>}
+          ) : <div className="cx-sub" style={{ marginTop: 14 }}>Site updates are approved through the project flow. Read-only here.</div>}
         </div>
       )}
     </div>
   );
 }
 
-/* map a manager_reports row to the shared item shape */
 const fromReport = (r) => ({
   uid: `r-${r.id}`, source: "manager", id: r.id, role: r.submitter_role, roleLabel: ROLE_LABEL[r.submitter_role] || cap(r.submitter_role),
   manager: r.submitter_name, date: r.created_at, tag: cap(r.report_type) + (r.period_label ? ` · ${r.period_label}` : ""),
@@ -127,7 +136,7 @@ export default function ReportsInbox() {
 
   useEffect(() => { load(); const t = setInterval(() => { if (!document.hidden) load(); }, 45000); return () => clearInterval(t); }, [load]);
 
-  const dailyItems = useMemo(() => (feed?.items || []).map((i) => ({ ...i, tag: i.source === "report" ? "time" : SOURCE[i.source] })), [feed]);
+  const dailyItems = useMemo(() => (feed?.items || []).map((i) => ({ ...i, tag: SOURCE[i.source] })), [feed]);
   const otherItems = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (others || []).filter((i) => (!status || i.status === status) && (!q || `${i.title} ${i.manager} ${i.summary}`.toLowerCase().includes(q)));
@@ -141,45 +150,51 @@ export default function ReportsInbox() {
   return (
     <div className="cx-page">
       <div className="cx-header">
-        <div><div className="cx-crumb">CEO</div><h1 className="cx-title">Reports</h1><p className="cx-subtitle">Daily updates and reports from your managers.</p></div>
-        <div className="cx-actions"><button className="cx-btn outline" onClick={load} disabled={busy}>{busy ? "Refreshing…" : "Refresh"}</button></div>
+        <div><h1 className="cx-hello">Reports</h1><p className="cx-lead">Daily updates and reports from your managers.</p></div>
+        <button className="cx-pill primary" onClick={load} disabled={busy}>{busy ? "Refreshing…" : "Refresh"}</button>
       </div>
 
-      <div className="cx-grid kpi">
-        <div className="cx-kpi"><span>Reported today</span><strong>{done} / {today.length}</strong><small>managers</small></div>
-        <div className="cx-kpi"><span>Daily updates awaiting review</span><strong>{pendingDaily}</strong></div>
-        <div className="cx-kpi"><span>Other reports awaiting review</span><strong>{pendingOthers}</strong></div>
-        <div className="cx-kpi"><span>Need attention</span><strong>{feed?.counts?.attention ?? 0}</strong><small>flagged in the period</small></div>
+      <div className="cx-grid rp-top4">
+        <div className="cx-feature">
+          <h3>Reported today</h3>
+          <div className="big">{done} / {today.length}</div>
+          <p>managers have sent their daily update</p>
+          <div className="cx-bar" style={{ marginTop: 16 }}><i style={{ width: `${today.length ? (done / today.length) * 100 : 0}%` }} /></div>
+        </div>
+        <div className="cx-kpi"><span>Daily updates to review</span><strong>{pendingDaily}</strong><small>awaiting your review</small></div>
+        <div className="cx-kpi"><span>Other reports to review</span><strong>{pendingOthers}</strong><small>weekly, monthly and more</small></div>
+        <div className="cx-kpi"><span>Need attention</span><strong>{feed?.counts?.attention ?? 0}</strong><small>flagged in this period</small></div>
       </div>
 
       <div className="cx-card">
-        <div className="cx-card-head"><div><h3>Today</h3><div className="cx-card-sub">Click a name to filter</div></div></div>
+        <div className="cx-card-head"><div><h3>Today</h3><div className="cx-sub">Select a manager to filter</div></div></div>
         {today.length === 0 ? <div className="cx-empty">No manager accounts found.</div> : (
           <div className="rp-today">
             {today.map((m) => (
-              <button key={m.id} type="button" className={role === m.role ? "on" : ""} onClick={() => setParam("role", role === m.role ? "" : m.role)}>
-                <div><b>{m.name}</b><small>{m.roleLabel}</small></div>
-                <span className={`cx-status ${m.submittedToday ? "ok" : "warn"}`}>{m.submittedToday ? (m.lastSubmittedAt ? timeAgo(m.lastSubmittedAt) : "Reported") : "Pending"}</span>
+              <button key={m.id} type="button" className={`rp-person ${role === m.role ? "on" : ""}`} onClick={() => setParam("role", role === m.role ? "" : m.role)}>
+                <span className="cx-avatar">{ini(m.name)}</span>
+                <div className="body"><b>{m.name}</b><small>{m.roleLabel}</small></div>
+                <span className={`cx-status ${m.submittedToday ? "ok" : "warn"}`}>{m.submittedToday ? (m.lastSubmittedAt ? timeAgo(m.lastSubmittedAt) : "Sent") : "Pending"}</span>
               </button>
             ))}
           </div>
         )}
       </div>
 
-      <div className="cx-tabs">
-        <button className={tab === "daily" ? "active" : ""} onClick={() => setParam("tab", "daily")}>Daily updates{pendingDaily > 0 && <em>{pendingDaily}</em>}</button>
-        <button className={tab === "reports" ? "active" : ""} onClick={() => setParam("tab", "reports")}>Other reports{pendingOthers > 0 && <em>{pendingOthers}</em>}</button>
+      <div className="cx-pillbar">
+        <div className="cx-seg">
+          <button className={tab === "daily" ? "active" : ""} onClick={() => setParam("tab", "daily")}>Daily updates{pendingDaily > 0 && <em>{pendingDaily}</em>}</button>
+          <button className={tab === "reports" ? "active" : ""} onClick={() => setParam("tab", "reports")}>Other reports{pendingOthers > 0 && <em>{pendingOthers}</em>}</button>
+        </div>
+        {tab === "reports" && <input className="cx-pill" placeholder="Search title, manager or summary" value={search} onChange={(e) => setSearch(e.target.value)} />}
+        <select className="cx-pill" value={role} onChange={(e) => setParam("role", e.target.value)}>{ROLES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        <select className="cx-pill" value={status} onChange={(e) => setParam("status", e.target.value)}>{STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        {tab === "daily" && <div className="cx-seg">{[7, 14, 30].map((n) => <button key={n} className={days === n ? "active" : ""} onClick={() => setDays(n)}>{n} days</button>)}</div>}
       </div>
 
+      {error && <div className="cx-msg err">{error}</div>}
       <div>
-        <div className="cx-toolbar">
-          {tab === "reports" && <input className="cx-input" placeholder="Search title, manager or summary" value={search} onChange={(e) => setSearch(e.target.value)} />}
-          <select className="cx-select" value={role} onChange={(e) => setParam("role", e.target.value)}>{ROLES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-          <select className="cx-select" value={status} onChange={(e) => setParam("status", e.target.value)}>{STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-          {tab === "daily" && <div className="cx-seg">{[7, 14, 30].map((n) => <button key={n} className={days === n ? "active" : ""} onClick={() => setDays(n)}>{n} days</button>)}</div>}
-        </div>
-        {error && <div className="cx-msg err">{error}</div>}
-        {(tab === "daily" ? !feed : !others) && !error ? <div className="cx-skel" style={{ height: 140 }} />
+        {(tab === "daily" ? !feed : !others) && !error ? <div className="cx-skel" style={{ height: 150 }} />
           : list.length === 0 ? <div className="cx-card"><div className="cx-empty">{tab === "daily" ? "No daily updates for these filters." : "No reports for these filters."}</div></div>
           : list.map((it) => <Item key={it.uid} it={it} onDone={load} />)}
       </div>

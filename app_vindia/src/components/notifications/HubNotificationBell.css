@@ -1,0 +1,65 @@
+/* CEO notification bell — dropdown anchored under the navbar bell */
+.cnb { position: relative; display: inline-flex; }
+.cnb__btn { position: relative; }
+.cnb__badge {
+  position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: #e0484d; color: #fff; font-size: 10.5px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; border: 2px solid #fff;
+}
+
+.cnb__panel {
+  position: absolute; top: calc(100% + 12px); right: -8px; width: 400px; max-width: calc(100vw - 24px);
+  background: #fff; border-radius: 20px; z-index: 1500;
+  box-shadow: 0 1px 2px rgba(27, 39, 87, .06), 0 24px 56px rgba(27, 39, 87, .22);
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif; color: #1b2757; text-align: left;
+  display: flex; flex-direction: column; max-height: min(600px, calc(100vh - 100px)); overflow: hidden;
+}
+.cnb__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 18px 20px 12px; }
+.cnb__head h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.cnb__head span { font-size: 12px; color: #7b88a8; }
+.cnb__head-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.cnb__head-actions button {
+  border: 0; background: #e8f0ff; color: #1d4ed8; font: 600 11.5px inherit; padding: 6px 11px;
+  border-radius: 999px; cursor: pointer;
+}
+.cnb__head-actions button:hover { background: #d8e5ff; }
+
+.cnb__filters { display: flex; gap: 6px; padding: 0 20px 12px; border-bottom: 1px solid #e8ecf5; }
+.cnb__filters button {
+  border: 0; background: #f3f6fc; color: #45527d; font: 600 12px inherit; padding: 7px 13px;
+  border-radius: 999px; cursor: pointer;
+}
+.cnb__filters button.is-on { background: #2563eb; color: #fff; }
+
+.cnb__list { overflow-y: auto; flex: 1; padding: 6px 8px; }
+.cnb__empty { text-align: center; color: #7b88a8; font-size: 13px; padding: 34px 12px; margin: 0; }
+
+.cnb__item {
+  width: 100%; display: flex; align-items: flex-start; gap: 12px; padding: 12px; border: 0;
+  background: transparent; border-radius: 14px; text-align: left; cursor: pointer; font: inherit; color: inherit;
+}
+.cnb__item:hover { background: #f4f7ff; }
+.cnb__item.is-unread { background: #f7faff; }
+.cnb__icon {
+  width: 34px; height: 34px; flex: none; border-radius: 12px; display: grid; place-items: center;
+  background: #e8f0ff; color: #2563eb;
+}
+.cnb__icon.sev-warn { background: #fdf1da; color: #d9910f; }
+.cnb__icon.sev-critical { background: #fde8e9; color: #e0484d; }
+.cnb__icon.sev-ok { background: #e3f6f0; color: #12a37f; }
+.cnb__body { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.cnb__meta { display: flex; justify-content: space-between; font-size: 11.5px; color: #7b88a8; }
+.cnb__title { font-size: 13.5px; font-weight: 600; color: #1b2757; }
+.cnb__desc { font-size: 12.5px; color: #5b6890; line-height: 1.45; }
+.cnb__dot { width: 8px; height: 8px; border-radius: 50%; background: #2563eb; margin-top: 6px; flex: none; }
+
+.cnb__foot { border-top: 1px solid #e8ecf5; padding: 10px 14px; }
+.cnb__foot button {
+  width: 100%; border: 0; background: transparent; color: #1d4ed8; font: 600 13px inherit;
+  padding: 8px; border-radius: 12px; cursor: pointer;
+}
+.cnb__foot button:hover { background: #f4f7ff; }
+
+@media (max-width: 520px) {
+  .cnb__panel { position: fixed; top: 64px; right: 12px; left: 12px; width: auto; }
+}

@@ -161,6 +161,8 @@ import ManagerReports from "../SharedResourse/ManagerReports";
 import Settings from "../SharedResourse/Settings";
 import ReportsInbox from "../pages/ceo/ReportsInbox";
 import Analytics from "../pages/ceo/Analytics";
+import BDADailyUpdate from "../pages/business-development/business-development-analyst/BDADailyUpdate";
+import CeoReports from "../pages/ceo/Reports";
 import RoleLayout from "../layouts/RoleLayout";
 
 /* ═══════════════════════════════════════════════════════════
@@ -1039,6 +1041,16 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+        path="/bda/daily-update"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
+            <BDALayout>
+              <BDADailyUpdate />
+            </BDALayout>
+          </ProtectedRoute>
+        }
+      />
 
         {/* ══ DIGITAL MARKETING ═════════════════════════════ */}
 
@@ -1432,6 +1444,16 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+        path="/reports-hub"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+            <CEOLayout>
+              <CeoReports />
+            </CEOLayout>
+          </ProtectedRoute>
+        }
+      />
 
         {/* Old links / notifications → the single Reports page */}
         <Route

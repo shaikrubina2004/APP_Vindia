@@ -36,16 +36,6 @@ exports.createReport = async (req, res) => {
       ]
     );
 
-    // 🔔 Project Manager daily update → CEO
-    await notifyCEO({
-      type: "daily_update",
-      title: `Project update: ${project_name}`,
-      description: `${submitted_by || "Project Manager"} · ${overall_status || "on-track"}${phase ? " · " + phase : ""}`,
-      link: "/reports?tab=daily",
-      severity: overall_status && overall_status !== "on-track" ? "warning" : "info",
-      referenceId: result.rows[0].id,
-    });
-
     res.status(201).json(result.rows[0]);
 
   } catch (error) {
@@ -265,5 +255,36 @@ exports.deleteReport = async (req, res) => {
   } catch (error) {
     console.error("DELETE ERROR:", error);
     res.status(500).json({ error: "Failed to delete report" });
+  }
+};
+
+/* =========================================================
+   📤 SEND A PM DAILY REPORT TO THE CEO
+   PUT /api/daily-reports/send-to-ceo/:id   (login required)
+========================================================= */
+exports.sendToCeo = async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE daily_reports
+       SET sent_to_ceo = TRUE, sent_to_ceo_at = NOW()
+       WHERE id = $1
+       RETURNING id, project_name, phase, overall_status, submitted_by, sent_to_ceo, sent_to_ceo_at`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "Report not found" });
+
+    const r = rows[0];
+    await notifyCEO({
+      type: "daily_update",
+      title: `Project update sent by ${r.submitted_by || "Project Manager"}`,
+      description: `${r.project_name}${r.phase ? " · " + r.phase : ""} · ${r.overall_status || "on-track"}`,
+      link: "/reports?tab=daily",
+      severity: r.overall_status === "critical" ? "critical" : r.overall_status && r.overall_status !== "on-track" ? "warning" : "info",
+      referenceId: r.id,
+    });
+    res.json(r);
+  } catch (error) {
+    console.error("SEND TO CEO ERROR:", error);
+    res.status(500).json({ error: "Failed to send report to CEO" });
   }
 };

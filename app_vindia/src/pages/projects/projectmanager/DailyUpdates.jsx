@@ -287,7 +287,7 @@ export default function DailyUpdates() {
     setPmLoading(true);
     try {
       const res = await API.get("/daily-reports");
-      const formatted = res.data.map(item => ({ ...item.data, id: item.id, approved: item.approved }));
+      const formatted = res.data.map(item => ({ ...item.data, id: item.id, approved: item.approved, sentToCeo: item.sent_to_ceo, sentToCeoAt: item.sent_to_ceo_at }));
       setPmUpdates(formatted);
     } catch (err) {
       console.error("PM fetch error", err);
@@ -335,6 +335,14 @@ export default function DailyUpdates() {
       else { await API.post("/daily-reports", payload); showToast("Report saved!"); }
       fetchPmReports(); setPmPage("list");
     } catch (err) { showToast("Save failed", "error"); }
+  };
+
+  const handleSendToCeo = async (id) => {
+    try {
+      await API.put(`/daily-reports/send-to-ceo/${id}`);
+      showToast("Report sent to the CEO");
+      fetchPmReports();
+    } catch (err) { showToast("Could not send to CEO", "error"); }
   };
 
   const handleSendMessage = () => {
@@ -593,6 +601,9 @@ export default function DailyUpdates() {
                   <div className="du-rc-footer">
                     <span className="du-rc-by">👤 {u.submittedBy||"Project Manager"}</span>
                     <div className="du-rc-actions">
+                      {u.sentToCeo
+                        ? <span className="du-approved-badge">✓ Sent to CEO</span>
+                        : <button className="btn-primary" onClick={()=>handleSendToCeo(u.id)}>📤 Send to CEO</button>}
                       <button className="btn-view" onClick={()=>{setForm({...EMPTY_FORM,...u});setEditingId(u.id);setActiveTab("work");setPmPage("edit");}}>✏ Edit</button>
                     </div>
                   </div>

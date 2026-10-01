@@ -1,25 +1,32 @@
-/* ReportsInbox.css — Reports page specifics (primitives in CEOBase.css) */
-.rp-today { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 28px; }
-.rp-today button { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border: 0; border-bottom: 1px solid #f1f5f9; background: none; font: inherit; text-align: left; cursor: pointer; }
-.rp-today button:hover b { color: #2563eb; }
-.rp-today b { display: block; font-size: 13.5px; font-weight: 500; } .rp-today small { color: #94a3b8; font-size: 12px; }
-.rp-today button.on b { color: #2563eb; }
+/* ReportsInbox.css — Reports page specifics (design system in CEOBase.css) */
+.rp-top4 { grid-template-columns: 1.2fr repeat(3, 1fr); }
+@media (max-width: 1100px) { .rp-top4 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .rp-top4 { grid-template-columns: 1fr; } }
 
-.rp-item { border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 10px; background: #fff; transition: box-shadow .18s, border-color .18s; }
-.rp-item:hover { border-color: #cbd5e1; box-shadow: 0 4px 14px rgba(0, 0, 0, .04); }
-.rp-item.open { border-color: #cbd5e1; }
-.rp-top { display: flex; align-items: center; gap: 14px; padding: 13px 16px; cursor: pointer; flex-wrap: wrap; }
+.rp-today { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 4px 28px; }
+.rp-person { display: flex; align-items: center; gap: 12px; padding: 11px 0; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; text-align: left; cursor: pointer; width: 100%; }
+.rp-today .rp-person:nth-child(-n+2) { border-top: 0; }
+.rp-person .body { flex: 1; min-width: 0; } .rp-person b { display: block; font-size: 13.5px; font-weight: 600; } .rp-person small { color: var(--muted); font-size: 12px; }
+.rp-person:hover b, .rp-person.on b { color: var(--blue); }
+
+.rp-item { background: #fff; border-radius: 20px; box-shadow: var(--shadow); margin-bottom: 12px; transition: box-shadow .18s; }
+.rp-item:hover { box-shadow: 0 14px 32px rgba(27, 42, 78, .09); }
+.rp-head { display: flex; align-items: center; gap: 14px; padding: 16px 20px; cursor: pointer; flex-wrap: wrap; }
 .rp-main { flex: 1; min-width: 200px; }
-.rp-main h4 { margin: 0 0 2px; font-size: 14px; font-weight: 600; color: #1e293b; }
-.rp-meta { font-size: 12.5px; color: #94a3b8; }
-.rp-tag { font-size: 11.5px; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 6px; }
-.rp-body { padding: 2px 16px 16px; border-top: 1px solid #f1f5f9; }
-.rp-sec { margin-top: 12px; }
-.rp-sec b { display: block; font-size: 11.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; margin-bottom: 3px; }
-.rp-sec p { margin: 0; white-space: pre-wrap; font-size: 13.5px; line-height: 1.55; color: #334155; }
-.rp-sec.risk p { color: #991b1b; }
-.rp-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 12px; }
-.rp-metrics div { border: 1px solid #eef2f7; border-radius: 10px; padding: 9px 12px; }
-.rp-metrics span { display: block; font-size: 11.5px; color: #94a3b8; } .rp-metrics b { font-size: 15px; font-weight: 600; }
-.rp-review { margin-top: 14px; }
+.rp-main h4 { margin: 0 0 3px; font-size: 14.5px; font-weight: 600; color: var(--navy); }
+.rp-meta { font-size: 12.5px; color: var(--muted); }
+.rp-body { padding: 0 20px 20px; border-top: 1px solid var(--line); }
+.rp-sec { margin-top: 14px; }
+.rp-sec b { display: block; font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.rp-sec p { margin: 0; white-space: pre-wrap; font-size: 13.5px; line-height: 1.6; color: var(--ink); }
+.rp-sec.risk p { color: #b42828; }
+
+.rp-group { margin-top: 16px; }
+.rp-glabel { font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--blue); margin-bottom: 8px; }
+.rp-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.rp-tiles div { background: var(--tint-2); border-radius: 14px; padding: 11px 14px; }
+.rp-tiles span { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 2px; }
+.rp-tiles b { font-size: 15px; font-weight: 600; color: var(--navy); }
+
+.rp-review { margin-top: 16px; }
 .rp-review .row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }

@@ -19,12 +19,6 @@ export const ProjectManagerMenu = [
   },
 
   {
-    name: "Report to CEO",
-    path: "/my-reports",
-    icon: "send",
-  },
-
-  {
     name: "Team Management",
     path: "/pm/team",
     icon: "users",

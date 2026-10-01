@@ -126,3 +126,45 @@
   justify-content: flex-end;
   gap: 10px;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   CEO → User Management (um-*). Old rules above are kept because
+   other screens may still rely on the shared .assign-btn / .edit-btn.
+   ════════════════════════════════════════════════════════════════ */
+.um-table th { background: #e8f0ff; color: #1d4ed8; }
+.um-email { color: #45527d; overflow-wrap: anywhere; }
+.um-count {
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: #fdf1da; color: #d9910f; font-size: 11.5px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ceo-pill.is-active .um-count { background: rgba(255,255,255,.25); color: #fff; }
+.um-row-btn { height: 32px; padding: 0 16px; font-size: 12.5px; }
+
+.um-overlay {
+  position: fixed; inset: 0; z-index: 1300; display: flex; align-items: center; justify-content: center;
+  padding: 20px; background: rgba(20, 28, 60, .42); backdrop-filter: blur(3px);
+}
+.um-modal {
+  width: min(460px, 100%); background: #fff; border-radius: 22px; padding: 24px 26px 22px;
+  box-shadow: 0 24px 60px rgba(20, 28, 60, .28); display: grid; gap: 16px;
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif; color: #1b2757;
+}
+.um-modal__head { display: flex; align-items: center; justify-content: space-between; }
+.um-modal__head h2 { margin: 0; font-size: 19px; font-weight: 700; }
+.um-modal__who {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  background: #f4f7ff; border-radius: 14px;
+}
+.um-field { display: grid; gap: 7px; font-size: 12.5px; font-weight: 600; color: #45527d; }
+.um-field select {
+  height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #e8ecf5;
+  background: #f3f6fc; color: #1b2757; font: 500 14px inherit; outline: none;
+}
+.um-field select:focus { border-color: #2563eb; background: #fff; }
+.um-field select:disabled { opacity: .6; cursor: not-allowed; }
+.um-confirm {
+  background: #fde8e9; color: #b3262b; border-radius: 12px; padding: 11px 14px; font-size: 13px;
+}
+.um-modal__actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+.um-cancel { box-shadow: none; background: #f3f6fc; }

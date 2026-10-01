@@ -6,8 +6,10 @@ const {
   getReportById,
   approveReport,
   updateReport,
-  deleteReport
+  deleteReport,
+  sendToCeo
 } = require("../controllers/dailyUpdatesController");
+const { protect } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -20,6 +22,9 @@ router.get("/:id", getReportById);
 
 /* ===== UPDATE ===== */
 router.put("/:id", updateReport);
+
+/* ===== SEND TO CEO ===== */
+router.put("/send-to-ceo/:id", protect, sendToCeo);
 
 /* ===== APPROVE ===== */
 router.put("/approve/:id", approveReport);

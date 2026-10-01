@@ -1,13 +1,18 @@
-/* Analytics.css — page specifics (primitives in CEOBase.css) */
-.an-donut { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+/* Analytics.css — page specifics (design system in CEOBase.css) */
+.an-kpis { grid-template-columns: 1.15fr repeat(4, 1fr); }
+@media (max-width: 1250px) { .an-kpis { grid-template-columns: 1fr 1fr 1fr; } }
+@media (max-width: 760px) { .an-kpis { grid-template-columns: 1fr 1fr; } }
+.an-charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .an-charts { grid-template-columns: 1fr; } }
+.an-card { min-height: 330px; }
+.an-donut { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
 .an-donut-chart { position: relative; width: 190px; height: 190px; flex-shrink: 0; }
 .an-donut-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
-.an-donut-center strong { font-size: 24px; font-weight: 600; color: #1e293b; line-height: 1.1; }
-.an-donut-center span { font-size: 12px; color: #94a3b8; max-width: 90px; }
+.an-donut-center strong { font-size: 26px; font-weight: 700; color: var(--navy); line-height: 1.1; }
+.an-donut-center span { font-size: 12px; color: var(--muted); max-width: 90px; }
 .an-legend { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 170px; }
-.an-legend li { display: flex; align-items: center; gap: 9px; padding: 8px 6px; border-radius: 8px; font-size: 13.5px; transition: background .12s; }
-.an-legend li:hover { background: #f8fafc; }
-.an-legend i { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.an-legend li { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 12px; font-size: 13.5px; transition: background .12s; }
+.an-legend li:hover { background: var(--tint-2); }
+.an-legend i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .an-legend b { margin-left: auto; font-weight: 600; }
-.an-legend small { width: 36px; text-align: right; color: #94a3b8; }
-.an-card { min-height: 320px; }
+.an-legend small { width: 38px; text-align: right; color: var(--muted); }

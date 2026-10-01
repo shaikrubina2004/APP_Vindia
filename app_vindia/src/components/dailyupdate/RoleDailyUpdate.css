@@ -1,0 +1,21 @@
+/* Extras on top of the Finance daily-update styles (FinanceDailyUpdate.css) */
+.rdu-hint {
+  font-weight: 500;
+  font-size: 12px;
+  color: #7a8ea0;
+  margin-top: -2px;
+}
+.fdu-field select {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fdu-text);
+  background: var(--fdu-surface);
+  border: 1px solid var(--fdu-border2);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.fdu-history-table { display: table; width: 100%; }
+@media (max-width: 720px) {
+  .fdu-history { overflow-x: auto; }
+}

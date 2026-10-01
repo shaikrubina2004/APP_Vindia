@@ -44,7 +44,8 @@ async function migrate() {
         ADD COLUMN IF NOT EXISTS ceo_comment    TEXT,
         ADD COLUMN IF NOT EXISTS reviewed_by    INTEGER,
         ADD COLUMN IF NOT EXISTS reviewed_at    TIMESTAMPTZ,
-        ADD COLUMN IF NOT EXISTS created_at     TIMESTAMPTZ DEFAULT NOW();
+        ADD COLUMN IF NOT EXISTS created_at     TIMESTAMPTZ DEFAULT NOW(),
+        ADD COLUMN IF NOT EXISTS details        JSONB;
     `);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_manager_reports_status
@@ -79,10 +80,36 @@ async function migrate() {
         is_read      BOOLEAN     DEFAULT FALSE,
         created_at   TIMESTAMPTZ DEFAULT NOW()
       );
+    `);
+    /* If the table already existed in an older/partial form, CREATE ... IF NOT
+       EXISTS does nothing and INSERTs would fail silently — so add every column
+       FIRST, and only then build the index that depends on them. */
+    await pool.query(`
+      ALTER TABLE operations_notifications
+        ADD COLUMN IF NOT EXISTS role_code    VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS link         TEXT,
+        ADD COLUMN IF NOT EXISTS description  TEXT,
+        ADD COLUMN IF NOT EXISTS severity     VARCHAR(20) DEFAULT 'info',
+        ADD COLUMN IF NOT EXISTS project_id   INTEGER,
+        ADD COLUMN IF NOT EXISTS reference_id INTEGER,
+        ADD COLUMN IF NOT EXISTS is_read      BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS created_at   TIMESTAMPTZ DEFAULT NOW();
+    `);
+    await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_ops_notifs_user_unread
         ON operations_notifications (user_id, is_read, created_at DESC);
     `);
     console.log("✅ operations_notifications ready (CEO bell uses role_code = 'ceo')");
+
+    /* Project Manager daily reports: explicit "Send to CEO" */
+    try {
+      await pool.query(`
+        ALTER TABLE daily_reports
+          ADD COLUMN IF NOT EXISTS sent_to_ceo    BOOLEAN DEFAULT FALSE,
+          ADD COLUMN IF NOT EXISTS sent_to_ceo_at TIMESTAMPTZ;
+      `);
+      console.log("✅ daily_reports.sent_to_ceo ready");
+    } catch (e) { console.warn("⚠️  daily_reports not updated:", e.message); }
 
     /* Indexes that make the CEO dashboard fast. Each is optional: a failure
        (e.g. a table you don't have yet) is skipped, not fatal. */

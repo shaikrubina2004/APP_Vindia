@@ -18,7 +18,7 @@ const VALID_TYPES = ["daily", "weekly", "monthly", "incident", "other"];
 /* POST /api/manager-reports  (manager) */
 exports.submitReport = async (req, res) => {
   try {
-    const { title, report_type, period_label, summary, highlights, issues, next_steps } = req.body;
+    const { title, report_type, period_label, summary, highlights, issues, next_steps, details } = req.body;
     if (!title?.trim() || !summary?.trim()) {
       return res.status(400).json({ message: "Title and summary are required" });
     }
@@ -26,20 +26,23 @@ exports.submitReport = async (req, res) => {
 
     const { rows } = await pool.query(
       `INSERT INTO manager_reports
-        (title, report_type, period_label, summary, highlights, issues, next_steps, submitted_by, submitter_role)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        (title, report_type, period_label, summary, highlights, issues, next_steps, submitted_by, submitter_role, details)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
       [title.trim(), type, period_label || null, summary.trim(),
        highlights || null, issues || null, next_steps || null,
-       req.user.id, req.user.role]
+       req.user.id, req.user.role,
+       details && typeof details === "object" ? JSON.stringify(details) : null]
     );
-    // 🔔 Tell the CEO a manager just submitted a report
+
+    // 🔔 Tell the CEO. Daily updates carry the role-specific fields in `details`.
     const who = req.user.name || req.user.email || req.user.role;
+    const st = details && details.status;
     await notifyCEO({
       type: type === "daily" ? "daily_update" : "report",
       title: `${type === "daily" ? "Daily update" : "New " + type + " report"} from ${who}`,
       description: title.trim(),
-      link: type === "daily" ? "/reports?tab=daily" : "/reports",
-      severity: issues && issues.trim() ? "warning" : "info",
+      link: type === "daily" ? "/reports?tab=daily" : "/reports?tab=reports",
+      severity: st === "critical" ? "critical" : (st === "attention" || (issues && issues.trim())) ? "warning" : "info",
       referenceId: rows[0].id,
     });
     res.status(201).json(rows[0]);
