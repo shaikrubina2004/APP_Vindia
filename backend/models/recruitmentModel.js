@@ -260,6 +260,138 @@ const Recruitment = {
       client.release();
     }
   },
+
+  /* ═══════════════════════════════════════
+     SCREENING
+  ═══════════════════════════════════════ */
+
+  // decision: 'qualify' -> stage becomes aptitude_test
+  //           'reject'  -> stage becomes rejected
+  recordScreeningDecision: async (id, { screening_notes, decision, rejection_reason }) => {
+    const nextStage = decision === "qualify" ? "aptitude_test" : "rejected";
+    const result = await pool.query(
+      `UPDATE candidates
+       SET screening_notes = $1,
+           stage = $2,
+           rejection_reason = $3,
+           updated_at = NOW()
+       WHERE id = $4
+       RETURNING *`,
+      [screening_notes || null, nextStage, decision === "reject" ? rejection_reason || null : null, id]
+    );
+    return result.rows[0];
+  },
+
+  /* ═══════════════════════════════════════
+     APTITUDE TEST
+  ═══════════════════════════════════════ */
+
+  sendAptitudeTest: async (id, testLink) => {
+    const result = await pool.query(
+      `UPDATE candidates
+       SET aptitude_test_link = $1,
+           aptitude_test_status = 'sent',
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [testLink, id]
+    );
+    return result.rows[0];
+  },
+
+  // Recording a score always marks the test completed and advances to
+  // interview — a bad score doesn't auto-reject; HR uses the existing
+  // universal Reject action if the result isn't good enough.
+  completeAptitudeTest: async (id, score) => {
+    const result = await pool.query(
+      `UPDATE candidates
+       SET aptitude_test_status = 'completed',
+           aptitude_test_score = $1,
+           stage = 'interview',
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [score, id]
+    );
+    return result.rows[0];
+  },
+
+  /* ═══════════════════════════════════════
+     INTERNAL APPROVAL
+  ═══════════════════════════════════════ */
+
+  // Call once interviews are done, to move a candidate from "interview"
+  // into the approval queue without changing any other field.
+  moveToApproval: async (id) => {
+    const result = await pool.query(
+      `UPDATE candidates SET stage = 'approval', updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    return result.rows[0];
+  },
+
+  // decision: 'approved' -> stage becomes bgv
+  //           'rejected' -> stage becomes rejected
+  recordApproval: async (id, { decision, approverId }) => {
+    const nextStage = decision === "approved" ? "bgv" : "rejected";
+    const result = await pool.query(
+      `UPDATE candidates
+       SET approval_status = $1,
+           approved_by = $2,
+           approved_at = NOW(),
+           stage = $3,
+           updated_at = NOW()
+       WHERE id = $4
+       RETURNING *`,
+      [decision, approverId, nextStage, id]
+    );
+    return result.rows[0];
+  },
+
+  /* ═══════════════════════════════════════
+     BGV (BACKGROUND VERIFICATION)
+  ═══════════════════════════════════════ */
+
+  // bgv_status 'cleared' auto-advances to the offer stage; 'flagged' or
+  // 'in_progress' just records status — HR decides manually from there,
+  // same universal Reject action covers a failed BGV.
+  updateBGV: async (id, { bgv_status, bgv_document_url, bgv_notes }) => {
+    const nextStage = bgv_status === "cleared" ? "offer" : null;
+    const result = await pool.query(
+      `UPDATE candidates
+       SET bgv_status = $1,
+           bgv_document_url = $2,
+           bgv_notes = $3,
+           stage = COALESCE($4, stage),
+           updated_at = NOW()
+       WHERE id = $5
+       RETURNING *`,
+      [bgv_status, bgv_document_url || null, bgv_notes || null, nextStage, id]
+    );
+    return result.rows[0];
+  },
+
+  /* ═══════════════════════════════════════
+     EMAIL LOG
+  ═══════════════════════════════════════ */
+
+  logCandidateEmail: async (candidateId, { email_type, subject, sent_to, status, error_message }) => {
+    const result = await pool.query(
+      `INSERT INTO candidate_emails (candidate_id, email_type, subject, sent_to, status, error_message)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [candidateId, email_type, subject || null, sent_to || null, status, error_message || null]
+    );
+    return result.rows[0];
+  },
+
+  getCandidateEmails: async (candidateId) => {
+    const result = await pool.query(
+      `SELECT * FROM candidate_emails WHERE candidate_id = $1 ORDER BY sent_at DESC`,
+      [candidateId]
+    );
+    return result.rows;
+  },
 };
 
 module.exports = Recruitment;

@@ -1,5 +1,12 @@
 // ===== FILE: APP_Vindia/backend/controllers/recruitmentController.js =====
 const Recruitment = require("../models/recruitmentModel");
+const {
+  sendMail,
+  qualifiedEmailTemplate,
+  rejectedEmailTemplate,
+  aptitudeTestEmailTemplate,
+  offerReleaseEmailTemplate,
+} = require("../utils/mailer");
 
 /* ═══════════════════════════════════════
    JOB OPENINGS
@@ -123,7 +130,8 @@ exports.getCandidateById = async (req, res) => {
     if (!candidate) {
       return res.status(404).json({ error: "Candidate not found" });
     }
-    res.status(200).json(candidate);
+    const emails = await Recruitment.getCandidateEmails(req.params.id);
+    res.status(200).json({ ...candidate, emails });
   } catch (err) {
     console.error("GET CANDIDATE BY ID ERROR:", err.message);
     res.status(500).json({ error: "Failed to fetch candidate" });
@@ -137,7 +145,7 @@ exports.updateCandidateStage = async (req, res) => {
 
     if (!validStages.includes(stage)) {
       return res.status(400).json({
-        error: `stage must be one of: ${validStages.join(", ")}. Use /offer for the offer stage and /hire for hiring.`,
+        error: `stage must be one of: ${validStages.join(", ")}. Use the dedicated endpoints for screening/aptitude/approval/bgv/offer.`,
       });
     }
 
@@ -215,5 +223,211 @@ exports.addInterviewRound = async (req, res) => {
   } catch (err) {
     console.error("ADD INTERVIEW ROUND ERROR:", err.message);
     res.status(500).json({ error: "Failed to add interview round" });
+  }
+};
+
+/* ═══════════════════════════════════════
+   SCREENING
+   POST /api/recruitment/candidates/:id/screening
+   Body: { screening_notes, decision: 'qualify'|'reject', rejection_reason }
+═══════════════════════════════════════ */
+
+exports.submitScreening = async (req, res) => {
+  try {
+    const { screening_notes, decision, rejection_reason } = req.body;
+
+    if (!["qualify", "reject"].includes(decision)) {
+      return res.status(400).json({ error: "decision must be 'qualify' or 'reject'" });
+    }
+
+    const existing = await Recruitment.getCandidateById(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Candidate not found" });
+
+    const candidate = await Recruitment.recordScreeningDecision(req.params.id, {
+      screening_notes, decision, rejection_reason,
+    });
+
+    // Send the matching email, then log the attempt either way.
+    const template = decision === "qualify"
+      ? qualifiedEmailTemplate(candidate.name, existing.job_title)
+      : rejectedEmailTemplate(candidate.name, existing.job_title, rejection_reason);
+
+    const mailResult = candidate.email
+      ? await sendMail({ to: candidate.email, ...template })
+      : { success: false, error: "Candidate has no email on file" };
+
+    await Recruitment.logCandidateEmail(req.params.id, {
+      email_type: decision === "qualify" ? "qualified" : "rejected",
+      subject: template.subject,
+      sent_to: candidate.email,
+      status: mailResult.success ? "sent" : "failed",
+      error_message: mailResult.error,
+    });
+
+    res.status(200).json({ ...candidate, emailSent: mailResult.success });
+  } catch (err) {
+    console.error("SUBMIT SCREENING ERROR:", err.message);
+    res.status(500).json({ error: "Failed to submit screening decision" });
+  }
+};
+
+/* ═══════════════════════════════════════
+   APTITUDE TEST
+═══════════════════════════════════════ */
+
+// POST /api/recruitment/candidates/:id/aptitude-test/send
+// Body: { test_link }
+exports.sendAptitudeTestLink = async (req, res) => {
+  try {
+    const { test_link } = req.body;
+    if (!test_link) return res.status(400).json({ error: "test_link is required" });
+
+    const existing = await Recruitment.getCandidateById(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Candidate not found" });
+
+    const candidate = await Recruitment.sendAptitudeTest(req.params.id, test_link);
+
+    const template = aptitudeTestEmailTemplate(candidate.name, existing.job_title, test_link);
+    const mailResult = candidate.email
+      ? await sendMail({ to: candidate.email, ...template })
+      : { success: false, error: "Candidate has no email on file" };
+
+    await Recruitment.logCandidateEmail(req.params.id, {
+      email_type: "aptitude_test",
+      subject: template.subject,
+      sent_to: candidate.email,
+      status: mailResult.success ? "sent" : "failed",
+      error_message: mailResult.error,
+    });
+
+    res.status(200).json({ ...candidate, emailSent: mailResult.success });
+  } catch (err) {
+    console.error("SEND APTITUDE TEST ERROR:", err.message);
+    res.status(500).json({ error: "Failed to send aptitude test" });
+  }
+};
+
+// PATCH /api/recruitment/candidates/:id/aptitude-test/complete
+// Body: { score }
+exports.completeAptitudeTest = async (req, res) => {
+  try {
+    const { score } = req.body;
+    if (score === undefined || score === null) {
+      return res.status(400).json({ error: "score is required" });
+    }
+
+    const candidate = await Recruitment.completeAptitudeTest(req.params.id, Number(score));
+    if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+
+    res.status(200).json(candidate);
+  } catch (err) {
+    console.error("COMPLETE APTITUDE TEST ERROR:", err.message);
+    res.status(500).json({ error: "Failed to record aptitude test score" });
+  }
+};
+
+/* ═══════════════════════════════════════
+   INTERNAL APPROVAL
+═══════════════════════════════════════ */
+
+// POST /api/recruitment/candidates/:id/approval/start
+exports.moveToApproval = async (req, res) => {
+  try {
+    const candidate = await Recruitment.moveToApproval(req.params.id);
+    if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+    res.status(200).json(candidate);
+  } catch (err) {
+    console.error("MOVE TO APPROVAL ERROR:", err.message);
+    res.status(500).json({ error: "Failed to move candidate to approval" });
+  }
+};
+
+// PATCH /api/recruitment/candidates/:id/approval
+// Body: { decision: 'approved'|'rejected' }
+exports.recordApproval = async (req, res) => {
+  try {
+    const { decision } = req.body;
+    if (!["approved", "rejected"].includes(decision)) {
+      return res.status(400).json({ error: "decision must be 'approved' or 'rejected'" });
+    }
+
+    const approverId = req.user?.id;
+    if (!approverId) return res.status(401).json({ error: "User not authenticated" });
+
+    const candidate = await Recruitment.recordApproval(req.params.id, { decision, approverId });
+    if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+
+    res.status(200).json(candidate);
+  } catch (err) {
+    console.error("RECORD APPROVAL ERROR:", err.message);
+    res.status(500).json({ error: "Failed to record approval decision" });
+  }
+};
+
+/* ═══════════════════════════════════════
+   BGV
+   PATCH /api/recruitment/candidates/:id/bgv
+   Body: { bgv_status, bgv_document_url, bgv_notes }
+═══════════════════════════════════════ */
+
+exports.updateBGV = async (req, res) => {
+  try {
+    const { bgv_status, bgv_document_url, bgv_notes } = req.body;
+    const validStatuses = ["not_started", "in_progress", "cleared", "flagged"];
+
+    if (!validStatuses.includes(bgv_status)) {
+      return res.status(400).json({ error: `bgv_status must be one of: ${validStatuses.join(", ")}` });
+    }
+
+    const candidate = await Recruitment.updateBGV(req.params.id, { bgv_status, bgv_document_url, bgv_notes });
+    if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+
+    res.status(200).json(candidate);
+  } catch (err) {
+    console.error("UPDATE BGV ERROR:", err.message);
+    res.status(500).json({ error: "Failed to update BGV status" });
+  }
+};
+
+/* ═══════════════════════════════════════
+   OFFER RELEASE
+   POST /api/recruitment/candidates/:id/offer/release
+   Sends the offer email using the offer fields already saved via
+   PATCH /candidates/:id/offer — doesn't change stage.
+═══════════════════════════════════════ */
+
+exports.releaseOffer = async (req, res) => {
+  try {
+    const candidate = await Recruitment.getCandidateById(req.params.id);
+    if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+
+    if (!candidate.offered_role || !candidate.offered_salary || !candidate.joining_date) {
+      return res.status(400).json({ error: "Save offer details before releasing the offer" });
+    }
+
+    const template = offerReleaseEmailTemplate(
+      candidate.name,
+      candidate.job_title,
+      candidate.offered_role,
+      candidate.offered_salary,
+      candidate.joining_date
+    );
+
+    const mailResult = candidate.email
+      ? await sendMail({ to: candidate.email, ...template })
+      : { success: false, error: "Candidate has no email on file" };
+
+    await Recruitment.logCandidateEmail(req.params.id, {
+      email_type: "offer_release",
+      subject: template.subject,
+      sent_to: candidate.email,
+      status: mailResult.success ? "sent" : "failed",
+      error_message: mailResult.error,
+    });
+
+    res.status(200).json({ emailSent: mailResult.success });
+  } catch (err) {
+    console.error("RELEASE OFFER ERROR:", err.message);
+    res.status(500).json({ error: "Failed to release offer" });
   }
 };
