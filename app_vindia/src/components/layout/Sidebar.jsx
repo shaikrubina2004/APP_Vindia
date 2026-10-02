@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import feather from "feather-icons";
+import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
 import "../../styles/layout/Sidebar.css";
+import "../../styles/layout/SidebarTip.css";
 
 export default function Sidebar({
   menuItems = [],
@@ -9,6 +11,16 @@ export default function Sidebar({
 }) {
   const [open, setOpen] = useState(Boolean(defaultOpen));
   const sidebarRef = useRef(null);
+
+  /* Hover label: while the sidebar is icons-only, show which page an icon opens.
+     Drawn on <body> so the narrow sidebar can never clip it. */
+  const [tip, setTip] = useState(null);
+  const showTip = (event, label) => {
+    if (open) return;                       // labels are already visible when expanded
+    const r = event.currentTarget.getBoundingClientRect();
+    setTip({ label, top: r.top + r.height / 2, left: r.right + 12 });
+  };
+  const hideTip = () => setTip(null);
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
@@ -85,6 +97,7 @@ export default function Sidebar({
         ref={sidebarRef}
         className={`sidebar ${open ? "open" : ""}`}
         aria-label="Main navigation"
+        onScroll={hideTip}
       >
         <ul className="sidebar__menu" role="menu">
           {menuItems.map((item, index) => (
@@ -92,7 +105,11 @@ export default function Sidebar({
               <NavLink
                 to={item.path}
                 role="menuitem"
-                onClick={() => setOpen(false)}
+                onClick={() => { hideTip(); setOpen(false); }}
+                onMouseEnter={(e) => showTip(e, item.name)}
+                onMouseLeave={hideTip}
+                onFocus={(e) => showTip(e, item.name)}
+                onBlur={hideTip}
                 className={({ isActive }) =>
                   isActive
                     ? "sidebar__link active"
@@ -111,6 +128,14 @@ export default function Sidebar({
           ))}
         </ul>
       </nav>
+
+      {tip && !open &&
+        createPortal(
+          <div className="sidebar-tip" role="tooltip" style={{ top: tip.top, left: tip.left }}>
+            {tip.label}
+          </div>,
+          document.body
+        )}
     </>
   );
 }

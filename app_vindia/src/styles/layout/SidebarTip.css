@@ -1,0 +1,29 @@
+/* SidebarTip.css — hover label for the icon-only sidebar */
+.sidebar-tip {
+  position: fixed;
+  transform: translateY(-50%);
+  z-index: 6000;
+  padding: 7px 12px;
+  border-radius: 9px;
+  background: #1b2a4e;
+  color: #fff;
+  font: 500 12.5px/1.2 "Inter", "Segoe UI", system-ui, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 10px 24px rgba(27, 42, 78, 0.28);
+  animation: sidebarTipIn 0.14s ease both;
+}
+.sidebar-tip::before {            /* little arrow pointing at the icon */
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  background: #1b2a4e;
+  transform: translateY(-50%) rotate(45deg);
+}
+@keyframes sidebarTipIn {
+  from { opacity: 0; transform: translateY(-50%) translateX(-4px); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
