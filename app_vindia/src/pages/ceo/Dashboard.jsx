@@ -135,7 +135,9 @@ function CeoDashboard() {
   const last = profitSeries.length ? profitSeries[profitSeries.length - 1].profit : 0;
   const prev = profitSeries.length > 1 ? profitSeries[profitSeries.length - 2].profit : 0;
   const delta = prev ? Math.round(((last - prev) / Math.abs(prev)) * 100) : null;
-  const focus = (projects.filter((p) => !/complet|cancel/i.test(p.status || "")).length ? projects.filter((p) => !/complet|cancel/i.test(p.status || "")) : projects).slice(0, 4);
+  const mgrSorted = [...managers.list].sort((a, b) => (b.submittedToday - a.submittedToday) || a.name.localeCompare(b.name));
+  const mgrShown = mgrSorted.slice(0, 5);
+  const mgrMore = managers.list.length - mgrShown.length;
   const budgetRows = projects.filter((p) => p.budget > 0).slice(0, 6).reverse()
     .map((p) => ({ full: p.name, name: p.name.length > 10 ? `${p.name.slice(0, 9)}…` : p.name, budget: p.budget, spent: p.spent }));
   const avgBudget = budgetRows.length ? budgetRows.reduce((s, r) => s + r.budget, 0) / budgetRows.length : 0;
@@ -153,7 +155,7 @@ function CeoDashboard() {
           <h1 className="cx-hello">{greeting}, <span>{user?.name}!</span></h1>
           <p className="cx-lead">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · updated {timeAgo(data.generatedAt)}</p>
         </div>
-        <button className="cx-pill primary" onClick={() => navigate("/reports?tab=daily")}>+ Open reports</button>
+        <button className="cx-pill primary" onClick={exportCsv}>Download data</button>
       </div>
 
       <div className="cx-pillbar">
@@ -163,9 +165,6 @@ function CeoDashboard() {
         </select>
         <div className="cx-seg">{[3, 6].map((n) => <button key={n} className={range === n ? "active" : ""} onClick={() => setRange(n)}>{n} months</button>)}</div>
         <button className="cx-pill" onClick={() => load(true)} disabled={busy}>{busy ? "Refreshing…" : "Refresh"}</button>
-        <span className="grow" />
-        <button className="cx-pill" onClick={exportCsv}>Download data</button>
-        <button className="cx-pill" onClick={() => navigate("/analytics")}>Analytics</button>
       </div>
       {error && <div className="cx-msg err">{error}</div>}
 
@@ -174,7 +173,7 @@ function CeoDashboard() {
         <div className="cx-card">
           <div className="cx-card-head"><div><h3>Income vs expense</h3><div className="cx-sub">Paid invoices and approved expenses</div></div></div>
           {monthly.every((m) => !m.income && !m.expense) ? <div className="cx-empty">No finance activity in this period.</div> : (
-            <div style={{ height: 190 }}>
+            <div style={{ height: 230 }}>
               <ResponsiveContainer>
                 <AreaChart data={monthly} margin={{ top: 6, right: 4, left: -18, bottom: 0 }}>
                   <defs><linearGradient id="gInc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2d6cf6" stopOpacity={0.18} /><stop offset="100%" stopColor="#2d6cf6" stopOpacity={0} /></linearGradient></defs>
@@ -193,13 +192,12 @@ function CeoDashboard() {
         <Brief slides={slides} onGo={navigate} />
 
         <div className="cx-card">
-          <div className="cx-card-head"><h3>Net profit</h3></div>
+          <div className="cx-card-head"><h3>Net profit</h3><button className="cx-more" onClick={() => navigate("/finance-manager/dashboard")}>See details</button></div>
           <div className="dsh-profit">
             <span className="cx-big">{inrShort(finance.profit)}</span>
             {delta !== null && <span className={`cx-delta ${delta < 0 ? "neg" : ""}`}>{delta > 0 ? "+" : ""}{delta}%</span>}
           </div>
-          <div className="cx-sub" style={{ marginBottom: 6 }}>{finance.profit >= 0 ? "Revenue minus approved expenses" : "Expenses exceed revenue"}</div>
-          <div style={{ height: 120 }}>
+          <div style={{ height: 100 }}>
             <ResponsiveContainer>
               <AreaChart data={profitSeries} margin={{ top: 6, right: 4, left: 4, bottom: 0 }}>
                 <defs><linearGradient id="gProf" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2d6cf6" stopOpacity={0.22} /><stop offset="100%" stopColor="#2d6cf6" stopOpacity={0} /></linearGradient></defs>
@@ -209,46 +207,23 @@ function CeoDashboard() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </div>
-
-        <div className="cx-card">
-          <div className="cx-card-head"><h3>Project progress</h3><button className="cx-more" onClick={() => navigate("/project-manager/dashboard")}>See details</button></div>
-          {focus.length === 0 ? <div className="cx-empty">No projects yet.</div> : (
-            <div className="dsh-plist">
-              {focus.map((p) => (
-                <div key={p.id} className="dsh-pitem" onClick={() => setProjectId(String(p.id))} title="Focus dashboard on this project">
-                  <span className="dsh-pico">{ini(p.name)}</span>
-                  <div className="body"><b>{p.name}</b><div className="cx-bar"><i style={{ width: `${Math.min(100, p.progress)}%` }} /></div></div>
-                  <span className="cx-sub" style={{ margin: 0 }}>{p.progress}%</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="dsh-facts3">
+            <div><span>Revenue</span><b>{inrShort(finance.revenue)}</b></div>
+            <div><span>Expenses</span><b>{inrShort(finance.expenses)}</b></div>
+            <div><span>Receivable</span><b>{inrShort(finance.receivable)}</b></div>
+          </div>
         </div>
       </div>
 
       {/* ROW 2 */}
       <div className="cx-grid dsh-row2">
         <div className="cx-card">
-          <div className="cx-card-head"><h3>Company snapshot</h3><button className="cx-more" onClick={() => navigate("/finance-manager/dashboard")}>See details</button></div>
-          <div className="dsh-user"><span className="cx-avatar">{ini(user?.name)}</span><div><b>{user?.name}</b><small>Chief Executive Officer</small></div></div>
-          <div className="dsh-facts">
-            <div className="dsh-fact"><span>Revenue</span><b>{inrShort(finance.revenue)}</b></div>
-            <div className="dsh-fact"><span>Expenses</span><b>{inrShort(finance.expenses)}</b></div>
-            <div className="dsh-fact"><span>Receivable</span><b>{inrShort(finance.receivable)}</b></div>
-            <div className="dsh-fact"><span>Overdue invoices</span><b>{finance.overdueInvoices}</b></div>
-            <div className="dsh-fact link" onClick={() => navigate("/project-manager/dashboard")}><span>Active projects</span><b>{activeCount} of {projects.length}</b></div>
-            <div className="dsh-fact link" onClick={() => navigate("/hr/attendance")}><span>Employees present</span><b>{hr.presentToday} of {hr.employees}</b></div>
-          </div>
-        </div>
-
-        <div className="cx-card dsh-wide">
           <div className="cx-card-head">
             <div><h3>Project budget report</h3><div className="cx-sub">Budget against spend, latest projects</div></div>
             <div className="dsh-legend"><span><i style={{ background: "#cfdcfa" }} />Budget</span><span><i style={{ background: "#2d6cf6" }} />Spent</span></div>
           </div>
           {budgetRows.length === 0 ? <div className="cx-empty">No project budgets recorded yet.</div> : (
-            <div style={{ height: 250 }}>
+            <div style={{ height: 300 }}>
               <ResponsiveContainer>
                 <BarChart data={budgetRows} barGap={-46} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
                   <defs><linearGradient id="gSpent" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#5b93ff" /><stop offset="100%" stopColor="#2d6cf6" /></linearGradient></defs>
@@ -265,16 +240,16 @@ function CeoDashboard() {
           )}
         </div>
 
-        <div className="cx-card">
-          <div className="cx-card-head"><div><h3>Managers</h3><div className="cx-sub">{managers.submittedToday} of {managers.total} reported today</div></div>
-            <button className="cx-more" onClick={() => navigate("/reports?tab=daily")}>See details</button></div>
-          {managers.list.length === 0 ? <div className="cx-empty">No manager accounts found.</div> : managers.list.map((m) => (
+        <div className="cx-card dsh-mgrs">
+          <div className="cx-card-head"><div><h3>Managers</h3><div className="cx-sub">{managers.submittedToday} of {managers.total} reported today</div></div></div>
+          {mgrShown.length === 0 ? <div className="cx-empty">No manager accounts found.</div> : mgrShown.map((m) => (
             <div key={m.id} className="dsh-mgr" onClick={() => navigate(`/reports?tab=daily&role=${m.role}`)}>
               <span className="cx-avatar">{ini(m.name)}</span>
               <div className="body"><b>{m.name}</b><small>{m.roleLabel}</small></div>
               <span className={`cx-status ${m.submittedToday ? "ok" : "warn"}`}>{m.submittedToday ? "Reported" : "Pending"}</span>
             </div>
           ))}
+          <button type="button" className="cx-pill dsh-more" onClick={() => navigate("/reports?tab=daily")}>{mgrMore > 0 ? `Show more (${mgrMore})` : "Open reports"}</button>
         </div>
       </div>
 
@@ -310,7 +285,6 @@ function CeoDashboard() {
           <div className="cx-bar"><i style={{ width: `${presentPct}%` }} /></div>
           <ul className="dsh-list">
             <li className="link" onClick={() => navigate("/hr/employees")}><span>Total employees</span><b>{hr.employees}</b></li>
-            <li className="link" onClick={() => navigate("/hr/attendance")}><span>Present today</span><b>{hr.presentToday}</b></li>
             <li><span>On leave</span><b>{hr.onLeave}</b></li>
             <li><span>Pending leave requests</span><b>{hr.pendingLeaves}</b></li>
           </ul>
@@ -356,11 +330,6 @@ function CeoDashboard() {
             </table>
           </div>
         )}
-      </div>
-
-      <div className="dsh-links">
-        {[["HR management", "/hr"], ["Finance", "/finance-manager/dashboard"], ["Projects", "/project-manager/dashboard"], ["Attendance", "/hr/attendance"], ["Payroll", "/hr/payroll"], ["Reports", "/reports"], ["Analytics", "/analytics"]]
-          .map(([label, path]) => <button key={path} type="button" className="cx-pill" onClick={() => navigate(path)}>{label}</button>)}
       </div>
     </div>
   );

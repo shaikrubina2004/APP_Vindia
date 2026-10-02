@@ -1,6 +1,7 @@
 // CEO → Users: assign a department + role to new sign-ups, edit or remove users.
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Search } from "lucide-react";
 import API from "../../services/authService";
 import { initials, Card, Empty } from "./ceoShared";
@@ -20,6 +21,19 @@ const FILTERS = [
   { id: "pending", label: "Needs role" },
   { id: "active", label: "Active" },
 ];
+
+/* The popup and the toast are drawn on <body>, not inside the page.
+   Inside the page, a parent element (transform / animation) turns
+   "position: fixed" into "fixed to the page", so on a long list the popup
+   opened far below the visible screen. On <body> it is always centred in the
+   window. The wrapper keeps the .ceo-page class (display: contents = no box)
+   so the CEO styles and colour variables still apply to the popup. */
+function OnBody({ children }) {
+  return createPortal(
+    <div className="ceo-page" style={{ display: "contents" }}>{children}</div>,
+    document.body
+  );
+}
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -64,6 +78,19 @@ export default function UserManagement() {
       .then((res) => setDepartments(res.data || []))
       .catch((err) => console.error(err));
   }, [loadUsers]);
+
+  /* While the popup is open: Esc closes it and the page behind stops scrolling */
+  useEffect(() => {
+    if (!selectedUser) return undefined;
+    const onKey = (e) => { if (e.key === "Escape" && !saving) setSelectedUser(null); };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [selectedUser, saving]);
 
   async function handleDeptChange(deptId) {
     setSelectedDept(deptId);
@@ -236,67 +263,73 @@ export default function UserManagement() {
         </div>
       </Card>
 
-      {/* ================= POPUP MODAL ================= */}
+      {/* ================= POPUP MODAL (drawn on <body>) ================= */}
       {selectedUser && (
-        <div className="um-overlay" onClick={closePopup}>
-          <div className="um-modal" role="dialog" aria-modal="true" aria-labelledby="um-title" onClick={(e) => e.stopPropagation()}>
-            <div className="um-modal__head">
-              <h2 id="um-title">{editMode ? "Edit user" : "Assign role"}</h2>
-              <button className="crp-close" onClick={closePopup} aria-label="Close">✕</button>
-            </div>
-
-            <div className="um-modal__who">
-              <span className="cd-avatar">{initials(selectedUser.name)}</span>
-              <div>
-                <div className="cd-row__name">{selectedUser.name}</div>
-                <div className="cd-row__meta">{selectedUser.email}</div>
+        <OnBody>
+          <div className="um-overlay" style={{ zIndex: 5000 }} onClick={closePopup}>
+            <div className="um-modal" role="dialog" aria-modal="true" aria-labelledby="um-title" onClick={(e) => e.stopPropagation()}>
+              <div className="um-modal__head">
+                <h2 id="um-title">{editMode ? "Edit user" : "Assign role"}</h2>
+                <button className="crp-close" onClick={closePopup} aria-label="Close">✕</button>
               </div>
-            </div>
 
-            <label className="um-field">
-              <span>Department</span>
-              <select value={selectedDept} onChange={(e) => handleDeptChange(e.target.value)}>
-                <option value="">Select department</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="um-field">
-              <span>Role</span>
-              <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} disabled={!selectedDept}>
-                <option value="">{selectedDept ? "Select role" : "Choose a department first"}</option>
-                {roles.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </select>
-            </label>
-
-            {confirmDelete && (
-              <div className="um-confirm">
-                Remove <b>{selectedUser.name}</b> permanently? This can't be undone.
+              <div className="um-modal__who">
+                <span className="cd-avatar">{initials(selectedUser.name)}</span>
+                <div>
+                  <div className="cd-row__name">{selectedUser.name}</div>
+                  <div className="cd-row__meta">{selectedUser.email}</div>
+                </div>
               </div>
-            )}
 
-            <div className="um-modal__actions">
-              {editMode && !confirmDelete && (
-                <button className="ceo-btn ceo-btn--danger" onClick={() => setConfirmDelete(true)} disabled={saving}>Delete</button>
+              <label className="um-field">
+                <span>Department</span>
+                <select value={selectedDept} onChange={(e) => handleDeptChange(e.target.value)}>
+                  <option value="">Select department</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="um-field">
+                <span>Role</span>
+                <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} disabled={!selectedDept}>
+                  <option value="">{selectedDept ? "Select role" : "Choose a department first"}</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              {confirmDelete && (
+                <div className="um-confirm">
+                  Remove <b>{selectedUser.name}</b> permanently? This can't be undone.
+                </div>
               )}
-              {editMode && confirmDelete && (
-                <button className="ceo-btn ceo-btn--danger" onClick={deleteUser} disabled={saving}>{saving ? "Removing…" : "Yes, remove"}</button>
-              )}
-              <span style={{ flex: 1 }} />
-              <button className="ceo-btn ceo-btn--ghost um-cancel" onClick={closePopup} disabled={saving}>Cancel</button>
-              <button className="ceo-btn ceo-btn--primary" onClick={handleSave} disabled={saving || !selectedRole}>
-                {saving ? "Saving…" : editMode ? "Save changes" : "Assign role"}
-              </button>
+
+              <div className="um-modal__actions">
+                {editMode && !confirmDelete && (
+                  <button className="ceo-btn ceo-btn--danger" onClick={() => setConfirmDelete(true)} disabled={saving}>Delete</button>
+                )}
+                {editMode && confirmDelete && (
+                  <button className="ceo-btn ceo-btn--danger" onClick={deleteUser} disabled={saving}>{saving ? "Removing…" : "Yes, remove"}</button>
+                )}
+                <span style={{ flex: 1 }} />
+                <button className="ceo-btn ceo-btn--ghost um-cancel" onClick={closePopup} disabled={saving}>Cancel</button>
+                <button className="ceo-btn ceo-btn--primary" onClick={handleSave} disabled={saving || !selectedRole}>
+                  {saving ? "Saving…" : editMode ? "Save changes" : "Assign role"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </OnBody>
       )}
 
-      {toast && <div className={`ceo-toast${toast.isError ? " is-error" : ""}`} role="status">{toast.msg}</div>}
+      {toast && (
+        <OnBody>
+          <div className={`ceo-toast${toast.isError ? " is-error" : ""}`} role="status">{toast.msg}</div>
+        </OnBody>
+      )}
     </div>
   );
 }

@@ -1,8 +1,8 @@
 /* Dashboard.css — CEO dashboard layout & widgets (system in CEOBase.css) */
-.dsh-row1 { grid-template-columns: 1.3fr 1fr 1fr 1.05fr; }
-.dsh-row2 { grid-template-columns: 1fr 1.9fr 1fr; }
+.dsh-row1 { grid-template-columns: 1.5fr 1fr 1fr; }
+.dsh-row2 { grid-template-columns: 2fr 1fr; align-items: start; }
 .dsh-row3 { grid-template-columns: repeat(3, 1fr); }
-@media (max-width: 1300px) { .dsh-row1 { grid-template-columns: 1fr 1fr; } .dsh-row2 { grid-template-columns: 1fr 1fr; } .dsh-row2 .dsh-wide { grid-column: 1 / -1; order: -1; } .dsh-row3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 1300px) { .dsh-row1 { grid-template-columns: 1fr 1fr; } .dsh-row1 > .cx-card:first-child { grid-column: 1 / -1; } .dsh-row2 { grid-template-columns: 1fr; } .dsh-row3 { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) { .dsh-row1, .dsh-row2, .dsh-row3 { grid-template-columns: 1fr; } }
 
 /* brief (blue) card */
@@ -73,3 +73,11 @@
 .dsh-list li span { color: var(--muted); } .dsh-list li b { font-weight: 600; }
 .dsh-over { color: #cf3f3f; font-weight: 600; }
 .dsh-links { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* net profit facts */
+.dsh-facts3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.dsh-facts3 span { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 3px; }
+.dsh-facts3 b { font-size: 14.5px; font-weight: 600; }
+/* managers: compact list + one button */
+.dsh-more { width: 100%; justify-content: center; margin-top: 12px; background: var(--tint-2); color: var(--blue); box-shadow: none; }
+.dsh-more:hover:not(:disabled) { background: var(--tint); box-shadow: none; }

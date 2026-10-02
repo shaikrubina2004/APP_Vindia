@@ -16,11 +16,11 @@ const TABS = [
 function Account({ user }) {
   const initials = (user?.name || "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   return (
-    <div className="ceo-card">
-      <h3>Account</h3><div className="ceo-sub">Your profile details.</div>
+    <div className="cst-card">
+      <h3>Account</h3><div className="cst-sub">Your profile details.</div>
       <div className="cs-profile">
         <div className="cs-avatar">{initials}</div>
-        <div><b>{user?.name || "—"}</b><span>{user?.email || "—"}</span><em className="ceo-badge info">{cap(user?.role)}</em></div>
+        <div><b>{user?.name || "—"}</b><span>{user?.email || "—"}</span><em className="cst-badge info">{cap(user?.role)}</em></div>
       </div>
       <dl className="cs-info">
         <dt>Name</dt><dd>{user?.name || "—"}</dd>
@@ -35,8 +35,8 @@ function Appearance() {
   const [theme, setT] = useState(getTheme());
   const choose = (t) => { setTheme(t); setT(t); };
   return (
-    <div className="ceo-card">
-      <h3>Appearance</h3><div className="ceo-sub">Choose light or dark mode. Saved on this device.</div>
+    <div className="cst-card">
+      <h3>Appearance</h3><div className="cst-sub">Choose light or dark mode. Saved on this device.</div>
       <div className="cs-themes">
         {[["light", "☀️ Light", "Bright and clean"], ["dark", "🌙 Dark", "Easy on the eyes"]].map(([k, l, d]) => (
           <button key={k} type="button" className={`cs-theme ${theme === k ? "active" : ""}`} onClick={() => choose(k)}>
@@ -70,15 +70,15 @@ function Password() {
   };
 
   return (
-    <div className="ceo-card">
-      <h3>Change password</h3><div className="ceo-sub">Use at least 8 characters.</div>
+    <div className="cst-card">
+      <h3>Change password</h3><div className="cst-sub">Use at least 8 characters.</div>
       <div className="cs-form">
-        <label>Current password<input className="ceo-input" type="password" autoComplete="current-password" value={f.current} onChange={set("current")} /></label>
-        <label>New password<input className="ceo-input" type="password" autoComplete="new-password" value={f.next} onChange={set("next")} /></label>
+        <label>Current password<input className="cst-input" type="password" autoComplete="current-password" value={f.current} onChange={set("current")} /></label>
+        <label>New password<input className="cst-input" type="password" autoComplete="new-password" value={f.next} onChange={set("next")} /></label>
         {f.next && <div className="cs-strength"><i className={`s${strength}`} style={{ width: `${strength * 25}%` }} /><small>{["", "Weak", "Fair", "Good", "Strong"][strength]}</small></div>}
-        <label>Confirm new password<input className="ceo-input" type="password" autoComplete="new-password" value={f.confirm} onChange={set("confirm")} /></label>
-        <button className="ceo-btn" onClick={submit} disabled={busy}>{busy ? "Saving…" : "Update password"}</button>
-        {msg && <div className={`ceo-msg ${msg.t}`}>{msg.m}</div>}
+        <label>Confirm new password<input className="cst-input" type="password" autoComplete="new-password" value={f.confirm} onChange={set("confirm")} /></label>
+        <button className="cst-btn" onClick={submit} disabled={busy}>{busy ? "Saving…" : "Update password"}</button>
+        {msg && <div className={`cst-msg ${msg.t}`}>{msg.m}</div>}
       </div>
     </div>
   );
@@ -98,19 +98,19 @@ function SystemSettings() {
     finally { setBusy(false); }
   };
   return (
-    <div className="ceo-card">
+    <div className="cst-card">
       <h3>Lead follow-up escalation</h3>
-      <div className="ceo-sub">When a BDA misses a follow-up, the lead is automatically reassigned to the BDA with the lightest workload.</div>
-      {!s ? (msg ? <div className={`ceo-msg ${msg.t}`}>{msg.m}</div> : <div className="ceo-skeleton" style={{ height: 80 }} />) : (
+      <div className="cst-sub">When a BDA misses a follow-up, the lead is automatically reassigned to the BDA with the lightest workload.</div>
+      {!s ? (msg ? <div className={`cst-msg ${msg.t}`}>{msg.m}</div> : <div className="cst-skeleton" style={{ height: 80 }} />) : (
         <div className="cs-form">
           <label className="cs-switch">
             <input type="checkbox" checked={!!s.escalation_enabled} onChange={(e) => setS({ ...s, escalation_enabled: e.target.checked })} />
             <span className="cs-slider" />Automatically reassign overdue leads
           </label>
           <label>Days overdue before reassigning
-            <input className="ceo-input" type="number" min="0" max="30" value={s.escalation_grace_days} onChange={(e) => setS({ ...s, escalation_grace_days: e.target.value })} /></label>
-          <button className="ceo-btn" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save changes"}</button>
-          {msg && <div className={`ceo-msg ${msg.t}`}>{msg.m}</div>}
+            <input className="cst-input" type="number" min="0" max="30" value={s.escalation_grace_days} onChange={(e) => setS({ ...s, escalation_grace_days: e.target.value })} /></label>
+          <button className="cst-btn" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save changes"}</button>
+          {msg && <div className={`cst-msg ${msg.t}`}>{msg.m}</div>}
         </div>
       )}
     </div>
@@ -121,8 +121,8 @@ export default function CEOSettings() {
   const { user } = useAuth();
   const [tab, setTab] = useState("account");
   return (
-    <div className="ceo-page">
-      <div className="ceo-hero"><div><h1>Settings</h1><p>Manage your account, appearance and company preferences.</p></div></div>
+    <div className="cst-page">
+      <div className="cst-hero"><div><h1>Settings</h1><p>Manage your account, appearance and company preferences.</p></div></div>
       <div className="cs-layout">
         <nav className="cs-nav">
           {TABS.map((t) => (
