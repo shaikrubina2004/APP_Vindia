@@ -30,3 +30,7 @@
 
 .rp-review { margin-top: 16px; }
 .rp-review .row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+
+/* the report a notification pointed to */
+.rp-flash { animation: rpFlash 2.4s ease; }
+@keyframes rpFlash { 0%, 55% { box-shadow: 0 0 0 3px rgba(45, 108, 246, .4), var(--shadow); } 100% { box-shadow: var(--shadow); } }

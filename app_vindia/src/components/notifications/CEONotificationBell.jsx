@@ -12,12 +12,18 @@ const TABS = [
   { key: "report", label: "Reports" },
   { key: "alert", label: "Alerts" },
 ];
+const TYPE_LABEL = { daily_update: "Daily update", report: "Report", incident: "Alert", task: "Alert", alert: "Alert" };
+
+const inTab = (n, tab) => tab === "all" || n.type === tab || (tab === "alert" && ["incident", "task", "alert"].includes(n.type));
+/* where a notification leads; old rows without a link fall back by type */
+const routeFor = (n) => n.link || (n.type === "report" ? "/reports?tab=reports" : "/reports?tab=daily");
 
 export default function CEONotificationBell() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("all");
+  const [showRead, setShowRead] = useState(false);
   const wrapRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -30,31 +36,45 @@ export default function CEONotificationBell() {
     return () => clearInterval(t);
   }, [load]);
 
-  const unread = items.filter((n) => !n.is_read).length;
-
-
-  // close on outside click
   useEffect(() => {
     const h = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const visible = items.filter((n) => tab === "all" || n.type === tab || (tab === "alert" && ["incident", "task"].includes(n.type)));
+  useEffect(() => { if (!open) setShowRead(false); }, [open]);   // always reopen with read items collapsed
+
+  const unread = items.filter((n) => !n.is_read).length;
+  const filtered = items.filter((n) => inTab(n, tab));
+  const unreadList = filtered.filter((n) => !n.is_read);
+  const readList = filtered.filter((n) => n.is_read);
 
   const openItem = async (n) => {
     if (!n.is_read) {
       setItems((l) => l.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
-      try { await markCeoNotificationRead(n.id); } catch { /* ignore */ }
+      markCeoNotificationRead(n.id).catch(() => load());
     }
     setOpen(false);
-    if (n.link) navigate(n.link);
+    navigate(routeFor(n));
   };
 
   const readAll = async () => {
     setItems((l) => l.map((x) => ({ ...x, is_read: true })));
     try { await markAllCeoNotificationsRead(); } catch { load(); }
   };
+
+  const Row = ({ n }) => (
+    <div className={`ceo-bell-item ${n.is_read ? "" : "unread"} ${n.severity || ""}`} onClick={() => openItem(n)} role="button" tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter") openItem(n); }}>
+      <span className="ceo-bell-dot" />
+      <div className="ceo-bell-txt">
+        <em>{TYPE_LABEL[n.type] || "Update"}</em>
+        <strong>{n.title}</strong>
+        {n.description && <p>{n.description}</p>}
+        <time>{timeAgo(n.created_at)}</time>
+      </div>
+    </div>
+  );
 
   return (
     <div className="ceo-bell" ref={wrapRef}>
@@ -68,31 +88,33 @@ export default function CEONotificationBell() {
       {open && (
         <div className="ceo-bell-panel">
           <div className="ceo-bell-head">
-            <h4>Notifications{unread ? ` (${unread})` : ""}</h4>
-            {unread > 0 && <button onClick={readAll}>Mark all read</button>}
+            <div><h4>Notifications</h4>{unread > 0 && <span className="ceo-bell-unread">{unread} unread</span>}</div>
+            <div className="ceo-bell-head-actions">
+              {unread > 0 && <button onClick={readAll}>Mark all read</button>}
+              <button className="ceo-bell-x" onClick={() => setOpen(false)} aria-label="Close">✕</button>
+            </div>
           </div>
+
           <div className="ceo-bell-tabs">
-            {TABS.map((t) => (
-              <button key={t.key} className={tab === t.key ? "active" : ""} onClick={() => setTab(t.key)}>{t.label}</button>
-            ))}
+            {TABS.map((t) => {
+              const c = items.filter((n) => !n.is_read && inTab(n, t.key)).length;
+              return <button key={t.key} className={tab === t.key ? "active" : ""} onClick={() => setTab(t.key)}>{t.label}{c > 0 && <span>{c}</span>}</button>;
+            })}
           </div>
+
           <div className="ceo-bell-list">
-            {visible.length === 0 ? (
-              <div className="ceo-bell-empty">You are all caught up</div>
-            ) : visible.map((n) => (
-              <div key={n.id} className={`ceo-bell-item ${n.is_read ? "" : "unread"} ${n.severity || ""}`} onClick={() => openItem(n)}>
-                <span className="ceo-bell-dot" />
-                <div className="ceo-bell-txt">
-                  <strong>{n.title}</strong>
-                  {n.description && <p>{n.description}</p>}
-                  <time>{timeAgo(n.created_at)}</time>
-                </div>
-              </div>
-            ))}
+            {unreadList.length === 0 && !(showRead && readList.length) && <div className="ceo-bell-empty">You are all caught up</div>}
+            {unreadList.map((n) => <Row key={n.id} n={n} />)}
+            {showRead && readList.map((n) => <Row key={n.id} n={n} />)}
           </div>
-          <div className="ceo-bell-foot">
-            <button onClick={() => { setOpen(false); navigate("/reports?tab=daily"); }}>Open reports</button>
-          </div>
+
+          {readList.length > 0 && (
+            <div className="ceo-bell-foot">
+              <button onClick={() => setShowRead((s) => !s)}>
+                {showRead ? "▲ Hide" : "▼ Show"} {readList.length} read notification{readList.length === 1 ? "" : "s"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

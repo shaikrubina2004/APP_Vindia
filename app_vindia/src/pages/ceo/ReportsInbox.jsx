@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import API from "../../services/authService";
 import {
@@ -40,8 +40,12 @@ function Fields({ fields }) {
   ));
 }
 
-function Item({ it, onDone }) {
-  const [open, setOpen] = useState(it.status === "pending");
+function Item({ it, onDone, autoOpen }) {
+  const [open, setOpen] = useState(it.status === "pending" || autoOpen);
+  const ref = useRef(null);
+  useEffect(() => {              // arrived from a notification: open it, scroll to it, flash it
+    if (autoOpen) { setOpen(true); ref.current?.scrollIntoView?.({ behavior: "smooth", block: "center" }); }
+  }, [autoOpen]);
   const [note, setNote] = useState(it.ceoComment || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -57,7 +61,7 @@ function Item({ it, onDone }) {
   };
 
   return (
-    <div className="rp-item">
+    <div className={`rp-item ${autoOpen ? "rp-flash" : ""}`} ref={ref}>
       <div className="rp-head" onClick={() => setOpen((o) => !o)}>
         <span className="cx-avatar">{ini(it.manager)}</span>
         <div className="rp-main">
@@ -111,6 +115,7 @@ export default function ReportsInbox() {
   const tab = params.get("tab") === "reports" ? "reports" : "daily";
   const role = params.get("role") || "";
   const status = params.get("status") || "";
+  const openId = params.get("open") || "";
   const setParam = (k, v) => { const p = new URLSearchParams(params); v ? p.set(k, v) : p.delete(k); setParams(p, { replace: true }); };
 
   const [days, setDays] = useState(14);
@@ -196,7 +201,7 @@ export default function ReportsInbox() {
       <div>
         {(tab === "daily" ? !feed : !others) && !error ? <div className="cx-skel" style={{ height: 150 }} />
           : list.length === 0 ? <div className="cx-card"><div className="cx-empty">{tab === "daily" ? "No daily updates for these filters." : "No reports for these filters."}</div></div>
-          : list.map((it) => <Item key={it.uid} it={it} onDone={load} />)}
+          : list.map((it) => <Item key={it.uid} it={it} onDone={load} autoOpen={it.uid === openId} />)}
       </div>
     </div>
   );

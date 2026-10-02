@@ -4,25 +4,38 @@
 .ceo-bell-btn:hover, .ceo-bell-btn.open { background: #f1f5f9; color: #1e293b; }
 .ceo-bell-btn svg { width: 20px; height: 20px; }
 .ceo-bell-badge { position: absolute; top: 2px; right: 2px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 20px; background: #dc2626; color: #fff; font-size: 10px; font-weight: 700; line-height: 18px; text-align: center; pointer-events: none; box-shadow: 0 0 0 2px #fff; }
-.ceo-bell-panel { position: absolute; right: 0; top: 46px; width: 360px; max-width: calc(100vw - 24px); background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; box-shadow: 0 16px 40px rgba(15, 23, 42, .14); z-index: 2000; overflow: hidden; }
-.ceo-bell-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
-.ceo-bell-head h4 { margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; }
-.ceo-bell-head button { background: none; border: 0; color: #2563eb; font-size: 12.5px; font-weight: 500; cursor: pointer; }
-.ceo-bell-tabs { display: flex; gap: 16px; padding: 0 16px; border-bottom: 1px solid #f1f5f9; }
-.ceo-bell-tabs button { background: none; border: 0; padding: 9px 0; font-size: 12.5px; color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-.ceo-bell-tabs button.active { color: #2563eb; border-bottom-color: #2563eb; font-weight: 500; }
-.ceo-bell-list { max-height: 360px; overflow-y: auto; }
-.ceo-bell-item { display: flex; gap: 11px; padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f8fafc; transition: background .12s; }
-.ceo-bell-item:hover { background: #f8fafc; }
-.ceo-bell-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; background: transparent; }
+.ceo-bell-panel { position: absolute; right: 0; top: 46px; width: 400px; max-width: calc(100vw - 24px); background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; box-shadow: 0 16px 40px rgba(15, 23, 42, .14); z-index: 2000; overflow: hidden; }
+.ceo-bell-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 18px 12px; }
+.ceo-bell-head h4 { margin: 0; font-size: 16px; font-weight: 700; color: #1e293b; }
+.ceo-bell-unread { display: block; margin-top: 2px; font-size: 12.5px; color: #64748b; }
+.ceo-bell-head-actions { display: flex; align-items: center; gap: 12px; }
+.ceo-bell-head-actions button { background: none; border: 0; color: #2563eb; font-size: 12.5px; font-weight: 500; cursor: pointer; padding: 0; }
+.ceo-bell-head-actions .ceo-bell-x { width: 30px; height: 30px; border-radius: 9px; background: #f1f5f9; color: #64748b; display: grid; place-items: center; font-size: 12px; }
+.ceo-bell-head-actions .ceo-bell-x:hover { background: #e2e8f0; }
+.ceo-bell-tabs { display: flex; gap: 6px; padding: 0 16px 12px; overflow-x: auto; border-bottom: 1px solid #f1f5f9; }
+.ceo-bell-tabs button { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #e2e8f0; padding: 5px 12px; border-radius: 99px; font-size: 12.5px; color: #475569; cursor: pointer; white-space: nowrap; }
+.ceo-bell-tabs button span { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: #eef2f7; font-size: 11px; font-weight: 600; display: grid; place-items: center; }
+.ceo-bell-tabs button.active { background: #0f172a; border-color: #0f172a; color: #fff; font-weight: 500; }
+.ceo-bell-tabs button.active span { background: rgba(255, 255, 255, .22); }
+.ceo-bell-list { max-height: 360px; overflow-y: auto; background: #fbfcfe; }
+.ceo-bell-item { display: flex; gap: 12px; padding: 13px 18px; cursor: pointer; border-bottom: 1px solid #f1f5f9; border-left: 3px solid transparent; transition: background .12s; }
+.ceo-bell-item:hover { background: #f1f5fb; }
+.ceo-bell-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex-shrink: 0; background: transparent; }
+.ceo-bell-item.unread { background: #fff; border-left-color: #2563eb; }
+.ceo-bell-item.unread.warning { border-left-color: #f59e0b; }
+.ceo-bell-item.unread.critical { border-left-color: #dc2626; }
 .ceo-bell-item.unread .ceo-bell-dot { background: #2563eb; }
-.ceo-bell-item.unread.warning .ceo-bell-dot { background: #d97706; }
+.ceo-bell-item.unread.warning .ceo-bell-dot { background: #f59e0b; }
 .ceo-bell-item.unread.critical .ceo-bell-dot { background: #dc2626; }
-.ceo-bell-txt strong { display: block; font-size: 13px; font-weight: 500; color: #1e293b; line-height: 1.35; }
-.ceo-bell-item:not(.unread) .ceo-bell-txt strong { color: #64748b; font-weight: 400; }
-.ceo-bell-txt p { margin: 2px 0 0; font-size: 12.5px; color: #94a3b8; line-height: 1.35; }
-.ceo-bell-txt time { display: block; margin-top: 3px; font-size: 11.5px; color: #cbd5e1; }
-.ceo-bell-empty { padding: 32px 16px; text-align: center; color: #94a3b8; font-size: 13px; }
-.ceo-bell-foot { padding: 10px; border-top: 1px solid #f1f5f9; text-align: center; }
-.ceo-bell-foot button { background: none; border: 0; color: #2563eb; font-weight: 500; font-size: 12.5px; cursor: pointer; }
+.ceo-bell-txt { min-width: 0; }
+.ceo-bell-txt em { display: block; font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: #7c5cdb; margin-bottom: 2px; }
+.ceo-bell-txt strong { display: block; font-size: 13.5px; font-weight: 600; color: #1e293b; line-height: 1.35; }
+.ceo-bell-item:not(.unread) .ceo-bell-txt strong { color: #64748b; font-weight: 500; }
+.ceo-bell-item:not(.unread) .ceo-bell-txt em { color: #a8b3c7; }
+.ceo-bell-txt p { margin: 2px 0 0; font-size: 12.5px; color: #64748b; line-height: 1.4; }
+.ceo-bell-txt time { display: block; margin-top: 4px; font-size: 11.5px; color: #a8b3c7; }
+.ceo-bell-empty { padding: 36px 16px; text-align: center; color: #94a3b8; font-size: 13px; }
+.ceo-bell-foot { padding: 11px; border-top: 1px solid #f1f5f9; text-align: center; background: #fff; }
+.ceo-bell-foot button { background: none; border: 0; color: #64748b; font-weight: 500; font-size: 13px; cursor: pointer; }
+.ceo-bell-foot button:hover { color: #2563eb; }
 @media (max-width: 480px) { .ceo-bell-panel { position: fixed; left: 10px; right: 10px; top: 64px; width: auto; } }

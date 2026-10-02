@@ -278,7 +278,7 @@ exports.sendToCeo = async (req, res) => {
       type: "daily_update",
       title: `Project update sent by ${r.submitted_by || "Project Manager"}`,
       description: `${r.project_name}${r.phase ? " · " + r.phase : ""} · ${r.overall_status || "on-track"}`,
-      link: "/reports?tab=daily",
+      link: `/reports?tab=daily&open=pm-${r.id}`,
       severity: r.overall_status === "critical" ? "critical" : r.overall_status && r.overall_status !== "on-track" ? "warning" : "info",
       referenceId: r.id,
     });

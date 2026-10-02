@@ -41,7 +41,7 @@ exports.submitReport = async (req, res) => {
       type: type === "daily" ? "daily_update" : "report",
       title: `${type === "daily" ? "Daily update" : "New " + type + " report"} from ${who}`,
       description: title.trim(),
-      link: type === "daily" ? "/reports?tab=daily" : "/reports?tab=reports",
+      link: type === "daily" ? `/reports?tab=daily&open=mr-${rows[0].id}` : `/reports?tab=reports&open=r-${rows[0].id}`,
       severity: st === "critical" ? "critical" : (st === "attention" || (issues && issues.trim())) ? "warning" : "info",
       referenceId: rows[0].id,
     });
