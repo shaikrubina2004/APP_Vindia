@@ -47,6 +47,18 @@
   font-size: 0.88rem;
 }
 
+.cd-resume-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.cd-resume-link:hover {
+  text-decoration: underline;
+}
+
 .cd-stage-badge {
   display: inline-block;
   padding: 0.25rem 0.75rem;
@@ -59,7 +71,14 @@
 
 .cd-stage-badge--applied { background: var(--neutral-100); color: var(--neutral-500); }
 .cd-stage-badge--screening { background: #fef3c7; color: var(--warning); }
+.cd-stage-badge--aptitude_test { background: #e0e7ff; color: #4f46e5; }
 .cd-stage-badge--interview { background: #dbeafe; color: var(--info); }
+.cd-stage-badge--approval { background: #fce7f3; color: #db2777; }
+.cd-stage-badge--not_started { background: var(--neutral-100); color: var(--neutral-500); }
+.cd-stage-badge--in_progress { background: #fef3c7; color: var(--warning); }
+.cd-stage-badge--cleared { background: #dcfce7; color: var(--success); }
+.cd-stage-badge--flagged { background: #fee2e2; color: #dc2626; }
+.cd-stage-badge--bgv { background: #fef3c7; color: var(--warning); }
 .cd-stage-badge--offer { background: #ede9fe; color: #7c3aed; }
 .cd-stage-badge--hired { background: #dcfce7; color: var(--success); }
 .cd-stage-badge--rejected { background: #fee2e2; color: #dc2626; }
@@ -110,8 +129,21 @@
   font-weight: 600;
 }
 
+.cd-note {
+  font-size: 0.85rem;
+  color: var(--neutral-500);
+  margin: 0 0 0.75rem;
+  line-height: 1.5;
+}
+
 .cd-inline-error {
   color: #dc2626;
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.cd-inline-success {
+  color: var(--success);
   font-size: 0.85rem;
   margin: 0 0 1rem;
 }
@@ -210,6 +242,18 @@
   vertical-align: top;
 }
 
+.cd-email-status {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.cd-email-status--sent { background: #dcfce7; color: var(--success); }
+.cd-email-status--failed { background: #fee2e2; color: #dc2626; }
+
 .cd-field {
   display: flex;
   flex-direction: column;
@@ -246,6 +290,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .cd-cancel-btn {

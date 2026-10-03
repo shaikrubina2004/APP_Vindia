@@ -24,6 +24,26 @@ const recruitmentService = {
 
   /* ── Interview Rounds ─────────────────────────────────── */
   addInterviewRound: (id, data) => api.post(`${R}/candidates/${id}/interviews`, data),
+
+  /* ── Screening ────────────────────────────────────────── */
+  submitScreening: (id, data) => api.post(`${R}/candidates/${id}/screening`, data),
+
+  /* ── Aptitude Test ────────────────────────────────────── */
+  sendAptitudeTestLink: (id, testLink) =>
+    api.post(`${R}/candidates/${id}/aptitude-test/send`, { test_link: testLink }),
+  completeAptitudeTest: (id, score) =>
+    api.patch(`${R}/candidates/${id}/aptitude-test/complete`, { score }),
+
+  /* ── Internal Approval ────────────────────────────────── */
+  moveToApproval: (id) => api.post(`${R}/candidates/${id}/approval/start`),
+  recordApproval: (id, decision) =>
+    api.patch(`${R}/candidates/${id}/approval`, { decision }),
+
+  /* ── BGV ──────────────────────────────────────────────── */
+  updateBGV: (id, data) => api.patch(`${R}/candidates/${id}/bgv`, data),
+
+  /* ── Offer Release ────────────────────────────────────── */
+  releaseOffer: (id) => api.post(`${R}/candidates/${id}/offer/release`),
 };
 
 export default recruitmentService;

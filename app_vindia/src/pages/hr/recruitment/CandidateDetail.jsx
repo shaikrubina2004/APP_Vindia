@@ -15,6 +15,7 @@ const CandidateDetail = () => {
   const [error, setError] = useState(null);
   const [candidate, setCandidate] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const [actionMsg, setActionMsg] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -25,6 +26,19 @@ const CandidateDetail = () => {
 
   const [showOfferForm, setShowOfferForm] = useState(false);
   const [offerForm, setOfferForm] = useState(EMPTY_OFFER);
+
+  // New pipeline-stage UI state
+  const [showScreeningForm, setShowScreeningForm] = useState(false);
+  const [screeningNotes, setScreeningNotes] = useState("");
+
+  const [showSendTestForm, setShowSendTestForm] = useState(false);
+  const [testLink, setTestLink] = useState("");
+
+  const [showScoreForm, setShowScoreForm] = useState(false);
+  const [testScore, setTestScore] = useState("");
+
+  const [showBgvForm, setShowBgvForm] = useState(false);
+  const [bgvForm, setBgvForm] = useState({ bgv_status: "in_progress", bgv_document_url: "", bgv_notes: "" });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +51,11 @@ const CandidateDetail = () => {
         offered_salary: res.data.offered_salary || "",
         joining_date: res.data.joining_date ? res.data.joining_date.split("T")[0] : "",
         offer_letter_url: res.data.offer_letter_url || "",
+      });
+      setBgvForm({
+        bgv_status: res.data.bgv_status || "in_progress",
+        bgv_document_url: res.data.bgv_document_url || "",
+        bgv_notes: res.data.bgv_notes || "",
       });
     } catch (err) {
       setError(err.response?.data?.error || "Failed to load this candidate");
@@ -54,20 +73,17 @@ const CandidateDetail = () => {
       ? new Date(d).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })
       : "—";
 
-  /* ── Stage actions ────────────────────────────────────── */
+  const formatDateTime = (d) =>
+    d
+      ? new Date(d).toLocaleString("en-IN", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+      : "—";
 
-  const moveToScreening = async () => {
-    setBusy(true);
+  const clearMsgs = () => {
     setActionError(null);
-    try {
-      await recruitmentService.updateCandidateStage(id, { stage: "screening" });
-      await load();
-    } catch (err) {
-      setActionError(err.response?.data?.error || "Failed to update stage");
-    } finally {
-      setBusy(false);
-    }
+    setActionMsg(null);
   };
+
+  /* ── Reject (universal, any active stage) ─────────────── */
 
   const openRejectModal = () => {
     setRejectionReason("");
@@ -76,7 +92,7 @@ const CandidateDetail = () => {
 
   const handleReject = async () => {
     setBusy(true);
-    setActionError(null);
+    clearMsgs();
     try {
       await recruitmentService.updateCandidateStage(id, {
         stage: "rejected",
@@ -91,7 +107,76 @@ const CandidateDetail = () => {
     }
   };
 
-  /* ── Interview rounds ─────────────────────────────────── */
+  /* ── Screening ─────────────────────────────────────────── */
+
+  const handleScreeningDecision = async (decision) => {
+    if (decision === "reject" && !rejectionReason.trim()) {
+      setActionError("Add a reason before rejecting.");
+      return;
+    }
+    setBusy(true);
+    clearMsgs();
+    try {
+      const res = await recruitmentService.submitScreening(id, {
+        screening_notes: screeningNotes.trim() || null,
+        decision,
+        rejection_reason: decision === "reject" ? rejectionReason.trim() : null,
+      });
+      setShowScreeningForm(false);
+      setActionMsg(
+        res.data.emailSent
+          ? `Candidate ${decision === "qualify" ? "qualified" : "rejected"} — email sent.`
+          : `Saved, but the email could not be sent (check the candidate has an email on file, or check SMTP settings).`
+      );
+      await load();
+    } catch (err) {
+      setActionError(err.response?.data?.error || "Failed to submit screening decision");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* ── Aptitude Test ─────────────────────────────────────── */
+
+  const handleSendTest = async () => {
+    if (!testLink.trim()) {
+      setActionError("Enter a test link first.");
+      return;
+    }
+    setBusy(true);
+    clearMsgs();
+    try {
+      const res = await recruitmentService.sendAptitudeTestLink(id, testLink.trim());
+      setShowSendTestForm(false);
+      setActionMsg(res.data.emailSent ? "Test link emailed to the candidate." : "Saved, but the email could not be sent.");
+      await load();
+    } catch (err) {
+      setActionError(err.response?.data?.error || "Failed to send the aptitude test");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRecordScore = async () => {
+    if (testScore === "" || isNaN(Number(testScore))) {
+      setActionError("Enter a numeric score.");
+      return;
+    }
+    setBusy(true);
+    clearMsgs();
+    try {
+      await recruitmentService.completeAptitudeTest(id, Number(testScore));
+      setShowScoreForm(false);
+      setTestScore("");
+      await load();
+    } catch (err) {
+      setActionError(err.response?.data?.error || "Failed to record the test score");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* ── Interview Rounds ──────────────────────────────────── */
 
   const openRoundModal = () => {
     const nextRound = (candidate.interviews?.length || 0) + 1;
@@ -101,7 +186,7 @@ const CandidateDetail = () => {
 
   const handleAddRound = async () => {
     setBusy(true);
-    setActionError(null);
+    clearMsgs();
     try {
       await recruitmentService.addInterviewRound(id, {
         round_number: Number(roundForm.round_number),
@@ -119,6 +204,55 @@ const CandidateDetail = () => {
     }
   };
 
+  /* ── Internal Approval ─────────────────────────────────── */
+
+  const handleMoveToApproval = async () => {
+    setBusy(true);
+    clearMsgs();
+    try {
+      await recruitmentService.moveToApproval(id);
+      await load();
+    } catch (err) {
+      setActionError(err.response?.data?.error || "Failed to move to approval");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleApprovalDecision = async (decision) => {
+    setBusy(true);
+    clearMsgs();
+    try {
+      await recruitmentService.recordApproval(id, decision);
+      await load();
+    } catch (err) {
+      setActionError(err.response?.data?.error || "Failed to record approval decision");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* ── BGV ───────────────────────────────────────────────── */
+
+  const handleBgvChange = (e) => {
+    const { name, value } = e.target;
+    setBgvForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveBgv = async () => {
+    setBusy(true);
+    clearMsgs();
+    try {
+      await recruitmentService.updateBGV(id, bgvForm);
+      setShowBgvForm(false);
+      await load();
+    } catch (err) {
+      setActionError(err.response?.data?.error || "Failed to save BGV status");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /* ── Offer ─────────────────────────────────────────────── */
 
   const handleOfferChange = (e) => {
@@ -127,13 +261,11 @@ const CandidateDetail = () => {
   };
 
   const handleSaveOffer = async () => {
-    setActionError(null);
-
+    clearMsgs();
     if (!offerForm.offered_role.trim() || !offerForm.offered_salary || !offerForm.joining_date) {
       setActionError("Role, salary, and joining date are all required to save an offer.");
       return;
     }
-
     setBusy(true);
     try {
       await recruitmentService.updateOfferDetails(id, {
@@ -151,13 +283,25 @@ const CandidateDetail = () => {
     }
   };
 
+  const handleReleaseOffer = async () => {
+    setBusy(true);
+    clearMsgs();
+    try {
+      const res = await recruitmentService.releaseOffer(id);
+      setActionMsg(res.data.emailSent ? "Offer emailed to the candidate." : "Could not send the offer email — check SMTP settings.");
+      await load();
+    } catch (err) {
+      setActionError(err.response?.data?.error || "Failed to release the offer");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /* ── Convert to Employee ──────────────────────────────── */
 
   const handleConvertToEmployee = () => {
     navigate("/hr/add-employee", {
       state: {
-        // No `id` here on purpose — AddEmployee.jsx treats state as
-        // "editing an existing employee" only when it has an id.
         name: candidate.name,
         email: candidate.email || "",
         phone: candidate.phone || "",
@@ -165,8 +309,6 @@ const CandidateDetail = () => {
         designation: candidate.offered_role || "",
         join_date: candidate.joining_date || "",
         salary: candidate.offered_salary || "",
-        // Marker AddEmployee.jsx uses to know this came from Recruitment,
-        // so it can call markHired() after the employee is actually created.
         _fromCandidateId: candidate.id,
       },
     });
@@ -185,10 +327,10 @@ const CandidateDetail = () => {
     );
   }
 
-  const canReject = !["hired", "rejected"].includes(candidate.stage);
-  const canAddRound = ["interview", "offer"].includes(candidate.stage) || candidate.interviews.length > 0;
-  const canMakeOffer = candidate.interviews.length > 0 && !["offer", "hired", "rejected"].includes(candidate.stage);
+  const stage = candidate.stage;
+  const canReject = !["hired", "rejected"].includes(stage);
   const hasOfferDetails = candidate.offered_role && candidate.offered_salary && candidate.joining_date;
+  const canMoveToApproval = stage === "interview" && candidate.interviews.length > 0;
 
   return (
     <div className="cd-page">
@@ -204,7 +346,7 @@ const CandidateDetail = () => {
             {candidate.department ? ` · ${candidate.department}` : ""}
           </p>
         </div>
-        <span className={`cd-stage-badge cd-stage-badge--${candidate.stage}`}>{candidate.stage}</span>
+        <span className={`cd-stage-badge cd-stage-badge--${stage}`}>{stage.replace("_", " ")}</span>
       </div>
 
       <div className="cd-meta">
@@ -226,6 +368,12 @@ const CandidateDetail = () => {
         </div>
       </div>
 
+      {candidate.resume_url && (
+        <a className="cd-resume-link" href={candidate.resume_url} target="_blank" rel="noreferrer">
+          View Resume ↗
+        </a>
+      )}
+
       {candidate.stage === "rejected" && candidate.rejection_reason && (
         <div className="cd-rejected-note">Rejected: {candidate.rejection_reason}</div>
       )}
@@ -236,123 +384,354 @@ const CandidateDetail = () => {
         </div>
       )}
 
+      {actionMsg && <p className="cd-inline-success">{actionMsg}</p>}
       {actionError && <p className="cd-inline-error">{actionError}</p>}
 
-      <div className="cd-actions">
-        {candidate.stage === "applied" && (
-          <button className="cd-action-btn" disabled={busy} onClick={moveToScreening}>
-            Start Screening
-          </button>
-        )}
-        {canAddRound && candidate.stage !== "hired" && candidate.stage !== "rejected" && (
-          <button className="cd-action-btn" disabled={busy} onClick={openRoundModal}>
-            + Add Interview Round
-          </button>
-        )}
-        {canMakeOffer && (
-          <button className="cd-action-btn" disabled={busy} onClick={() => setShowOfferForm(true)}>
-            Make Offer
-          </button>
-        )}
-        {candidate.stage === "offer" && !showOfferForm && (
-          <button className="cd-action-btn" disabled={busy} onClick={() => setShowOfferForm(true)}>
-            Edit Offer
-          </button>
-        )}
-        {candidate.stage === "offer" && hasOfferDetails && (
-          <button className="cd-primary-btn" disabled={busy} onClick={handleConvertToEmployee}>
-            Convert to Employee →
-          </button>
-        )}
-        {canReject && (
-          <button className="cd-reject-btn" disabled={busy} onClick={openRejectModal}>
-            Reject
-          </button>
-        )}
-      </div>
-
-      {showOfferForm && (
+      {/* ═══ SCREENING ═══ */}
+      {stage === "applied" && (
         <div className="cd-section">
-          <h2>Offer Details</h2>
-          <div className="cd-field-row">
-            <label className="cd-field">
-              Offered Role *
-              <input
-                name="offered_role"
-                value={offerForm.offered_role}
-                onChange={handleOfferChange}
-              />
-            </label>
-            <label className="cd-field">
-              Offered Salary *
-              <input
-                type="number"
-                name="offered_salary"
-                value={offerForm.offered_salary}
-                onChange={handleOfferChange}
-              />
-            </label>
-          </div>
-          <div className="cd-field-row">
-            <label className="cd-field">
-              Joining Date *
-              <input
-                type="date"
-                name="joining_date"
-                value={offerForm.joining_date}
-                onChange={handleOfferChange}
-              />
-            </label>
-            <label className="cd-field">
-              Offer Letter URL
-              <input
-                name="offer_letter_url"
-                value={offerForm.offer_letter_url}
-                onChange={handleOfferChange}
-                placeholder="Optional link"
-              />
-            </label>
-          </div>
-          <div className="cd-modal-actions">
-            <button className="cd-cancel-btn" disabled={busy} onClick={() => setShowOfferForm(false)}>
-              Cancel
+          <h2>Screening</h2>
+          {!showScreeningForm ? (
+            <button className="cd-action-btn" disabled={busy} onClick={() => setShowScreeningForm(true)}>
+              Start Screening
             </button>
-            <button className="cd-primary-btn" disabled={busy} onClick={handleSaveOffer}>
-              {busy ? "Saving…" : "Save Offer"}
+          ) : (
+            <>
+              <label className="cd-field">
+                Fit notes vs. job description
+                <textarea
+                  rows={3}
+                  value={screeningNotes}
+                  onChange={(e) => setScreeningNotes(e.target.value)}
+                  placeholder="How does this resume match the JD?"
+                />
+              </label>
+              <div className="cd-modal-actions">
+                <button className="cd-cancel-btn" disabled={busy} onClick={() => setShowScreeningForm(false)}>
+                  Cancel
+                </button>
+                <button
+                  className="cd-reject-btn"
+                  disabled={busy}
+                  onClick={() => {
+                    setShowScreeningForm(false);
+                    setRejectionReason("");
+                    setShowRejectModal(true);
+                  }}
+                >
+                  Reject
+                </button>
+                <button className="cd-primary-btn" disabled={busy} onClick={() => handleScreeningDecision("qualify")}>
+                  {busy ? "Saving…" : "Qualify →"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ═══ APTITUDE TEST ═══ */}
+      {stage === "aptitude_test" && (
+        <div className="cd-section">
+          <h2>Aptitude Test</h2>
+          {candidate.screening_notes && (
+            <p className="cd-note"><strong>Screening notes:</strong> {candidate.screening_notes}</p>
+          )}
+
+          {candidate.aptitude_test_status === "not_sent" && !showSendTestForm && (
+            <button className="cd-action-btn" disabled={busy} onClick={() => setShowSendTestForm(true)}>
+              Send Aptitude Test
+            </button>
+          )}
+
+          {showSendTestForm && (
+            <>
+              <label className="cd-field">
+                Test link
+                <input value={testLink} onChange={(e) => setTestLink(e.target.value)} placeholder="https://..." />
+              </label>
+              <div className="cd-modal-actions">
+                <button className="cd-cancel-btn" disabled={busy} onClick={() => setShowSendTestForm(false)}>
+                  Cancel
+                </button>
+                <button className="cd-primary-btn" disabled={busy} onClick={handleSendTest}>
+                  {busy ? "Sending…" : "Send"}
+                </button>
+              </div>
+            </>
+          )}
+
+          {candidate.aptitude_test_status === "sent" && (
+            <>
+              <p className="cd-note">
+                Test link sent: <a href={candidate.aptitude_test_link} target="_blank" rel="noreferrer">{candidate.aptitude_test_link}</a>
+              </p>
+              {!showScoreForm ? (
+                <button className="cd-action-btn" disabled={busy} onClick={() => setShowScoreForm(true)}>
+                  Record Test Score
+                </button>
+              ) : (
+                <>
+                  <label className="cd-field">
+                    Score
+                    <input type="number" value={testScore} onChange={(e) => setTestScore(e.target.value)} />
+                  </label>
+                  <div className="cd-modal-actions">
+                    <button className="cd-cancel-btn" disabled={busy} onClick={() => setShowScoreForm(false)}>
+                      Cancel
+                    </button>
+                    <button className="cd-primary-btn" disabled={busy} onClick={handleRecordScore}>
+                      {busy ? "Saving…" : "Save Score & Move to Interview"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {candidate.aptitude_test_status === "completed" && (
+            <p className="cd-note">Score recorded: <strong>{candidate.aptitude_test_score}</strong></p>
+          )}
+        </div>
+      )}
+
+      {/* ═══ INTERVIEW ═══ */}
+      {(stage === "interview" || candidate.interviews.length > 0) && stage !== "applied" && stage !== "aptitude_test" && (
+        <div className="cd-section">
+          <h2>Interview Rounds</h2>
+          {candidate.interviews.length === 0 ? (
+            <p className="cd-empty">No interview rounds logged yet.</p>
+          ) : (
+            <table className="cd-table">
+              <thead>
+                <tr>
+                  <th>Round</th>
+                  <th>Interviewer</th>
+                  <th>Date</th>
+                  <th>Rating</th>
+                  <th>Feedback</th>
+                </tr>
+              </thead>
+              <tbody>
+                {candidate.interviews.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.round_number}</td>
+                    <td>{r.interviewer_name || "—"}</td>
+                    <td>{formatDate(r.interview_date)}</td>
+                    <td>{r.rating ? `${r.rating} / 5` : "—"}</td>
+                    <td>{r.feedback || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {stage === "interview" && (
+            <div className="cd-actions" style={{ marginTop: "0.9rem" }}>
+              <button className="cd-action-btn" disabled={busy} onClick={openRoundModal}>
+                + Add Interview Round
+              </button>
+              {canMoveToApproval && (
+                <button className="cd-primary-btn" disabled={busy} onClick={handleMoveToApproval}>
+                  Move to Approval →
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ INTERNAL APPROVAL ═══ */}
+      {stage === "approval" && (
+        <div className="cd-section">
+          <h2>Internal Approval</h2>
+          <p className="cd-note">Review the candidate's profile and interview feedback above, then approve or reject.</p>
+          <div className="cd-modal-actions">
+            <button className="cd-reject-btn" disabled={busy} onClick={() => handleApprovalDecision("rejected")}>
+              Reject
+            </button>
+            <button className="cd-primary-btn" disabled={busy} onClick={() => handleApprovalDecision("approved")}>
+              {busy ? "Saving…" : "Approve →"}
             </button>
           </div>
         </div>
       )}
 
+      {/* ═══ BGV ═══ */}
+      {stage === "bgv" && (
+        <div className="cd-section">
+          <h2>Background Verification</h2>
+          {!showBgvForm ? (
+            <>
+              <p className="cd-note">
+                Status: <span className={`cd-stage-badge cd-stage-badge--${candidate.bgv_status}`}>{candidate.bgv_status.replace("_", " ")}</span>
+              </p>
+              {candidate.bgv_document_url && (
+                <p className="cd-note">
+                  Document: <a href={candidate.bgv_document_url} target="_blank" rel="noreferrer">{candidate.bgv_document_url}</a>
+                </p>
+              )}
+              {candidate.bgv_notes && <p className="cd-note">{candidate.bgv_notes}</p>}
+              <button className="cd-action-btn" disabled={busy} onClick={() => setShowBgvForm(true)}>
+                Update BGV
+              </button>
+            </>
+          ) : (
+            <>
+              <label className="cd-field">
+                Status
+                <select name="bgv_status" value={bgvForm.bgv_status} onChange={handleBgvChange}>
+                  <option value="in_progress">In Progress</option>
+                  <option value="cleared">Cleared</option>
+                  <option value="flagged">Flagged</option>
+                </select>
+              </label>
+              <label className="cd-field">
+                Document link
+                <input
+                  name="bgv_document_url"
+                  value={bgvForm.bgv_document_url}
+                  onChange={handleBgvChange}
+                  placeholder="Link to BGV report/document"
+                />
+              </label>
+              <label className="cd-field">
+                Notes
+                <textarea rows={3} name="bgv_notes" value={bgvForm.bgv_notes} onChange={handleBgvChange} />
+              </label>
+              <div className="cd-modal-actions">
+                <button className="cd-cancel-btn" disabled={busy} onClick={() => setShowBgvForm(false)}>
+                  Cancel
+                </button>
+                <button className="cd-primary-btn" disabled={busy} onClick={handleSaveBgv}>
+                  {busy ? "Saving…" : "Save"}
+                </button>
+              </div>
+              <p className="cd-note">Marking "Cleared" automatically moves the candidate to the Offer stage.</p>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ═══ OFFER ═══ */}
+      {stage === "offer" && (
+        <div className="cd-section">
+          <h2>Offer</h2>
+          {!showOfferForm ? (
+            hasOfferDetails ? (
+              <>
+                <div className="cd-meta" style={{ marginBottom: "0.9rem" }}>
+                  <div className="cd-meta-item">
+                    <span className="cd-meta-label">Role</span>
+                    <span className="cd-meta-value">{candidate.offered_role}</span>
+                  </div>
+                  <div className="cd-meta-item">
+                    <span className="cd-meta-label">Salary</span>
+                    <span className="cd-meta-value">₹{Number(candidate.offered_salary).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="cd-meta-item">
+                    <span className="cd-meta-label">Joining Date</span>
+                    <span className="cd-meta-value">{formatDate(candidate.joining_date)}</span>
+                  </div>
+                </div>
+                <div className="cd-actions">
+                  <button className="cd-action-btn" disabled={busy} onClick={() => setShowOfferForm(true)}>
+                    Edit Offer
+                  </button>
+                  <button className="cd-action-btn" disabled={busy} onClick={handleReleaseOffer}>
+                    {busy ? "Sending…" : "Release Offer (Email)"}
+                  </button>
+                  <button className="cd-primary-btn" disabled={busy} onClick={handleConvertToEmployee}>
+                    Convert to Employee →
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button className="cd-action-btn" disabled={busy} onClick={() => setShowOfferForm(true)}>
+                Add Offer Details
+              </button>
+            )
+          ) : (
+            <>
+              <div className="cd-field-row">
+                <label className="cd-field">
+                  Offered Role *
+                  <input name="offered_role" value={offerForm.offered_role} onChange={handleOfferChange} />
+                </label>
+                <label className="cd-field">
+                  Offered Salary *
+                  <input type="number" name="offered_salary" value={offerForm.offered_salary} onChange={handleOfferChange} />
+                </label>
+              </div>
+              <div className="cd-field-row">
+                <label className="cd-field">
+                  Joining Date *
+                  <input type="date" name="joining_date" value={offerForm.joining_date} onChange={handleOfferChange} />
+                </label>
+                <label className="cd-field">
+                  Offer Letter URL
+                  <input
+                    name="offer_letter_url"
+                    value={offerForm.offer_letter_url}
+                    onChange={handleOfferChange}
+                    placeholder="Optional link"
+                  />
+                </label>
+              </div>
+              <div className="cd-modal-actions">
+                <button className="cd-cancel-btn" disabled={busy} onClick={() => setShowOfferForm(false)}>
+                  Cancel
+                </button>
+                <button className="cd-primary-btn" disabled={busy} onClick={handleSaveOffer}>
+                  {busy ? "Saving…" : "Save Offer"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ═══ EMAIL HISTORY ═══ */}
       <div className="cd-section">
-        <h2>Interview Rounds</h2>
-        {candidate.interviews.length === 0 ? (
-          <p className="cd-empty">No interview rounds logged yet.</p>
+        <h2>Email History</h2>
+        {!candidate.emails || candidate.emails.length === 0 ? (
+          <p className="cd-empty">No emails sent yet.</p>
         ) : (
           <table className="cd-table">
             <thead>
               <tr>
-                <th>Round</th>
-                <th>Interviewer</th>
-                <th>Date</th>
-                <th>Rating</th>
-                <th>Feedback</th>
+                <th>Type</th>
+                <th>Subject</th>
+                <th>Sent To</th>
+                <th>Status</th>
+                <th>When</th>
               </tr>
             </thead>
             <tbody>
-              {candidate.interviews.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.round_number}</td>
-                  <td>{r.interviewer_name || "—"}</td>
-                  <td>{formatDate(r.interview_date)}</td>
-                  <td>{r.rating ? `${r.rating} / 5` : "—"}</td>
-                  <td>{r.feedback || "—"}</td>
+              {candidate.emails.map((e) => (
+                <tr key={e.id}>
+                  <td style={{ textTransform: "capitalize" }}>{e.email_type.replace("_", " ")}</td>
+                  <td>{e.subject || "—"}</td>
+                  <td>{e.sent_to || "—"}</td>
+                  <td>
+                    <span className={`cd-email-status cd-email-status--${e.status}`}>{e.status}</span>
+                  </td>
+                  <td>{formatDateTime(e.sent_at)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+
+      {canReject && (
+        <div className="cd-actions">
+          <button className="cd-reject-btn" disabled={busy} onClick={openRejectModal}>
+            Reject Candidate
+          </button>
+        </div>
+      )}
+
+      {/* ═══ MODALS ═══ */}
 
       {showRejectModal && (
         <div className="cd-modal-backdrop" onClick={() => !busy && setShowRejectModal(false)}>
