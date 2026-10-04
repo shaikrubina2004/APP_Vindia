@@ -31,6 +31,7 @@ const leaveRoutes = require("./routes/leaveRoutes");
 const rolesRoutes = require("./routes/rolesRoutes");
 const travelExpenseRoutes = require("./routes/travelExpenseRoutes");
 const payrollRoutes = require("./routes/payrollRoutes");
+const employeeDocumentRoutes = require("./routes/employeeDocumentRoutes");
 
 const projectRoutes = require("./routes/projectRoutes");
 const wbsRoutes = require("./routes/wbsRoutes");
@@ -167,7 +168,7 @@ app.use("/api/leaves", leaveRoutes);
 app.use("/api/roles", rolesRoutes);
 app.use("/api/travel-expenses", travelExpenseRoutes);
 app.use("/api/payroll", payrollRoutes);
-
+app.use("/api/employee-documents", employeeDocumentRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/wbs", wbsRoutes);
 app.use("/api/cost-summary", costRoutes);

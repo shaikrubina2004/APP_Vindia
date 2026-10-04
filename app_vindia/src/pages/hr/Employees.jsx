@@ -38,9 +38,7 @@ function Employees() {
 
   // ✅ UPDATED FILTER LOGIC
   const filteredEmployees = employees.filter((emp) => {
-    const nameMatch = emp.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
+    const nameMatch = emp.name.toLowerCase().includes(search.toLowerCase());
 
     if (!nameMatch) return false;
 

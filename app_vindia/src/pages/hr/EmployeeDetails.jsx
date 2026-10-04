@@ -1,20 +1,37 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { deleteEmployee, getEmployeeById } from "../../services/employeeService";
+import employeeDocumentService from "../../services/employeeDocumentService";
 import "./EmployeeDetails.css";
-
 function EmployeeDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [employee, setEmployee] = useState(null);
+     const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const [additionalDocs, setAdditionalDocs] = useState([]);
+  const [showDocUpload, setShowDocUpload] = useState(false);
+  const [docTitle, setDocTitle] = useState("");
+  const [docCategory, setDocCategory] = useState("");
+  const [docFile, setDocFile] = useState(null);
+  const [docUploading, setDocUploading] = useState(false);
+  const [docError, setDocError] = useState(null);
+
   useEffect(() => {
     fetchEmployee();
+    fetchAdditionalDocs();
   }, [id]);
 
+  const fetchAdditionalDocs = async () => {
+    try {
+      const res = await employeeDocumentService.getByEmployee(id);
+      setAdditionalDocs(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
   const fetchEmployee = async () => {
     try {
       setLoading(true);
@@ -33,10 +50,51 @@ function EmployeeDetails() {
     setTimeout(() => setCopied(false), 1800);
   };
 
-  const handleDelete = async () => {
+    const handleDelete = async () => {
     if (window.confirm("Delete this employee?")) {
       await deleteEmployee(employee.id);
       navigate("/hr/employees");
+    }
+  };
+
+  const handleDocFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) setDocFile(file);
+  };
+
+  const handleUploadDoc = async () => {
+    setDocError(null);
+    if (!docTitle.trim() || !docFile) {
+      setDocError("Title and a file are both required.");
+      return;
+    }
+    setDocUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("employee_id", employee.id);
+      formData.append("title", docTitle.trim());
+      formData.append("category", docCategory.trim());
+      formData.append("file", docFile);
+      await employeeDocumentService.upload(formData);
+      setDocTitle("");
+      setDocCategory("");
+      setDocFile(null);
+      setShowDocUpload(false);
+      await fetchAdditionalDocs();
+    } catch (err) {
+      setDocError(err.response?.data?.error || "Failed to upload document");
+    } finally {
+      setDocUploading(false);
+    }
+  };
+
+  const handleDeleteDoc = async (docId) => {
+    if (!window.confirm("Delete this document?")) return;
+    try {
+      await employeeDocumentService.delete(docId);
+      setAdditionalDocs((prev) => prev.filter((d) => d.id !== docId));
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -209,7 +267,7 @@ function EmployeeDetails() {
             <span className="ed-bottom-card-icon"></span>
             <h4>Documents</h4>
           </div>
-          <div className="ed-docs-list">
+                    <div className="ed-docs-list">
             {docs.map(({ label, field }) => (
               <div key={field} className="ed-doc-row">
                 <span className="ed-doc-label">{label}</span>
@@ -221,6 +279,69 @@ function EmployeeDetails() {
               </div>
             ))}
           </div>
+
+          <div className="ed-bottom-card-header" style={{ marginTop: "1.1rem" }}>
+            <h4>Additional Documents</h4>
+          </div>
+
+          {additionalDocs.length === 0 ? (
+            <p className="ed-doc-none" style={{ marginBottom: "0.75rem" }}>None uploaded yet</p>
+          ) : (
+            <div className="ed-docs-list">
+              {additionalDocs.map((d) => (
+                <div key={d.id} className="ed-doc-row">
+                  <span className="ed-doc-label">
+                    {d.title}
+                    {d.category ? ` · ${d.category}` : ""}
+                  </span>
+                  <span>
+                    <a href={`http://localhost:5000${d.file_url}`} target="_blank" rel="noreferrer" className="ed-doc-view-btn">View</a>
+                    {" "}
+                    <button
+                      className="ed-doc-view-btn"
+                      style={{ border: "none", background: "none", color: "#dc2626", cursor: "pointer" }}
+                      onClick={() => handleDeleteDoc(d.id)}
+                    >
+                      Delete
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!showDocUpload ? (
+            <button className="ed-btn ed-btn--edit" style={{ marginTop: "0.5rem" }} onClick={() => setShowDocUpload(true)}>
+              + Upload Document
+            </button>
+          ) : (
+            <div style={{ marginTop: "0.5rem" }}>
+              <input
+                type="text"
+                placeholder="Document title"
+                value={docTitle}
+                onChange={(e) => setDocTitle(e.target.value)}
+                style={{ display: "block", width: "100%", marginBottom: "0.5rem", padding: "0.4rem" }}
+              />
+              <input
+                type="text"
+                placeholder="Category (optional)"
+                value={docCategory}
+                onChange={(e) => setDocCategory(e.target.value)}
+                style={{ display: "block", width: "100%", marginBottom: "0.5rem", padding: "0.4rem" }}
+              />
+              <input type="file" onChange={handleDocFileChange} style={{ marginBottom: "0.5rem" }} />
+              {docError && <p style={{ color: "#dc2626", fontSize: "0.85rem" }}>{docError}</p>}
+              <div>
+                <button className="ed-btn ed-btn--delete" onClick={() => setShowDocUpload(false)} disabled={docUploading}>
+                  Cancel
+                </button>{" "}
+                <button className="ed-btn ed-btn--edit" onClick={handleUploadDoc} disabled={docUploading}>
+                  {docUploading ? "Uploading…" : "Upload"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
       </div>
