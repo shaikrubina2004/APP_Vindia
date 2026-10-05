@@ -77,6 +77,11 @@ const QUICK_ADD_ITEMS = {
     { label: "Stock Out", path: "/operations/inventory/stock-out" },
     { label: "View Incident", path: "/operations/inventory/incidents" },
   ],
+  hr_manager: [
+    { label: "Add Employee", path: "/hr/add-employee" },
+    { label: "New Job Opening", path: "/hr/recruitment/job-openings" },
+    { label: "View Incident", path: "/hr/incidents" },
+  ],
 };
 
 // Fallback for unknown roles

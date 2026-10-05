@@ -11,12 +11,12 @@ function EmployeeDetails() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const [additionalDocs, setAdditionalDocs] = useState([]);
+    const [additionalDocs, setAdditionalDocs] = useState([]);
   const [showDocUpload, setShowDocUpload] = useState(false);
-  const [docTitle, setDocTitle] = useState("");
   const [docCategory, setDocCategory] = useState("");
-  const [docFile, setDocFile] = useState(null);
+  const [docFiles, setDocFiles] = useState([]);
   const [docUploading, setDocUploading] = useState(false);
+  const [docUploadProgress, setDocUploadProgress] = useState("");
   const [docError, setDocError] = useState(null);
 
   useEffect(() => {
@@ -57,34 +57,60 @@ function EmployeeDetails() {
     }
   };
 
+    // Supports picking files multiple times (e.g. browse → pick 2 → browse
+  // again → pick 3 more) — each round adds to the staged list rather than
+  // replacing it, with simple de-dup by name+size so re-picking the same
+  // file twice doesn't queue it twice.
   const handleDocFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) setDocFile(file);
+    const picked = Array.from(e.target.files || []);
+    setDocFiles((prev) => {
+      const existingKeys = new Set(prev.map((f) => `${f.name}_${f.size}`));
+      const newOnes = picked.filter((f) => !existingKeys.has(`${f.name}_${f.size}`));
+      return [...prev, ...newOnes];
+    });
+    e.target.value = ""; // allow re-selecting the same file later if removed
   };
+
+  const removeStagedFile = (index) => {
+    setDocFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const stripExtension = (filename) => filename.replace(/\.[^/.]+$/, "");
 
   const handleUploadDoc = async () => {
     setDocError(null);
-    if (!docTitle.trim() || !docFile) {
-      setDocError("Title and a file are both required.");
+    if (docFiles.length === 0) {
+      setDocError("Select at least one file.");
       return;
     }
     setDocUploading(true);
+    const failures = [];
     try {
-      const formData = new FormData();
-      formData.append("employee_id", employee.id);
-      formData.append("title", docTitle.trim());
-      formData.append("category", docCategory.trim());
-      formData.append("file", docFile);
-      await employeeDocumentService.upload(formData);
-      setDocTitle("");
-      setDocCategory("");
-      setDocFile(null);
-      setShowDocUpload(false);
+      for (let i = 0; i < docFiles.length; i++) {
+        const file = docFiles[i];
+        setDocUploadProgress(`Uploading ${i + 1} of ${docFiles.length}…`);
+        try {
+          const formData = new FormData();
+          formData.append("employee_id", employee.id);
+          formData.append("title", stripExtension(file.name));
+          formData.append("category", docCategory.trim());
+          formData.append("file", file);
+          await employeeDocumentService.upload(formData);
+        } catch (err) {
+          failures.push(file.name);
+        }
+      }
+      if (failures.length > 0) {
+        setDocError(`Failed to upload: ${failures.join(", ")}`);
+      } else {
+        setDocCategory("");
+        setDocFiles([]);
+        setShowDocUpload(false);
+      }
       await fetchAdditionalDocs();
-    } catch (err) {
-      setDocError(err.response?.data?.error || "Failed to upload document");
     } finally {
       setDocUploading(false);
+      setDocUploadProgress("");
     }
   };
 
@@ -315,29 +341,56 @@ function EmployeeDetails() {
               + Upload Document
             </button>
           ) : (
-            <div style={{ marginTop: "0.5rem" }}>
+                        <div style={{ marginTop: "0.5rem" }}>
               <input
                 type="text"
-                placeholder="Document title"
-                value={docTitle}
-                onChange={(e) => setDocTitle(e.target.value)}
-                style={{ display: "block", width: "100%", marginBottom: "0.5rem", padding: "0.4rem" }}
-              />
-              <input
-                type="text"
-                placeholder="Category (optional)"
+                placeholder="Category (optional, applies to all files below)"
                 value={docCategory}
                 onChange={(e) => setDocCategory(e.target.value)}
                 style={{ display: "block", width: "100%", marginBottom: "0.5rem", padding: "0.4rem" }}
               />
-              <input type="file" onChange={handleDocFileChange} style={{ marginBottom: "0.5rem" }} />
+
+              {docFiles.length > 0 && (
+                <div style={{ marginBottom: "0.5rem" }}>
+                  {docFiles.map((f, i) => (
+                    <div
+                      key={`${f.name}_${f.size}`}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.3rem 0", fontSize: "0.85rem" }}
+                    >
+                      <span>📄 {f.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeStagedFile(i)}
+                        disabled={docUploading}
+                        style={{ border: "none", background: "none", color: "#dc2626", cursor: "pointer" }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <input
+                type="file"
+                multiple
+                onChange={handleDocFileChange}
+                disabled={docUploading}
+                style={{ marginBottom: "0.5rem" }}
+              />
+              <p style={{ fontSize: "0.78rem", color: "#6b7280", margin: "0 0 0.5rem" }}>
+                Select multiple files at once, or click again to add more — each is titled from its own filename.
+              </p>
+
               {docError && <p style={{ color: "#dc2626", fontSize: "0.85rem" }}>{docError}</p>}
+              {docUploadProgress && <p style={{ fontSize: "0.85rem", color: "#0A4174" }}>{docUploadProgress}</p>}
+
               <div>
-                <button className="ed-btn ed-btn--delete" onClick={() => setShowDocUpload(false)} disabled={docUploading}>
+                <button className="ed-btn ed-btn--delete" onClick={() => { setShowDocUpload(false); setDocFiles([]); }} disabled={docUploading}>
                   Cancel
                 </button>{" "}
-                <button className="ed-btn ed-btn--edit" onClick={handleUploadDoc} disabled={docUploading}>
-                  {docUploading ? "Uploading…" : "Upload"}
+                <button className="ed-btn ed-btn--edit" onClick={handleUploadDoc} disabled={docUploading || docFiles.length === 0}>
+                  {docUploading ? "Uploading…" : `Upload ${docFiles.length > 0 ? `(${docFiles.length})` : ""}`}
                 </button>
               </div>
             </div>
