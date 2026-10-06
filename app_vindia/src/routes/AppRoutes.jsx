@@ -504,7 +504,7 @@ const AppRoutes = () => {
 
         {/* ══ SITE ENGINEER ═════════════════════════════════ */}
 
-        <SiteEngineerRoutes />
+        {SiteEngineerRoutes}
 
         {/* ══ QUANTITY SURVEYOR ═════════════════════════════ */}
 
