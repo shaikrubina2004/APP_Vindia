@@ -1,0 +1,103 @@
+/* ════════════════════════════════════════════════════════════
+   Operations & Administration hub — additions on top of opsShared.css
+   (same tokens: slate greys, 14px cards, indigo/sky/emerald/amber/red).
+   ════════════════════════════════════════════════════════════ */
+@import "../../../styles/opsShared.css";
+
+.ops-alert-success { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+.ops-badge-amber { background: #fffbeb; color: #b45309; }
+.ops-badge-amber .ops-badge-dot { background: #f59e0b; }
+
+/* KPI grid variants */
+.ops-kpi-grid.hub-kpi-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 1100px) { .ops-kpi-grid.hub-kpi-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px)  { .ops-kpi-grid.hub-kpi-4 { grid-template-columns: 1fr; } }
+.ops-tone-violet { background: #7c3aed; }
+.hub-kpi-sub { font-size: 12px; color: #94a3b8; margin: 2px 0 0; }
+
+/* ── Procurement → delivery pipeline ─────────────────────── */
+.hub-pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; padding: 18px 12px 20px; }
+@media (max-width: 900px) { .hub-pipeline { grid-template-columns: 1fr; gap: 10px; } }
+.hub-stage {
+  position: relative; display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 4px 10px; text-decoration: none; color: inherit; border-radius: 12px; transition: background .15s ease;
+}
+.hub-stage:hover { background: #f8fafc; }
+.hub-stage:not(:last-child)::after {
+  content: ""; position: absolute; top: 24px; right: -10%; width: 20%; height: 2px;
+  background: linear-gradient(90deg, #cbd5e1, #e2e8f0);
+}
+@media (max-width: 900px) { .hub-stage:not(:last-child)::after { display: none; } }
+.hub-stage-dot {
+  width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: #fff; margin-bottom: 8px; box-shadow: 0 4px 10px rgba(15, 23, 42, .12); z-index: 1;
+}
+.hub-stage-count { font-size: 22px; font-weight: 600; color: #1e293b; line-height: 1.1; }
+.hub-stage-name  { font-size: 13px; font-weight: 500; color: #334155; margin-top: 2px; }
+.hub-stage-hint  { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+.hub-stage-alert { font-size: 11px; font-weight: 600; color: #b91c1c; background: #fef2f2; border-radius: 999px; padding: 2px 8px; margin-top: 6px; }
+
+/* ── Layout ──────────────────────────────────────────────── */
+.hub-grid-2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; }
+@media (max-width: 1000px) { .hub-grid-2 { grid-template-columns: 1fr; } }
+.hub-grid-eq { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 1000px) { .hub-grid-eq { grid-template-columns: 1fr; } }
+
+/* ── Attention list ──────────────────────────────────────── */
+.hub-attention { list-style: none; margin: 0; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+.hub-attention a {
+  display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: 10px;
+  text-decoration: none; color: inherit; transition: background .15s ease;
+}
+.hub-attention a:hover { background: #f8fafc; }
+.hub-att-bar { width: 4px; align-self: stretch; border-radius: 4px; flex-shrink: 0; }
+.hub-att-bar.critical { background: #ef4444; }
+.hub-att-bar.warn { background: #f59e0b; }
+.hub-att-bar.info { background: #38bdf8; }
+.hub-att-title { font-size: 14px; font-weight: 500; color: #1e293b; margin: 0; }
+.hub-att-detail { font-size: 12px; color: #94a3b8; margin: 2px 0 0; }
+.hub-all-clear { display: flex; gap: 10px; align-items: center; padding: 28px 20px; color: #047857; font-size: 14px; justify-content: center; }
+
+/* ── Feed / lists ────────────────────────────────────────── */
+.hub-feed { list-style: none; margin: 0; padding: 4px 20px 12px; }
+.hub-feed li { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; align-items: center; }
+.hub-feed li:last-child { border-bottom: none; }
+.hub-feed-ico { width: 30px; height: 30px; border-radius: 9px; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.hub-feed-main { flex: 1; min-width: 0; }
+.hub-feed-main p { margin: 0; font-size: 13px; color: #334155; }
+.hub-feed-main small { color: #94a3b8; font-size: 12px; }
+
+/* ── Toolbars / filters ──────────────────────────────────── */
+.hub-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.hub-search { position: relative; }
+.hub-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+.hub-search input { padding-left: 32px; min-width: 240px; }
+.hub-row-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.hub-clickable { cursor: pointer; }
+.hub-mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.hub-strong { font-weight: 600; color: #1e293b; }
+.hub-late { color: #b91c1c; font-weight: 500; }
+
+/* ── Small stacked bar (reports) ─────────────────────────── */
+.hub-bar-row { display: grid; grid-template-columns: 150px 1fr 90px; gap: 12px; align-items: center; padding: 8px 20px; font-size: 13px; color: #334155; }
+.hub-bar-row .ops-progress-track { height: 8px; }
+.hub-bar-fill { background: #6366f1; height: 100%; border-radius: 999px; transition: width .6s ease; }
+.hub-bar-val { text-align: right; color: #64748b; }
+.hub-stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; padding: 16px 20px; }
+.hub-tile { background: #f8fafc; border-radius: 12px; padding: 12px 14px; }
+.hub-tile b { display: block; font-size: 22px; font-weight: 600; color: #1e293b; }
+.hub-tile span { font-size: 12px; color: #64748b; }
+
+/* ── Detail rows inside modals ───────────────────────────── */
+.hub-detail { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: 13px; }
+.hub-detail dt { color: #94a3b8; }
+.hub-detail dd { margin: 0; color: #334155; }
+.hub-warn-note { font-size: 12px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; padding: 8px 12px; border-radius: 10px; }
+
+/* Purchase-order badges (also used by the older Procurement pages) */
+.po-badge--pending_approval { background: #fffbeb; color: #b45309; }
+.po-badge--rejected { background: #fee2e2; color: #dc2626; }
+
+.ops-tab-count { font-size: 11px; background: #f1f5f9; color: #64748b; border-radius: 999px; padding: 1px 7px; }
+.ops-tab-active .ops-tab-count { background: #dbeafe; color: #2563eb; }
+.ops-tone-sky { background: #0ea5e9; }

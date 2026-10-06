@@ -1,0 +1,258 @@
+/* Project approvals (PM) - same navy palette as the other PM pages */
+.pa-page {
+    padding: 24px;
+    max-width: 1280px;
+    margin: 0 auto;
+    font-family: "DM Sans", sans-serif;
+    color: #0f172a;
+}
+
+.pa-header h1 {
+    margin: 0 0 4px;
+    font-size: 22px;
+    font-weight: 800;
+    color: #0a4174;
+}
+
+.pa-header p {
+    margin: 0 0 18px;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.pa-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(10, 65, 116, 0.06);
+    margin-bottom: 18px;
+}
+
+.pa-form {
+    padding: 18px 20px;
+}
+
+.pa-form h2 {
+    margin: 0 0 14px;
+    font-size: 14px;
+    font-weight: 800;
+    color: #0a4174;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.pa-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.pa-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #475569;
+}
+
+.pa-grid .pa-wide {
+    grid-column: span 2;
+}
+
+.pa-grid input,
+.pa-grid select,
+.pa-grid textarea {
+    padding: 9px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #0f172a;
+    background: #fff;
+}
+
+.pa-grid input:focus,
+.pa-grid select:focus,
+.pa-grid textarea:focus {
+    outline: none;
+    border-color: #1e5a96;
+    box-shadow: 0 0 0 3px rgba(30, 90, 150, 0.14);
+}
+
+.pa-grid .pa-check {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.pa-grid .pa-check input {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+}
+
+.pa-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.pa-btn {
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.pa-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.pa-btn--primary {
+    background: #0a4174;
+    color: #fff;
+}
+
+.pa-btn--primary:hover:not(:disabled) {
+    background: #1e5a96;
+}
+
+.pa-btn--ghost {
+    background: #fff;
+    color: #0a4174;
+    border-color: #cbd5e1;
+}
+
+.pa-btn--danger {
+    background: #fff;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.pa-table-wrap {
+    overflow-x: auto;
+}
+
+.pa-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.pa-table th {
+    text-align: left;
+    padding: 11px 14px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.pa-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+}
+
+.pa-sub {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.pa-row-actions {
+    white-space: nowrap;
+    display: flex;
+    gap: 6px;
+}
+
+.pa-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.pa-pill--approved {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.pa-pill--pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.pa-pill--upcoming {
+    background: #e6f1fb;
+    color: #185fa5;
+}
+
+.pa-pill--rejected {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.pa-alert {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 14px;
+}
+
+.pa-alert--error {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+
+.pa-alert--ok {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.pa-empty {
+    padding: 28px;
+    text-align: center;
+    color: #64748b;
+    font-size: 13px;
+}
+
+@media (max-width: 900px) {
+    .pa-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .pa-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .pa-grid .pa-wide {
+        grid-column: auto;
+    }
+
+    .pa-page {
+        padding: 14px;
+    }
+}

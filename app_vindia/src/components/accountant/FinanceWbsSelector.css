@@ -1,0 +1,254 @@
+/* ===== FILE: APP_Vindia/app_vindia/src/components/accountant/FinanceWbsSelector.css =====
+   Shares the Accountant module's existing palette/tokens (see
+   pages/Accountant/AccountantExpenses.css) so this drops into any
+   finance form without looking bolted-on:
+     primary blue  #17679a / hover #11577f
+     navy text     #142d45 / #1d374d
+     borders       #d7e2ea / #dbe5ed
+     muted text    #7e91a2 / #8a99a5
+     surfaces      #fbfcfd / #f9fbfc / #fff
+*/
+
+.fws-wrap {
+  border: 1px solid #dfe8ef;
+  background: #fbfcfd;
+  border-radius: 13px;
+  padding: 16px 17px 17px;
+  margin-bottom: 16px;
+}
+
+.fws-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 13px;
+}
+
+.fws-label {
+  display: block;
+  color: #17344b;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.1px;
+}
+
+.fws-required {
+  color: #c73f3f;
+  font-weight: 800;
+}
+
+.fws-helper {
+  display: block;
+  margin-top: 3px;
+  color: #8394a3;
+  font-size: 11px;
+  line-height: 1.5;
+  max-width: 46ch;
+}
+
+.fws-project-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eaf5fb;
+  color: #17679a;
+  font-size: 11px;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.fws-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1ca76b;
+  display: inline-block;
+}
+
+/* ── States ── */
+.fws-state {
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12px;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fws-state-idle {
+  background: #f2f5f7;
+  color: #6f8293;
+  border: 1px dashed #d7e2ea;
+}
+
+.fws-state-loading {
+  background: #eaf5fb;
+  color: #17679a;
+  border: 1px solid #d3e7f2;
+}
+
+.fws-state-error {
+  background: #fff5f5;
+  color: #9b2f2f;
+  border: 1px solid #efc8c8;
+}
+
+.fws-state-empty {
+  background: #fff9ef;
+  color: #97690f;
+  border: 1px solid #f2e2bd;
+  line-height: 1.55;
+}
+
+.fws-spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid #d3e7f2;
+  border-top-color: #17679a;
+  animation: fws-spin 0.8s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes fws-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Cascading selects ── */
+.fws-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.fws-field {
+  display: block;
+}
+
+.fws-field > span {
+  display: block;
+  margin-bottom: 6px;
+  color: #566d7f;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.fws-field select {
+  width: 100%;
+  height: 40px;
+  box-sizing: border-box;
+  border: 1px solid #d7e2ea;
+  border-radius: 9px;
+  background: #fff;
+  color: #1d374d;
+  font: inherit;
+  font-size: 12.5px;
+  padding: 0 10px;
+  outline: 0;
+  transition: 0.15s;
+}
+
+.fws-field select:focus {
+  border-color: #7cabca;
+  box-shadow: 0 0 0 3px rgba(23, 103, 154, 0.08);
+}
+
+.fws-field select:disabled {
+  background: #f2f5f7;
+  color: #8a99a5;
+  cursor: not-allowed;
+}
+
+/* ── Resolved trail (Project -> Milestone -> Activity) ── */
+.fws-trail {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 13px;
+  padding-top: 13px;
+  border-top: 1px dashed #e2eaf0;
+}
+
+.fws-trail-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.fws-trail-project {
+  background: #eef5f9;
+  color: #43667e;
+}
+
+.fws-trail-milestone {
+  background: #eaf8f1;
+  color: #16825c;
+}
+
+.fws-trail-activity {
+  background: #f0edfb;
+  color: #6657a4;
+}
+
+.fws-trail-arrow {
+  color: #b7c4cd;
+  font-size: 11px;
+}
+
+/* ── Compact badge, for table cells ── */
+.fws-badge {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.35;
+  padding: 4px 0;
+}
+
+.fws-badge strong {
+  color: #17344b;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.fws-badge em {
+  color: #7e91a2;
+  font-size: 10.5px;
+  font-style: normal;
+}
+
+.fws-badge small {
+  color: #9aa8b3;
+  font-size: 9.5px;
+  margin-top: 1px;
+}
+
+.fws-badge-unassigned {
+  display: inline-flex;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #f2f5f7;
+  color: #8798a6;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+@media (max-width: 620px) {
+  .fws-head {
+    flex-direction: column;
+  }
+  .fws-grid {
+    grid-template-columns: 1fr;
+  }
+}

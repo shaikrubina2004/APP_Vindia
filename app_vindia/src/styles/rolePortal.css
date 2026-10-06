@@ -1,0 +1,38 @@
+/* Shared visual baseline for role portals. Page-specific CSS remains authoritative. */
+.role-portal {
+  --portal-surface: #ffffff;
+  --portal-border: #e5eaf1;
+  --portal-text: #142033;
+  --portal-muted: #667085;
+  --portal-accent: #185fa5;
+  min-height: 100%;
+}
+
+.role-portal .page-content {
+  background: #f6f8fb;
+}
+
+.role-portal .portal-page {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.role-portal button,
+.role-portal input,
+.role-portal select,
+.role-portal textarea {
+  font: inherit;
+}
+
+.role-portal :focus-visible {
+  outline: 3px solid rgba(24, 95, 165, .22);
+  outline-offset: 2px;
+}
+
+.role-portal .portal-card {
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border);
+  border-radius: 14px;
+  box-shadow: 0 6px 24px rgba(16, 24, 40, .06);
+}
