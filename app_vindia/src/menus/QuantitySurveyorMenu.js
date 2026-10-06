@@ -14,7 +14,6 @@ const QuantitySurveyorMenu = [
     path: "/quantity-surveyor/daily-updates",
     icon: "edit-3",
   },
-  { name: "Measurement", path: "/quantity-surveyor/measurement", icon: "maximize" },
   { name: "BOQ", path: "/quantity-surveyor/boq", icon: "list" },
 
   // ✅ NEW

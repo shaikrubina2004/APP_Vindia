@@ -110,7 +110,7 @@ export default function AccountantResourcePage({
         <form className="acs-form" onSubmit={handleCreate}>
           {createFields.map((f) => (
             <div className="acs-field" key={f.name}>
-              <label htmlFor={f.name}>{f.label}{f.required && " *"}</label>
+              {!f.hideLabel && <label htmlFor={f.name}>{f.label}{f.required && " *"}</label>}
               {f.type === "select" ? (
                 <select
                   id={f.name}
@@ -123,6 +123,12 @@ export default function AccountantResourcePage({
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
+              ) : f.type === "custom" ? (
+                // Escape hatch for fields the generic renderer can't express —
+                // e.g. FinanceWbsSelector, whose options depend on another
+                // field's current value. f.render gets the live form state
+                // and the same setter every other field uses.
+                f.render(formValues, handleFieldChange)
               ) : (
                 <input
                   id={f.name}

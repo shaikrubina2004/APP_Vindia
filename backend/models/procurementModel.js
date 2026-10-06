@@ -1,13 +1,19 @@
 // ===== FILE: APP_Vindia/backend/models/procurementModel.js =====
 const pool = require("../config/db");
+const { PO_STATUS } = require("../config/operations");
 
 /* ─────────────────────────────
    HELPER: Generate next PO code
    Format: PO-<YEAR>-<0001 style sequence, per year>
+   Must be called INSIDE a transaction: it takes a transaction-level advisory
+   lock so two officers creating a PO at the same instant cannot get the same
+   number (previously a duplicate-key 500).
 ───────────────────────────── */
 const generatePoCode = async (client) => {
   const year = new Date().getFullYear();
   const prefix = `PO-${year}-`;
+
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('po_code'))");
 
   const codeResult = await client.query(
     `SELECT po_code FROM purchase_orders
@@ -29,19 +35,36 @@ const generatePoCode = async (client) => {
   return `${prefix}${String(lastSeq + 1).padStart(4, "0")}`;
 };
 
+/* Received quantity per PO line = accepted qty on goods receipts of the
+   deliveries linked to that PO, matched by item name (case-insensitive). */
+const RECEIVED_FOR_LINE_SQL = `
+  COALESCE((
+    SELECT SUM(gri.accepted_qty)
+    FROM goods_receipt_items gri
+    JOIN goods_receipts gr ON gr.id = gri.goods_receipt_id
+    JOIN deliveries d ON d.id = gr.delivery_id
+    LEFT JOIN delivery_items di ON di.id = gri.delivery_item_id
+    LEFT JOIN inventory_items ii ON ii.id = gri.item_id
+    WHERE d.purchase_order_id = po.id
+      AND LOWER(TRIM(COALESCE(di.item_name, ii.item_name))) = LOWER(TRIM(poi.item_name))
+  ), 0)`;
+
 const Procurement = {
   /* ─────────────────────────────
      Approved material requests that
-     don't have a PO linked yet
+     don't have a live PO yet. A cancelled / rejected PO frees the request
+     again (before, one cancelled PO locked it forever).
   ───────────────────────────── */
   getApprovedUnlinkedRequests: async () => {
     const result = await pool.query(
-      `SELECT mr.*
+      `SELECT mr.*, u.name AS requested_by_name
        FROM material_requests mr
+       LEFT JOIN users u ON u.id = mr.created_by
        WHERE mr.status = 'approved'
          AND NOT EXISTS (
            SELECT 1 FROM purchase_orders po
            WHERE po.material_request_id = mr.id
+             AND po.status NOT IN ('cancelled', 'rejected')
          )
        ORDER BY mr.created_at DESC`
     );
@@ -49,9 +72,10 @@ const Procurement = {
   },
 
   /* ─────────────────────────────
-     Create a Purchase Order + its line items
-     in a single transaction.
-     items: [{ item_name, unit, ordered_qty }, ...]
+     Create a Purchase Order + its line items in a single transaction.
+     items: [{ item_name, unit, ordered_qty, unit_price? }, ...]
+     Total > threshold  ->  status 'pending_approval' (Operations Manager)
+     otherwise          ->  status 'issued'
   ───────────────────────────── */
   createPO: async ({
     material_request_id,
@@ -59,20 +83,74 @@ const Procurement = {
     project_id,
     items,
     created_by,
+    expected_delivery_date,
+    payment_terms,
+    remarks,
+    approvalThreshold,
   }) => {
     const client = await pool.connect();
 
     try {
       await client.query("BEGIN");
 
+      // Serialise on the material request so two officers cannot both raise
+      // a PO for the same request.
+      if (material_request_id) {
+        const mr = await client.query(
+          "SELECT id, status FROM material_requests WHERE id = $1 FOR UPDATE",
+          [material_request_id]
+        );
+        if (!mr.rows.length) {
+          const e = new Error("Material request not found");
+          e.status = 404;
+          throw e;
+        }
+        if (mr.rows[0].status !== "approved") {
+          const e = new Error("Only approved material requests can be ordered");
+          e.status = 400;
+          throw e;
+        }
+        const dup = await client.query(
+          `SELECT po_code FROM purchase_orders
+           WHERE material_request_id = $1 AND status NOT IN ('cancelled','rejected')
+           LIMIT 1`,
+          [material_request_id]
+        );
+        if (dup.rows.length) {
+          const e = new Error(`This request already has purchase order ${dup.rows[0].po_code}`);
+          e.status = 409;
+          throw e;
+        }
+      }
+
+      const total = items.reduce(
+        (sum, it) => sum + Number(it.ordered_qty) * Number(it.unit_price || 0),
+        0
+      );
+      const needsApproval = total > approvalThreshold;
+      const status = needsApproval ? PO_STATUS.PENDING_APPROVAL : PO_STATUS.ISSUED;
+
       const po_code = await generatePoCode(client);
 
       const poResult = await client.query(
         `INSERT INTO purchase_orders
-           (po_code, material_request_id, vendor_id, project_id, status, created_by)
-         VALUES ($1, $2, $3, $4, 'issued', $5)
+           (po_code, material_request_id, vendor_id, project_id, status, created_by,
+            total_amount, expected_delivery_date, payment_terms, remarks, approval_required)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
-        [po_code, material_request_id, vendor_id, project_id, created_by]
+        [
+          po_code,
+          material_request_id,
+          vendor_id,
+          project_id,
+          status,
+          created_by,
+          total,
+          expected_delivery_date || null,
+          payment_terms || null,
+          remarks || null,
+          needsApproval,
+        ]
       );
 
       const purchaseOrder = poResult.rows[0];
@@ -81,10 +159,18 @@ const Procurement = {
       for (const it of items) {
         const itemResult = await client.query(
           `INSERT INTO purchase_order_items
-             (purchase_order_id, item_name, unit, ordered_qty)
-           VALUES ($1, $2, $3, $4)
+             (purchase_order_id, item_name, unit, ordered_qty, unit_price)
+           VALUES ($1, $2, $3, $4, $5)
            RETURNING *`,
-          [purchaseOrder.id, it.item_name, it.unit || null, it.ordered_qty]
+          [
+            purchaseOrder.id,
+            it.item_name,
+            it.unit || null,
+            it.ordered_qty,
+            it.unit_price === undefined || it.unit_price === "" || it.unit_price === null
+              ? null
+              : it.unit_price,
+          ]
         );
         insertedItems.push(itemResult.rows[0]);
       }
@@ -101,17 +187,17 @@ const Procurement = {
   },
 
   /* ─────────────────────────────
-     List POs, optionally filtered by status.
-     Matches the shape Logistics will need later:
-     po_code, vendor_id, project_id, status, items[]
+     List POs, optionally filtered by status (comma-separated allowed:
+     ?status=issued,partially_fulfilled). Each row carries a fulfilment
+     summary so lists can draw a progress bar.
   ───────────────────────────── */
   getAllPOs: async ({ status } = {}) => {
     const values = [];
     let where = "WHERE 1=1";
 
     if (status) {
-      values.push(status);
-      where += ` AND po.status = $${values.length}`;
+      values.push(String(status).split(",").map((s) => s.trim()).filter(Boolean));
+      where += ` AND po.status = ANY($${values.length})`;
     }
 
     const result = await pool.query(
@@ -119,12 +205,16 @@ const Procurement = {
          po.*,
          v.name AS vendor_name,
          p.name AS project_name,
+         u.name AS created_by_name,
+         (SELECT COALESCE(SUM(poi.ordered_qty), 0) FROM purchase_order_items poi
+           WHERE poi.purchase_order_id = po.id) AS ordered_total,
          COALESCE(
            (SELECT json_agg(
               json_build_object(
                 'item_name', poi.item_name,
                 'unit', poi.unit,
-                'ordered_qty', poi.ordered_qty
+                'ordered_qty', poi.ordered_qty,
+                'unit_price', poi.unit_price
               )
             )
             FROM purchase_order_items poi
@@ -134,6 +224,7 @@ const Procurement = {
        FROM purchase_orders po
        LEFT JOIN vendors v ON v.id = po.vendor_id
        LEFT JOIN projects p ON p.id = po.project_id
+       LEFT JOIN users u ON u.id = po.created_by
        ${where}
        ORDER BY po.created_at DESC`,
       values
@@ -142,7 +233,8 @@ const Procurement = {
   },
 
   /* ─────────────────────────────
-     Single PO with its items
+     Single PO with items (+ received qty per line), linked deliveries
+     and approval info.
   ───────────────────────────── */
   getPOById: async (id) => {
     const result = await pool.query(
@@ -150,26 +242,146 @@ const Procurement = {
          po.*,
          v.name AS vendor_name,
          p.name AS project_name,
-         COALESCE(
-           (SELECT json_agg(
-              json_build_object(
-                'id', poi.id,
-                'item_name', poi.item_name,
-                'unit', poi.unit,
-                'ordered_qty', poi.ordered_qty
-              )
-            )
-            FROM purchase_order_items poi
-            WHERE poi.purchase_order_id = po.id
-           ), '[]'
-         ) AS items
+         u.name AS created_by_name,
+         ua.name AS approved_by_name
        FROM purchase_orders po
        LEFT JOIN vendors v ON v.id = po.vendor_id
        LEFT JOIN projects p ON p.id = po.project_id
+       LEFT JOIN users u ON u.id = po.created_by
+       LEFT JOIN users ua ON ua.id = po.approved_by
        WHERE po.id = $1`,
       [id]
     );
-    return result.rows[0];
+    const po = result.rows[0];
+    if (!po) return po;
+
+    const items = await pool.query(
+      `SELECT poi.id, poi.item_name, poi.unit, poi.ordered_qty, poi.unit_price,
+              ${RECEIVED_FOR_LINE_SQL} AS received_qty
+       FROM purchase_order_items poi
+       JOIN purchase_orders po ON po.id = poi.purchase_order_id
+       WHERE poi.purchase_order_id = $1
+       ORDER BY poi.id`,
+      [id]
+    );
+
+    const deliveries = await pool.query(
+      `SELECT id, delivery_code, status, receipt_status, expected_date, delivery_date
+       FROM deliveries WHERE purchase_order_id = $1 ORDER BY created_at DESC`,
+      [id]
+    );
+
+    return { ...po, items: items.rows, deliveries: deliveries.rows };
+  },
+
+  /* ─────────────────────────────
+     Operations Manager decision on a PO waiting for approval.
+     Returns null if the PO is not in pending_approval any more.
+  ───────────────────────────── */
+  decidePO: async ({ id, approve, userId, reason }) => {
+    const result = await pool.query(
+      `UPDATE purchase_orders
+       SET status = $1,
+           approved_by = $2,
+           approved_at = NOW(),
+           rejection_reason = $3,
+           updated_at = NOW()
+       WHERE id = $4 AND status = 'pending_approval'
+       RETURNING *`,
+      [
+        approve ? PO_STATUS.ISSUED : PO_STATUS.REJECTED,
+        userId,
+        approve ? null : reason || null,
+        id,
+      ]
+    );
+    return result.rows[0] || null;
+  },
+
+  /* ─────────────────────────────
+     Cancel a PO that has not been fulfilled and has no live delivery.
+  ───────────────────────────── */
+  cancelPO: async ({ id, reason }) => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const po = await client.query(
+        "SELECT id, status, po_code FROM purchase_orders WHERE id = $1 FOR UPDATE",
+        [id]
+      );
+      if (!po.rows.length) {
+        await client.query("ROLLBACK");
+        return { error: "Purchase order not found", status: 404 };
+      }
+      if (![PO_STATUS.PENDING_APPROVAL, PO_STATUS.ISSUED].includes(po.rows[0].status)) {
+        await client.query("ROLLBACK");
+        return {
+          error: `A purchase order in status "${po.rows[0].status}" cannot be cancelled`,
+          status: 400,
+        };
+      }
+      const live = await client.query(
+        `SELECT delivery_code FROM deliveries
+         WHERE purchase_order_id = $1 AND status <> 'cancelled' LIMIT 1`,
+        [id]
+      );
+      if (live.rows.length) {
+        await client.query("ROLLBACK");
+        return {
+          error: `Delivery ${live.rows[0].delivery_code} is still active — cancel it first`,
+          status: 409,
+        };
+      }
+      const updated = await client.query(
+        `UPDATE purchase_orders
+         SET status = 'cancelled', cancelled_reason = $2, updated_at = NOW()
+         WHERE id = $1 RETURNING *`,
+        [id, reason || null]
+      );
+      await client.query("COMMIT");
+      return { po: updated.rows[0] };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  },
+
+  /* ─────────────────────────────
+     Re-derive issued / partially_fulfilled / fulfilled from what Inventory
+     has actually accepted. Call inside the goods-receipt transaction
+     (pass its client).
+  ───────────────────────────── */
+  recomputePOStatus: async (client, poId) => {
+    if (!poId) return null;
+    const summary = await client.query(
+      `SELECT po.status,
+              COUNT(*)::int AS lines,
+              COUNT(*) FILTER (WHERE r.received >= poi.ordered_qty)::int AS full_lines,
+              COUNT(*) FILTER (WHERE r.received > 0)::int AS started_lines
+       FROM purchase_orders po
+       JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+       CROSS JOIN LATERAL (SELECT ${RECEIVED_FOR_LINE_SQL} AS received) r
+       WHERE po.id = $1
+       GROUP BY po.status`,
+      [poId]
+    );
+    const row = summary.rows[0];
+    if (!row) return null;
+    if (![PO_STATUS.ISSUED, PO_STATUS.PARTIALLY_FULFILLED, PO_STATUS.FULFILLED].includes(row.status)) {
+      return row.status;
+    }
+    let next = row.status;
+    if (row.lines > 0 && row.full_lines === row.lines) next = PO_STATUS.FULFILLED;
+    else if (row.started_lines > 0) next = PO_STATUS.PARTIALLY_FULFILLED;
+    if (next !== row.status) {
+      await client.query(
+        "UPDATE purchase_orders SET status = $1, updated_at = NOW() WHERE id = $2",
+        [next, poId]
+      );
+    }
+    return next;
   },
 
   /* ─────────────────────────────

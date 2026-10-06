@@ -1,6 +1,8 @@
 import axios from "axios";
+import { API_ORIGIN } from "./api";
 
-const API = axios.create({ baseURL: "http://localhost:5000/api/deliveries" });
+// Was hard-coded to http://localhost:5000 — broke in every deployed environment.
+const API = axios.create({ baseURL: `${API_ORIGIN}/api/deliveries` });
 
 API.interceptors.request.use((req) => {
   const token = localStorage.getItem("token");
@@ -20,11 +22,13 @@ export const getPendingReceipts = () => API.get("/pending-receipt");
 export const getLogisticsDashboard = () => API.get("/dashboard");
 
 // Purchase Orders (read-only for Logistics — created by Procurement)
-const PROCUREMENT_API = axios.create({ baseURL: "http://localhost:5000/api/procurement" });
+const PROCUREMENT_API = axios.create({ baseURL: `${API_ORIGIN}/api/procurement` });
 PROCUREMENT_API.interceptors.request.use((req) => {
   const token = localStorage.getItem("token");
   if (token) req.headers.Authorization = `Bearer ${token}`;
   return req;
 });
-export const getOpenPurchaseOrders = () => PROCUREMENT_API.get("/purchase-orders", { params: { status: "issued" } });
+// Only POs Logistics may actually deliver against (approved / partly received).
+export const getOpenPurchaseOrders = () =>
+  PROCUREMENT_API.get("/purchase-orders", { params: { status: "issued,partially_fulfilled" } });
 export const getPurchaseOrder = (id) => PROCUREMENT_API.get(`/purchase-orders/${id}`);

@@ -7,8 +7,9 @@ const controller = require("../controllers/operationsDailyUpdateController");
 
 router.use(protect);
 
-/* Inventory Controller + Logistics Coordinator: submit and view their own */
-const submitters = requireRole("inventory_controller", "logistics_coordinator");
+/* Inventory Controller, Logistics Coordinator, Office Administrator: submit and view their own
+   (Procurement Officers keep their own richer Daily Report). */
+const submitters = requireRole("inventory_controller", "logistics_coordinator", "office_administrator");
 
 router.post("/", submitters, controller.submitUpdate);
 router.get("/mine", submitters, controller.getMyUpdates);
@@ -23,7 +24,7 @@ router.put("/:id/review", manager, controller.reviewUpdate);
 /* Single update — keep AFTER /mine and /today */
 router.get(
   "/:id",
-  requireRole("inventory_controller", "logistics_coordinator", "operations_manager"),
+  requireRole("inventory_controller", "logistics_coordinator", "office_administrator", "operations_manager"),
   controller.getUpdateById
 );
 

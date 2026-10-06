@@ -31,6 +31,40 @@ const { updateMeasurementStatus } = require("./siteMeasurementcontroller");
 
 const toInt = v => { const n = parseInt(v); return isNaN(n) ? null : n; };
 
+async function userCanAccessProject(req, projectId) {
+  const role = String(req.user?.role || "").trim().toLowerCase();
+  if (role === "ceo" || role === "quantity_surveyor") return true;
+  const id = Number(projectId);
+  if (!Number.isInteger(id) || id <= 0) return false;
+  if (role === "site_engineer") {
+    const r = await pool.query(`SELECT 1 FROM projects WHERE id = $1 AND site_engineer_id = $2 LIMIT 1`, [id, req.user.id]);
+    return r.rows.length > 0;
+  }
+  if (role === "project_manager") {
+    const e = await pool.query(`SELECT id FROM employees WHERE user_id = $1 LIMIT 1`, [req.user.id]);
+    if (!e.rows.length) return false;
+    const r = await pool.query(`SELECT 1 FROM projects WHERE id = $1 AND manager_id = $2 LIMIT 1`, [id, e.rows[0].id]);
+    return r.rows.length > 0;
+  }
+  return false;
+}
+
+async function getAccessibleProjectIds(req) {
+  const role = String(req.user?.role || "").trim().toLowerCase();
+  if (role === "ceo" || role === "quantity_surveyor") return null;
+  if (role === "site_engineer") {
+    const r = await pool.query(`SELECT id FROM projects WHERE site_engineer_id = $1`, [req.user.id]);
+    return r.rows.map(x => Number(x.id));
+  }
+  if (role === "project_manager") {
+    const e = await pool.query(`SELECT id FROM employees WHERE user_id = $1 LIMIT 1`, [req.user.id]);
+    if (!e.rows.length) return [];
+    const r = await pool.query(`SELECT id FROM projects WHERE manager_id = $1`, [e.rows[0].id]);
+    return r.rows.map(x => Number(x.id));
+  }
+  return [];
+}
+
 function safeArr(v) {
   if (Array.isArray(v)) return v;
   if (v === null || v === undefined) return [];
@@ -62,7 +96,10 @@ function formatQr(r) {
     seComment:       r.se_comment      || "",
     totalItems:      r.total_items     || 0,
     items:           safeArr(r.items),
-    measurementId:   r.measurement_id  || null,
+    // New workflow stores the source in site_measurement_id.
+    // Keep the legacy field as a read-only fallback for historical records.
+    measurementId:   r.site_measurement_id || r.measurement_id || null,
+    siteMeasurementId: r.site_measurement_id || null,
     generatedFrom:   r.generated_from  || "measurement",
     submittedBy:     r.submitted_by    || "",
     zone:            r.zone            || "",
@@ -85,6 +122,12 @@ exports.getAllReports = async (req, res) => {
     if (boqId)     { params.push(toInt(boqId));     conds.push(`boq_id = $${params.length}`); }
     if (projectId) { params.push(toInt(projectId)); conds.push(`project_id = $${params.length}`); }
     if (status)    { params.push(status);            conds.push(`status = $${params.length}`); }
+    const allowedIds = await getAccessibleProjectIds(req);
+    if (allowedIds !== null) {
+      if (!allowedIds.length) return res.json([]);
+      params.push(allowedIds);
+      conds.push(`project_id = ANY($${params.length}::int[])`);
+    }
     const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
     const result = await pool.query(
       `SELECT * FROM quantity_reports ${where} ORDER BY created_at DESC`, params
@@ -104,6 +147,9 @@ exports.getReportById = async (req, res) => {
       "SELECT * FROM quantity_reports WHERE id = $1", [req.params.id]
     );
     if (!result.rows.length) return res.status(404).json({ error: "Not found" });
+    if (!(await userCanAccessProject(req, result.rows[0].project_id))) {
+      return res.status(403).json({ error: "You are not authorized to access this project's quantity report." });
+    }
     return res.json(formatQr(result.rows[0]));
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -122,11 +168,31 @@ exports.createReport = async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    const { projectId, milestoneId, boqId } = req.body;
+    let { projectId, milestoneId, boqId, measurementId } = req.body || {};
+
+    // The QS Pending Measurements screen sends only measurementId.
+    // Resolve the BOQ/project/milestone from that authoritative SE record.
+    if (measurementId && (!projectId || !milestoneId || !boqId)) {
+      const measurementLookup = await client.query(
+        `SELECT id, boq_id, project_id, milestone_id
+           FROM site_measurements
+          WHERE id = $1`,
+        [toInt(measurementId)]
+      );
+      if (!measurementLookup.rows.length) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Site measurement not found" });
+      }
+      const m = measurementLookup.rows[0];
+      measurementId = m.id;
+      projectId = projectId || m.project_id;
+      milestoneId = milestoneId || m.milestone_id;
+      boqId = boqId || m.boq_id;
+    }
 
     if (!projectId || !milestoneId || !boqId) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ error: "projectId, milestoneId and boqId are required" });
+      return res.status(400).json({ error: "measurementId or projectId, milestoneId and boqId are required" });
     }
 
     const boqRes = await client.query("SELECT * FROM boqs WHERE id = $1", [toInt(boqId)]);
@@ -145,8 +211,10 @@ exports.createReport = async (req, res) => {
     }
 
     const measurementRes = await client.query(
-      `SELECT * FROM site_measurements WHERE boq_id = $1 ORDER BY created_at DESC LIMIT 1`,
-      [toInt(boqId)]
+      measurementId
+        ? `SELECT * FROM site_measurements WHERE id = $1 AND boq_id = $2 LIMIT 1`
+        : `SELECT * FROM site_measurements WHERE boq_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      measurementId ? [toInt(measurementId), toInt(boqId)] : [toInt(boqId)]
     );
     if (!measurementRes.rows.length) {
       await client.query("ROLLBACK");
@@ -155,6 +223,18 @@ exports.createReport = async (req, res) => {
       });
     }
     const measurement = measurementRes.rows[0];
+    if (!(await userCanAccessProject(req, measurement.project_id))) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "You are not authorized to create a quantity report for this project." });
+    }
+    if (toInt(projectId) !== Number(measurement.project_id) || toInt(milestoneId) !== Number(measurement.milestone_id)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Measurement project or milestone does not match the requested quantity report." });
+    }
+    if (!["submitted", "rejected"].includes(measurement.status)) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: `Measurement is not available for a new Quantity Report (status: ${measurement.status}).` });
+    }
 
     const existing = await client.query(
       `SELECT id FROM quantity_reports WHERE boq_id = $1 AND status = 'pending_se'`,
@@ -185,7 +265,7 @@ exports.createReport = async (req, res) => {
     const result = await client.query(
       `INSERT INTO quantity_reports
          (project_id, project_name, milestone_id, milestone_name,
-          boq_id, measurement_id, items, labour_items,
+          boq_id, site_measurement_id, items, labour_items,
           total_items, status, generated_from,
           submitted_by, zone, activity, measurement_date,
           created_at, updated_at)
@@ -243,9 +323,13 @@ exports.updateReport = async (req, res) => {
     const { items, totalItems } = req.body;
 
     const check = await pool.query(
-      "SELECT status, boq_id FROM quantity_reports WHERE id = $1", [id]
+      "SELECT status, boq_id, project_id, site_measurement_id, measurement_id FROM quantity_reports WHERE id = $1", [id]
     );
     if (!check.rows.length) return res.status(404).json({ error: "Quantity report not found" });
+    if (!(await userCanAccessProject(req, check.rows[0].project_id))) {
+      return res.status(403).json({ error: "You are not authorized to update this project's quantity report." });
+    }
+
     if (check.rows[0].status === "approved") {
       return res.status(403).json({ error: "Cannot edit an approved quantity report" });
     }
@@ -297,7 +381,7 @@ exports.approveReport = async (req, res) => {
       `UPDATE quantity_reports
        SET status = 'approved', se_comment = '', updated_at = NOW()
        WHERE id = $1 AND status = 'pending_se'
-       RETURNING id, status, boq_id, measurement_id, project_name, milestone_name`,
+       RETURNING id, status, boq_id, site_measurement_id, measurement_id, project_id, project_name, milestone_name`,
       [req.params.id]
     );
     if (!result.rows.length) {
@@ -307,7 +391,12 @@ exports.approveReport = async (req, res) => {
       });
     }
 
-    const { boq_id, measurement_id, project_name, milestone_name } = result.rows[0];
+    const { boq_id, site_measurement_id, measurement_id, project_id, project_name, milestone_name } = result.rows[0];
+    if (!(await userCanAccessProject(req, project_id))) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "You are not authorized to approve this project's quantity report." });
+    }
+    const sourceMeasurementId = site_measurement_id || measurement_id;
 
     // Finalise BOQ (unchanged)
     await client.query(
@@ -318,7 +407,7 @@ exports.approveReport = async (req, res) => {
     );
 
     // CHANGED: measurement status → approved
-    await updateMeasurementStatus(client, measurement_id, "approved");
+    await updateMeasurementStatus(client, sourceMeasurementId, "approved");
 
     await client.query("COMMIT");
 
@@ -370,7 +459,7 @@ exports.rejectReport = async (req, res) => {
       `UPDATE quantity_reports
        SET status = 'rejected', se_comment = $1, updated_at = NOW()
        WHERE id = $2 AND status = 'pending_se'
-       RETURNING id, status, boq_id, measurement_id, project_name, milestone_name`,
+       RETURNING id, status, boq_id, site_measurement_id, measurement_id, project_id, project_name, milestone_name`,
       [note, req.params.id]
     );
     if (!result.rows.length) {
@@ -380,7 +469,12 @@ exports.rejectReport = async (req, res) => {
       });
     }
 
-    const { boq_id, measurement_id, project_name, milestone_name } = result.rows[0];
+    const { boq_id, site_measurement_id, measurement_id, project_id, project_name, milestone_name } = result.rows[0];
+    if (!(await userCanAccessProject(req, project_id))) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "You are not authorized to reject this project's quantity report." });
+    }
+    const sourceMeasurementId = site_measurement_id || measurement_id;
 
     await client.query(
       `UPDATE boqs SET status = 'rejected_by_se', se_note = $1, updated_at = NOW() WHERE id = $2`,
@@ -388,7 +482,7 @@ exports.rejectReport = async (req, res) => {
     );
 
     // CHANGED: measurement status → rejected
-    await updateMeasurementStatus(client, measurement_id, "rejected");
+    await updateMeasurementStatus(client, sourceMeasurementId, "rejected");
 
     await client.query("COMMIT");
 
@@ -433,7 +527,7 @@ exports.deleteReport = async (req, res) => {
     await client.query("BEGIN");
 
     const check = await pool.query(
-      "SELECT status, boq_id, measurement_id FROM quantity_reports WHERE id = $1",
+      "SELECT status, boq_id, project_id, site_measurement_id, measurement_id FROM quantity_reports WHERE id = $1",
       [req.params.id]
     );
     if (!check.rows.length) {
@@ -445,7 +539,13 @@ exports.deleteReport = async (req, res) => {
       return res.status(403).json({ error: "Cannot delete an approved quantity report" });
     }
 
-    const { boq_id, measurement_id } = check.rows[0];
+    if (!(await userCanAccessProject(req, check.rows[0].project_id))) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "You are not authorized to delete this project's quantity report." });
+    }
+
+    const { boq_id, site_measurement_id, measurement_id } = check.rows[0];
+    const sourceMeasurementId = site_measurement_id || measurement_id;
 
     await client.query("DELETE FROM quantity_reports WHERE id = $1", [req.params.id]);
 
@@ -456,7 +556,7 @@ exports.deleteReport = async (req, res) => {
     );
 
     // CHANGED: measurement status → submitted so QS can regenerate QR
-    await updateMeasurementStatus(client, measurement_id, "submitted");
+    await updateMeasurementStatus(client, sourceMeasurementId, "submitted");
 
     await client.query("COMMIT");
     res.json({ message: "Quantity report deleted", id: parseInt(req.params.id) });

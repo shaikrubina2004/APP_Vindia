@@ -7,7 +7,8 @@ import {
   fmtDate,
   fmtINR,
 } from "../../hooks/Useclientapi.jsx";
-import CheckInButton from "../../SharedResourse/CheckInButton";
+import { Link } from "react-router-dom";
+import ProjectSwitcher from "./ProjectSwitcher";
 import "../../styles/Client.css";
 
 // ── Shared pill ────────────────────────────────────────────────────────────
@@ -19,6 +20,7 @@ function StatusPill({ status }) {
     pending: ["Pending", "pill--neutral"],
     due: ["Due", "pill--danger"],
     paid: ["Paid", "pill--success"],
+    partial: ["Part paid", "pill--warning"],
     open: ["Open", "pill--warning"],
     under_review: ["Under review", "pill--info"],
     Created: ["Created", "pill--neutral"],
@@ -158,16 +160,12 @@ function LogCard({ log }) {
 
 // ── Invoice row ────────────────────────────────────────────────────────────
 function InvoiceRow({ inv }) {
-  const statusKey =
-    inv.status === "finalised" || inv.status === "finalized"
-      ? "paid"
-      : inv.status === "pending_pm" || inv.status === "pending_se"
-        ? "due"
-        : inv.status;
+  // real payment state from the API (a finalised estimate is billed, not paid)
+  const statusKey = inv.payment_status || "due";
   return (
     <div className="invoice-row">
       <div className="invoice-row__left">
-        <span className="invoice-row__id">BOQ-{inv.id}</span>
+        <span className="invoice-row__id">INV-{String(inv.id).padStart(4, "0")}</span>
         <span className="invoice-row__desc">{inv.milestone_name}</span>
       </div>
       <div className="invoice-row__right">
@@ -177,9 +175,8 @@ function InvoiceRow({ inv }) {
         <StatusPill status={statusKey} />
       </div>
       <div className="invoice-row__due">
-        {inv.invoice_date
-          ? `Finalised ${fmtDate(inv.invoice_date)}`
-          : "Pending finalisation"}
+        {inv.invoice_date ? `Finalised ${fmtDate(inv.invoice_date)}` : ""}
+        {inv.balance > 0 ? ` · Balance ${fmtINR(inv.balance)}` : ""}
       </div>
     </div>
   );
@@ -233,18 +230,6 @@ export default function ClientDashboard() {
   const { data: invoicesData } = useClientAPI("/client/invoices");
   const { data: incidentsData } = useClientAPI("/client/incidents");
 
-  // Used by the shared CheckInButton — decides whether to skip location
-  // capture for the CEO. Falls back to role if designation isn't stored yet.
-  const currentUser = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("user") || "{}");
-    } catch {
-      return {};
-    }
-  })();
-  const employeeId = currentUser?.employee_id || currentUser?.id || null;
-  const designation = currentUser?.designation || currentUser?.role || null;
-
   if (loading) return <PageLoader />;
   if (error) return <PageError message={error} onRetry={refetch} />;
 
@@ -253,9 +238,9 @@ export default function ClientDashboard() {
   const milestones = (data?.milestones || []).slice(0, 4);
   const logs = logsData?.logs || [];
   const invoices = (invoicesData?.invoices || []).slice(0, 3);
-  const incidents = (incidentsData?.incidents || [])
-    .filter((i) => i.status !== "Closed")
-    .slice(0, 3);
+  // count ALL open incidents; only the list is trimmed to 3 (the count used to cap at 3)
+  const openIncidents = (incidentsData?.incidents || []).filter((i) => i.status !== "Closed");
+  const incidents = openIncidents.slice(0, 3);
 
   const progress = Math.round(project.progress ?? 0);
 
@@ -291,9 +276,8 @@ export default function ClientDashboard() {
             gap: 14,
           }}
         >
-          {employeeId && (
-            <CheckInButton employeeId={employeeId} designation={designation} />
-          )}
+          {/* clients are external users: no attendance check-in here */}
+          <ProjectSwitcher />
           <ProgressRing pct={progress} />
         </div>
       </header>
@@ -305,13 +289,13 @@ export default function ClientDashboard() {
           label="Overall progress"
           value={`${progress}%`}
           sub={
-            progress >= 75
-              ? "On track"
+            overview.delayed
+              ? `${overview.delayed} milestone${overview.delayed > 1 ? "s" : ""} behind`
               : progress > 0
-                ? "In progress"
+                ? "On track"
                 : "Not started"
           }
-          subType={progress >= 75 ? "success" : "info"}
+          subType={overview.delayed ? "warning" : progress > 0 ? "success" : "info"}
         />
         <StatCard
           icon="🏗️"
@@ -332,7 +316,7 @@ export default function ClientDashboard() {
         <StatCard
           icon="⚠️"
           label="Open incidents"
-          value={incidents.length}
+          value={openIncidents.length}
           sub="Awaiting response"
           subType="warning"
         />
@@ -367,7 +351,7 @@ export default function ClientDashboard() {
           <div className="cd-card">
             <div className="cd-card__head">
               <span className="cd-card__title">Incidents</span>
-              <span className="incident-count">{incidents.length} open</span>
+              <span className="incident-count">{openIncidents.length} open</span>
             </div>
             <div className="incident-list">
               {incidents.length ? (
@@ -414,9 +398,9 @@ export default function ClientDashboard() {
           <div className="cd-card">
             <div className="cd-card__head">
               <span className="cd-card__title">Invoices</span>
-              <a href="/client/invoices" className="cd-card__link">
+              <Link to="/client/invoices" className="cd-card__link">
                 View all →
-              </a>
+              </Link>
             </div>
             <div className="invoice-list">
               {invoices.length ? (

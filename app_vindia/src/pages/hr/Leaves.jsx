@@ -281,7 +281,7 @@ function StatCard({
   );
 }
 
-function Leaves() {
+function Leaves({ mode = "hr" }) {
   const [leaves, setLeaves] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [summaries, setSummaries] = useState({});
@@ -294,6 +294,7 @@ function Leaves() {
   const [searchQuery, setSearchQuery] =
     useState("");
   const [loading, setLoading] = useState(true);
+  const isManagerView = mode === "manager";
 
   const today = new Date();
 
@@ -313,7 +314,9 @@ function Leaves() {
     setLoading(true);
 
     try {
-      const response = await API.get("/leaves");
+      const response = await API.get(
+        isManagerView ? "/leaves/team" : "/leaves"
+      );
 
       /*
         Supports these backend response formats:
@@ -364,14 +367,17 @@ function Leaves() {
             `Employee ${leave.employee_id}`,
 
           type:
-            leave.reason ||
+            leave.leave_type_label ||
+            leave.leave_type ||
             leave.type ||
+            leave.reason ||
             "Leave",
 
           from_date: leave.from_date,
           to_date: leave.to_date,
 
           status: normalizeStatus(rawStatus),
+          can_review: Boolean(leave.can_review),
 
           days:
             Math.round(
@@ -467,8 +473,15 @@ function Leaves() {
 
   const handleAction = async (id, newStatus) => {
     try {
+      const comment = newStatus === "Rejected"
+        ? window.prompt("Reason for rejecting this leave:", "")
+        : "";
+
+      if (newStatus === "Rejected" && comment === null) return;
+
       await API.put(`/leaves/${id}/status`, {
         status: newStatus,
+        comment: comment || "",
       });
 
       showMessage(
@@ -629,7 +642,7 @@ function Leaves() {
         <div className="hero">
           <div>
             <h1 className="eyebrow">
-              Leave Management
+              {isManagerView ? "Team Leave Approvals" : "Leave Management"}
             </h1>
           </div>
 
@@ -730,8 +743,9 @@ function Leaves() {
               <h2>Leave Requests</h2>
 
               <p>
-                Search, filter, and process leave
-                applications.
+                {isManagerView
+                  ? "Review leave applications submitted by your direct reports."
+                  : "Search, filter, and process leave applications."}
               </p>
             </div>
 
@@ -889,16 +903,12 @@ function Leaves() {
                           </td>
 
                           <td>
-                            {statusClass ===
-                            "pending" ? (
+                            {statusClass === "pending" && leave.can_review ? (
                               <div className="action-btns">
                                 <button
                                   className="btn-approve"
                                   onClick={() =>
-                                    handleAction(
-                                      leave.id,
-                                      "Approved"
-                                    )
+                                    handleAction(leave.id, "Approved")
                                   }
                                 >
                                   Approve
@@ -907,19 +917,16 @@ function Leaves() {
                                 <button
                                   className="btn-reject"
                                   onClick={() =>
-                                    handleAction(
-                                      leave.id,
-                                      "Rejected"
-                                    )
+                                    handleAction(leave.id, "Rejected")
                                   }
                                 >
                                   Reject
                                 </button>
                               </div>
+                            ) : statusClass === "pending" ? (
+                              <span className="muted">Awaiting related manager</span>
                             ) : (
-                              <span className="muted">
-                                —
-                              </span>
+                              <span className="muted">—</span>
                             )}
                           </td>
 

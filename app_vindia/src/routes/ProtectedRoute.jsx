@@ -2,98 +2,25 @@
 
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
+import { getDashboardRoute } from "../utils/dashboardRouter";
 
-// Returns the correct home dashboard for each role.
-// Mirrors getDashboardRoute in utils/dashboardRouter.js
-const getRoleDashboard = (role) => {
-  switch (role) {
-    case "ceo":
-      return "/dashboard";
+const normalizeRole = (role) =>
+  String(role || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
 
-    case "hr_manager":
-      return "/hr";
-
-    case "site_engineer":
-      return "/site-engineer/dashboard";
-
-    case "project_manager":
-      return "/pm/team";
-
-    case "quantity_surveyor":
-      return "/quantity-surveyor/dashboard";
-
-    case "mep_engineer":
-      return "/mep/dashboard";
-
-    case "architect":
-      return "/architect/dashboard";
-
-    case "structural_engineer":
-      return "/structural-engineer/dashboard";
-
-    case "planning_engineer":
-      return "/planning-engineer/dashboard";
-
-    case "qc_engineer":
-      return "/qc/dashboard";
-
-    case "safety_officer":
-      return "/safety/dashboard";
-
-    case "project_coordinator":
-      return "/project-coordinator/dashboard";
-
-    case "bda":
-      return "/business-development/dashboard";
-
-    // NEW ROLES
-    case "digital_marketing":
-      return "/digital-marketing/dashboard";
-    case "client":
-      return "/client/dashboard";
-
-    case "3d_visualizer":
-      return "/3d-visualizer/dashboard";
-    
-     // Operations & Administration
-    case "operations_manager":
-      return "/operations/manager/dashboard";
-
-    case "office_administrator":
-      return "/operations/administrator/dashboard";
-
-    case "procurement_officer":
-      return "/operations/procurement/dashboard";
-
-    case "logistics_coordinator":
-      return "/operations/logistics/dashboard";
-
-    case "inventory_controller":
-      return "/operations/inventory/dashboard";
-
-
-    case "finance_manager":
-      return "/finance-manager/dashboard";
-
-    case "accountant":
-  return "/accountant/dashboard";
-
-    default:
-      return "/";
-  }
-};
-
-const ProtectedRoute = ({ children, allowedRoles }) => {
+const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { user } = useAuth();
 
-  // Not logged in → back to sign in
-  if (!user) {
-    return <Navigate to="/" replace />;
-  }
+  if (!user) return <Navigate to="/" replace />;
 
-  // Role not allowed → redirect to their own dashboard
-  if (!allowedRoles.includes(user.role)) {
-    return <Navigate to={getRoleDashboard(user.role)} replace />;
+  const userRole = normalizeRole(user.role);
+  const allowed = allowedRoles.map(normalizeRole);
+
+  if (!allowed.includes(userRole)) {
+    return <Navigate to={getDashboardRoute(userRole)} replace />;
   }
 
   return children;

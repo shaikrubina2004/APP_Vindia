@@ -1,6 +1,7 @@
 import { useAuth } from "../../context/useAuth";
 import accountantService from "../../services/accountantService";
 import AccountantResourcePage from "./AccountantResourcePage";
+import { WbsBadge } from "../../components/accountant/FinanceWbsSelector";
 
 const formatCurrency = (v) => `₹${Number(v || 0).toLocaleString("en-IN")}`;
 const FM_ROLES = ["finance_manager", "ceo"];
@@ -17,6 +18,11 @@ export default function TaxRegister() {
       emptyLabel="No tax register entries yet."
       columns={[
         { key: "source_type", label: "Source" },
+        { key: "project_name", label: "Project", render: (r) => r.project_name || "—" },
+        {
+          key: "wbs", label: "WBS",
+          render: (r) => <WbsBadge code={r.wbs_code} name={r.wbs_name} milestoneCode={r.milestone_code} milestoneName={r.milestone_name} />,
+        },
         { key: "tax_type", label: "Tax Type" },
         { key: "taxable_amount", label: "Taxable Amount", render: (r) => formatCurrency(r.taxable_amount) },
         { key: "tax_amount", label: "Tax Amount", render: (r) => formatCurrency(r.tax_amount) },
@@ -33,6 +39,15 @@ export default function TaxRegister() {
           options: [{ value: "invoice", label: "Invoice" }, { value: "expense", label: "Expense" }],
         },
         { name: "source_id", label: "Source ID", type: "number", required: true },
+        {
+          name: "wbs_note", label: "WBS", type: "custom", hideLabel: true,
+          render: () => (
+            <p className="acs-field-note">
+              Project and WBS are derived automatically from the source invoice/expense — they can't
+              disagree with their source, so there's nothing to pick here.
+            </p>
+          ),
+        },
         {
           name: "tax_type", label: "Tax Type", type: "select", required: true,
           options: [{ value: "gst", label: "GST" }, { value: "tds", label: "TDS" }, { value: "other", label: "Other" }],

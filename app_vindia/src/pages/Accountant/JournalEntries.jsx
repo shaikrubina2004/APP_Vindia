@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import accountantService from "../../services/accountantService";
 import { useProject } from "../../context/ProjectContext";
 import { useAuth } from "../../context/useAuth";
+import FinanceWbsSelector, { WbsBadge } from "../../components/accountant/FinanceWbsSelector";
 import "./JournalEntries.css";
 
 const formatCurrency = (value) =>
@@ -82,6 +83,7 @@ export default function JournalEntries() {
   const [header, setHeader] = useState({
     entry_date: today(),
     project_id: "",
+    wbs_id: "",
     description: "",
   });
 
@@ -177,6 +179,7 @@ export default function JournalEntries() {
     setHeader({
       entry_date: today(),
       project_id: "",
+      wbs_id: "",
       description: "",
     });
     setLines([emptyLine(), emptyLine()]);
@@ -231,12 +234,20 @@ export default function JournalEntries() {
       return;
     }
 
+    // Project-level entries (Section 13) must carry a WBS — the backend
+    // enforces this too, but catching it here avoids a round-trip.
+    if (header.project_id && !header.wbs_id) {
+      setFormError("Select a WBS / Milestone for this project-level entry.");
+      return;
+    }
+
     try {
       setSaving(true);
 
       await accountantService.createJournalEntry({
         entry_date: header.entry_date,
         project_id: header.project_id || null,
+        wbs_id: header.project_id ? header.wbs_id || null : null,
         description: header.description.trim(),
         lines: cleanLines,
       });
@@ -429,6 +440,7 @@ export default function JournalEntries() {
                   <th>Date</th>
                   <th>Description</th>
                   <th>Project</th>
+                  <th>WBS</th>
                   <th className="je-number">Debit</th>
                   <th className="je-number">Credit</th>
                   <th>Status</th>
@@ -438,13 +450,13 @@ export default function JournalEntries() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="je-empty">
+                    <td colSpan={9} className="je-empty">
                       Loading journal entries…
                     </td>
                   </tr>
                 ) : filteredEntries.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="je-empty">
+                    <td colSpan={9} className="je-empty">
                       <div className="je-empty-icon">◎</div>
                       <strong>No journal entries found</strong>
                       <span>Try another filter or create a new entry.</span>
@@ -470,6 +482,7 @@ export default function JournalEntries() {
                         </div>
                       </td>
                       <td>{entry.project_name || "Company level"}</td>
+                      <td><WbsBadge code={entry.wbs_code} name={entry.wbs_name} milestoneCode={entry.milestone_code} milestoneName={entry.milestone_name} /></td>
                       <td className="je-number">{formatCurrency(entry.total_debit)}</td>
                       <td className="je-number">{formatCurrency(entry.total_credit)}</td>
                       <td>
@@ -590,6 +603,7 @@ export default function JournalEntries() {
                       setHeader((current) => ({
                         ...current,
                         project_id: event.target.value,
+                        wbs_id: "",
                       }))
                     }
                   >
@@ -603,7 +617,24 @@ export default function JournalEntries() {
                       ))}
                   </select>
                 </label>
+              </div>
 
+              {header.project_id && (
+                <FinanceWbsSelector
+                  projectId={header.project_id}
+                  projectLabel={
+                    projects.find((p) => String(p.id) === String(header.project_id))?.name
+                  }
+                  value={header.wbs_id}
+                  onChange={(ctx) =>
+                    setHeader((current) => ({ ...current, wbs_id: ctx ? String(ctx.wbs_id) : "" }))
+                  }
+                  fetchWbs={accountantService.getFinanceWbs}
+                  required
+                />
+              )}
+
+              <div className="je-form-grid">
                 <label className="je-field-wide">
                   <span>Description</span>
                   <input
@@ -774,6 +805,12 @@ export default function JournalEntries() {
 
             {selectedEntry.description && (
               <div className="je-detail-description">{selectedEntry.description}</div>
+            )}
+
+            {selectedEntry.project_id && (
+              <div className="je-detail-description">
+                <WbsBadge code={selectedEntry.wbs_code} name={selectedEntry.wbs_name} milestoneCode={selectedEntry.milestone_code} milestoneName={selectedEntry.milestone_name} />
+              </div>
             )}
 
             <div className="je-detail-summary">

@@ -79,6 +79,18 @@ async function notifyRFIRecipients(assignedToRole, assignedToUserId, { title, de
       await insertDigitalMarketingNotification(assignedToUserId ?? null, "rfi", title, description, "/digital-marketing/rfi", severity, null);
       return;
     }
+
+    // Shared notifications table is the generic fallback for PM, QS, SE,
+    // Architect, Coordinator and other internal RFI recipients. When the
+    // notification schema is role-based, the assigned user id is still
+    // persisted on the RFI itself for exact access control.
+    if (assignedToRole) {
+      await pool.query(
+        `INSERT INTO notifications (role, type, severity, message, description)
+         VALUES ($1,'rfi',$2,$3,$4)`,
+        [assignedToRole, severity, title, description]
+      );
+    }
   } catch (err) {
     console.error("notifyRFIRecipients error:", err.message);
   }
@@ -107,21 +119,51 @@ async function resolveUserRole(userId, fallbackRole) {
   return { code: fallbackRole, name: fallbackRole };
 }
 
+async function getRfiProjectNames(req, roleCode) {
+  const role = String(roleCode || req.user?.role || "").trim().toLowerCase();
+  const userId = req.user?.id;
+  if (!userId) return null;
+  if (["client", "site_engineer", "architect", "project_coordinator"].includes(role)) {
+    const column = {
+      client: "client_user_id",
+      site_engineer: "site_engineer_id",
+      architect: "architect_id",
+      project_coordinator: "coordinator_id",
+    }[role];
+    const result = await pool.query(
+      `SELECT name FROM projects WHERE ${column} = $1 AND status IS DISTINCT FROM 'Archived'`,
+      [userId]
+    );
+    return result.rows.map(r => r.name).filter(Boolean);
+  }
+  if (role === "project_manager") {
+    const employee = await pool.query(`SELECT id FROM employees WHERE user_id = $1 LIMIT 1`, [userId]);
+    if (!employee.rows.length) return [];
+    const result = await pool.query(
+      `SELECT p.name FROM projects p WHERE p.manager_id = $1 AND p.status IS DISTINCT FROM 'Archived'`,
+      [employee.rows[0].id]
+    );
+    return result.rows.map(r => r.name).filter(Boolean);
+  }
+  return null;
+}
+
 // ── WHERE clause builder ──────────────────────────────────────────────────────
 // Matches by BOTH code and name so any stored format works.
 //   e.g. roleCode="structural_engineer", roleName="Structural Engineer"
 //   matches rfis where raised_by_role OR assigned_to_role is either value.
-function buildRoleWhere(view, paramOffset = 0) {
-  // $1 = roleCode, $2 = roleName (always passed as a pair)
-  const c = `$${paramOffset + 1}`;
-  const n = `$${paramOffset + 2}`;
+function buildRoleWhere(view, { roleCodeParam, roleNameParam, userIdParam, projectNamesParam }) {
+  const roleRaised = `(LOWER(r.raised_by_role) IN (LOWER(${roleCodeParam}), LOWER(${roleNameParam})))`;
+  const roleAssigned = `(LOWER(r.assigned_to_role) IN (LOWER(${roleCodeParam}), LOWER(${roleNameParam})))`;
+  const ownRaised = `r.raised_by_id = ${userIdParam}`;
+  const ownAssigned = `r.assigned_to_user_id = ${userIdParam}`;
+  const projectScope = projectNamesParam ? `r.project_name = ANY(${projectNamesParam}::text[])` : null;
+  const raised = projectScope ? `(${ownRaised} OR (${roleRaised} AND ${projectScope}))` : `(${ownRaised} OR ${roleRaised})`;
+  const assigned = projectScope ? `(${ownAssigned} OR (${roleAssigned} AND ${projectScope}))` : `(${ownAssigned} OR ${roleAssigned})`;
 
-  const matchRaised   = `LOWER(r.raised_by_role)   IN (LOWER(${c}), LOWER(${n}))`;
-  const matchAssigned = `LOWER(r.assigned_to_role) IN (LOWER(${c}), LOWER(${n}))`;
-
-  if (view === "sent")     return `WHERE ${matchRaised}`;
-  if (view === "received") return `WHERE ${matchAssigned}`;
-  return                          `WHERE ${matchRaised} OR ${matchAssigned}`;
+  if (view === "sent") return `WHERE ${raised}`;
+  if (view === "received") return `WHERE ${assigned}`;
+  return `WHERE ${raised} OR ${assigned}`;
 }
 
 // ── GET /api/rfis?view=all|sent|received ──────────────────────────────────────
@@ -132,11 +174,16 @@ router.get("/", protect, async (req, res) => {
 
     // ✅ Always resolve from DB — no reliance on JWT role format
     const { code, name } = await resolveUserRole(userId, req.user?.role);
+    const projectNames = await getRfiProjectNames(req, code);
 
     console.log(`GET /api/rfis | userId=${userId} | code=${code} | name=${name} | view=${view}`);
 
-    const where  = buildRoleWhere(view, 0);
-    const params = [code, name];
+    const params = [userId, code, name];
+    let projectParam = null;
+    if (projectNames !== null) { params.push(projectNames); projectParam = `$${params.length}`; }
+    const where = buildRoleWhere(view, {
+      userIdParam: "$1", roleCodeParam: "$2", roleNameParam: "$3", projectNamesParam: projectParam,
+    });
 
     const result = await pool.query(
       `SELECT r.*,
@@ -169,10 +216,11 @@ router.get("/:id", protect, async (req, res) => {
       `SELECT * FROM rfis
        WHERE id = $1
          AND (
-           LOWER(raised_by_role)   IN (LOWER($2), LOWER($3)) OR
-           LOWER(assigned_to_role) IN (LOWER($2), LOWER($3))
+           raised_by_id = $2 OR assigned_to_user_id = $2 OR
+           (LOWER(raised_by_role) IN (LOWER($3), LOWER($4)) AND ($5::text[] IS NULL OR project_name = ANY($5::text[]))) OR
+           (LOWER(assigned_to_role) IN (LOWER($3), LOWER($4)) AND ($5::text[] IS NULL OR project_name = ANY($5::text[])))
          )`,
-      [id, code, name]
+      [id, userId, code, name, await getRfiProjectNames(req, code)]
     );
 
     if (!rfiRes.rowCount)
@@ -293,10 +341,11 @@ router.post("/:id/respond", protect, upload.single("file"), async (req, res) => 
       `SELECT * FROM rfis
        WHERE id = $1
          AND (
-           LOWER(raised_by_role)   IN (LOWER($2), LOWER($3)) OR
-           LOWER(assigned_to_role) IN (LOWER($2), LOWER($3))
+           raised_by_id = $2 OR assigned_to_user_id = $2 OR
+           (LOWER(raised_by_role) IN (LOWER($3), LOWER($4)) AND ($5::text[] IS NULL OR project_name = ANY($5::text[]))) OR
+           (LOWER(assigned_to_role) IN (LOWER($3), LOWER($4)) AND ($5::text[] IS NULL OR project_name = ANY($5::text[])))
          )`,
-      [id, code, name]
+      [id, userId, code, name, await getRfiProjectNames(req, code)]
     );
 
     if (!rfiRes.rowCount)
@@ -351,11 +400,12 @@ router.patch("/:id/status", protect, async (req, res) => {
       `UPDATE rfis SET status=$1, updated_at=NOW()
        WHERE id=$2
          AND (
-           LOWER(raised_by_role)   IN (LOWER($3), LOWER($4)) OR
-           LOWER(assigned_to_role) IN (LOWER($3), LOWER($4))
+           raised_by_id = $3 OR assigned_to_user_id = $3 OR
+           (LOWER(raised_by_role) IN (LOWER($4), LOWER($5)) AND ($6::text[] IS NULL OR project_name = ANY($6::text[]))) OR
+           (LOWER(assigned_to_role) IN (LOWER($4), LOWER($5)) AND ($6::text[] IS NULL OR project_name = ANY($6::text[])))
          )
        RETURNING *`,
-      [status, id, code, name]
+      [status, id, userId, code, name, await getRfiProjectNames(req, code)]
     );
 
     if (!result.rowCount)

@@ -6,7 +6,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
-import "../../styles/MeasurementSubmission.css";
+import "../../styles/Measurementsubmission.css";
 
 const PAGE_SIZE  = 8;
 const UNITS      = ["sqm","sqft","cu m","RMT","m","nos","kg","tonnes","bags","litre","LS"];

@@ -46,11 +46,32 @@ function num(v) {
 const AccountantDashboard = {
   /**
    * @param {number|null} projectId - validated positive integer, or null for global view
+   * @param {number|string|null} wbsId - optional WBS/milestone scope, always
+   *   applied alongside projectId (Section 19: "Selected Project -> Selected
+   *   WBS -> financial KPIs for that scope"). "unassigned" filters to rows
+   *   with no WBS classified yet.
    */
-  getDashboard: async (projectId) => {
+  getDashboard: async (projectId, wbsId) => {
     const hasProjectFilter = projectId !== null && projectId !== undefined;
-    const params = hasProjectFilter ? [projectId] : [];
-    const pf = hasProjectFilter ? "AND project_id = $1" : "";
+    const hasWbsFilter = wbsId !== null && wbsId !== undefined && wbsId !== "";
+    const isUnassigned = wbsId === "unassigned";
+
+    const params = [];
+    let pf = "";
+    let pfWbs = "";
+    if (hasProjectFilter) {
+      params.push(projectId);
+      pf = `AND project_id = $${params.length}`;
+    }
+    if (hasWbsFilter) {
+      if (isUnassigned) {
+        pfWbs = `AND wbs_id IS NULL`;
+      } else {
+        params.push(wbsId);
+        pfWbs = `AND wbs_id = $${params.length}`;
+      }
+    }
+    const combinedFilter = `${pf} ${pfWbs}`;
 
     const [
       // ── Financial Overview (existing 4 metrics — unchanged queries) ──
@@ -78,20 +99,20 @@ const AccountantDashboard = {
     ] = await Promise.all([
       pool.query(
         `SELECT COUNT(*)::int AS count, COALESCE(SUM(amount),0) AS amount
-         FROM invoices WHERE status = 'pending' ${pf}`,
+         FROM invoices WHERE status = 'pending' ${combinedFilter}`,
         params
       ),
       pool.query(
         `SELECT COUNT(*)::int AS count, COALESCE(SUM(amount),0) AS amount
-         FROM expenses WHERE status = 'pending' ${pf}`,
+         FROM expenses WHERE status = 'pending' ${combinedFilter}`,
         params
       ),
       pool.query(
         `SELECT COUNT(*)::int AS count, COALESCE(SUM(amount),0) AS amount
-         FROM payments WHERE status IN ('pending', 'processing') ${pf}`,
+         FROM payments WHERE status IN ('pending', 'processing') ${combinedFilter}`,
         params
       ),
-      // vendors: no project_id column — intentionally global, unchanged.
+      // vendors: no project_id/wbs_id column — intentionally global, unchanged.
       pool.query(`SELECT COUNT(*)::int AS count FROM vendors WHERE status = 'active'`),
 
       // Journal entry status counts — single aggregation query, no JS math.
@@ -102,13 +123,13 @@ const AccountantDashboard = {
            COUNT(*) FILTER (WHERE status = 'approved')::int  AS approved,
            COUNT(*) FILTER (WHERE status = 'posted')::int    AS posted,
            COUNT(*) FILTER (WHERE status = 'reversed')::int  AS reversed
-         FROM journal_entries WHERE 1=1 ${pf}`,
+         FROM journal_entries WHERE 1=1 ${combinedFilter}`,
         params
       ),
 
-      // Bank reconciliation — no project_id column on this table (linked
-      // via bank_account_id only, confirmed in the migration), so this
-      // is intentionally NOT project-filtered, matching the spec.
+      // Bank reconciliation — no project_id/wbs_id column on this table
+      // (linked via bank_account_id only), so intentionally unfiltered,
+      // matching the pre-existing spec.
       pool.query(
         `SELECT
            COUNT(*) FILTER (WHERE status = 'in_progress')::int AS "inProgress",
@@ -123,15 +144,16 @@ const AccountantDashboard = {
         `SELECT
            COALESCE(SUM(allocated_amount),0) AS allocated,
            COALESCE(SUM(spent_amount),0)     AS spent
-         FROM budgets WHERE 1=1 ${pf}`,
+         FROM budgets WHERE 1=1 ${combinedFilter}`,
         params
       ),
 
       // Receivables/Payables — reused as-is via the existing model,
-      // project-filtered the same way its own page filters it.
-      ReceivablesPayables.getReport(
-        hasProjectFilter ? { project_id: projectId } : {}
-      ),
+      // project- and WBS-filtered the same way its own page filters it.
+      ReceivablesPayables.getReport({
+        ...(hasProjectFilter ? { project_id: projectId } : {}),
+        ...(hasWbsFilter ? { wbs_id: wbsId } : {}),
+      }),
 
       // Tax register aggregate.
       pool.query(
@@ -141,23 +163,26 @@ const AccountantDashboard = {
            COUNT(*) FILTER (WHERE status = 'filed')::int   AS "filedCount",
            COALESCE(SUM(taxable_amount),0) AS "taxableAmount",
            COALESCE(SUM(tax_amount),0)     AS "taxAmount"
-         FROM tax_register WHERE 1=1 ${pf}`,
+         FROM tax_register WHERE 1=1 ${combinedFilter}`,
         params
       ),
 
       // Petty cash balance — reused exactly via pettyCashModel.getBalance,
-      // which already restricts to status='approved' transactions.
+      // which already restricts to status='approved' transactions. That
+      // helper only takes a project scope, so a WBS scope narrows the
+      // pending-count query below instead; the balance itself stays
+      // project-level, matching its existing single-purpose contract.
       PettyCash.getBalance(projectId),
 
       // Petty cash pending count — new, dashboard-only aggregate (not in
       // pettyCashModel.js, per instruction to add it here instead).
       pool.query(
         `SELECT COUNT(*)::int AS count
-         FROM petty_cash_transactions WHERE status = 'pending' ${pf}`,
+         FROM petty_cash_transactions WHERE status = 'pending' ${combinedFilter}`,
         params
       ),
 
-      // Chart of Accounts — counts only, not project-filtered (accounts
+      // Chart of Accounts — counts only, not project/WBS-filtered (accounts
       // are not project-scoped).
       pool.query(
         `SELECT
@@ -173,14 +198,18 @@ const AccountantDashboard = {
       // General Ledger — posted-only, same correct pattern as the fixed
       // ledgerModel.getTrialBalance (INNER JOIN + WHERE in a subquery,
       // not a LEFT JOIN ON condition that would silently include
-      // non-posted lines).
+      // non-posted lines). project_id/wbs_id columns here belong to
+      // journal_entries (je.), not journal_entry_lines, so the combined
+      // filter is rebuilt with the je. prefix rather than reused as-is.
       pool.query(
         `SELECT
            COALESCE(SUM(jel.debit),0)  AS "postedDebit",
            COALESCE(SUM(jel.credit),0) AS "postedCredit"
          FROM journal_entry_lines jel
          JOIN journal_entries je ON je.id = jel.journal_entry_id
-         WHERE je.status = 'posted' ${hasProjectFilter ? "AND je.project_id = $1" : ""}`,
+         WHERE je.status = 'posted'
+           ${hasProjectFilter ? `AND je.project_id = $1` : ""}
+           ${hasWbsFilter ? (isUnassigned ? "AND je.wbs_id IS NULL" : `AND je.wbs_id = $${params.length}`) : ""}`,
         params
       ),
     ]);

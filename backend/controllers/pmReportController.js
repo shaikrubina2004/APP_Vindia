@@ -82,35 +82,118 @@ exports.getCostReport = async (req, res) => {
   }
 };
 
+// ── Timesheet data shared by the on-screen report and the Excel export ─────────
+// Source of truth = timesheets submitted by employees and approved by their
+// reporting manager (timesheets / timesheet_entries). Crew that the PM tracks in
+// Team Management (team_members) do not file timesheets, so they are appended and
+// labelled "team" instead of being dropped.
+async function loadProjectTimesheetData(projectId) {
+  const staff = await pool.query(
+    `SELECT
+       e.id,
+       e.name,
+       COALESCE(NULLIF(e.designation, ''), NULLIF(e.department, ''), 'Employee') AS role,
+       COALESCE(SUM(te.regular_hours + te.overtime_hours)
+         FILTER (WHERE t.status = 'approved'), 0) AS approved_hours,
+       COALESCE(SUM(te.overtime_hours)
+         FILTER (WHERE t.status = 'approved'), 0) AS overtime_hours,
+       COALESCE(SUM(te.regular_hours + te.overtime_hours)
+         FILTER (WHERE t.status IN ('submitted','under_review','resubmitted')), 0) AS pending_hours,
+       COUNT(DISTINCT te.work_date)
+         FILTER (WHERE t.status = 'approved') AS days_worked,
+       COUNT(DISTINCT te.task_id)
+         FILTER (WHERE t.status = 'approved' AND te.task_id IS NOT NULL) AS tasks
+     FROM timesheet_entries te
+     JOIN timesheets t ON t.id = te.timesheet_id
+     JOIN employees e ON e.id = t.employee_id
+     WHERE te.project_id = $1
+     GROUP BY e.id, e.name, e.designation, e.department
+     ORDER BY approved_hours DESC, e.name ASC`,
+    [projectId]
+  );
+
+  const crew = await pool.query(
+    `SELECT name, role, type, COALESCE(hours, 0) AS hours,
+       COALESCE(tasks_count, 0) AS tasks, COALESCE(days_worked, 0) AS days_worked
+     FROM team_members WHERE project_id = $1 AND status = 'Active' ORDER BY name ASC`,
+    [projectId]
+  );
+
+  const trend = await pool.query(
+    `SELECT to_char(t.week_start::date, 'Mon DD') AS week,
+            t.week_start::date AS week_key,
+            COALESCE(SUM(te.regular_hours + te.overtime_hours), 0) AS hours
+     FROM timesheet_entries te
+     JOIN timesheets t ON t.id = te.timesheet_id
+     WHERE te.project_id = $1 AND t.status = 'approved'
+     GROUP BY t.week_start
+     ORDER BY t.week_start DESC
+     LIMIT 6`,
+    [projectId]
+  );
+
+  const num = (v) => Math.round((parseFloat(v) || 0) * 100) / 100;
+
+  const employees = [
+    ...staff.rows.map((m) => ({
+      name: m.name,
+      role: m.role,
+      type: "Employee",
+      source: "timesheet",
+      hours: num(m.approved_hours),
+      overtime: num(m.overtime_hours),
+      pending_hours: num(m.pending_hours),
+      tasks: parseInt(m.tasks || 0, 10),
+      days_worked: parseInt(m.days_worked || 0, 10),
+    })),
+    ...crew.rows.map((m) => ({
+      name: m.name,
+      role: m.role,
+      type: m.type || "Team",
+      source: "team",
+      hours: num(m.hours),
+      overtime: 0,
+      pending_hours: 0,
+      tasks: parseInt(m.tasks || 0, 10),
+      days_worked: parseInt(m.days_worked || 0, 10),
+    })),
+  ];
+
+  return {
+    employees,
+    // oldest → newest for the bar chart
+    trend: trend.rows.reverse().map((r) => ({ week: r.week, hours: num(r.hours) })),
+  };
+}
+
 exports.getTimesheetReport = async (req, res) => {
   try {
     const { projectId } = req.params;
-    const members = await pool.query(
-      `SELECT name, role, type, COALESCE(hours, 0) AS hours,
-         COALESCE(tasks_count, 0) AS tasks, COALESCE(days_worked, 0) AS days_worked
-       FROM team_members WHERE project_id = $1 AND status = 'Active' ORDER BY name ASC`,
-      [projectId]
-    );
-    const trend = await pool.query(
-      `SELECT TO_CHAR(DATE_TRUNC('week', created_at), 'Mon DD') AS week, COUNT(*) AS submissions
-       FROM daily_reports WHERE project_name IN (SELECT name FROM projects WHERE id = $1)
-       GROUP BY DATE_TRUNC('week', created_at)
-       ORDER BY DATE_TRUNC('week', created_at) ASC LIMIT 6`,
-      [projectId]
-    );
-    const totalHours = members.rows.reduce((s, m) => s + parseInt(m.hours || 0), 0);
-    const totalTasks = members.rows.reduce((s, m) => s + parseInt(m.tasks || 0), 0);
+    const { employees, trend } = await loadProjectTimesheetData(projectId);
+
+    const totalHours = num2(employees.reduce((s, m) => s + m.hours, 0));
+    const overtimeHours = num2(employees.reduce((s, m) => s + m.overtime, 0));
+    const pendingHours = num2(employees.reduce((s, m) => s + m.pending_hours, 0));
+    const totalTasks = employees.reduce((s, m) => s + m.tasks, 0);
+
     res.json({
-      totalHours, totalTasks, activeWorkers: members.rows.length,
-      employees: members.rows.map((m) => ({ name: m.name, role: m.role, type: m.type,
-        hours: parseInt(m.hours || 0), tasks: parseInt(m.tasks || 0), days_worked: parseInt(m.days_worked || 0) })),
-      trend: trend.rows,
+      totalHours,
+      overtimeHours,
+      pendingHours,
+      totalTasks,
+      activeWorkers: employees.length,
+      employees,
+      trend,
     });
   } catch (err) {
     console.error("PM timesheet report error:", err.message);
     res.status(500).json({ error: "Failed to load timesheet report", detail: err.message });
   }
 };
+
+function num2(v) {
+  return Math.round((Number(v) || 0) * 100) / 100;
+}
 
 exports.getIncidentReport = async (req, res) => {
   try {
@@ -169,10 +252,17 @@ exports.exportProjectReport = async (req, res) => {
         Status: x.status, Date: new Date(x.created_at).toLocaleDateString("en-IN") }));
       sheetName = "Cost Report"; filename = "cost-report";
     } else if (type === "timesheet") {
-      const { rows: r } = await pool.query(
-        `SELECT name, role, type, hours, tasks_count, days_worked FROM team_members WHERE project_id=$1 AND status='Active' ORDER BY name`, [projectId]
-      );
-      rows = r.map((x) => ({ Employee: x.name, Role: x.role, Type: x.type, Hours: x.hours||0, Tasks: x.tasks_count||0, "Days Worked": x.days_worked||0 }));
+      const { employees } = await loadProjectTimesheetData(projectId);
+      rows = employees.map((x) => ({
+        Employee: x.name,
+        Role: x.role,
+        Source: x.source === "timesheet" ? "Approved timesheets" : "Team management",
+        "Approved Hours": x.hours,
+        "Overtime Hours": x.overtime,
+        "Pending Approval Hours": x.pending_hours,
+        Tasks: x.tasks,
+        "Days Worked": x.days_worked,
+      }));
       sheetName = "Timesheet"; filename = "timesheet-report";
     } else if (type === "incident") {
       const { rows: r } = await pool.query(

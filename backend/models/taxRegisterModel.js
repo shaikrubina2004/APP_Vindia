@@ -17,10 +17,20 @@ const TaxRegister = {
       values.push(filters.source_type);
       where += ` AND t.source_type = $${values.length}`;
     }
+    if (filters.wbs_id === "unassigned") {
+      where += ` AND t.wbs_id IS NULL AND t.project_id IS NOT NULL`;
+    } else if (filters.wbs_id) {
+      values.push(filters.wbs_id);
+      where += ` AND t.wbs_id = $${values.length}`;
+    }
     const result = await pool.query(
-      `SELECT t.*, p.name AS project_name
+      `SELECT t.*, p.name AS project_name,
+              w.code AS wbs_code, w.name AS wbs_name, w.parent_id AS wbs_parent_id,
+              m.code AS milestone_code, m.name AS milestone_name
        FROM tax_register t
        LEFT JOIN projects p ON p.id = t.project_id
+       LEFT JOIN wbs w ON w.id = t.wbs_id
+       LEFT JOIN wbs m ON m.id = COALESCE(w.parent_id, w.id)
        ${where}
        ORDER BY t.created_at DESC`,
       values
@@ -29,20 +39,32 @@ const TaxRegister = {
   },
 
   getById: async (id) => {
-    const result = await pool.query(`SELECT * FROM tax_register WHERE id = $1`, [id]);
+    const result = await pool.query(
+      `SELECT t.*, w.code AS wbs_code, w.name AS wbs_name, w.parent_id AS wbs_parent_id,
+              m.code AS milestone_code, m.name AS milestone_name
+       FROM tax_register t
+       LEFT JOIN wbs w ON w.id = t.wbs_id
+       LEFT JOIN wbs m ON m.id = COALESCE(w.parent_id, w.id)
+       WHERE t.id = $1`,
+      [id]
+    );
     return result.rows[0];
   },
 
+  // project_id AND wbs_id are always DERIVED from the source
+  // invoice/expense (see deriveWbsFromSource in
+  // utils/financeWbsValidation.js) — never taken as a manual field
+  // from the request, per Section 15.
   create: async (data) => {
     const {
       source_type, source_id, tax_type, rate,
-      taxable_amount, tax_amount, filing_period, project_id, created_by,
+      taxable_amount, tax_amount, filing_period, project_id, wbs_id, created_by,
     } = data;
     const result = await pool.query(
       `INSERT INTO tax_register
-         (source_type, source_id, tax_type, rate, taxable_amount, tax_amount, filing_period, project_id, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [source_type, source_id, tax_type, rate, taxable_amount, tax_amount, filing_period, project_id || null, created_by]
+         (source_type, source_id, tax_type, rate, taxable_amount, tax_amount, filing_period, project_id, wbs_id, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [source_type, source_id, tax_type, rate, taxable_amount, tax_amount, filing_period, project_id || null, wbs_id || null, created_by]
     );
     return result.rows[0];
   },

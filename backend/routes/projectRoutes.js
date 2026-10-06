@@ -21,13 +21,19 @@ const authMiddleware = require("../middleware/authMiddleware");
 const { requireRole } = authMiddleware;
 const CAN_CREATE = requireRole("ceo", "project_manager");
 
+// Staff/user directories (site engineers, managers, clients...) are internal data.
+const notClient = (req, res, next) =>
+  req.user?.role === "client"
+    ? res.status(403).json({ message: "Access denied. Insufficient role." })
+    : next();
+
 // ✅ Routes
 router.post("/", authMiddleware, CAN_CREATE, createProject);
 router.get("/", authMiddleware, getAllProjects);
-router.get("/site-engineers", authMiddleware, getSiteEngineers);
-router.get("/managers", authMiddleware, getManagers);
-router.get("/coordinators", authMiddleware, getCoordinators); // ✅ added
-router.get("/architects", authMiddleware, getArchitects);
-router.get("/clients", authMiddleware, getClients);
+router.get("/site-engineers", authMiddleware, notClient, getSiteEngineers);
+router.get("/managers", authMiddleware, notClient, getManagers);
+router.get("/coordinators", authMiddleware, notClient, getCoordinators); // ✅ added
+router.get("/architects", authMiddleware, notClient, getArchitects);
+router.get("/clients", authMiddleware, notClient, getClients);
 
 module.exports = router;

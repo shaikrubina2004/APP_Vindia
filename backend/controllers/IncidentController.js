@@ -117,6 +117,15 @@ async function safeQSNotify(
   }
 }
 
+/* Roles whose bell reads operations_notifications -> their portal base path */
+const OPS_BELL_BASE = {
+  logistics_coordinator: "/operations/logistics",
+  inventory_controller: "/operations/inventory",
+  procurement_officer: "/operations/procurement",
+  operations_manager: "/operations/manager",
+  office_administrator: "/operations/administrator",
+};
+
 /*
  * Master notify router — looks up the user's role and sends to the
  * correct notification table.
@@ -184,18 +193,13 @@ async function notifyByRole(
       } catch (err) {
         console.error("MEP Notification error:", err.message);
       }
-    } else if (
-      roleCode === "logistics_coordinator" ||
-      roleCode === "inventory_controller"
-    ) {
-      // These two roles read from operations_notifications, not pc_notifications.
+    } else if (OPS_BELL_BASE[roleCode]) {
+      // These roles read from operations_notifications, not pc_notifications.
       // Without this branch their incidents/tasks were written to the PC table
-      // and never appeared in their bell.
+      // and never appeared in their bell. (Procurement Officer, Operations
+      // Manager and Office Administrator were missing from this list.)
       try {
-        const base =
-          roleCode === "logistics_coordinator"
-            ? "/operations/logistics"
-            : "/operations/inventory";
+        const base = OPS_BELL_BASE[roleCode];
         const fallbackLink =
           type === "task" ? `${base}/incidents?page=tasks` : `${base}/incidents`;
 

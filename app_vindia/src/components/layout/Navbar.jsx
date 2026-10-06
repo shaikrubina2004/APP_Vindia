@@ -11,6 +11,7 @@ import ArchitectNotificationBell from "../../components/notifications/ArchitectN
 import OperationsNotificationBell from "../notifications/OperationsNotificationBell";
 import CEONotificationBell from "../notifications/CEONotificationBell";
 import SiteEngineerNotificationBell from "../notifications/SiteEngineerNotificationBell";
+import ClientNotificationBell from "../notifications/ClientNotificationBell";
 import ThreeDVisualizerNotificationBell from "../notifications/ThreeDVisualizerNotificationBell";
 import DigitalMarketingNotificationBell from "../notifications/DigitalMarketingNotificationBell";
 import "../../styles/layout/Navbar.css";
@@ -18,32 +19,50 @@ import logo from "../../assets/logo.png.png";
 
 // ✅ Role-based quick-add menu items
 const QUICK_ADD_ITEMS = {
+  client: [
+    { label: "Raise RFI", path: "/client/rfi" },
+    { label: "Raise Incident", path: "/client/incidents" },
+  ],
   ceo: [
     { label: "Reports", path: "/reports" },
     { label: "Analytics", path: "/analytics" },
+  ],
+  project_manager: [
+    { label: "Daily Update", path: "/pm/daily-updates" },
+    { label: "Incident", path: "/pm/incidents" },
+    { label: "Project Approval", path: "/pm/project-approvals" },
   ],
   project_coordinator: [
     { label: "Add Milestone", path: "/project-coordinator/milestone" },
     { label: "View Incident", path: "/project-coordinator/incidents" },
     { label: "View Task", path: "/project-coordinator/incidents?page=tasks" },
   ],
-  structural_engineer: [
-    { label: "Create Project", path: "/projects/create" },
-    { label: "Submit Expense", path: "/expenses/submit" },
+  site_engineer: [
+    { label: "Daily Diary", path: "/site-engineer/daily-diary" },
+    { label: "Site Measurement", path: "/site-engineer/qs-measurements" },
+    { label: "Incident", path: "/site-engineer/incidents" },
   ],
   quantity_surveyor: [
-    { label: "Create Project", path: "/projects/create" },
-    { label: "Submit Expense", path: "/expenses/submit" },
+    { label: "Measurement", path: "/quantity-surveyor/measurement" },
+    { label: "Quantity Report", path: "/quantity-surveyor/quantity-report" },
+    { label: "RFI", path: "/quantity-surveyor/rfi" },
+    { label: "Incident", path: "/quantity-surveyor/incident" },
+  ],
+  structural_engineer: [
+    { label: "Daily Update", path: "/structural-engineer/daily-updates" },
+    { label: "RFI", path: "/structural-engineer/rfi" },
+    { label: "Incident", path: "/structural-engineer/incidents" },
   ],
   mep_engineer: [
-    { label: "Create Project", path: "/projects/create" },
-    { label: "Submit Expense", path: "/expenses/submit" },
+    { label: "Daily Log", path: "/mep/daily-log" },
+    { label: "RFI", path: "/mep/rfi" },
+    { label: "Incident", path: "/mep/incidents" },
   ],
   architect: [
-    { label: "Create Project", path: "/projects/create" },
-    { label: "Submit Expense", path: "/expenses/submit" },
+    { label: "Projects", path: "/architect/projects" },
+    { label: "RFI", path: "/architect/rfi" },
+    { label: "Incident", path: "/architect/incidents" },
   ],
-  // All BDA variants get only Add Lead + Add Follow-up
   bda: [
     { label: "Add Lead", path: "/bda/add-lead" },
     { label: "Add Follow-up", path: "/bda/follow-up" },
@@ -70,12 +89,43 @@ const QUICK_ADD_ITEMS = {
   ],
   logistics_coordinator: [
     { label: "New Delivery", path: "/operations/logistics/deliveries" },
-    { label: "View Incident", path: "/operations/logistics/incidents" },
+    { label: "Daily Update", path: "/operations/logistics/daily-update" },
+    { label: "Incident", path: "/operations/logistics/incidents" },
   ],
   inventory_controller: [
     { label: "Stock In", path: "/operations/inventory/stock-in" },
     { label: "Stock Out", path: "/operations/inventory/stock-out" },
-    { label: "View Incident", path: "/operations/inventory/incidents" },
+    { label: "Daily Update", path: "/operations/inventory/daily-update" },
+    { label: "Incident", path: "/operations/inventory/incidents" },
+  ],
+  procurement_officer: [
+    { label: "Purchase Requests", path: "/operations/procurement/purchase-requests" },
+    { label: "Purchase Orders", path: "/operations/procurement/purchase-orders" },
+    { label: "Daily Report", path: "/operations/procurement/daily-report" },
+  ],
+  operations_manager: [
+    { label: "Material Requests", path: "/operations/manager/material-requests" },
+    { label: "Approvals", path: "/operations/manager/approvals" },
+    { label: "Purchase Orders", path: "/operations/procurement/purchase-orders" },
+    { label: "Daily Updates", path: "/operations/manager/daily-updates" },
+  ],
+  office_administrator: [
+    { label: "Office Request", path: "/operations/administrator/requests" },
+    { label: "Visitor", path: "/operations/administrator/visitors" },
+    { label: "Asset", path: "/operations/administrator/assets" },
+    { label: "Daily Update", path: "/operations/administrator/daily-update" },
+  ],
+  accountant: [
+    { label: "Invoice", path: "/accountant/invoices" },
+    { label: "Expense", path: "/accountant/expenses" },
+    { label: "Payment", path: "/accountant/payments" },
+    { label: "Journal Entry", path: "/accountant/journal-entries" },
+  ],
+  finance_manager: [
+    { label: "Invoice", path: "/finance-manager/invoices" },
+    { label: "Expense", path: "/finance-manager/expenses" },
+    { label: "Payment", path: "/finance-manager/payments" },
+    { label: "Daily Update", path: "/finance-manager/daily-update" },
   ],
   hr_manager: [
     { label: "Add Employee", path: "/hr/add-employee" },
@@ -160,8 +210,20 @@ const SITE_ENGINEER_ROUTES = {
 const OPERATIONS_MANAGER_ROUTES = {
   default: "/operations/manager/dashboard",
   daily_update: "/operations/manager/daily-updates",
-  incident: "/operations/manager/dashboard",
-  task: "/operations/manager/tasks",
+  approval: "/operations/manager/approvals",
+  delay: "/operations/manager/logistics",
+  receipt: "/operations/manager/inventory",
+  low_stock: "/operations/manager/inventory",
+  incident: "/operations/manager/incidents",
+  task: "/operations/manager/incidents?page=tasks",
+};
+
+const OFFICE_ADMIN_ROUTES = {
+  default: "/operations/administrator/dashboard",
+  request: "/operations/administrator/requests",
+  daily_update: "/operations/administrator/daily-update",
+  incident: "/operations/administrator/incidents",
+  task: "/operations/administrator/incidents?page=tasks",
 };
 
 const OperationsManagerBell = ({ userId }) => (
@@ -169,6 +231,14 @@ const OperationsManagerBell = ({ userId }) => (
     userId={userId}
     role="operations_manager"
     routes={OPERATIONS_MANAGER_ROUTES}
+  />
+);
+
+const OfficeAdministratorBell = ({ userId }) => (
+  <OperationsNotificationBell
+    userId={userId}
+    role="office_administrator"
+    routes={OFFICE_ADMIN_ROUTES}
   />
 );
 
@@ -220,6 +290,7 @@ const NOTIFICATION_COMPONENTS = {
   business_development_analyst: BdaBell,
   logistics_coordinator: LogisticsBell,
   operations_manager: OperationsManagerBell,
+  office_administrator: OfficeAdministratorBell,
   inventory_controller: InventoryBell,
   finance_manager: FinanceBell,
   ceo: CEONotificationBell,
@@ -228,18 +299,12 @@ const NOTIFICATION_COMPONENTS = {
   "3d_visualizer": ThreeDVisualizerNotificationBell,
   digital_marketing: DigitalMarketingNotificationBell,
   hr_manager: HRBell,
+  client: ClientNotificationBell,
 };
 
 function Navbar() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-
-  useEffect(() => {
-    console.log("======= USER OBJECT =======");
-    console.log(user);
-    console.log("role:", user?.role);
-    console.log("===========================");
-  }, [user]);
 
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -290,6 +355,7 @@ function Navbar() {
       </div>
 
       <div className="navbar-right">
+        {user?.role !== "client" && (
         <button
           className="navbar-icon-btn timesheet-btn"
           onClick={() => navigate("/timesheet")}
@@ -308,6 +374,7 @@ function Navbar() {
           </svg>
           <span>Timesheet</span>
         </button>
+        )}
 
         {/* ✅ Role-based Quick Add */}
         <div
@@ -365,36 +432,48 @@ function Navbar() {
           onMouseEnter={() => setIsProfileOpen(true)}
           onMouseLeave={() => setIsProfileOpen(false)}
         >
-          <button className="profile-btn">
+          <button
+            className="profile-btn"
+            aria-label="Open profile menu"
+            onClick={() => setIsProfileOpen((open) => !open)}
+          >
             <div className="avatar">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
+              {user?.profile_photo ? (
+                <img
+                  src={`${(import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE || "http://localhost:5000").replace(/\/+$/, "")}/uploads/${user.profile_photo}`}
+                  alt=""
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+              ) : (
+                <span>{(user?.name || "?").split(" ").map((part) => part[0]).filter(Boolean).slice(0, 2).join("").toUpperCase()}</span>
+              )}
             </div>
           </button>
           <div className={`dropdown-menu ${isProfileOpen ? "show" : ""}`}>
             <div className="dropdown-header">
-              <p>{user?.name}</p>
-              <small>{user?.email}</small>
+              <div className="dropdown-avatar">
+                {user?.profile_photo ? (
+                  <img
+                    src={`${(import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE || "http://localhost:5000").replace(/\/+$/, "")}/uploads/${user.profile_photo}`}
+                    alt=""
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
+                ) : (
+                  <span>{(user?.name || "?").split(" ").map((part) => part[0]).filter(Boolean).slice(0, 2).join("").toUpperCase()}</span>
+                )}
+              </div>
+              <div className="dropdown-user-copy">
+                <p className="dropdown-name">{user?.name || "Employee"}</p>
+                <small className="dropdown-role">{user?.role_name || user?.role || "Employee"}</small>
+                {user?.department_name || user?.employee_department ? (
+                  <small className="dropdown-department">{user?.department_name || user?.employee_department}</small>
+                ) : null}
+                <small className="dropdown-email">{user?.email || user?.employee_email}</small>
+              </div>
             </div>
-            <button className="dropdown-item">Profile</button>
-            <button
-              className="dropdown-item"
-              onClick={() => {
-                setIsProfileOpen(false);
-                navigate("/settings");
-              }}
-            >
-              Settings
-            </button>
+            <button className="dropdown-item" onClick={() => { setIsProfileOpen(false); navigate("/settings"); }}>Profile</button>
+            <button className="dropdown-item" onClick={() => { setIsProfileOpen(false); navigate("/timesheet"); }}>My Timesheet</button>
+            <button className="dropdown-item" onClick={() => { setIsProfileOpen(false); navigate("/settings"); }}>Settings</button>
             <div className="dropdown-divider"></div>
             <button className="dropdown-item logout" onClick={handleLogout}>
               Logout

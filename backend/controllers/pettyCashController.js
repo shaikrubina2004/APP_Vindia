@@ -1,18 +1,19 @@
 // ===== FILE: APP_Vindia/backend/controllers/pettyCashController.js =====
 const PettyCash = require("../models/pettyCashModel");
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
+const { validateFinanceWbs } = require("../utils/financeWbsValidation");
 
 const FM_ONLY_ROLES = ["finance_manager", "ceo"];
 
 exports.getAll = asyncHandler(async (req, res) => {
-  const { project_id, status } = req.query;
-  const rows = await PettyCash.getAll({ project_id, status });
+  const { project_id, status, wbs_id } = req.query;
+  const rows = await PettyCash.getAll({ project_id, status, wbs_id });
   res.json({ success: true, data: rows });
 });
 
 exports.getBalance = asyncHandler(async (req, res) => {
-  const { project_id } = req.query;
-  const balance = await PettyCash.getBalance(project_id);
+  const { project_id, wbs_id } = req.query;
+  const balance = await PettyCash.getBalance(project_id, wbs_id);
   res.json({ success: true, data: balance });
 });
 
@@ -23,21 +24,35 @@ exports.getById = asyncHandler(async (req, res) => {
 });
 
 exports.create = asyncHandler(async (req, res) => {
-  const { project_id, transaction_type, amount, category, description, receipt_url } = req.body;
+  const { project_id, transaction_type, amount, category, description, receipt_url, wbs_id } = req.body;
   if (!transaction_type || amount === undefined) {
     throw new AppError("transaction_type and amount are required", 400);
   }
   if (!["inflow", "outflow"].includes(transaction_type)) {
     throw new AppError("transaction_type must be 'inflow' or 'outflow'", 400);
   }
+
+  // Project-related petty cash requires a WBS; genuine company-level
+  // petty cash (no project_id) stays WBS-free (Section 16).
+  await validateFinanceWbs({ project_id, wbs_id }, { required: true });
+
   const row = await PettyCash.create({
-    project_id, transaction_type, amount, category, description, receipt_url,
+    project_id, transaction_type, amount, category, description, receipt_url, wbs_id,
     created_by: req.user.id,
   });
   res.status(201).json({ success: true, data: row });
 });
 
 exports.update = asyncHandler(async (req, res) => {
+  if (Object.prototype.hasOwnProperty.call(req.body, "wbs_id")) {
+    const existing = await PettyCash.getById(req.params.id);
+    if (!existing) throw new AppError("Petty cash transaction not found", 404);
+    await validateFinanceWbs(
+      { project_id: existing.project_id, wbs_id: req.body.wbs_id },
+      { required: !!existing.project_id }
+    );
+  }
+
   const result = await PettyCash.update(req.params.id, req.body);
   if (result.error === "NOT_FOUND") throw new AppError("Petty cash transaction not found", 404);
   if (result.error === "NOT_EDITABLE") {

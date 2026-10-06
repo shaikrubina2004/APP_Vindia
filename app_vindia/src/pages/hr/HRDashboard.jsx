@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/useAuth";
 import "../../styles/HRDashboard.css";
 import CheckInButton from "../../SharedResourse/CheckInButton";
 
@@ -719,15 +720,11 @@ export default function HRDashboard() {
   const [attendanceRows, setAttendanceRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const user = JSON.parse(
-    localStorage.getItem("user") || "{}"
-  );
+  const { user } = useAuth();
 
   const hrName =
+    user?.employee_name ||
     user?.name ||
-    user?.full_name ||
-    user?.username ||
-    user?.first_name ||
     "HR Manager";
 
   const employeeId =

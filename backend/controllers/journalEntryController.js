@@ -8,6 +8,7 @@
 
 const JournalEntry = require("../models/journalEntryModel");
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
+const { validateFinanceWbs } = require("../utils/financeWbsValidation");
 
 const FM_ONLY_ROLES = ["finance_manager", "ceo"];
 
@@ -26,8 +27,8 @@ function isAccountant(req) {
 }
 
 exports.getAll = asyncHandler(async (req, res) => {
-  const { project_id, status } = req.query;
-  const rows = await JournalEntry.getAll({ project_id, status });
+  const { project_id, status, wbs_id } = req.query;
+  const rows = await JournalEntry.getAll({ project_id, status, wbs_id });
   res.json({ success: true, data: rows });
 });
 
@@ -43,7 +44,7 @@ exports.create = asyncHandler(async (req, res) => {
     throw new AppError("Only Accountant can create journal entries", 403);
   }
 
-  const { entry_date, description, project_id, lines } = req.body;
+  const { entry_date, description, project_id, wbs_id, lines } = req.body;
 
   if (!Array.isArray(lines) || lines.length === 0) {
     throw new AppError("At least one journal line is required", 400);
@@ -54,10 +55,15 @@ exports.create = asyncHandler(async (req, res) => {
     }
   }
 
+  // Project-level entries must carry a WBS; genuine company-level
+  // entries (no project_id) may leave both null (Section 13).
+  await validateFinanceWbs({ project_id, wbs_id }, { required: true });
+
   const entry = await JournalEntry.create({
     entry_date,
     description,
     project_id,
+    wbs_id,
     lines,
     created_by: req.user.id,
   });
@@ -73,10 +79,16 @@ exports.update = asyncHandler(async (req, res) => {
     throw new AppError("Only Accountant can edit journal entries", 403);
   }
 
-  const { entry_date, description, project_id, lines } = req.body;
+  const { entry_date, description, project_id, wbs_id, lines } = req.body;
+
+  // Only reachable on a draft (the model re-checks this under a row
+  // lock), so a normal WBS validation is correct here — there's no
+  // "already locked" state to guard against yet.
+  await validateFinanceWbs({ project_id, wbs_id }, { required: true });
+
   const result = await JournalEntry.updateDraft(
     req.params.id,
-    { entry_date, description, project_id, lines },
+    { entry_date, description, project_id, wbs_id, lines },
     req.user.id
   );
 

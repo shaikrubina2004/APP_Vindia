@@ -30,6 +30,14 @@ export const ROLE_CONFIG = {
       "e.g. Truck broke down en route to Site A. Vendor delayed loading. Leave blank if none.",
     nextPlaceholder: "e.g. Dispatch 4 deliveries to Site C. Confirm vehicle for steel pickup.",
   },
+  office_administrator: {
+    roleLabel: "Office Administrator",
+    workPlaceholder:
+      "e.g. Closed 3 office requests (stationery, AC service). Registered 6 visitors. Reissued 2 laptops.",
+    issuesPlaceholder:
+      "e.g. Printer vendor has not confirmed the service slot. Leave blank if none.",
+    nextPlaceholder: "e.g. Follow up on the furniture quotation. Renew the courier contract.",
+  },
 };
 
 export const emptyForm = () => ({

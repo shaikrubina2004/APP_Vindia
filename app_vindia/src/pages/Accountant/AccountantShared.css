@@ -214,6 +214,7 @@
   box-shadow: var(--acs-shadow);
 }
 .acs-field { display: flex; flex-direction: column; gap: 5px; }
+.acs-field-note { margin: 0; padding: 10px 12px; background: var(--acs-surface-alt, #f5f9fc); border: 1px dashed var(--acs-border, #d7e2ea); border-radius: 9px; color: var(--acs-muted); font-size: 0.74rem; line-height: 1.5; }
 .acs-field label { font-size: 0.74rem; color: var(--acs-muted); font-weight: 600; letter-spacing: 0.01em; }
 .acs-field input, .acs-field select, .acs-field textarea {
   padding: 9px 11px;

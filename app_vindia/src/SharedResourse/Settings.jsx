@@ -28,9 +28,11 @@ function Account({ user }) {
       <h3>Account</h3>
       <div className="pp-sub">Your details. Contact the CEO to change your name, email or role.</div>
       <dl className="pp-info">
-        <dt>Name</dt><dd>{user?.name || "—"}</dd>
-        <dt>Email</dt><dd>{user?.email || "—"}</dd>
-        <dt>Role</dt><dd>{cap(user?.role)}</dd>
+        <dt>Name</dt><dd>{user?.employee_name || user?.name || "—"}</dd>
+        <dt>Email</dt><dd>{user?.employee_email || user?.email || "—"}</dd>
+        <dt>Department</dt><dd>{user?.department_name || user?.employee_department || "—"}</dd>
+        <dt>Designation</dt><dd>{user?.designation || "—"}</dd>
+        <dt>Role</dt><dd>{user?.role_name || cap(user?.role)}</dd>
       </dl>
     </div>
   );

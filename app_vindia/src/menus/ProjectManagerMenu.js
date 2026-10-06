@@ -31,6 +31,12 @@ export const ProjectManagerMenu = [
   },
 
   {
+    name: "Project Approvals",
+    path: "/pm/project-approvals",
+    icon: "check-circle",
+  },
+
+  {
     name: "Reports",
     path: "/pm/reports",
     icon: "bar-chart-2",
@@ -41,5 +47,11 @@ export const ProjectManagerMenu = [
     path: "/pm/cost-reports",
     icon: "dollar-sign",
   },
+
+  {
+    name: "Labour Registry",
+    path: "/pm/labour",
+    icon: "users",
+  }
 
 ];

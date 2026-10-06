@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/useAuth";
 import financeService from "../../services/financeService";
 import { getProjects } from "../../services/projectService";
+import FinanceWbsSelector, { WbsBadge } from "../../components/accountant/FinanceWbsSelector";
 import "./PaymentTracking.css";
 
 /* ── Helpers ───────────────────────────────────────────────── */
@@ -73,6 +74,7 @@ const EMPTY_PAYMENT = {
   project_id: "",
   vendor_id: "",
   invoice_id: "",
+  wbs_id: "",
   amount: "",
   payment_method: "",
   reference_number: "",
@@ -209,6 +211,14 @@ export default function PaymentTracking() {
       return;
     }
 
+    // WBS is inherited automatically when an invoice is linked; only
+    // require an explicit selection when this payment stands alone
+    // (Section 11).
+    if (!form.invoice_id && !form.wbs_id) {
+      setFormError("Select a WBS / Milestone for this payment (or link an invoice to inherit one).");
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
 
@@ -224,6 +234,8 @@ export default function PaymentTracking() {
         status: form.status,
         payment_date: form.payment_date,
         notes: form.notes,
+        // Ignored/overwritten server-side when invoice_id is set.
+        wbs_id: form.invoice_id ? null : form.wbs_id,
       });
 
       await loadAll();
@@ -576,12 +588,13 @@ export default function PaymentTracking() {
               <select
                 className="pt-input"
                 value={form.project_id}
-                onChange={(e) =>
+                onChange={(e) => {
                   setF(
                     "project_id",
                     e.target.value
-                  )
-                }
+                  );
+                  setF("wbs_id", "");
+                }}
               >
                 <option value="">
                   Select project
@@ -658,6 +671,26 @@ export default function PaymentTracking() {
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {/* WBS */}
+            {form.invoice_id ? (
+              <div className="pt-form-row" style={{ gridColumn: "1 / -1" }}>
+                <div className="pt-wbs-inherited">
+                  WBS classification will be <b>inherited automatically</b> from the linked invoice.
+                </div>
+              </div>
+            ) : (
+              <div className="pt-form-row" style={{ gridColumn: "1 / -1" }}>
+                <FinanceWbsSelector
+                  projectId={form.project_id || null}
+                  projectLabel={projects.find((p) => String(p.id) === String(form.project_id))?.name}
+                  value={form.wbs_id}
+                  onChange={(ctx) => setF("wbs_id", ctx ? String(ctx.wbs_id) : "")}
+                  fetchWbs={financeService.getFinanceWbs}
+                  required
+                />
               </div>
             )}
 
@@ -1247,6 +1280,7 @@ function HistoryTab({
               <th>Party</th>
               <th>Type</th>
               <th>Reference</th>
+              <th>WBS</th>
               <th>Amount</th>
               <th>Method</th>
               <th>Status</th>
@@ -1287,6 +1321,15 @@ function HistoryTab({
                 <td className="pt-invoice">
                   {p.reference_number ||
                     "—"}
+                </td>
+
+                <td>
+                  <WbsBadge
+                    code={p.wbs_code}
+                    name={p.wbs_name}
+                    milestoneCode={p.milestone_code}
+                    milestoneName={p.milestone_name}
+                  />
                 </td>
 
                 <td className="pt-amount">
@@ -1565,6 +1608,19 @@ function PaymentModal({
               {payment.vendor_name ||
                 payment.invoice_number ||
                 "—"}
+            </p>
+          </div>
+
+          <div className="pt-modal-row">
+            <label>WBS Classification</label>
+
+            <p>
+              <WbsBadge
+                code={payment.wbs_code}
+                name={payment.wbs_name}
+                milestoneCode={payment.milestone_code}
+                milestoneName={payment.milestone_name}
+              />
             </p>
           </div>
 

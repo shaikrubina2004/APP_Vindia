@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import "../../../styles/Reports.css";
 import { useProject } from "../../../context/ProjectContext";
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE || "http://localhost:5000").replace(/\/+$/, "");
 const token = () => localStorage.getItem("token");
 
 const fmt = (n) => n >= 1e6 ? `₹${(n/1e6).toFixed(2)}M` : n >= 1e3 ? `₹${(n/1e3).toFixed(0)}K` : `₹${n||0}`;
@@ -120,10 +120,37 @@ export default function Reports() {
     fetchTab(tab, projectId);
   }, [tab, projectId, projectsLoading, fetchTab]);
 
-  function handleExport() {
-    if (!projectId) return;
+  // window.open() cannot send the Authorization header, so the export always came back
+  // 401. Fetch with the token, then hand the file to the browser.
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+  async function handleExport() {
+    if (!projectId || exporting) return;
+    setExportError("");
     const map = { project:"project", cost:"cost", timesheet:"timesheet", incidents:"incident" };
-    window.open(`${BASE}/api/pm-reports/${projectId}/export?type=${map[tab]||tab}`, "_blank");
+    setExporting(true);
+    try {
+      const res = await fetch(`${BASE}/api/pm-reports/${projectId}/export?type=${map[tab]||tab}`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.detail || j.error || `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${map[tab]||tab}-report-${projectId}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(e.message || "Export failed.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   function handleProjectChange(e) {
@@ -186,16 +213,21 @@ export default function Reports() {
           <p>{projectId ? `${activeProject?.name} — Live analytics` : "Select a project to begin"}</p>
         </div>
         <button className="rpt-export-btn rpt-excel" onClick={handleExport}
-          disabled={!projectId || loading}
+          disabled={!projectId || loading || exporting}
           style={{marginLeft:"auto",opacity:projectId?1:0.45,cursor:projectId?"pointer":"not-allowed"}}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
             <line x1="8" y1="13" x2="16" y2="13"/>
           </svg>
-          Export Excel
+          {exporting ? "Exporting…" : "Export Excel"}
         </button>
       </div>
+      {exportError && (
+        <div role="alert" style={{margin:"0 0 12px",padding:"10px 14px",background:"#fef2f2",color:"#b91c1c",border:"1px solid #fecaca",borderRadius:8,fontSize:13}}>
+          Export failed: {exportError}
+        </div>
+      )}
 
       {/* ── Tabs ── */}
       <div className="rpt-tabs">
@@ -362,27 +394,31 @@ export default function Reports() {
           <div className="rpt-kpi-row">
             <div className="rpt-kpi-card">
               <div className="rpt-kpi-icon kpi-blue">⏱</div>
-              <div><span className="rpt-kpi-label">Total Hours</span><span className="rpt-kpi-val">{data.totalHours||0}</span></div>
+              <div><span className="rpt-kpi-label">Approved Hours</span><span className="rpt-kpi-val">{data.totalHours||0}</span></div>
+            </div>
+            <div className="rpt-kpi-card">
+              <div className="rpt-kpi-icon kpi-amber">🕒</div>
+              <div><span className="rpt-kpi-label">Awaiting Approval</span><span className="rpt-kpi-val">{data.pendingHours||0}</span></div>
+            </div>
+            <div className="rpt-kpi-card">
+              <div className="rpt-kpi-icon kpi-red">⚡</div>
+              <div><span className="rpt-kpi-label">Overtime Hours</span><span className="rpt-kpi-val">{data.overtimeHours||0}</span></div>
             </div>
             <div className="rpt-kpi-card">
               <div className="rpt-kpi-icon kpi-green">👥</div>
-              <div><span className="rpt-kpi-label">Active Workers</span><span className="rpt-kpi-val">{data.activeWorkers||0}</span></div>
-            </div>
-            <div className="rpt-kpi-card">
-              <div className="rpt-kpi-icon kpi-amber">✅</div>
-              <div><span className="rpt-kpi-label">Total Tasks</span><span className="rpt-kpi-val">{data.totalTasks||0}</span></div>
+              <div><span className="rpt-kpi-label">People on Project</span><span className="rpt-kpi-val">{data.activeWorkers||0}</span></div>
             </div>
           </div>
           <div className="rpt-ts-grid">
             <div className="rpt-card">
-              <div className="rpt-card-header"><h3>Team Members</h3></div>
-              {!data.employees?.length ? <p className="rpt-empty">No active team members found.</p> : (
+              <div className="rpt-card-header"><h3>Hours by Team Member</h3></div>
+              {!data.employees?.length ? <p className="rpt-empty">No timesheet hours booked to this project yet.</p> : (
                 <div className="rpt-table-wrap">
                   <table className="rpt-table">
-                    <thead><tr><th>Employee</th><th>Role</th><th>Type</th><th>Hours</th><th>Tasks</th><th>Days</th></tr></thead>
+                    <thead><tr><th>Name</th><th>Role</th><th>Source</th><th>Approved</th><th>OT</th><th>Pending</th><th>Tasks</th><th>Days</th></tr></thead>
                     <tbody>
                       {data.employees.map((e,i)=>(
-                        <tr key={i}>
+                        <tr key={`${e.source}-${e.name}-${i}`}>
                           <td>
                             <div className="rpt-emp-cell">
                               <div className="rpt-emp-avatar">{(e.name||"?").charAt(0).toUpperCase()}</div>
@@ -390,8 +426,10 @@ export default function Reports() {
                             </div>
                           </td>
                           <td><span className="rpt-role-badge">{e.role}</span></td>
-                          <td><span className={`pill pill-${(e.type||"").toLowerCase()}`}>{e.type}</span></td>
+                          <td><span className={`pill ${e.source==="timesheet"?"pill-staff":"pill-labour"}`}>{e.source==="timesheet"?"Timesheet":"Team mgmt"}</span></td>
                           <td><strong>{e.hours}h</strong></td>
+                          <td>{e.overtime ? `${e.overtime}h` : "—"}</td>
+                          <td>{e.pending_hours ? `${e.pending_hours}h` : "—"}</td>
                           <td>{e.tasks}</td>
                           <td>{e.days_worked}</td>
                         </tr>
@@ -402,8 +440,8 @@ export default function Reports() {
               )}
             </div>
             <div className="rpt-card">
-              <div className="rpt-card-header"><h3>Daily Report Submissions</h3></div>
-              {data.trend?.length>0 ? <MiniBarChart data={data.trend} valueKey="submissions" labelKey="week"/> : <p className="rpt-empty">No submission data yet.</p>}
+              <div className="rpt-card-header"><h3>Approved Hours per Week</h3></div>
+              {data.trend?.length>0 ? <MiniBarChart data={data.trend} valueKey="hours" labelKey="week"/> : <p className="rpt-empty">No approved timesheets yet.</p>}
             </div>
           </div>
         </div>

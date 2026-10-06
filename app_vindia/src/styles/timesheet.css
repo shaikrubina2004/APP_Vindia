@@ -754,3 +754,29 @@
   z-index: 10;
   cursor: pointer;
 }
+
+/* Manager team leave approval -------------------------------------------- */
+.ts-team-view { display: flex; flex-direction: column; gap: 18px; }
+.ts-team-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.ts-team-subtitle { margin: 4px 0 0; color: #6b7280; font-size: 13px; line-height: 1.5; }
+.ts-inline-error { padding: 10px 12px; border-radius: 10px; border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; font-size: 13px; margin-bottom: 12px; }
+.ts-empty-state { text-align: center; padding: 32px; color: #6b7280; }
+.ts-team-user-name { font-weight: 600; color: #111827; }
+.ts-team-user-email { margin-top: 2px; font-size: 11px; color: #6b7280; }
+.ts-team-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.ts-team-waiting { font-size: 11px; color: #9ca3af; }
+.ts-team-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.ts-team-section-title { margin: 0; font-size: 18px; color: #111827; }
+.ts-pending-count { display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.ts-leave-list { display: flex; flex-direction: column; gap: 12px; }
+.ts-leave-request { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 14px; background: #fff; box-shadow: 0 2px 8px rgba(15,23,42,.04); }
+.ts-leave-request-main { min-width: 0; }
+.ts-leave-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 8px; font-size: 12px; color: #4b5563; }
+.ts-leave-type { font-weight: 700; color: #1f2937; }
+.ts-leave-reason { margin-top: 8px; color: #374151; font-size: 13px; line-height: 1.5; }
+.ts-leave-actions { display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+.ts-btn-danger { color: #b91c1c !important; border-color: #fca5a5 !important; }
+@media (max-width: 900px) {
+  .ts-leave-request { flex-direction: column; align-items: stretch; }
+  .ts-leave-actions { width: 100%; }
+}

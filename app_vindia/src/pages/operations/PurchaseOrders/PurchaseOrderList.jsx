@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import procurementService from "../../../services/procurementService";
 import "./PurchaseOrderList.css";
 
-const STATUS_OPTIONS = ["all", "issued", "partially_fulfilled", "fulfilled", "cancelled"];
+const STATUS_OPTIONS = ["all", "pending_approval", "issued", "partially_fulfilled", "fulfilled", "rejected", "cancelled"];
 
 const PurchaseOrderList = () => {
   const navigate = useNavigate();

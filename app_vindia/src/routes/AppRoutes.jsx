@@ -46,6 +46,7 @@ import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
 import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
 import Reports from "../pages/projects/projectmanager/Reports";
 import Pmcostreports from "../pages/projects/projectmanager/Pmcostreports";
+import ProjectApprovals from "../pages/projects/projectmanager/ProjectApprovals";
 import ApprovalRequests from "../pages/siteEngineer/ApprovalRequests";
 
 /* ── OPERATIONS ──────────────────────────────────────────── */
@@ -289,6 +290,18 @@ const AppRoutes = () => {
           }
         />
 
+
+        <Route
+          path="/pm/project-approvals"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
+              <ProjectManagerLayout>
+                <ProjectApprovals />
+              </ProjectManagerLayout>
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/pm/reports"
           element={
@@ -491,7 +504,7 @@ const AppRoutes = () => {
 
         {/* ══ SITE ENGINEER ═════════════════════════════════ */}
 
-        {SiteEngineerRoutes}
+        <SiteEngineerRoutes />
 
         {/* ══ QUANTITY SURVEYOR ═════════════════════════════ */}
 
@@ -591,7 +604,7 @@ const AppRoutes = () => {
 
         <Route path="/mep/*" element={<MEPRoutes />} />
 
-        <Route path="/client/*" element={<ClientRoutes />} />
+        <Route path="/client/*" element={<ProtectedRoute allowedRoles={[ROLES.CLIENT, ROLES.CEO]}><ClientRoutes /></ProtectedRoute>} />
 
         {/* ══ PLANNING / QC / SAFETY ════════════════════════ */}
 
@@ -1435,60 +1448,32 @@ const AppRoutes = () => {
                 {/* ══ CEO REPORTS / ANALYTICS / MANAGER UPDATES ═════ */}
 
         <Route
-          path="/reports"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-              <CEOLayout>
-                <ReportsInbox />
-              </CEOLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-        path="/reports-hub"
-        element={
-          <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-            <CEOLayout>
-              <CeoReports />
-            </CEOLayout>
-          </ProtectedRoute>
-        }
-      />
+            path="/reports-hub"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+                <CEOLayout>
+                  <CeoReports />
+                </CEOLayout>
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Old links / notifications → the single Reports page */}
-        <Route
-          path="/ceo/manager-updates"
-          element={<Navigate to="/reports?tab=daily" replace />}
-        />
+          {/* Old links / notifications → the single Reports page */}
+          <Route
+            path="/ceo/manager-updates"
+            element={<Navigate to="/reports?tab=daily" replace />}
+          />
 
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-              <CEOLayout>
-                <Analytics />
-              </CEOLayout>
-            </ProtectedRoute>
-          }
-        />
-
-
-        {/* Old links / notifications → the single Reports page */}
-        <Route
-          path="/ceo/manager-updates"
-          element={<Navigate to="/reports?tab=daily" replace />}
-        />
-
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
-              <CEOLayout>
-                <Analytics />
-              </CEOLayout>
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+                <CEOLayout>
+                  <Analytics />
+                </CEOLayout>
+              </ProtectedRoute>
+            }
+          />
 
         {/* ══ MANAGERS: REPORT TO CEO ════════════════════════ */}
 

@@ -1,23 +1,28 @@
 // ===== FILE: APP_Vindia/backend/controllers/invoiceController.js =====
 const Invoice = require("../models/invoiceModel");
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
+const { validateFinanceWbs, assertWbsUnchanged } = require("../utils/financeWbsValidation");
 
 // GET /api/finance/invoices
 // Optional query filters: ?project_id=&status=&search=
 exports.getAllInvoices = asyncHandler(async (req, res) => {
-  const { project_id, status, search } = req.query;
-  const invoices = await Invoice.getAll({ project_id, status, search });
+  const { project_id, status, search, wbs_id } = req.query;
+  const invoices = await Invoice.getAll({ project_id, status, search, wbs_id });
   res.json({ success: true, data: invoices });
 });
 
 // POST /api/finance/invoices
-// Body: { project_id, client_name, amount, tax_amount?, issue_date?, due_date?, notes? }
+// Body: { project_id, client_name, amount, tax_amount?, issue_date?, due_date?, notes?, wbs_id? }
 // invoice_number is generated server-side, not taken from the request.
 exports.createInvoice = asyncHandler(async (req, res) => {
-  const { project_id, client_name, amount } = req.body;
+  const { project_id, client_name, amount, wbs_id } = req.body;
   if (!project_id || !client_name || amount == null) {
     throw new AppError("project_id, client_name and amount are required", 400);
   }
+
+  // Backend independently confirms wbs_id belongs to project_id —
+  // never trusts the frontend selector alone.
+  await validateFinanceWbs({ project_id, wbs_id }, { required: true });
 
   const invoice_number = await Invoice.getNextInvoiceNumber();
 
@@ -29,11 +34,19 @@ exports.createInvoice = asyncHandler(async (req, res) => {
 });
 
 // PUT /api/finance/invoices/:id
-// Body: any of { client_name, amount, tax_amount, due_date, notes }
+// Body: any of { client_name, amount, tax_amount, due_date, notes, wbs_id }
 // project_id and invoice_number are immutable — matches Invoice.update() on the model.
 exports.updateInvoice = asyncHandler(async (req, res) => {
   const existing = await Invoice.getById(req.params.id);
   if (!existing) throw new AppError("Invoice not found", 404);
+
+  // Once an invoice is paid its accounting classification is locked —
+  // same principle as expenses/journal entries (Section 22.8).
+  if (String(existing.status || "").toLowerCase() === "paid") {
+    assertWbsUnchanged(existing.wbs_id, req.body.wbs_id, "invoice");
+  } else if (Object.prototype.hasOwnProperty.call(req.body, "wbs_id")) {
+    await validateFinanceWbs({ project_id: existing.project_id, wbs_id: req.body.wbs_id }, { required: true });
+  }
 
   const invoice = await Invoice.update(req.params.id, req.body);
   res.json({ success: true, data: invoice });

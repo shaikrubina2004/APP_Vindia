@@ -120,6 +120,24 @@ exports.createWBSTask = async (req, res) => {
   if (!project_id || !parent_id || !name)
     return res.status(400).json({ error: "project_id, parent_id and name required" });
   try {
+    // A child WBS task must belong to the same project as its parent —
+    // without this check, a child could silently be created under a
+    // parent milestone from a DIFFERENT project, corrupting the
+    // hierarchy Finance's WBS-aware reporting relies on being
+    // project-consistent.
+    const parentCheck = await pool.query(
+      `SELECT id, project_id FROM wbs WHERE id = $1`,
+      [parent_id]
+    );
+    if (!parentCheck.rows[0]) {
+      return res.status(404).json({ error: "Parent WBS item not found" });
+    }
+    if (String(parentCheck.rows[0].project_id) !== String(project_id)) {
+      return res.status(400).json({
+        error: "Parent WBS item belongs to a different project.",
+      });
+    }
+
     const { rows } = await pool.query(
       `INSERT INTO wbs (project_id, code, name, parent_id, status, progress)
        VALUES ($1,$2,$3,$4,'Not Started',0) RETURNING *`,

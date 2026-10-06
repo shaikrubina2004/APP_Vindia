@@ -9,6 +9,7 @@ exports.getReceivablesPayables = asyncHandler(async (req, res) => {
     search,
     from_date,
     to_date,
+    wbs_id,
   } = req.query;
 
   const report = await ReceivablesPayables.getReport({
@@ -17,6 +18,7 @@ exports.getReceivablesPayables = asyncHandler(async (req, res) => {
     search,
     from_date,
     to_date,
+    wbs_id,
   });
 
   res.json({

@@ -10,6 +10,12 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./SiteEngineerNotificationBell.css";
 
+const API_ORIGIN = (
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE ||
+  "http://localhost:5000"
+).replace(/\/+$/, "");
+
 const TYPE_CFG = {
   rfi:         { label: "RFI",         color: "#7c3aed", bg: "#f5f3ff" },
   incident:    { label: "Incident",    color: "#dc2626", bg: "#fef2f2" },
@@ -49,7 +55,7 @@ export default function SiteEngineerNotificationBell({ userId, routes = {} }) {
   const fetchNotifs = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/site-engineer-notifications/${userId}`, {
+      const res = await fetch(`${API_ORIGIN}/api/site-engineer-notifications/${userId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
@@ -78,7 +84,7 @@ export default function SiteEngineerNotificationBell({ userId, routes = {} }) {
   const markRead = async (id) => {
     setNotifs((p) => p.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     try {
-      await fetch(`http://localhost:5000/api/site-engineer-notifications/${id}/read`, {
+      await fetch(`${API_ORIGIN}/api/site-engineer-notifications/${id}/read`, {
         method: "PATCH",
         headers: authHeaders(),
       });
@@ -88,7 +94,7 @@ export default function SiteEngineerNotificationBell({ userId, routes = {} }) {
   const markAllRead = async () => {
     setNotifs((p) => p.map((n) => ({ ...n, is_read: true })));
     try {
-      await fetch(`http://localhost:5000/api/site-engineer-notifications/read-all/${userId}`, {
+      await fetch(`${API_ORIGIN}/api/site-engineer-notifications/read-all/${userId}`, {
         method: "PATCH",
         headers: authHeaders(),
       });

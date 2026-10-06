@@ -20,6 +20,7 @@ import QuantitySurveyorLayout from "./QuantitySurveyorLayout";
 import SiteEngineerLayout from "./SiteEngineerLayout";
 import StructuralEngineerLayout from "./StructuralEngineerLayout";
 import ThreeDVisualizerLayout from "./ThreeDVisualizerLayout";
+import EmployeeLayout from "./EmployeeLayout";
 
 /* Shared pages (Settings, Report to CEO) are used by many roles.
    This picks the right sidebar/layout for whoever is logged in, so each
@@ -47,10 +48,21 @@ const LAYOUT_BY_ROLE = {
   site_engineer: SiteEngineerLayout,
   structural_engineer: StructuralEngineerLayout,
   "3d_visualizer": ThreeDVisualizerLayout,
+
+  // Internal roles without a dedicated operational portal still get
+  // a consistent shell with My Timesheet + Settings.
+  employee: EmployeeLayout,
+  finance: EmployeeLayout,
+  marketing: EmployeeLayout,
+  software_engineer: EmployeeLayout,
+  tester: EmployeeLayout,
+  sales_executive: EmployeeLayout,
+  draftsman: EmployeeLayout,
 };
 
 export default function RoleLayout({ children }) {
   const { user } = useAuth();
-  const Layout = LAYOUT_BY_ROLE[user?.role] || AppLayout;
+  const role = String(user?.role || "").trim().toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+  const Layout = LAYOUT_BY_ROLE[role] || AppLayout;
   return <Layout>{children}</Layout>;
 }

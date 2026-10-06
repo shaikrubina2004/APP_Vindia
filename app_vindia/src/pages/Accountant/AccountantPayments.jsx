@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import accountantService from "../../services/accountantService";
 import { getProjects } from "../../services/projectService";
+import FinanceWbsSelector, { WbsBadge } from "../../components/accountant/FinanceWbsSelector";
 import "./AccountantPayments.css";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -34,6 +35,7 @@ const EMPTY_FORM = {
   reference_number: "",
   payment_date: today(),
   notes: "",
+  wbs_id: "",
 };
 
 const PAYMENT_METHODS = [
@@ -241,6 +243,11 @@ export default function AccountantPayments() {
     if (!form.project_id) return setFormError("Select a project.");
     if (!Number.isFinite(amount) || amount <= 0) return setFormError("Enter a valid payment amount.");
     if (!form.payment_date) return setFormError("Select the payment date.");
+    // WBS is inherited automatically when an invoice is linked; only
+    // require an explicit selection when this payment stands alone.
+    if (!form.invoice_id && !form.wbs_id) {
+      return setFormError("Select a WBS / Milestone for this payment (or link it to an invoice to inherit one).");
+    }
 
     setSaving(true);
     try {
@@ -256,6 +263,9 @@ export default function AccountantPayments() {
         notes: form.notes.trim() || null,
         // Backend forces Accountant-created payments to pending.
         status: "pending",
+        // Ignored/overwritten server-side when invoice_id is set (the
+        // invoice's own WBS is authoritative — see paymentController.js).
+        wbs_id: form.invoice_id ? null : Number(form.wbs_id),
       });
 
       setShowCreate(false);
@@ -392,6 +402,7 @@ export default function AccountantPayments() {
                   <th>Direction</th>
                   <th>Invoice / Vendor</th>
                   <th>Project</th>
+                  <th>WBS</th>
                   <th className="ap-num">Amount</th>
                   <th>Method</th>
                   <th>Date</th>
@@ -424,6 +435,7 @@ export default function AccountantPayments() {
                       <td>
                         <span className="ap-project">{projectName(projects, payment.project_id)}</span>
                       </td>
+                      <td><WbsBadge code={payment.wbs_code} name={payment.wbs_name} milestoneCode={payment.milestone_code} milestoneName={payment.milestone_name} /></td>
                       <td className="ap-num ap-amount">{money(payment.amount)}</td>
                       <td>{titleCase(payment.payment_method || "—")}</td>
                       <td>{dateOnly(payment.payment_date)}</td>
@@ -467,6 +479,7 @@ export default function AccountantPayments() {
 
             <div className="ap-detail-list">
               <div><span>Project</span><strong>{selectedProjectName}</strong></div>
+              <div><span>WBS Classification</span><strong><WbsBadge code={selectedPayment.wbs_code} name={selectedPayment.wbs_name} milestoneCode={selectedPayment.milestone_code} milestoneName={selectedPayment.milestone_name} /></strong></div>
               <div><span>Invoice</span><strong>{selectedPayment.invoice_number || "Not linked"}</strong></div>
               <div><span>Vendor</span><strong>{selectedPayment.vendor_name || "Not linked"}</strong></div>
               <div><span>Payment Date</span><strong>{dateOnly(selectedPayment.payment_date)}</strong></div>
@@ -565,6 +578,24 @@ export default function AccountantPayments() {
                         </select>
                       </Field>
                     </div>
+                    {form.invoice_id ? (
+                      <div className="ap-wbs-inherited">
+                        <FileText size={14} />
+                        <span>
+                          WBS classification will be <b>inherited automatically</b> from{" "}
+                          {invoices.find((i) => String(i.id) === String(form.invoice_id))?.invoice_number || "the linked invoice"}.
+                        </span>
+                      </div>
+                    ) : (
+                      <FinanceWbsSelector
+                        projectId={form.project_id || null}
+                        projectLabel={projects.find((p) => String(p.id) === String(form.project_id))?.name}
+                        value={form.wbs_id}
+                        onChange={(ctx) => updateField("wbs_id", ctx ? String(ctx.wbs_id) : "")}
+                        fetchWbs={accountantService.getFinanceWbs}
+                        required
+                      />
+                    )}
                   </section>
 
                   <PaymentEditableFields form={form} updateField={updateField} />

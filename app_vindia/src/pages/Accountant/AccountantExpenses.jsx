@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Search, RefreshCw, Plus, Receipt, CircleDollarSign, Clock3, CheckCircle2, Banknote, Eye, X, Building2, FileText, Pencil, ExternalLink } from "lucide-react";
 import accountantService from "../../services/accountantService";
 import { getProjects } from "../../services/projectService";
+import FinanceWbsSelector, { WbsBadge } from "../../components/accountant/FinanceWbsSelector";
 import "./AccountantExpenses.css";
 
 const CATEGORY_OPTIONS = [
@@ -34,6 +35,7 @@ const createEmptyForm = (projectId = "") => ({
   expense_date: today(),
   payment_method: "bank_transfer",
   receipt_url: "",
+  wbs_id: "",
 });
 
 const money = (value) => {
@@ -84,6 +86,7 @@ export default function AccountantExpenses() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
+  const [wbsFilter, setWbsFilter] = useState("all");
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
@@ -97,7 +100,7 @@ export default function AccountantExpenses() {
     setError("");
 
     try {
-      const params = projectFilter !== "all" ? { project_id: projectFilter } : {};
+      const params = { ...(projectFilter !== "all" ? { project_id: projectFilter } : {}), ...(wbsFilter === "unassigned" ? { wbs_id: "unassigned" } : {}) };
       const [expenseRes, vendorRes, projectRes] = await Promise.all([
         accountantService.getExpenses(params),
         accountantService.getVendors(),
@@ -112,7 +115,7 @@ export default function AccountantExpenses() {
     } finally {
       setLoading(false);
     }
-  }, [projectFilter]);
+  }, [projectFilter, wbsFilter]);
 
   useEffect(() => {
     load();
@@ -201,6 +204,7 @@ export default function AccountantExpenses() {
       expense_date: expense.expense_date ? String(expense.expense_date).slice(0, 10) : today(),
       payment_method: expense.payment_method || "bank_transfer",
       receipt_url: expense.receipt_url || "",
+      wbs_id: expense.wbs_id ? String(expense.wbs_id) : "",
     });
     setFormError("");
     setEditingExpense(expense);
@@ -250,6 +254,7 @@ export default function AccountantExpenses() {
         expense_date: form.expense_date,
         payment_method: form.payment_method || null,
         receipt_url: form.receipt_url.trim() || null,
+        wbs_id: form.wbs_id ? Number(form.wbs_id) : null,
       };
 
       if (editingExpense) {
@@ -319,6 +324,10 @@ export default function AccountantExpenses() {
                 <option value="all">All projects</option>
                 {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
+              <select value={wbsFilter} onChange={(e) => setWbsFilter(e.target.value)} className="ae-select">
+                <option value="all">All WBS</option>
+                <option value="unassigned">WBS unassigned</option>
+              </select>
               <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="ae-select">
                 <option value="all">All categories</option>
                 {CATEGORY_OPTIONS.map((category) => <option key={category} value={category}>{category}</option>)}
@@ -340,6 +349,7 @@ export default function AccountantExpenses() {
                   <tr>
                     <th>Expense</th>
                     <th>Project</th>
+                    <th>WBS</th>
                     <th>Vendor</th>
                     <th>Category</th>
                     <th>Amount</th>
@@ -360,6 +370,7 @@ export default function AccountantExpenses() {
                           <span className="ae-row-sub">#{expense.id} · {expense.expense_type || "project"}</span>
                         </td>
                         <td><strong>{expense.project_name || "—"}</strong></td>
+                        <td><WbsBadge code={expense.wbs_code} name={expense.wbs_name} milestoneCode={expense.milestone_code} milestoneName={expense.milestone_name} /></td>
                         <td>{expense.vendor_name || <span className="ae-muted">No vendor</span>}</td>
                         <td><span className="ae-category">{expense.category || "Misc"}</span></td>
                         <td><strong className="ae-amount">{money(expense.amount)}</strong></td>
@@ -460,6 +471,7 @@ function EmptyState({ hasFilters, onCreate }) {
 }
 
 function ExpenseModal({ form, editing, projects, vendors, saving, error, onChange, onClose, onSubmit }) {
+  const selectedProject = projects.find((p) => String(p.id) === String(form.project_id));
   return (
     <div className="ae-modal-backdrop" onMouseDown={onClose}>
       <div className="ae-modal" onMouseDown={(e) => e.stopPropagation()}>
@@ -475,7 +487,7 @@ function ExpenseModal({ form, editing, projects, vendors, saving, error, onChang
             <div className="ae-form-section-title"><Building2 size={17} /><div><strong>Project & Classification</strong><span>Every expense must be tied to a project.</span></div></div>
             <div className="ae-form-grid two">
               <Field label="Project" required>
-                <select value={form.project_id} onChange={(e) => onChange("project_id", e.target.value)} disabled={editing}>
+                <select value={form.project_id} onChange={(e) => { onChange("project_id", e.target.value); onChange("wbs_id", ""); }} disabled={editing}>
                   <option value="">Select project…</option>
                   {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
                 </select>
@@ -498,6 +510,16 @@ function ExpenseModal({ form, editing, projects, vendors, saving, error, onChang
                 </select>
               </Field>
             </div>
+
+            {form.expense_type === "project" && (
+              <FinanceWbsSelector
+                projectId={form.project_id || null}
+                projectLabel={selectedProject?.name}
+                value={form.wbs_id}
+                onChange={(ctx) => onChange("wbs_id", ctx ? String(ctx.wbs_id) : "")}
+                fetchWbs={accountantService.getFinanceWbs}
+              />
+            )}
           </div>
 
           <div className="ae-form-section">
@@ -541,6 +563,10 @@ function ExpenseDrawer({ expense, onClose, onEdit }) {
         <div className="ae-drawer-total"><span>Recorded amount</span><strong>{money(expense.amount)}</strong><small>{expense.project_name || "No project"} · {expense.category || "Misc"}</small></div>
         <div className="ae-detail-list">
           <Detail label="Project" value={expense.project_name || "—"} />
+          <Detail
+            label="WBS Classification"
+            value={<WbsBadge code={expense.wbs_code} name={expense.wbs_name} milestoneCode={expense.milestone_code} milestoneName={expense.milestone_name} />}
+          />
           <Detail label="Vendor" value={expense.vendor_name || "No vendor"} />
           <Detail label="Category" value={expense.category || "—"} />
           <Detail label="Expense type" value={titleCase(expense.expense_type || "project")} />

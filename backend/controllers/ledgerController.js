@@ -3,8 +3,8 @@ const Ledger = require("../models/ledgerModel");
 const { asyncHandler } = require("../middleware/errorHandler");
 
 exports.getLedger = asyncHandler(async (req, res) => {
-  const { account_id, project_id } = req.query;
-  const rows = await Ledger.getEntries({ account_id, project_id });
+  const { account_id, project_id, wbs_id } = req.query;
+  const rows = await Ledger.getEntries({ account_id, project_id, wbs_id });
   res.json({ success: true, data: rows });
 });
 

@@ -20,28 +20,59 @@ router.post(
   procurementController.createPurchaseOrder
 );
 
-// GET /purchase-orders and GET /purchase-orders/:id are also opened to
-// Logistics Coordinators, who need to read the list to link a delivery
-// to a PO — they can't create or modify one.
+// Read access to purchase orders:
+//  - Logistics Coordinators link deliveries to a PO
+//  - Operations Manager / CEO oversee and approve
+//  - Finance reads them for invoice matching
+// Only Procurement creates POs; only the Operations Manager approves them.
+const PO_READERS = [
+  "procurement_officer",
+  "logistics_coordinator",
+  "operations_manager",
+  "finance_manager",
+  "accountant",
+  "ceo",
+];
+
 router.get(
   "/purchase-orders",
   protect,
-  requireRole("procurement_officer", "logistics_coordinator"),
+  requireRole(...PO_READERS),
   procurementController.getPurchaseOrders
 );
 
 router.get(
   "/purchase-orders/:id",
   protect,
-  requireRole("procurement_officer", "logistics_coordinator"),
+  requireRole(...PO_READERS),
   procurementController.getPurchaseOrderById
+);
+
+router.put(
+  "/purchase-orders/:id/approve",
+  protect,
+  requireRole("operations_manager", "ceo"),
+  procurementController.approvePurchaseOrder
+);
+
+router.put(
+  "/purchase-orders/:id/reject",
+  protect,
+  requireRole("operations_manager", "ceo"),
+  procurementController.rejectPurchaseOrder
+);
+
+router.put(
+  "/purchase-orders/:id/cancel",
+  protect,
+  requireRole("procurement_officer", "operations_manager", "ceo"),
+  procurementController.cancelPurchaseOrder
 );
 
 // Manager rollup — every officer's daily reports. Deliberately its own
 // role set (operations_manager / ceo), and registered before the
 // ":date" route below so "/all" doesn't get swallowed as a date param.
-// Safe to leave mounted now even though no one can log in as
-// operations_manager yet.
+// Powers the Procurement tab on the Operations Manager screens.
 router.get(
   "/daily-reports/all",
   protect,

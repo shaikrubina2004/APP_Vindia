@@ -56,7 +56,17 @@ const notifyRole = async (
 // GET /api/site-engineer-notifications/:userId
 const getNotifications = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = Number(req.params.userId);
+    const requesterId = Number(req.user?.id);
+    const requesterRole = String(req.user?.role || "").trim().toLowerCase();
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+    if (userId !== requesterId && requesterRole !== "ceo") {
+      return res.status(403).json({ error: "You can only read your own notifications." });
+    }
+
     const result = await pool.query(
       `SELECT * FROM site_engineer_notifications
        WHERE user_id = $1
@@ -66,7 +76,7 @@ const getNotifications = async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    console.error("getSiteEngineerNotifications:", err);
     res.status(500).json({ error: "Failed to fetch notifications" });
   }
 };
@@ -74,14 +84,21 @@ const getNotifications = async (req, res) => {
 // PATCH /api/site-engineer-notifications/:id/read
 const markOneRead = async (req, res) => {
   try {
-    const { id } = req.params;
-    await pool.query(
-      `UPDATE site_engineer_notifications SET is_read = TRUE WHERE id = $1`,
-      [id]
+    const id = Number(req.params.id);
+    const requesterId = Number(req.user?.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "Invalid notification ID" });
+
+    const result = await pool.query(
+      `UPDATE site_engineer_notifications
+          SET is_read = TRUE
+        WHERE id = $1 AND user_id = $2
+        RETURNING id`,
+      [id, requesterId]
     );
-    res.json({ success: true });
+    if (!result.rows.length) return res.status(404).json({ error: "Notification not found" });
+    res.json({ success: true, id });
   } catch (err) {
-    console.error(err);
+    console.error("markSiteEngineerNotificationRead:", err);
     res.status(500).json({ error: "Failed to mark read" });
   }
 };
@@ -89,14 +106,21 @@ const markOneRead = async (req, res) => {
 // PATCH /api/site-engineer-notifications/read-all/:userId
 const markAllRead = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = Number(req.params.userId);
+    const requesterId = Number(req.user?.id);
+    const requesterRole = String(req.user?.role || "").trim().toLowerCase();
+    if (!Number.isInteger(userId) || userId <= 0) return res.status(400).json({ error: "Invalid user ID" });
+    if (userId !== requesterId && requesterRole !== "ceo") {
+      return res.status(403).json({ error: "You can only update your own notifications." });
+    }
+
     await pool.query(
       `UPDATE site_engineer_notifications SET is_read = TRUE WHERE user_id = $1`,
       [userId]
     );
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    console.error("markAllSiteEngineerNotificationsRead:", err);
     res.status(500).json({ error: "Failed to mark all read" });
   }
 };
@@ -104,11 +128,21 @@ const markAllRead = async (req, res) => {
 // POST /api/site-engineer-notifications (manual/internal trigger)
 const createNotification = async (req, res) => {
   try {
-    const { user_id, type, title, description, link, severity, project_id } = req.body;
-    await insertNotification(user_id, type, title, description, link, severity, project_id);
+    const role = String(req.user?.role || "").trim().toLowerCase();
+    if (!("site_engineer" === role || "ceo" === role || role.endsWith("_manager"))) {
+      return res.status(403).json({ error: "Not authorized to create site engineer notifications." });
+    }
+
+    const { user_id, type, title, description, link, severity, project_id } = req.body || {};
+    const targetUserId = Number(user_id);
+    if (!Number.isInteger(targetUserId) || targetUserId <= 0 || !title) {
+      return res.status(400).json({ error: "user_id and title are required" });
+    }
+
+    await insertNotification(targetUserId, type || "work", title, description || "", link || null, severity || "info", project_id || null);
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    console.error("createSiteEngineerNotification:", err);
     res.status(500).json({ error: "Failed to create notification" });
   }
 };

@@ -34,7 +34,7 @@ function parseProjectId(raw) {
 }
 
 exports.getDashboard = asyncHandler(async (req, res) => {
-  const { projectId: rawProjectId } = req.query;
+  const { projectId: rawProjectId, wbsId: rawWbsId } = req.query;
 
   const { valid, projectId } = parseProjectId(rawProjectId);
 
@@ -45,7 +45,12 @@ exports.getDashboard = asyncHandler(async (req, res) => {
     );
   }
 
-  const data = await AccountantDashboard.getDashboard(projectId);
+  // wbsId reuses the same "unassigned" convention as the other Finance
+  // list endpoints; otherwise it's passed through as-is and validated
+  // implicitly by the WBS join returning nothing for a bad id.
+  const wbsId = rawWbsId === undefined || rawWbsId === "" ? null : rawWbsId;
+
+  const data = await AccountantDashboard.getDashboard(projectId, wbsId);
 
   res.json({
     success: true,

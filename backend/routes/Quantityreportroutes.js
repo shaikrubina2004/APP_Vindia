@@ -9,6 +9,14 @@
 const express = require("express");
 const router  = express.Router();
 
+const auth = require("../middleware/authMiddleware");
+const { requireRole } = auth;
+
+router.use(auth);
+router.use(requireRole("quantity_surveyor", "project_manager", "site_engineer", "ceo"));
+const WRITE_ROLES = requireRole("quantity_surveyor", "project_manager", "ceo");
+const REVIEW_ROLES = requireRole("site_engineer", "project_manager", "ceo");
+
 const {
   getAllReports,
   getReportById,
@@ -29,13 +37,14 @@ const {
 //  Otherwise Express matches "approve" / "reject" as the :id parameter
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.put("/approve/:id", approveReport);  // PUT  SE approves  → approved + auto-finalise BOQ if CR also approved
-router.put("/reject/:id",  rejectReport);   // PUT  SE rejects   → rejected + se_comment
+router.post("/create", WRITE_ROLES, createReport);
+router.put("/approve/:id", REVIEW_ROLES, approveReport);  // PUT  SE approves  → approved + auto-finalise BOQ if CR also approved
+router.put("/reject/:id",  REVIEW_ROLES, rejectReport);   // PUT  SE rejects   → rejected + se_comment
 
 router.get   ("/",    getAllReports);        // GET  all reports  (?projectId=&status=)
-router.post  ("/",    createReport);        // POST create quantity report
+router.post  ("/",    WRITE_ROLES, createReport);        // POST create quantity report
 router.get   ("/:id", getReportById);       // GET  single report
-router.put   ("/:id", updateReport);        // PUT  edit & resubmit
-router.delete("/:id", deleteReport);        // DELETE report
+router.put   ("/:id", WRITE_ROLES, updateReport);        // PUT  edit & resubmit
+router.delete("/:id", WRITE_ROLES, deleteReport);        // DELETE report
 
 module.exports = router;

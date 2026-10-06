@@ -239,6 +239,10 @@ exports.getClients = async (req, res) => {
  */
 exports.getAllProjects = async (req, res) => {
   try {
+    // Clients are external users: they may only see the project(s) linked to them.
+    // Previously every logged-in role (clients included) received every project,
+    // with budgets and other clients' names.
+    const clientOnly = req.user?.role === "client";
     const result = await pool.query(
       `SELECT 
         p.*,
@@ -253,7 +257,9 @@ exports.getAllProjects = async (req, res) => {
        LEFT JOIN users u ON p.coordinator_id = u.id
        LEFT JOIN users ua ON p.architect_id = ua.id
        LEFT JOIN users uc2 ON p.client_user_id = uc2.id
+       ${clientOnly ? "WHERE p.client_user_id = $1" : ""}
        ORDER BY p.created_at DESC`,
+      clientOnly ? [req.user.id] : [],
     );
     return res.status(200).json(result.rows);
   } catch (err) {
@@ -275,7 +281,7 @@ exports.getProjectById = async (req, res) => {
         s.name AS site_engineer_name,
         u.name AS coordinator_name,
         ua.name AS architect_name,
-        uc2.name AS client_user_name,
+        uc2.name AS client_user_name
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
        LEFT JOIN users s ON p.site_engineer_id = s.id

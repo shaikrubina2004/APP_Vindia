@@ -145,3 +145,5 @@
   color: #dc2626;
   cursor: pointer;
 }
+.pol-badge--pending_approval { background: #fffbeb; color: #b45309; }
+.pol-badge--rejected { background: #fee2e2; color: #dc2626; }

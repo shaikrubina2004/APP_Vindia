@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useProject } from "../../context/ProjectContext";
+import { useAuth } from "../../context/useAuth";
 import ProjectSwitcher from "../../components/project/ProjectSwitcher";
 import { API } from "../../services/authService";
 import CheckInButton from "../../SharedResourse/CheckInButton";
@@ -62,18 +63,12 @@ export default function MEPDashboard() {
   const [milestones, setMilestones] = useState({ M: [], E: [], P: [] });
   const [loading, setLoading] = useState(true);
 
-  // Parsed once, reused for id/name/designation — avoids parsing
-  // localStorage three separate times like before.
-  const currentUser = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("user")) || {};
-    } catch {
-      return {};
-    }
-  })();
+  // AuthContext resolves the logged-in account to its employee record,
+  // so the dashboard uses the employee identity assigned to the role.
+  const { user: currentUser } = useAuth();
 
   const currentUserId = currentUser?.id || null;
-  const currentUserName = currentUser?.name || "MEP Engineer";
+  const currentUserName = currentUser?.employee_name || currentUser?.name || "MEP Engineer";
   // Used by CheckInButton to decide whether to skip location capture
   // for the CEO — falls back to role if designation isn't stored yet.
   const currentDesignation =
@@ -169,7 +164,7 @@ export default function MEPDashboard() {
             MEP Engineer · {currentUserName}
           </div>
           <div className="dash-hero-title">
-            Good morning 👋
+            Good morning, {currentUserName} 👋
             <br />
             {activeProject.name}
           </div>

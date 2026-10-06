@@ -250,35 +250,41 @@ exports.updateWorker = async (req, res) => {
    GET WORKERS
 ========================================================= */
 
+// Projects a PM manages: projects.manager_id is an employees.id, linked to the login
+// through employees.user_id. (The JWT carries no project_id, so the old
+// req.user.project_id check was always null and a PM received every worker.)
+const PM_PROJECT_IDS = `SELECT p.id FROM projects p
+                        JOIN employees e ON e.id = p.manager_id
+                        WHERE e.user_id = $1`;
+
 exports.getWorkers = async (req, res) => {
   try {
-    let projectId = null;
-
-    /*
-      Project Manager:
-      only their assigned project.
-
-      Site Engineer:
-      optional project filter for now because the JWT
-      does not currently contain project_id.
-    */
-    if (req.user?.role === "project_manager") {
-      projectId = req.user.project_id || null;
-    } else if (req.query.project_id) {
-      projectId = req.query.project_id;
+    const projectFilter = req.query.project_id ? Number(req.query.project_id) : null;
+    if (projectFilter !== null && !Number.isInteger(projectFilter)) {
+      return res.status(400).json({ error: "Invalid project_id" });
     }
 
-    const result = await pool.query(
-      `SELECT *
-       FROM workers
-       WHERE is_deleted IS NOT TRUE
-       AND (
-         $1::int IS NULL
-         OR project_id = $1
-       )
-       ORDER BY created_at DESC`,
-      [projectId]
-    );
+    let result;
+    if (req.user?.role === "project_manager") {
+      result = await pool.query(
+        `SELECT w.*
+         FROM workers w
+         WHERE w.is_deleted IS NOT TRUE
+           AND w.project_id IN (${PM_PROJECT_IDS})
+           AND ($2::int IS NULL OR w.project_id = $2)
+         ORDER BY w.created_at DESC`,
+        [req.user.id, projectFilter]
+      );
+    } else {
+      result = await pool.query(
+        `SELECT *
+         FROM workers
+         WHERE is_deleted IS NOT TRUE
+           AND ($1::int IS NULL OR project_id = $1)
+         ORDER BY created_at DESC`,
+        [projectFilter]
+      );
+    }
 
     return res.json(result.rows);
   } catch (err) {
@@ -311,6 +317,7 @@ exports.updateStatus = async (req, res) => {
       });
     }
 
+    const isPM = req.user?.role === "project_manager";
     const result = await pool.query(
       `UPDATE workers
        SET
@@ -318,8 +325,9 @@ exports.updateStatus = async (req, res) => {
         updated_at = NOW()
        WHERE id = $2
        AND is_deleted IS NOT TRUE
+       ${isPM ? `AND project_id IN (${PM_PROJECT_IDS.replace("$1", "$3")})` : ""}
        RETURNING *`,
-      [status, id]
+      isPM ? [status, id, req.user.id] : [status, id]
     );
 
     if (!result.rows.length) {

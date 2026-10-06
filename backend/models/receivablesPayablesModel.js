@@ -74,7 +74,8 @@ async function getReceivables(filters = {}) {
     project_id,
     from,
     to,
-    status
+    status,
+    wbs_id
   } = filters;
 
   const values = [];
@@ -83,6 +84,13 @@ async function getReceivables(filters = {}) {
   if (project_id) {
     values.push(project_id);
     conditions.push(`i.project_id = $${values.length}`);
+  }
+
+  if (wbs_id === "unassigned") {
+    conditions.push(`i.wbs_id IS NULL`);
+  } else if (wbs_id) {
+    values.push(wbs_id);
+    conditions.push(`i.wbs_id = $${values.length}`);
   }
 
   if (from) {
@@ -119,6 +127,11 @@ async function getReceivables(filters = {}) {
       p.name AS project_name,
       i.issue_date AS invoice_date,
       i.due_date,
+      i.wbs_id,
+      w.code AS wbs_code,
+      w.name AS wbs_name,
+      COALESCE(mw.code, w.code) AS milestone_code,
+      COALESCE(mw.name, w.name) AS milestone_name,
 
       COALESCE(i.amount, 0) AS total,
 
@@ -154,6 +167,12 @@ async function getReceivables(filters = {}) {
     LEFT JOIN payments pay
       ON pay.invoice_id = i.id
 
+    LEFT JOIN wbs w
+      ON w.id = i.wbs_id
+
+    LEFT JOIN wbs mw
+      ON mw.id = w.parent_id
+
     ${whereClause}
 
     GROUP BY
@@ -165,7 +184,12 @@ async function getReceivables(filters = {}) {
     i.issue_date,
     i.due_date,
     i.amount,
-    i.status
+    i.status,
+    i.wbs_id,
+    w.code,
+    w.name,
+    mw.code,
+    mw.name
 
     ORDER BY i.issue_date DESC, i.id DESC
   `;
@@ -191,6 +215,11 @@ async function getReceivables(filters = {}) {
       projectName: row.project_name,
       invoiceDate: row.invoice_date,
       dueDate: row.due_date,
+      wbsId: row.wbs_id,
+      wbsCode: row.wbs_code,
+      wbsName: row.wbs_name,
+      milestoneCode: row.milestone_code,
+      milestoneName: row.milestone_name,
 
       total,
       received,
@@ -225,7 +254,8 @@ async function getPayables(filters = {}) {
     vendor_id,
     from,
     to,
-    status
+    status,
+    wbs_id
   } = filters;
 
   const values = [];
@@ -234,6 +264,13 @@ async function getPayables(filters = {}) {
   if (project_id) {
     values.push(project_id);
     conditions.push(`e.project_id = $${values.length}`);
+  }
+
+  if (wbs_id === "unassigned") {
+    conditions.push(`e.wbs_id IS NULL`);
+  } else if (wbs_id) {
+    values.push(wbs_id);
+    conditions.push(`e.wbs_id = $${values.length}`);
   }
 
   if (vendor_id) {

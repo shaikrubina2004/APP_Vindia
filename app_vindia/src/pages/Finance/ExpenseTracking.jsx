@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import financeService from "../../services/financeService";
 import { getProjects } from "../../services/projectService";
+import FinanceWbsSelector, { WbsBadge } from "../../components/accountant/FinanceWbsSelector";
 import "./ExpenseTracking.css";
 
 /* ── Category list — kept identical to BudgetPlanning.jsx so an
@@ -62,6 +63,7 @@ const EMPTY_EXPENSE = {
   description: "",
   receipt_url: "",
   project_id: "",
+  wbs_id: "",
 };
 
 /* ── Helpers ───────────────────────────────────────────────── */
@@ -331,6 +333,7 @@ export default function ExpenseTracking() {
       description: expense.description || "",
       receipt_url: expense.receipt_url || "",
       project_id: expense.project_id ? String(expense.project_id) : "",
+      wbs_id: expense.wbs_id ? String(expense.wbs_id) : "",
     });
     setFormError(null);
     setSaved(false);
@@ -347,6 +350,9 @@ export default function ExpenseTracking() {
     if (form.expense_type === "project" && !form.project_id) {
       setFormError("Project is required for a project expense."); return;
     }
+    if (form.expense_type === "project" && !form.wbs_id) {
+      setFormError("Select a WBS / Milestone for this project expense."); return;
+    }
     if (!form.expense_date) {
       setFormError("Expense date is required."); return;
     }
@@ -354,6 +360,7 @@ export default function ExpenseTracking() {
     const payload = {
       expense_type: form.expense_type,
       project_id: form.expense_type === "project" ? form.project_id : null,
+      wbs_id: form.expense_type === "project" ? (form.wbs_id || null) : null,
       category: form.category,
       description: form.description,
       amount: Number(form.amount),
@@ -935,12 +942,13 @@ export default function ExpenseTracking() {
                   value={
                     form.project_id
                   }
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setF(
                       "project_id",
                       e.target.value
-                    )
-                  }
+                    );
+                    setF("wbs_id", "");
+                  }}
                 >
                   <option value="">
                     Select project...
@@ -957,6 +965,15 @@ export default function ExpenseTracking() {
                     )
                   )}
                 </select>
+
+                <FinanceWbsSelector
+                  projectId={form.project_id || null}
+                  projectLabel={projects.find((p) => String(p.id) === String(form.project_id))?.name}
+                  value={form.wbs_id}
+                  onChange={(ctx) => setF("wbs_id", ctx ? String(ctx.wbs_id) : "")}
+                  fetchWbs={financeService.getFinanceWbs}
+                  required
+                />
               </div>
             )}
 
@@ -1490,6 +1507,7 @@ function ExpensesTab({
               <th>Type</th>
               <th>Category</th>
               <th>Project</th>
+              <th>WBS</th>
               <th>Amount</th>
               <th>Status</th>
                 {isAccountant && <th>Actions</th>}
@@ -1558,6 +1576,15 @@ function ExpensesTab({
                   <td className="et-project">
                     {exp.project_name ||
                       "—"}
+                  </td>
+
+                  <td>
+                    <WbsBadge
+                      code={exp.wbs_code}
+                      name={exp.wbs_name}
+                      milestoneCode={exp.milestone_code}
+                      milestoneName={exp.milestone_name}
+                    />
                   </td>
 
                   <td className="et-amount">

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/useAuth";
 import { getProjects } from "../../services/projectService";
 import api from "../../services/api";
 import CheckInButton from "../../SharedResourse/CheckInButton";
@@ -121,9 +122,9 @@ const PanelHeader = ({ title, count, linkLabel, onLink }) => (
 ═══════════════════════════════════════════════════════════ */
 export default function ThreeDVisualizerDashboard() {
   const navigate   = useNavigate();
-  const user       = getUser();
+  const { user }   = useAuth();
   const userId     = user?.id;
-  const userName   = user?.name || "3D Vizualizer";
+  const userName   = user?.employee_name || user?.name || "3D Visualizer";
   const employeeId = user?.employee_id || user?.id || null;
   // Used by the shared CheckInButton — decides whether to skip location
   // capture for the CEO. Falls back to role if designation isn't stored yet.

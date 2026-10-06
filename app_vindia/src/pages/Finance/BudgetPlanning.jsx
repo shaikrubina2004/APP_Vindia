@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import financeService from "../../services/financeService";
 import { getProjects } from "../../services/projectService";
+import FinanceWbsSelector, { WbsBadge } from "../../components/accountant/FinanceWbsSelector";
 import "./BudgetPlanning.css";
 
 /* ── Helpers ───────────────────────────────────────────────── */
@@ -49,6 +50,7 @@ const CATEGORY_COLORS = [
 
 const EMPTY_BUDGET = {
   project_id: "",
+  wbs_id: "",
   category: "Materials",
   allocated_amount: "",
   fiscal_year: "2025-26",
@@ -437,6 +439,7 @@ function PlanningTab({
     setEditingBudgetId(budget.id);
     setForm({
       project_id: budget.project_id ?? "",
+      wbs_id: budget.wbs_id ? String(budget.wbs_id) : "",
       category: budget.category || "Materials",
       allocated_amount:
         budget.allocated_amount ?? "",
@@ -489,6 +492,9 @@ function PlanningTab({
         ),
         fiscal_year: form.fiscal_year,
         notes: form.notes,
+        // A budget's WBS can be refined/cleared while editing — the
+        // model only applies this key when it's explicitly present.
+        wbs_id: form.wbs_id || null,
       };
 
       if (editingBudgetId) {
@@ -500,6 +506,7 @@ function PlanningTab({
       } else {
         await financeService.createBudget({
           project_id: form.project_id,
+          wbs_id: form.wbs_id || null,
           category: form.category,
           allocated_amount: Number(
             form.allocated_amount
@@ -603,9 +610,10 @@ function PlanningTab({
               <select
                 className="bp-input"
                 value={form.project_id}
-                onChange={(e) =>
-                  setF("project_id", e.target.value)
-                }
+                onChange={(e) => {
+                  setF("project_id", e.target.value);
+                  if (!editingBudgetId) setF("wbs_id", "");
+                }}
                 disabled={Boolean(editingBudgetId)}
               >
                 <option value="">
@@ -630,6 +638,18 @@ function PlanningTab({
                   editing an existing budget.
                 </small>
               )}
+            </div>
+
+            <div className="bp-frow" style={{ gridColumn: "1 / -1" }}>
+              <FinanceWbsSelector
+                projectId={form.project_id || null}
+                projectLabel={projects.find((p) => String(p.id) === String(form.project_id))?.name}
+                value={form.wbs_id}
+                onChange={(ctx) => setF("wbs_id", ctx ? String(ctx.wbs_id) : "")}
+                fetchWbs={financeService.getFinanceWbs}
+                label="WBS / Milestone (optional)"
+                helperText="Leave unset for a plain project+category budget envelope, or scope this budget to one WBS to track it more tightly."
+              />
             </div>
 
             <div className="bp-frow">
@@ -835,6 +855,7 @@ function PlanningTab({
                 <thead>
                   <tr>
                     <th>Project</th>
+                    <th>WBS</th>
                     <th>Category</th>
                     <th>Budget</th>
                     <th>Fiscal Year</th>
@@ -852,6 +873,14 @@ function PlanningTab({
                     return (
                       <tr key={budget.id} className="bp-trow">
                         <td>{budget.project_name || project?.name || `Project #${budget.project_id}`}</td>
+                        <td>
+                          <WbsBadge
+                            code={budget.wbs_code}
+                            name={budget.wbs_name}
+                            milestoneCode={budget.milestone_code}
+                            milestoneName={budget.milestone_name}
+                          />
+                        </td>
                         <td>{budget.category || "—"}</td>
                         <td className="bp-mono">{fmt(budget.allocated_amount)}</td>
                         <td>{budget.fiscal_year || "—"}</td>

@@ -1,4 +1,4 @@
-// ===== FILE: APP_Vindia/backend/routes/finance.routes.js =====
+// backend/routes/financeRoutes.js
 
 const express = require("express");
 
@@ -36,6 +36,8 @@ const vendorController = require("../controllers/vendorController");
 const financeSettingsController = require(
   "../controllers/financeSettingsController"
 );
+
+const financeWbsController = require("../controllers/financeWbsController");
 
 const {
   getReceivablesPayables,
@@ -77,6 +79,18 @@ const accountantAccess = requireRole(
   "ceo"
 );
 
+// ============================================================
+// FINANCE WBS OPTIONS
+// ============================================================
+// Reuses the existing canonical WBS hierarchy for Finance.
+// GET /api/finance/wbs?project_id=123
+router.get(
+  "/wbs",
+  accountantAccess,
+  financeWbsController.getFinanceWbsOptions
+);
+
+
 // Read-only vendor list access for other modules that need to pick a vendor
 // (e.g. Logistics creating a delivery) without granting them any other
 // Finance permission.
@@ -86,7 +100,10 @@ const vendorReadAccess = requireRole(
   "ceo",
   "logistics_coordinator",
   "inventory_controller",
-  "procurement_officer"
+  "procurement_officer",
+
+    "operations_manager"
+
 );
 
 const managerAccess = requireRole(

@@ -4,6 +4,7 @@ import {
   PageLoader,
   PageError,
   fmtDate,
+  assetUrl,
 } from "../../hooks/Useclientapi.jsx";
 import "../../styles/Client.css";
 
@@ -75,7 +76,7 @@ function LogEntry({ log }) {
               ⚠ Delay: {log.delay_type}
             </span>
           )}
-          {(log.notes || log.delay_description) && (
+          {(log.delay_description || log.next_day) && (
             <button
               className="cl-btn cl-btn--ghost"
               style={{ marginLeft: "auto", padding: "4px 12px", fontSize: 12 }}
@@ -103,19 +104,9 @@ function LogEntry({ log }) {
                 <strong>Delay note:</strong> {log.delay_description}
               </p>
             )}
-            {log.notes && (
-              <p>
-                <strong>Notes:</strong> {log.notes}
-              </p>
-            )}
             {log.next_day && (
               <p>
                 <strong>Plan tomorrow:</strong> {log.next_day}
-              </p>
-            )}
-            {log.linked_incident && (
-              <p>
-                <strong>Linked incident:</strong> {log.linked_incident}
               </p>
             )}
             {attachments.length > 0 && (
@@ -123,7 +114,7 @@ function LogEntry({ log }) {
                 {attachments.map((att, i) => (
                   <a
                     key={i}
-                    href={`${import.meta.env.VITE_API_BASE || "http://localhost:5000"}${att.url || att}`}
+                    href={assetUrl(att.url || att)}
                     target="_blank"
                     rel="noreferrer"
                     className="dl-photo-thumb"
@@ -145,7 +136,7 @@ export default function DailyLogs() {
   const [tagFilter, setTagFilter] = useState("all");
 
   const { data, loading, error, refetch } = useClientAPI(
-    "/client/daily-logs?limit=50",
+    "/client/daily-logs?limit=100",
   );
 
   if (loading) return <PageLoader />;
@@ -174,7 +165,8 @@ export default function DailyLogs() {
           <div className="cl-eyebrow">Progress</div>
           <h1 className="cl-page-title">Daily Site Logs</h1>
           <p className="cl-page-sub">
-            {data?.total ?? logs.length} log{logs.length !== 1 ? "s" : ""} ·
+            {data?.total ?? logs.length} log{(data?.total ?? logs.length) !== 1 ? "s" : ""}
+            {data?.total > logs.length ? ` · showing the latest ${logs.length}` : ""} ·
             submitted by site engineer
           </p>
         </div>

@@ -19,6 +19,16 @@ const financeService = {
     }),
 
   // ============================================================
+  // FINANCE WBS OPTIONS
+  // Backs the Project -> WBS/Milestone -> Activity selector
+  // (components/accountant/FinanceWbsSelector.jsx) on every Finance
+  // Manager create/edit form. Same shared backend endpoint/shape as
+  // accountantService.getFinanceWbs.
+  // ============================================================
+  getFinanceWbs: (projectId) =>
+    api.get(`${FINANCE_BASE_URL}/wbs`, { params: { project_id: projectId } }),
+
+  // ============================================================
   // COST REPORTING
   // ============================================================
 

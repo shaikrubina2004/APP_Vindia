@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
+const { requireRole } = authMiddleware;
+const ops = require("../config/operations");
 const controller = require("../controllers/materialRequestController");
 
 /* =========================
@@ -37,9 +39,11 @@ router.delete(
 );
 
 // Status update
+// Approve / reject — restricted (was open to any logged-in user).
 router.put(
   "/status/:id",
   authMiddleware,
+  requireRole(...ops.MATERIAL_REQUEST_APPROVER_ROLES),
   controller.updateRequest
 );
 
@@ -47,6 +51,7 @@ router.put(
 router.post(
   "/delivery",
   authMiddleware,
+  requireRole(...ops.MATERIAL_REQUEST_FULFIL_ROLES),
   controller.addDelivery
 );
 
@@ -54,6 +59,7 @@ router.post(
 router.post(
   "/receive",
   authMiddleware,
+  requireRole(...ops.MATERIAL_REQUEST_RECEIVE_ROLES),
   controller.receiveMaterial
 );
 

@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import financeService from "../../services/financeService";
 import { getProjects } from "../../services/projectService";
+import FinanceWbsSelector, { WbsBadge } from "../../components/accountant/FinanceWbsSelector";
 import "./InvoiceManagement.css";
 
 /* ── Empty invoice form ─────────────────────────────────── */
 
 const EMPTY_FORM = {
   project_id: "",
+  wbs_id: "",
   client_name: "",
   invoiceNo: "",
   issueDate: "",
@@ -587,6 +589,7 @@ function AllInvoicesTab({
               <th>Invoice ID</th>
               <th>Client</th>
               <th>Project</th>
+              <th>WBS</th>
               <th>Amount</th>
               <th>Issue Date</th>
               <th>Due Date</th>
@@ -601,7 +604,7 @@ function AllInvoicesTab({
               <tr>
                 <td
                   colSpan={
-                    8
+                    9
                   }
                   className="inv-empty"
                 >
@@ -637,6 +640,15 @@ function AllInvoicesTab({
                       inv.project_name ||
                       "—"
                     }
+                  </td>
+
+                  <td>
+                    <WbsBadge
+                      code={inv.wbs_code}
+                      name={inv.wbs_name}
+                      milestoneCode={inv.milestone_code}
+                      milestoneName={inv.milestone_name}
+                    />
                   </td>
 
                   <td className="inv-amount">
@@ -892,6 +904,13 @@ function CreateInvoiceTab({
         return;
       }
 
+      if (!form.wbs_id) {
+        setFormError(
+          "Select a WBS / Milestone for this invoice."
+        );
+        return;
+      }
+
       if (subtotal <= 0) {
         setFormError(
           "Add at least one line item with a rate."
@@ -907,6 +926,9 @@ function CreateInvoiceTab({
           {
             project_id:
               form.project_id,
+
+            wbs_id:
+              form.wbs_id,
 
             client_name:
               form.client_name ||
@@ -1032,12 +1054,13 @@ function CreateInvoiceTab({
                 value={
                   form.project_id
                 }
-                onChange={(e) =>
+                onChange={(e) => {
                   setField(
                     "project_id",
                     e.target.value
-                  )
-                }
+                  );
+                  setField("wbs_id", "");
+                }}
               >
                 <option value="">
                   Select a project…
@@ -1055,6 +1078,17 @@ function CreateInvoiceTab({
                 )}
               </select>
 
+            </div>
+
+            <div className="inv-form-row">
+              <FinanceWbsSelector
+                projectId={form.project_id || null}
+                projectLabel={projectName}
+                value={form.wbs_id}
+                onChange={(ctx) => setField("wbs_id", ctx ? String(ctx.wbs_id) : "")}
+                fetchWbs={financeService.getFinanceWbs}
+                required
+              />
             </div>
 
             <div className="inv-form-row">
@@ -1776,6 +1810,13 @@ function PendingInvoicesTab({
                     }
                   </p>
 
+                  <WbsBadge
+                    code={inv.wbs_code}
+                    name={inv.wbs_name}
+                    milestoneCode={inv.milestone_code}
+                    milestoneName={inv.milestone_name}
+                  />
+
                 </div>
 
                 <div className="inv-pcard-right">
@@ -1999,6 +2040,18 @@ function InvoiceDetailDrawer({
             value={
               invoice.project_name ||
               "—"
+            }
+          />
+
+          <Row
+            label="WBS Classification"
+            value={
+              <WbsBadge
+                code={invoice.wbs_code}
+                name={invoice.wbs_name}
+                milestoneCode={invoice.milestone_code}
+                milestoneName={invoice.milestone_name}
+              />
             }
           />
 

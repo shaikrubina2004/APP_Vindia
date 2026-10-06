@@ -17,8 +17,6 @@ const siteEngineerMenu = [
     icon: "users",
   },
 
-  
-
   {
     name: "RFI Register",
     path: "/site-engineer/rfi",
@@ -43,8 +41,6 @@ const siteEngineerMenu = [
     icon: "bar-chart",
   },
 
- 
-
   {
     name: "Snag List",
     path: "/site-engineer/snag-list",
@@ -62,7 +58,6 @@ const siteEngineerMenu = [
     path: "/site-engineer/approvals",
     icon: "check-circle",
   },
-  
 
   {
     name: "Photo Gallery",

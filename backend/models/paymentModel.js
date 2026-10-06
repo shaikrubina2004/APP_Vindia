@@ -21,11 +21,22 @@ const Payment = {
       where += ` AND pay.status = $${values.length}`;
     }
 
+    if (filters.wbs_id === "unassigned") {
+      where += ` AND pay.wbs_id IS NULL AND pay.project_id IS NOT NULL`;
+    } else if (filters.wbs_id) {
+      values.push(filters.wbs_id);
+      where += ` AND pay.wbs_id = $${values.length}`;
+    }
+
     const result = await pool.query(
-      `SELECT pay.*, i.invoice_number, v.name AS vendor_name
+      `SELECT pay.*, i.invoice_number, v.name AS vendor_name,
+              w.code AS wbs_code, w.name AS wbs_name, w.parent_id AS wbs_parent_id,
+              m.code AS milestone_code, m.name AS milestone_name
        FROM payments pay
        LEFT JOIN invoices i ON i.id = pay.invoice_id
        LEFT JOIN vendors v ON v.id = pay.vendor_id
+       LEFT JOIN wbs w ON w.id = pay.wbs_id
+       LEFT JOIN wbs m ON m.id = COALESCE(w.parent_id, w.id)
        ${where}
        ORDER BY pay.payment_date DESC, pay.created_at DESC`,
       values
@@ -36,7 +47,15 @@ const Payment = {
 
   getById: async (id) => {
     const result = await pool.query(
-      `SELECT * FROM payments WHERE id = $1`,
+      `SELECT pay.*, i.invoice_number, v.name AS vendor_name,
+              w.code AS wbs_code, w.name AS wbs_name, w.parent_id AS wbs_parent_id,
+              m.code AS milestone_code, m.name AS milestone_name
+       FROM payments pay
+       LEFT JOIN invoices i ON i.id = pay.invoice_id
+       LEFT JOIN vendors v ON v.id = pay.vendor_id
+       LEFT JOIN wbs w ON w.id = pay.wbs_id
+       LEFT JOIN wbs m ON m.id = COALESCE(w.parent_id, w.id)
+       WHERE pay.id = $1`,
       [id]
     );
 
@@ -55,13 +74,14 @@ const Payment = {
       status = "completed",
       payment_date,
       notes,
+      wbs_id = null,
     } = data;
 
     const result = await pool.query(
       `INSERT INTO payments
          (invoice_id, project_id, vendor_id, payment_type, amount, payment_method,
-          reference_number, status, payment_date, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, COALESCE($9, CURRENT_DATE), $10)
+          reference_number, status, payment_date, notes, wbs_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, COALESCE($9, CURRENT_DATE), $10, $11)
        RETURNING *`,
       [
         invoice_id,
@@ -74,6 +94,7 @@ const Payment = {
         status,
         payment_date,
         notes,
+        wbs_id,
       ]
     );
 

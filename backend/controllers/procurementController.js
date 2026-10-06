@@ -1,5 +1,16 @@
 // ===== FILE: APP_Vindia/backend/controllers/procurementController.js =====
 const Procurement = require("../models/procurementModel");
+const ops = require("../config/operations");
+const { notifyRole, insertNotification } = require("./operationsNotificationsController");
+
+// Notifications must never fail the business action they describe.
+const safeNotify = async (fn) => {
+  try {
+    await fn();
+  } catch (err) {
+    console.error("Procurement notification failed:", err.message);
+  }
+};
 
 /* ─────────────────────────────
    GET APPROVED, UNLINKED MATERIAL REQUESTS
@@ -24,7 +35,15 @@ exports.getApprovedRequests = async (req, res) => {
 ───────────────────────────── */
 exports.createPurchaseOrder = async (req, res) => {
   try {
-    const { material_request_id, vendor_id, project_id, items } = req.body;
+    const {
+      material_request_id,
+      vendor_id,
+      project_id,
+      items,
+      expected_delivery_date,
+      payment_terms,
+      remarks,
+    } = req.body;
 
     if (!vendor_id) {
       return res.status(400).json({ error: "vendor_id is required" });
@@ -52,6 +71,13 @@ exports.createPurchaseOrder = async (req, res) => {
           error: "Each item needs an item_name and a positive ordered_qty",
         });
       }
+      const hasPrice =
+        it.unit_price !== undefined && it.unit_price !== null && it.unit_price !== "";
+      if (hasPrice && (!Number.isFinite(Number(it.unit_price)) || Number(it.unit_price) < 0)) {
+        return res.status(400).json({
+          error: `Unit price for "${it.item_name}" must be a number ≥ 0`,
+        });
+      }
     }
 
     const userId = req.user?.id;
@@ -65,10 +91,43 @@ exports.createPurchaseOrder = async (req, res) => {
       project_id,
       items: parsedItems,
       created_by: userId,
+      expected_delivery_date,
+      payment_terms,
+      remarks,
+      approvalThreshold: ops.PO_APPROVAL_THRESHOLD,
+    });
+
+    await safeNotify(async () => {
+      if (purchaseOrder.status === ops.PO_STATUS.PENDING_APPROVAL) {
+        await notifyRole(
+          "operations_manager",
+          "approval",
+          `${purchaseOrder.po_code} needs approval`,
+          `Total ₹${Number(purchaseOrder.total_amount).toLocaleString("en-IN")} is above the ₹${ops.PO_APPROVAL_THRESHOLD.toLocaleString("en-IN")} limit.`,
+          "/operations/manager/approvals",
+          "warn",
+          project_id,
+          purchaseOrder.id
+        );
+      } else {
+        await notifyRole(
+          "logistics_coordinator",
+          "delivery",
+          `${purchaseOrder.po_code} issued`,
+          "New purchase order — schedule the delivery.",
+          "/operations/logistics/deliveries",
+          "info",
+          project_id,
+          purchaseOrder.id
+        );
+      }
     });
 
     res.status(201).json(purchaseOrder);
   } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ error: err.message });
+    }
     console.error("CREATE PO ERROR:", err.message);
     res.status(500).json({ error: "Failed to create purchase order" });
   }
@@ -106,6 +165,87 @@ exports.getPurchaseOrderById = async (req, res) => {
   } catch (err) {
     console.error("GET PURCHASE ORDER BY ID ERROR:", err.message);
     res.status(500).json({ error: "Failed to fetch purchase order" });
+  }
+};
+
+/* ─────────────────────────────
+   APPROVE / REJECT A PO  (Operations Manager)
+   PUT /api/procurement/purchase-orders/:id/approve
+   PUT /api/procurement/purchase-orders/:id/reject   Body: { reason }
+───────────────────────────── */
+const decide = (approve) => async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || "").trim();
+    if (!approve && !reason) {
+      return res.status(400).json({ error: "A reason is required to reject a purchase order" });
+    }
+
+    const po = await Procurement.decidePO({
+      id: req.params.id,
+      approve,
+      userId: req.user.id,
+      reason,
+    });
+
+    if (!po) {
+      return res.status(409).json({
+        error: "This purchase order is not waiting for approval (already decided or not found)",
+      });
+    }
+
+    await safeNotify(async () => {
+      if (po.created_by) {
+        await insertNotification(
+          po.created_by,
+          "approval",
+          approve ? `${po.po_code} approved` : `${po.po_code} rejected`,
+          approve ? "Issued — Logistics can now schedule delivery." : reason,
+          "/operations/procurement/purchase-orders",
+          approve ? "ok" : "warn",
+          po.project_id,
+          "procurement_officer",
+          po.id
+        );
+      }
+      if (approve) {
+        await notifyRole(
+          "logistics_coordinator",
+          "delivery",
+          `${po.po_code} issued`,
+          "Approved purchase order — schedule the delivery.",
+          "/operations/logistics/deliveries",
+          "info",
+          po.project_id,
+          po.id
+        );
+      }
+    });
+
+    res.status(200).json(po);
+  } catch (err) {
+    console.error("DECIDE PO ERROR:", err.message);
+    res.status(500).json({ error: "Failed to update purchase order" });
+  }
+};
+
+exports.approvePurchaseOrder = decide(true);
+exports.rejectPurchaseOrder = decide(false);
+
+/* ─────────────────────────────
+   CANCEL A PO
+   PUT /api/procurement/purchase-orders/:id/cancel   Body: { reason }
+───────────────────────────── */
+exports.cancelPurchaseOrder = async (req, res) => {
+  try {
+    const result = await Procurement.cancelPO({
+      id: req.params.id,
+      reason: String(req.body?.reason || "").trim() || null,
+    });
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.status(200).json(result.po);
+  } catch (err) {
+    console.error("CANCEL PO ERROR:", err.message);
+    res.status(500).json({ error: "Failed to cancel purchase order" });
   }
 };
 

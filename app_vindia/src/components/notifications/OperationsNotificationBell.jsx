@@ -1,8 +1,15 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import "./OperationsNotificationBell.css";
+import { API_ORIGIN } from "../../services/api";
 
-const API = "http://localhost:5000/api/operations-notifications";
+// Was hard-coded to http://localhost:5000 and sent no token. The endpoint now
+// requires a valid JWT and only serves the logged-in user's own notifications.
+const API = `${API_ORIGIN}/api/operations-notifications`;
+const authHeaders = () => {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 /* Every type the Operations bell understands. */
 const TYPE_CFG = {
@@ -13,6 +20,8 @@ const TYPE_CFG = {
   incident:  { label: "Incident",  color: "#dc2626", bg: "#fef2f2" },
   task:      { label: "Task",      color: "#7c3aed", bg: "#f5f3ff" },
   daily_update: { label: "Daily Update", color: "#0891b2", bg: "#ecfeff" },
+  approval:  { label: "Approval",  color: "#b45309", bg: "#fffbeb" },
+  request:   { label: "Request",   color: "#4338ca", bg: "#eef2ff" },
 };
 
 const SEV_COLOR = {
@@ -30,10 +39,11 @@ const SEV_COLOR = {
 const ROLE_FILTERS = {
   logistics_coordinator: ["all", "delivery", "delay", "receipt", "incident", "task", "daily_update"],
   inventory_controller:  ["all", "delivery", "low_stock", "receipt", "incident", "task", "daily_update"],
-  operations_manager:    ["all", "daily_update", "incident", "task"],
+  operations_manager:    ["all", "approval", "delay", "receipt", "low_stock", "daily_update", "incident", "task"],
+  office_administrator:  ["all", "request", "daily_update", "incident", "task"],
   finance_manager:       ["all", "incident", "task"],
-  procurement_officer:   ["all", "receipt", "delay", "incident", "task"],
-  hr_manager: ["all", "incident", "task"],
+  procurement_officer:   ["all", "request", "approval", "receipt", "delay", "daily_update", "incident", "task"],
+
 };
 
 /* A couple of labels read better when they're role-specific. */
@@ -49,7 +59,7 @@ const ROLE_TITLE = {
   finance_manager: "Finance",
   procurement_officer: "Procurement",
   operations_manager: "Operations",
-  hr_manager: "HR",
+  office_administrator: "Office Admin",
 
 
 };
@@ -87,7 +97,7 @@ export default function OperationsNotificationBell({ userId, role, routes = {} }
     if (!userId) return;
     try {
       setLoading(true);
-      const res = await fetch(`${API}/${userId}`);
+      const res = await fetch(`${API}/${userId}`, { headers: authHeaders() });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const data = await res.json();
       // Only keep types this role should ever see, even if older rows exist.
@@ -121,14 +131,14 @@ export default function OperationsNotificationBell({ userId, role, routes = {} }
   const markRead = async (id) => {
     setNotifs((p) => p.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     try {
-      await fetch(`${API}/${id}/read`, { method: "PATCH" });
+      await fetch(`${API}/${id}/read`, { method: "PATCH", headers: authHeaders() });
     } catch (err) { console.error(err); }
   };
 
   const markAllRead = async () => {
     setNotifs((p) => p.map((n) => ({ ...n, is_read: true })));
     try {
-      await fetch(`${API}/read-all/${userId}`, { method: "PATCH" });
+      await fetch(`${API}/read-all/${userId}`, { method: "PATCH", headers: authHeaders() });
     } catch (err) { console.error(err); }
   };
 

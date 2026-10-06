@@ -10,11 +10,13 @@ const todayLocal = () =>
 const ROLE_LABEL = {
   inventory_controller: "Inventory Controller",
   logistics_coordinator: "Logistics Coordinator",
+  office_administrator: "Office Administrator",
 };
 
 const SUBMIT_LINK = {
   inventory_controller: "/operations/inventory/daily-update",
   logistics_coordinator: "/operations/logistics/daily-update",
+  office_administrator: "/operations/administrator/daily-update",
 };
 
 /* POST /api/ops-daily-updates

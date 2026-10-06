@@ -1,12 +1,13 @@
 // ===== FILE: APP_Vindia/backend/controllers/taxRegisterController.js =====
 const TaxRegister = require("../models/taxRegisterModel");
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
+const { deriveWbsFromSource } = require("../utils/financeWbsValidation");
 
 const FM_ONLY_ROLES = ["finance_manager", "ceo"];
 
 exports.getAll = asyncHandler(async (req, res) => {
-  const { project_id, filing_period, source_type } = req.query;
-  const rows = await TaxRegister.getAll({ project_id, filing_period, source_type });
+  const { project_id, filing_period, source_type, wbs_id } = req.query;
+  const rows = await TaxRegister.getAll({ project_id, filing_period, source_type, wbs_id });
   res.json({ success: true, data: rows });
 });
 
@@ -21,6 +22,10 @@ exports.getById = asyncHandler(async (req, res) => {
   res.json({ success: true, data: row });
 });
 
+// project_id/wbs_id are ALWAYS derived from the source invoice/expense
+// (Section 15) — a client-supplied project_id that disagrees with the
+// source's own project is rejected rather than silently overwritten,
+// exactly like the invoice<->payment relationship in Section 11.
 exports.create = asyncHandler(async (req, res) => {
   const { source_type, source_id, tax_type, rate, taxable_amount, tax_amount, filing_period, project_id } = req.body;
   if (!source_type || !source_id || !tax_type) {
@@ -29,9 +34,26 @@ exports.create = asyncHandler(async (req, res) => {
   if (!["invoice", "expense"].includes(source_type)) {
     throw new AppError("source_type must be 'invoice' or 'expense'", 400);
   }
+
+  const derived = await deriveWbsFromSource(source_type, source_id);
+
+  if (
+    project_id !== undefined &&
+    project_id !== null &&
+    project_id !== "" &&
+    Number(project_id) !== Number(derived.project_id)
+  ) {
+    throw new AppError(
+      "This tax record's project must match its source invoice/expense's project — it cannot disagree with its source.",
+      400
+    );
+  }
+
   const row = await TaxRegister.create({
     source_type, source_id, tax_type, rate, taxable_amount, tax_amount, filing_period,
-    project_id, created_by: req.user.id,
+    project_id: derived.project_id,
+    wbs_id: derived.wbs_id,
+    created_by: req.user.id,
   });
   res.status(201).json({ success: true, data: row });
 });

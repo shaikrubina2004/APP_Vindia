@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import accountantService from "../../services/accountantService";
 import { useProject } from "../../context/ProjectContext";
+import FinanceWbsSelector, { WbsBadge } from "../../components/accountant/FinanceWbsSelector";
 import "./GeneralLedger.css";
 
 const formatCurrency = (value) =>
@@ -39,6 +40,7 @@ export default function GeneralLedger() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [projectFilter, setProjectFilter] = useState("all");
+  const [wbsFilter, setWbsFilter] = useState("");
   const [accountFilter, setAccountFilter] = useState("");
   const [view, setView] = useState("ledger");
   const [showPostedOnly, setShowPostedOnly] = useState(true);
@@ -50,6 +52,7 @@ export default function GeneralLedger() {
 
       const filters = {};
       if (projectFilter !== "all") filters.project_id = projectFilter;
+      if (projectFilter !== "all" && wbsFilter) filters.wbs_id = wbsFilter;
       if (accountFilter.trim()) filters.account_id = accountFilter.trim();
 
       const response = await accountantService.getLedger(filters);
@@ -64,7 +67,7 @@ export default function GeneralLedger() {
     } finally {
       setLoading(false);
     }
-  }, [projectFilter, accountFilter]);
+  }, [projectFilter, wbsFilter, accountFilter]);
 
   const loadTrialBalance = useCallback(async () => {
     try {
@@ -237,7 +240,10 @@ export default function GeneralLedger() {
 
             <select
               value={projectFilter}
-              onChange={(event) => setProjectFilter(event.target.value)}
+              onChange={(event) => {
+                setProjectFilter(event.target.value);
+                setWbsFilter("");
+              }}
             >
               <option value="all">All projects</option>
               {projects
@@ -248,6 +254,13 @@ export default function GeneralLedger() {
                   </option>
                 ))}
             </select>
+
+            {projectFilter !== "all" && (
+              <select value={wbsFilter} onChange={(event) => setWbsFilter(event.target.value)}>
+                <option value="">All WBS</option>
+                <option value="unassigned">WBS unassigned</option>
+              </select>
+            )}
 
             {view === "ledger" && (
               <>
@@ -282,6 +295,7 @@ export default function GeneralLedger() {
                   <th>Account</th>
                   <th>Description</th>
                   <th>Project</th>
+                  <th>WBS</th>
                   <th className="gl-num">Debit</th>
                   <th className="gl-num">Credit</th>
                   <th className="gl-num">Balance</th>
@@ -290,11 +304,11 @@ export default function GeneralLedger() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="gl-empty">Loading ledger…</td>
+                    <td colSpan={9} className="gl-empty">Loading ledger…</td>
                   </tr>
                 ) : visibleEntries.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="gl-empty">
+                    <td colSpan={9} className="gl-empty">
                       <div className="gl-empty-icon">◎</div>
                       <strong>No posted ledger lines found</strong>
                       <span>Post balanced Journal Entries to populate the ledger.</span>
@@ -317,6 +331,7 @@ export default function GeneralLedger() {
                       </td>
                       <td>{entry.description || "—"}</td>
                       <td>{entry.project_name || "Company level"}</td>
+                      <td><WbsBadge code={entry.wbs_code} name={entry.wbs_name} milestoneCode={entry.milestone_code} milestoneName={entry.milestone_name} /></td>
                       <td className="gl-num">{formatCurrency(entry.debit)}</td>
                       <td className="gl-num">{formatCurrency(entry.credit)}</td>
                       <td className="gl-num gl-balance">

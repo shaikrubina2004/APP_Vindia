@@ -107,10 +107,60 @@
         ORDER BY p.name`,
         values
       );
+
+      // WBS breakdown — Section 18: bring Finance data into the SAME
+      // PROJECT -> WBS/Milestone structure the existing BOQ/cost_reports
+      // architecture already uses (milestone_id -> wbs.id). Only
+      // meaningful within a single project, so it's only computed when
+      // a projectId is given; a company-wide call gets an empty array
+      // rather than a cross-project WBS-code collision.
+      let byWbs = [];
+      if (projectId) {
+        const wbsRollup = await pool.query(
+          `WITH wbs_milestone AS (
+             SELECT id, COALESCE(parent_id, id) AS milestone_id
+             FROM wbs WHERE project_id = $1
+           ),
+           milestones AS (
+             SELECT id, code, name FROM wbs WHERE project_id = $1 AND parent_id IS NULL
+           ),
+           bsum AS (
+             SELECT wm.milestone_id, SUM(b.allocated_amount) AS allocated
+             FROM budgets b JOIN wbs_milestone wm ON wm.id = b.wbs_id
+             WHERE b.project_id = $1
+             GROUP BY wm.milestone_id
+           ),
+           esum AS (
+             SELECT wm.milestone_id, SUM(e.amount) AS spent
+             FROM expenses e JOIN wbs_milestone wm ON wm.id = e.wbs_id
+             WHERE e.project_id = $1 AND e.status IN ('approved','paid')
+             GROUP BY wm.milestone_id
+           ),
+           isum AS (
+             SELECT wm.milestone_id, SUM(i.amount) AS invoiced
+             FROM invoices i JOIN wbs_milestone wm ON wm.id = i.wbs_id
+             WHERE i.project_id = $1
+             GROUP BY wm.milestone_id
+           )
+           SELECT m.id AS "milestoneId", m.code, m.name,
+                  COALESCE(bsum.allocated, 0) AS allocated,
+                  COALESCE(esum.spent, 0) AS spent,
+                  COALESCE(isum.invoiced, 0) AS invoiced
+           FROM milestones m
+           LEFT JOIN bsum ON bsum.milestone_id = m.id
+           LEFT JOIN esum ON esum.milestone_id = m.id
+           LEFT JOIN isum ON isum.milestone_id = m.id
+           ORDER BY m.code`,
+          [projectId]
+        );
+        byWbs = wbsRollup.rows;
+      }
+
       return {
         budgetVsActual: budgetVsActual.rows,
         byExpenseCategory: byExpenseCategory.rows,
         projectTotals: projectTotals.rows,
+        byWbs,
       };
     },
   };

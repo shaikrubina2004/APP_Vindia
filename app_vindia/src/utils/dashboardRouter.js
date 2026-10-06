@@ -10,7 +10,6 @@ export const getDashboardRoute = (role) => {
     case ROLES.CEO:
       return "/dashboard";
 
-    case ROLES.HR:
     case ROLES.HR_MANAGER:
       return "/hr";
 
@@ -81,9 +80,21 @@ export const getDashboardRoute = (role) => {
       return "/operations/inventory/dashboard";
 
     case ROLES.ACCOUNTANT:
-  return "/accountant/dashboard";
+      return "/accountant/dashboard";
 
-      
+    // Internal roles without a dedicated portal currently use the common
+    // Timesheet as their employee landing page. Client is intentionally
+    // excluded from this fallback.
+    case ROLES.EMPLOYEE:
+    case ROLES.FINANCE:
+    case ROLES.MARKETING:
+    case ROLES.HR_EXECUTIVE:
+    case ROLES.SOFTWARE_ENGINEER:
+    case ROLES.TESTER:
+    case ROLES.SALES_EXECUTIVE:
+    case ROLES.BD_MANAGER:
+    case ROLES.DRAFTSMAN:
+      return "/timesheet";
 
     default:
       return "/";

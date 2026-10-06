@@ -80,6 +80,81 @@ function fmtDate(v) {
   });
 }
 
+async function getRequesterEmployee(userId) {
+  const result = await pool.query(
+    `SELECT id FROM employees WHERE user_id = $1 LIMIT 1`,
+    [userId]
+  );
+  return result.rows[0] || null;
+}
+
+async function userCanAccessProject(req, projectId) {
+  const role = String(req.user?.role || "").trim().toLowerCase();
+  if (role === "ceo") return true;
+
+  const numericId = Number(projectId);
+  if (!Number.isInteger(numericId) || numericId <= 0) return false;
+
+  if (role === "site_engineer") {
+    const result = await pool.query(
+      `SELECT 1 FROM projects WHERE id = $1 AND site_engineer_id = $2 LIMIT 1`,
+      [numericId, req.user.id]
+    );
+    return result.rows.length > 0;
+  }
+
+  if (role === "project_manager") {
+    const employee = await getRequesterEmployee(req.user.id);
+    if (!employee) return false;
+    const result = await pool.query(
+      `SELECT 1 FROM projects WHERE id = $1 AND manager_id = $2 LIMIT 1`,
+      [numericId, employee.id]
+    );
+    return result.rows.length > 0;
+  }
+
+  // QS currently has no project assignment foreign key in the schema.
+  // Keep the read access broad until a QS↔project assignment field exists.
+  return role === "quantity_surveyor";
+}
+
+async function getAccessibleProjectIds(req) {
+  const role = String(req.user?.role || "").trim().toLowerCase();
+  if (role === "ceo" || role === "quantity_surveyor") return null;
+
+  if (role === "site_engineer") {
+    const result = await pool.query(
+      `SELECT id FROM projects WHERE site_engineer_id = $1`,
+      [req.user.id]
+    );
+    return result.rows.map(r => Number(r.id));
+  }
+
+  if (role === "project_manager") {
+    const employee = await getRequesterEmployee(req.user.id);
+    if (!employee) return [];
+    const result = await pool.query(
+      `SELECT id FROM projects WHERE manager_id = $1`,
+      [employee.id]
+    );
+    return result.rows.map(r => Number(r.id));
+  }
+
+  return [];
+}
+
+async function assertMeasurementAccess(req, measurement, res) {
+  if (!measurement) {
+    res.status(404).json({ error: "Measurement not found" });
+    return false;
+  }
+  if (!(await userCanAccessProject(req, measurement.project_id))) {
+    res.status(403).json({ error: "You are not authorized to access this project measurement." });
+    return false;
+  }
+  return true;
+}
+
 // Status display metadata for frontend badges
 const STATUS_META = {
   submitted:    { label: "Submitted",    color: "blue"   },
@@ -135,6 +210,42 @@ exports.updateMeasurementStatus = async (client, measurementId, newStatus) => {
   console.log(`✅ Measurement #${measurementId} → ${newStatus}`);
 };
 
+/**
+ * GET /api/site-measurements/pending
+ * QS inbox: submitted SE measurements which do not yet have a pending/approved QR.
+ */
+exports.getPendingForQs = async (req, res) => {
+  try {
+    const allowedIds = await getAccessibleProjectIds(req);
+    const params = [];
+    let projectWhere = "";
+    if (allowedIds !== null) {
+      if (!allowedIds.length) return res.json([]);
+      params.push(allowedIds);
+      projectWhere = `AND sm.project_id = ANY($1::int[])`;
+    }
+
+    const result = await pool.query(
+      `SELECT sm.*
+         FROM site_measurements sm
+        WHERE sm.status = 'submitted'
+          ${projectWhere}
+          AND NOT EXISTS (
+            SELECT 1
+              FROM quantity_reports qr
+             WHERE qr.site_measurement_id = sm.id
+               AND qr.status IN ('pending_se', 'approved')
+          )
+        ORDER BY sm.created_at DESC`,
+      params
+    );
+    res.json(result.rows.map(formatMeasurement));
+  } catch (err) {
+    console.error("sm.getPendingForQs:", err.message);
+    res.status(500).json({ error: "Failed to fetch pending site measurements" });
+  }
+};
+
 /* ═══════════════════════════════════════════════════════════
    GET ALL  —  GET /api/site-measurements
    UNCHANGED — no data modification on GET
@@ -146,16 +257,23 @@ exports.getAll = async (req, res) => {
 
     if (boqId) {
       params.push(parseInt(boqId));
-      conds.push(`boq_id = $${params.length}`);
+      conds.push(`sm.boq_id = $${params.length}`);
     }
     if (projectId) {
       params.push(parseInt(projectId));
-      conds.push(`project_id = $${params.length}`);
+      conds.push(`sm.project_id = $${params.length}`);
     }
 
-    const where  = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    const allowedIds = await getAccessibleProjectIds(req);
+    if (allowedIds !== null) {
+      if (!allowedIds.length) return res.json([]);
+      params.push(allowedIds);
+      conds.push(`sm.project_id = ANY($${params.length}::int[])`);
+    }
+
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
     const result = await pool.query(
-      `SELECT * FROM site_measurements ${where} ORDER BY created_at DESC`,
+      `SELECT sm.* FROM site_measurements sm ${where} ORDER BY sm.created_at DESC`,
       params
     );
     res.json(result.rows.map(formatMeasurement));
@@ -177,10 +295,9 @@ exports.getById = async (req, res) => {
       "SELECT * FROM site_measurements WHERE id = $1",
       [req.params.id]
     );
-    if (!result.rows.length) {
-      return res.status(404).json({ error: "Measurement not found" });
-    }
-    res.json(formatMeasurement(result.rows[0]));
+    const measurement = result.rows[0];
+    if (!(await assertMeasurementAccess(req, measurement, res))) return;
+    res.json(formatMeasurement(measurement));
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch measurement: " + err.message });
   }
@@ -237,6 +354,12 @@ exports.create = async (req, res) => {
       return res.status(404).json({ error: "BOQ not found" });
     }
     const boq = boqRes.rows[0];
+
+    if (!(await userCanAccessProject(req, boq.project_id))) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "You are not assigned to this project." });
+    }
+
     // Verify the submitted project and milestone belong to the selected BOQ
 if (
   parseInt(projectId) !== parseInt(boq.project_id) ||
@@ -396,7 +519,7 @@ NOW()
   labourReportId ? parseInt(labourReportId) : null,
   dailyDiaryId ? parseInt(dailyDiaryId) : null,
 
-  submittedBy || "Site Engineer",
+  req.user?.name || (String(req.user?.role || "site_engineer").replace(/_/g, " ") || "Site Engineer"),
   date || new Date().toISOString().split("T")[0],
   zone || "",
   activity || "",
@@ -444,10 +567,14 @@ exports.update = async (req, res) => {
     const { date, zone, activity, notes, items } = req.body;
 
     const check = await pool.query(
-      "SELECT id, status FROM site_measurements WHERE id = $1", [id]
+      "SELECT id, project_id, status FROM site_measurements WHERE id = $1", [id]
     );
     if (!check.rows.length) {
       return res.status(404).json({ error: "Measurement not found" });
+    }
+
+    if (!(await userCanAccessProject(req, check.rows[0].project_id))) {
+      return res.status(403).json({ error: "You are not assigned to this project." });
     }
 
     // CHANGED: only approved is blocked
@@ -505,12 +632,17 @@ exports.remove = async (req, res) => {
     await client.query("BEGIN");
 
     const check = await client.query(
-      "SELECT id, boq_id, status FROM site_measurements WHERE id = $1",
+      "SELECT id, boq_id, project_id, status FROM site_measurements WHERE id = $1",
       [req.params.id]
     );
     if (!check.rows.length) {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "Measurement not found" });
+    }
+
+    if (!(await userCanAccessProject(req, check.rows[0].project_id))) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "You are not assigned to this project." });
     }
 
     // CHANGED: only approved is blocked
@@ -555,7 +687,7 @@ exports.getMeasurementItems = async (req, res) => {
     const { id } = req.params;
 
     const result = await pool.query(
-      `SELECT id, items
+      `SELECT id, boq_id, project_id, milestone_id, status, items
        FROM site_measurements
        WHERE id = $1`,
       [id]
@@ -568,9 +700,16 @@ exports.getMeasurementItems = async (req, res) => {
     }
 
     const measurement = result.rows[0];
+    if (!(await userCanAccessProject(req, measurement.project_id))) {
+      return res.status(403).json({ error: "You are not authorized to access this project measurement." });
+    }
 
     const items = safeArr(measurement.items).map((item, index) => ({
       measurementId: measurement.id,
+      boqId: measurement.boq_id,
+      projectId: measurement.project_id,
+      milestoneId: measurement.milestone_id,
+      measurementStatus: measurement.status,
       boqItemId: index + 1,
       description: item.description,
       unit: item.unit,

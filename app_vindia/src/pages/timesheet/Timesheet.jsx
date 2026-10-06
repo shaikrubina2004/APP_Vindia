@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import "../../styles/timesheet.css";
 import ApplyLeave from "../../SharedResourse/ApplyLeave";
 import ManagerTimesheet from "./ManagerTimesheet";
+import API from "../../services/authService";
+import { useAuth } from "../../context/useAuth";
 
 function buildMonthWeeks(year, month) {
   const lastDate = new Date(year, month + 1, 0).getDate();
@@ -90,46 +92,23 @@ function getLeaveTypeForDate(dayFull, appliedLeaves) {
   return leave ? leave.leaveType : null;
 }
 
-const WBS_PROJECTS = [
-  { code: "1.0", name: "Site Preparation & Foundation" },
-  { code: "2.0", name: "Structural Work" },
-  { code: "3.0", name: "MEP Installation" },
-];
-
-const WBS_TASKS = [
-  { code: "1.1", name: "Excavation Work", projectCode: "1.0" },
-  { code: "1.2", name: "Foundation Laying", projectCode: "1.0" },
-  { code: "2.1", name: "Column Installation", projectCode: "2.0" },
-  { code: "2.2", name: "Beam Work", projectCode: "2.0" },
-  { code: "3.1", name: "Electrical Work", projectCode: "3.0" },
-  { code: "3.2", name: "Plumbing Work", projectCode: "3.0" },
-];
+const WBS_PROJECTS = [];
+const WBS_TASKS = [];
 
 const MANAGER_ROLES = [
   "PROJECT_MANAGER",
   "OPERATIONS_MANAGER",
   "HR_MANAGER",
   "FINANCE_MANAGER",
-  "IT_MANAGER",
-  "BDM",
+  "CEO",
 ];
 
-const getUser = () => {
-  try {
-    const stored = localStorage.getItem("user");
-    return stored
-      ? JSON.parse(stored)
-      : { role: "PROJECT_MANAGER", name: "Demo User" };
-  } catch {
-    return { role: "PROJECT_MANAGER", name: "Demo User" };
-  }
-};
-
 export default function Timesheet() {
-  const user = getUser();
+  const { user } = useAuth();
 
   // ── FIX 1: isManager computed from MANAGER_ROLES constant ─────────────────
-const isManager = true;
+const normalizedRole = String(user?.role || "").trim().toLowerCase();
+  const isManager = MANAGER_ROLES.map((role) => role.toLowerCase()).includes(normalizedRole);
   const [view, setView] = useState("MY");
   const currentDate = new Date();
   const [rows, setRows] = useState([
@@ -144,6 +123,8 @@ const isManager = true;
   ]);
   const [submissionStatus, setSubmissionStatus] = useState("NOT SUBMITTED");
   const [appliedLeaves, setAppliedLeaves] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [tasksByProject, setTasksByProject] = useState({});
 
   const weekDates = getWeekDates(currentDate);
   const canSubmit = isUploadAllowed(weekDates);
@@ -229,7 +210,59 @@ const isManager = true;
   const timeOffTotal = () =>
     weekDates.reduce((s, _, idx) => s + (leaveDayFlags[idx] ? 9 : 0), 0);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadInitialData = async () => {
+      try {
+        const projectRes = await API.get("/timesheets/options/projects");
+        if (!cancelled) {
+          setProjects(Array.isArray(projectRes.data?.data) ? projectRes.data.data : []);
+        }
+      } catch (err) {
+        if (!cancelled) console.error("Failed to load timesheet projects:", err);
+      }
+
+      try {
+        const leaveRes = await API.get("/leaves/me");
+        if (!cancelled) {
+          const approvedLeaves = Array.isArray(leaveRes.data)
+            ? leaveRes.data
+                .filter((leave) => String(leave.status || "").toLowerCase() === "approved")
+                .map((leave) => ({
+                  id: leave.id,
+                  employeeName: leave.employee_name || user?.name || "",
+                  leaveType: leave.leave_type || "leave",
+                  fromDate: String(leave.from_date).slice(0, 10),
+                  toDate: String(leave.to_date).slice(0, 10),
+                  reason: leave.reason || "",
+                  status: leave.status,
+                  appliedOn: leave.created_at ? String(leave.created_at).slice(0, 10) : "",
+                }))
+            : [];
+          setAppliedLeaves(approvedLeaves);
+        }
+      } catch (err) {
+        if (!cancelled) console.error("Failed to load approved leave for timesheet:", err);
+      }
+    };
+
+    loadInitialData();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  const loadTasks = async (projectId) => {
+    if (!projectId || tasksByProject[projectId]) return;
+    try {
+      const res = await API.get(`/timesheets/options/projects/${projectId}/tasks`);
+      setTasksByProject((prev) => ({ ...prev, [projectId]: Array.isArray(res.data?.data) ? res.data.data : [] }));
+    } catch (err) {
+      console.error("Failed to load timesheet tasks:", err);
+    }
+  };
+
   const handleProjectSelect = (id, projectCode) => {
+    loadTasks(projectCode);
     setRows(
       rows.map((r) => (r.id === id ? { ...r, projectCode, taskCode: "" } : r)),
     );
@@ -321,6 +354,11 @@ const isManager = true;
   };
 
   const handleSubmit = async () => {
+  if (!canSubmit) {
+    alert(`This week's timesheet can be submitted on or after ${getDueDate()}.`);
+    return;
+  }
+
   try {
     const payload = [];
 
@@ -330,7 +368,6 @@ const isManager = true;
           payload.push({
             project_id: row.projectCode,
             task_id: row.taskCode,
-            user_id: user.id,
             work_date: date,
             hours: hrs,
             description: row.employeeType,
@@ -339,13 +376,7 @@ const isManager = true;
       });
     });
 
-    await fetch("http://localhost:5000/api/timesheets/bulk", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    await API.post("/timesheets/bulk", payload);
 
     setSubmissionStatus("SUBMITTED");
     alert("Timesheet submitted successfully");
@@ -357,22 +388,35 @@ const isManager = true;
 };
 const fetchMyTimesheet = async () => {
   try {
-    const res = await fetch(
-      `http://localhost:5000/api/timesheets/user/${user.email}`
-    );
+    const weekStart = toDateStr(weekDates[0]?.full || new Date());
+    const res = await API.get("/timesheets/me", { params: { week_start: weekStart } });
+    const sheet = res.data?.data;
 
-    if (!res.ok) {
-      throw new Error("API failed");
+    if (!sheet) {
+      setSubmissionStatus("NOT SUBMITTED");
+      return;
     }
 
-    const data = await res.json();
+    const grouped = new Map();
+    (sheet.entries || []).forEach((entry) => {
+      const key = `${entry.project_id || ""}:${entry.task_id || ""}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          id: entry.id,
+          projectCode: entry.project_id == null ? "" : String(entry.project_id),
+          taskCode: entry.task_id == null ? "" : String(entry.task_id),
+          employeeType: entry.description || "Employee",
+          hours: {},
+          groupId: entry.project_id || entry.id,
+        });
+      }
+      const row = grouped.get(key);
+      const dateKey = String(entry.work_date).slice(0, 10);
+      row.hours[dateKey] = Number(entry.regular_hours || 0) + Number(entry.overtime_hours || 0);
+    });
 
-    if (data.length > 0) {
-      const latest = data[0];
-      setRows(latest.rows || []);
-      setSubmissionStatus(latest.status || "NOT SUBMITTED");
-    }
-
+    if (grouped.size) setRows(Array.from(grouped.values()));
+    setSubmissionStatus(sheet.display_status || sheet.status || "NOT SUBMITTED");
   } catch (err) {
     console.error("Fetch error:", err);
   }
@@ -380,20 +424,32 @@ const fetchMyTimesheet = async () => {
 useEffect(() => {
   fetchMyTimesheet();
 }, []);
-  const handleLeaveSubmitted = (leaveData) => {
+  const handleLeaveSubmitted = async (leaveData) => {
+    const res = await API.post("/leaves", {
+      leaveType: leaveData.leaveType,
+      fromDate: leaveData.fromDate,
+      toDate: leaveData.toDate,
+      reason: leaveData.reason,
+    });
+
+    const saved = res.data || {};
     setAppliedLeaves((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        employeeName: leaveData.employeeName || leaveData.name,
-        leaveType: leaveData.leaveType,
-        fromDate: leaveData.fromDate,
-        toDate: leaveData.toDate,
-        reason: leaveData.reason,
-        status: leaveData.status,
-        appliedOn: leaveData.appliedOn,
-      },
+      ...prev.filter((leave) => leave.id !== saved.id),
+      ...(String(saved.status || "").toLowerCase() === "approved"
+        ? [{
+            id: saved.id,
+            employeeName: saved.employee_name || user?.name || "",
+            leaveType: saved.leave_type || leaveData.leaveType,
+            fromDate: String(saved.from_date || leaveData.fromDate).slice(0, 10),
+            toDate: String(saved.to_date || leaveData.toDate).slice(0, 10),
+            reason: saved.reason || leaveData.reason,
+            status: saved.status || "Approved",
+            appliedOn: saved.created_at ? String(saved.created_at).slice(0, 10) : leaveData.appliedOn,
+          }]
+        : []),
     ]);
+
+    return saved;
   };
 
   const leaveTypeLabel = (type) => {
@@ -517,7 +573,7 @@ useEffect(() => {
                     <th className="th-emp">Employee Type</th>
                     {weekDates.map((d, i) => (
                       <th
-                        key={i}
+                        key={toDateStr(d.full)}
                         className={`th-day ${d.isSunday ? "ts-sunday-header" : ""} ${leaveDayFlags[i] ? "ts-leave-header" : ""}`}
                       >
                         {d.label}
@@ -586,9 +642,9 @@ useEffect(() => {
                               }
                             >
                               <option value="">Select Project</option>
-                              {WBS_PROJECTS.map((p) => (
-                                <option key={p.code} value={p.code}>
-                                  {p.code} – {p.name}
+                              {projects.map((p) => (
+                                <option key={`${p.id}-${p.code || ""}`} value={p.id}>
+                                  {p.id} – {p.name}
                                 </option>
                               ))}
                             </select>
@@ -616,11 +672,9 @@ useEffect(() => {
                               style={{ opacity: !row.projectCode ? 0.5 : 1 }}
                             >
                               <option value="">Select Task</option>
-                              {WBS_TASKS.filter(
-                                (t) => t.projectCode === row.projectCode,
-                              ).map((t) => (
-                                <option key={t.code} value={t.code}>
-                                  {t.code} – {t.name}
+                              {(tasksByProject[row.projectCode] || []).map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {t.id} – {t.title}
                                 </option>
                               ))}
                             </select>
@@ -653,7 +707,7 @@ useEffect(() => {
                           const isLeaveDay = leaveDayFlags[di];
                           return (
                             <td
-                              key={di}
+                              key={toDateStr(day.full)}
                               className={`td-hours ${day.isSunday ? "ts-sunday-cell" : ""} ${isLeaveDay ? "ts-leave-blocked-cell" : ""}`}
                             >
                               {isLeaveDay ? (
@@ -739,7 +793,7 @@ useEffect(() => {
                       );
                       return (
                         <td
-                          key={di}
+                          key={toDateStr(day.full)}
                           className={`td-hours ts-time-off-cell ${val ? "ts-time-off-active" : ""}`}
                           title={
                             val

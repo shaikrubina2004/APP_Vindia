@@ -1,6 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const c = require("../controllers/boqController");
+const auth = require("../middleware/authMiddleware");
+const { requireRole } = auth;
+
+router.use(auth);
+router.use(requireRole("quantity_surveyor", "project_manager", "site_engineer", "client", "ceo"));
+const WRITE_ROLES = requireRole("quantity_surveyor", "project_manager", "ceo");
 
 // ═══════════════════════════════════════
 // PROJECTS & MILESTONES
@@ -23,12 +29,12 @@ router.get("/", c.getAllBoqs);
 router.get("/:id", c.getBoqById);
 
 // CREATE BOQ
-router.post("/", c.createBoq);
+router.post("/", WRITE_ROLES, c.createBoq);
 
 // UPDATE BOQ
-router.put("/:id", c.updateBoq);
+router.put("/:id", WRITE_ROLES, c.updateBoq);
 
 // DELETE BOQ
-router.delete("/:id", c.deleteBoq);
+router.delete("/:id", WRITE_ROLES, c.deleteBoq);
 
 module.exports = router;

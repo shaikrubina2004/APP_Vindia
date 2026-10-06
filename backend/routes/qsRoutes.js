@@ -2,6 +2,10 @@ const express = require("express");
 const router = express.Router();
 const c = require("../controllers/qsController");
 const authMiddleware = require("../middleware/authMiddleware");
+const { requireRole } = authMiddleware;
+
+router.use(authMiddleware);
+router.use(requireRole("quantity_surveyor", "project_manager", "site_engineer", "ceo"));
 
 // Apply auth to all routes
 

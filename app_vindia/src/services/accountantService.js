@@ -18,10 +18,16 @@ const accountantService = {
    * @param {string|number|null} [projectId] - null/undefined/"" all mean
    *   "global view" and are simply omitted from the request, matching
    *   the backend's contract (missing/empty projectId = global).
+   * @param {string|number|null} [wbsId] - optional WBS/milestone scope
+   *   ("unassigned" is a valid value too). Only meaningful together
+   *   with a projectId — omitted whenever projectId itself is empty.
    */
-  getDashboard: (projectId) =>
+  getDashboard: (projectId, wbsId) =>
     api.get(`${ACCOUNTANT_BASE_URL}/dashboard`, {
-      params: projectId ? { projectId } : {},
+      params: {
+        ...(projectId ? { projectId } : {}),
+        ...(projectId && wbsId ? { wbsId } : {}),
+      },
     }),
 
   // ============================================================
@@ -95,12 +101,27 @@ const accountantService = {
   // ============================================================
   getJournalEntries: (params = {}) => api.get(`${ACCOUNTANT_BASE_URL}/journal-entries`, { params }),
   getJournalEntry: (id) => api.get(`${ACCOUNTANT_BASE_URL}/journal-entries/${id}`),
+  // Aliases — JournalEntries.jsx calls these exact names. Fixing the
+  // caller's naming instead risked missing another caller elsewhere;
+  // aliasing here guarantees both spellings resolve to the same
+  // request (confirmed runtime mismatch, Section 25).
+  getAllJournalEntries: (params = {}) => api.get(`${ACCOUNTANT_BASE_URL}/journal-entries`, { params }),
+  getJournalEntryById: (id) => api.get(`${ACCOUNTANT_BASE_URL}/journal-entries/${id}`),
   createJournalEntry: (data) => api.post(`${ACCOUNTANT_BASE_URL}/journal-entries`, data),
   updateJournalEntry: (id, data) => api.put(`${ACCOUNTANT_BASE_URL}/journal-entries/${id}`, data),
   submitJournalEntry: (id) => api.put(`${ACCOUNTANT_BASE_URL}/journal-entries/${id}/submit`),
   approveJournalEntry: (id) => api.put(`${ACCOUNTANT_BASE_URL}/journal-entries/${id}/approve`),
   postJournalEntry: (id) => api.put(`${ACCOUNTANT_BASE_URL}/journal-entries/${id}/post`),
   reverseJournalEntry: (id) => api.post(`${ACCOUNTANT_BASE_URL}/journal-entries/${id}/reverse`),
+
+  // ============================================================
+  // FINANCE WBS OPTIONS
+  // Backs the Project -> WBS/Milestone -> Activity selector
+  // (components/accountant/FinanceWbsSelector.jsx) on every finance
+  // create/edit form. Shared shape/endpoint with financeService.js.
+  // ============================================================
+  getFinanceWbs: (projectId) =>
+    api.get(`${ACCOUNTANT_BASE_URL}/wbs`, { params: { project_id: projectId } }),
 
   // ============================================================
   // GENERAL LEDGER (derived, read-only — Decision 2)

@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import AccountantDashboard from "../pages/Accountant/AccountantDashboard";
 
@@ -40,6 +40,7 @@ const ACCOUNTANT_AND_FM = [ROLES.ACCOUNTANT, ROLES.FINANCE_MANAGER, ROLES.CEO];
 
 const AccountantRoutes = () => (
   <Routes>
+    <Route path="/" element={<Navigate to="/dashboard" replace />} />
     <Route
       path="/dashboard"
       element={

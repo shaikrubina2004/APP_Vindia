@@ -2,6 +2,12 @@
 const Expense = require("../models/expenseModel");
 const Budget = require("../models/budgetModel");
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
+const { validateFinanceWbs, assertWbsUnchanged } = require("../utils/financeWbsValidation");
+
+// Once an expense has moved past pending, its WBS classification
+// becomes part of the accounting record and must not silently move
+// (Section 9 / 22.8).
+const WBS_LOCKED_STATUSES = ["approved", "paid"];
 
 // GET /api/finance/expenses
 // Optional query filters: ?project_id=&expense_type=&category=&status=
@@ -26,8 +32,8 @@ function blockPrivilegedStatusForAccountant(req) {
 }
 
 exports.getAllExpenses = asyncHandler(async (req, res) => {
-  const { project_id, expense_type, category, status } = req.query;
-  const expenses = await Expense.getAll({ project_id, expense_type, category, status });
+  const { project_id, expense_type, category, status, wbs_id } = req.query;
+  const expenses = await Expense.getAll({ project_id, expense_type, category, status, wbs_id });
   res.json({ success: true, data: expenses });
 });
 
@@ -48,12 +54,16 @@ exports.getExpenseById = asyncHandler(async (req, res) => {
 
 // POST /api/finance/expenses
 // Body: { project_id, category, description, amount, vendor_id?, expense_date?,
-//         payment_method?, status?, receipt_url?, expense_type? }
+//         payment_method?, status?, receipt_url?, expense_type?, wbs_id? }
 exports.createExpense = asyncHandler(async (req, res) => {
-  const { project_id, category, amount } = req.body;
+  const { project_id, category, amount, wbs_id } = req.body;
   if (!project_id || !category || amount == null) {
     throw new AppError("project_id, category and amount are required", 400);
   }
+
+  // Backend is the authority on the WBS relationship — never trust the
+  // frontend to have already matched wbs_id to project_id.
+  await validateFinanceWbs({ project_id, wbs_id }, { required: true });
 
   const expense = await Expense.create({
     ...req.body,
@@ -68,7 +78,7 @@ exports.createExpense = asyncHandler(async (req, res) => {
 
 // PUT /api/finance/expenses/:id
 // Body: any of { category, description, amount, vendor_id, expense_date,
-//                 payment_method, status, receipt_url }
+//                 payment_method, status, receipt_url, wbs_id }
 exports.updateExpense = asyncHandler(async (req, res) => {
   // Authorization checked BEFORE any DB round-trip — fail fast, and
   // don't leak whether the record exists to a caller who isn't even
@@ -78,6 +88,13 @@ exports.updateExpense = asyncHandler(async (req, res) => {
 
   const existing = await Expense.getById(req.params.id);
   if (!existing) throw new AppError("Expense not found", 404);
+
+  if (WBS_LOCKED_STATUSES.includes(String(existing.status || "").toLowerCase())) {
+    assertWbsUnchanged(existing.wbs_id, req.body.wbs_id, "expense");
+  } else if (Object.prototype.hasOwnProperty.call(req.body, "wbs_id")) {
+    const projectId = req.body.project_id ?? existing.project_id;
+    await validateFinanceWbs({ project_id: projectId, wbs_id: req.body.wbs_id }, { required: true });
+  }
 
   const expense = await Expense.update(req.params.id, req.body);
 

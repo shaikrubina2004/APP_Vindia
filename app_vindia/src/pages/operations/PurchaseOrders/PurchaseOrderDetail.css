@@ -141,3 +141,5 @@
   color: #dc2626;
   cursor: pointer;
 }
+.pod-badge--pending_approval { background: #fffbeb; color: #b45309; }
+.pod-badge--rejected { background: #fee2e2; color: #dc2626; }

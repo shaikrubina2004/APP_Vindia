@@ -1233,3 +1233,19 @@ body {
     border: 1px solid #ddd;
   }
 }
+.pt-wbs-inherited {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed #cfe0ea;
+  background: #f3f9fc;
+  border-radius: 9px;
+  color: #3d6a86;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.pt-wbs-inherited b {
+  color: #17344b;
+}

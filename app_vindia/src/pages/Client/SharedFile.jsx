@@ -4,10 +4,9 @@ import {
   PageLoader,
   PageError,
   fmtDate,
+  assetUrl,
 } from "../../hooks/Useclientapi.jsx";
 import "../../styles/Client.css";
-
-const BASE_URL = import.meta.env.VITE_API_BASE || "http://localhost:5000";
 
 // Derive category + icon from drawing type / discipline
 function getFileMeta(drawing) {
@@ -38,12 +37,7 @@ export default function SharedFile() {
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
 
-  // Shared drawings come from the drawings table — versions visible to client
-  // We reuse /client/boq-style endpoint; for drawings we need a new controller fn.
-  // For now we call the drawings project endpoint scoped by client token.
-  // The clientController doesn't have a drawings endpoint yet — this page
-  // is ready to wire once you add getClientDrawings to the controller.
-  // Fallback to empty while that's added.
+  // Drawings issued for coordination/construction (GET /client/shared-files).
   const { data, loading, error, refetch } = useClientAPI(
     "/client/shared-files",
   );
@@ -173,7 +167,7 @@ export default function SharedFile() {
                       <td>
                         {fileUrl ? (
                           <a
-                            href={`${BASE_URL}${fileUrl}`}
+                            href={assetUrl(fileUrl)}
                             download
                             className="sf-download-btn"
                             target="_blank"

@@ -19,6 +19,7 @@ const ROLE_FILTERS = [
   { value: "all",                   label: "All roles" },
   { value: "inventory_controller",  label: "Inventory" },
   { value: "logistics_coordinator", label: "Logistics" },
+  { value: "office_administrator",  label: "Office Admin" },
 ];
 
 const parseDay = (s) => {

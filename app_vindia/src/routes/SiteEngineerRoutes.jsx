@@ -31,7 +31,7 @@
     import PhotoGallery     from "../pages/siteEngineer/Photogallery";
     import SiteInstruction  from "../pages/siteEngineer/Siteinstruction";
     import MaterialRequest  from "../pages/siteEngineer/Materialrequest";
-    import LabourReport from "../pages/siteEngineer/Labourreport";``
+    import LabourReport from "../pages/siteEngineer/Labourreport";
 
     // ── Shared ─────────────────────────────────────────────────
     import AppShell from "../components/incidents/AppShell";
@@ -220,17 +220,6 @@ import LabourRegistry from "../pages/siteEngineer/Labourregistry";
         </ProtectedRoute>
         }
     />,
-    <Route
-    key="se-approvals"
-    path="/site-engineer/approvals"
-    element={
-    <ProtectedRoute allowedRoles={[...SE_ROLES, ROLES.QC_ENGINEER]}>
-        <SiteEngineerLayout>
-            <ApprovalWorkflow />
-        </SiteEngineerLayout>
-    </ProtectedRoute>
-    }
-/>,
     
 
     ];

@@ -1,8 +1,10 @@
 import axios from "axios";
+import { API_ORIGIN } from "./api";
 
-const ITEMS_API = axios.create({ baseURL: "http://localhost:5000/api/inventory/items" });
-const TXN_API = axios.create({ baseURL: "http://localhost:5000/api/inventory" });
-const GRN_API = axios.create({ baseURL: "http://localhost:5000/api/goods-receipts" });
+// Was hard-coded to http://localhost:5000 — broke in every deployed environment.
+const ITEMS_API = axios.create({ baseURL: `${API_ORIGIN}/api/inventory/items` });
+const TXN_API = axios.create({ baseURL: `${API_ORIGIN}/api/inventory` });
+const GRN_API = axios.create({ baseURL: `${API_ORIGIN}/api/goods-receipts` });
 
 [ITEMS_API, TXN_API, GRN_API].forEach((api) => {
   api.interceptors.request.use((req) => {

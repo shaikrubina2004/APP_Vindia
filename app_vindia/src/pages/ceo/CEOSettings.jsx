@@ -20,12 +20,14 @@ function Account({ user }) {
       <h3>Account</h3><div className="cst-sub">Your profile details.</div>
       <div className="cs-profile">
         <div className="cs-avatar">{initials}</div>
-        <div><b>{user?.name || "—"}</b><span>{user?.email || "—"}</span><em className="cst-badge info">{cap(user?.role)}</em></div>
+        <div><b>{user?.employee_name || user?.name || "—"}</b><span>{user?.employee_email || user?.email || "—"}</span><em className="cst-badge info">{user?.role_name || cap(user?.role)}</em></div>
       </div>
       <dl className="cs-info">
-        <dt>Name</dt><dd>{user?.name || "—"}</dd>
-        <dt>Email</dt><dd>{user?.email || "—"}</dd>
-        <dt>Role</dt><dd>{cap(user?.role)}</dd>
+        <dt>Name</dt><dd>{user?.employee_name || user?.name || "—"}</dd>
+        <dt>Email</dt><dd>{user?.employee_email || user?.email || "—"}</dd>
+        <dt>Department</dt><dd>{user?.department_name || user?.employee_department || "—"}</dd>
+        <dt>Designation</dt><dd>{user?.designation || "—"}</dd>
+        <dt>Role</dt><dd>{user?.role_name || cap(user?.role)}</dd>
       </dl>
     </div>
   );

@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { useAuth } from "../../context/useAuth";
 import financeService from "../../services/financeService";
+import { WbsBadge } from "../../components/accountant/FinanceWbsSelector";
 import "./CostReporting.css";
 
 /* ─────────────────────────────────────────────────────────────
@@ -1334,6 +1335,33 @@ function VarianceTab({
   costCategories,
   projectTotals,
 }) {
+  // WBS breakdown is inherently project-scoped (Section 18), and this
+  // page deliberately has no global project selector by prior design
+  // (see the comment on the getCostReport() call above) — so it's
+  // fetched on demand per row here instead of changing that design.
+  const [expandedProjectId, setExpandedProjectId] = useState(null);
+  const [wbsByProject, setWbsByProject] = useState({});
+  const [wbsLoading, setWbsLoading] = useState(null);
+
+  const toggleWbsBreakdown = async (projectId) => {
+    if (expandedProjectId === projectId) {
+      setExpandedProjectId(null);
+      return;
+    }
+    setExpandedProjectId(projectId);
+    if (wbsByProject[projectId]) return; // already fetched
+    setWbsLoading(projectId);
+    try {
+      const res = await financeService.getCostReport(projectId);
+      const rows = res?.data?.data?.byWbs || [];
+      setWbsByProject((current) => ({ ...current, [projectId]: rows }));
+    } catch (err) {
+      setWbsByProject((current) => ({ ...current, [projectId]: [] }));
+    } finally {
+      setWbsLoading(null);
+    }
+  };
+
   const totalVariance = costCategories.reduce(
     (sum, category) =>
       sum +
@@ -1623,6 +1651,7 @@ function VarianceTab({
                   <th>Actual</th>
                   <th>Remaining</th>
                   <th>Status</th>
+                  <th>WBS</th>
                 </tr>
               </thead>
 
@@ -1632,9 +1661,12 @@ function VarianceTab({
                     project.spent >
                     project.allocated;
 
+                  const isExpanded = expandedProjectId === project.id;
+                  const wbsRows = wbsByProject[project.id] || [];
+
                   return (
+                    <Fragment key={project.id}>
                     <tr
-                      key={project.id}
                       className="ca-trow"
                     >
                       <td>
@@ -1686,7 +1718,53 @@ function VarianceTab({
                             : "Under Budget"}
                         </span>
                       </td>
+
+                      <td>
+                        <button
+                          type="button"
+                          className="ca-wbs-toggle"
+                          onClick={() => toggleWbsBreakdown(project.id)}
+                        >
+                          {isExpanded ? "Hide" : "View"}
+                        </button>
+                      </td>
                     </tr>
+
+                    {isExpanded && (
+                      <tr className="ca-wbs-row">
+                        <td colSpan={6}>
+                          {wbsLoading === project.id ? (
+                            <div className="ca-wbs-loading">Loading WBS breakdown…</div>
+                          ) : wbsRows.length === 0 ? (
+                            <div className="ca-wbs-empty">
+                              No WBS milestones classify any budget, expense or invoice on this project yet.
+                            </div>
+                          ) : (
+                            <table className="ca-wbs-table">
+                              <thead>
+                                <tr>
+                                  <th>Milestone</th>
+                                  <th>Allocated</th>
+                                  <th>Spent</th>
+                                  <th>Invoiced</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {wbsRows.map((row) => (
+                                  <tr key={row.milestoneId}>
+                                    <td><WbsBadge code={row.code} name={row.name} /></td>
+                                    <td className="ca-mono">{fmt(Number(row.allocated))}</td>
+                                    <td className="ca-mono">{fmt(Number(row.spent))}</td>
+                                    <td className="ca-mono">{fmt(Number(row.invoiced))}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>

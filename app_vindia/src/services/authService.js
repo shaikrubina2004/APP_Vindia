@@ -1,8 +1,16 @@
 import axios from "axios";
 
+// One place decides the backend URL. Set VITE_API_URL (or the older VITE_API_BASE)
+// in .env for staging/production; local development keeps working unchanged.
+const API_ORIGIN = (
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE ||
+  "http://localhost:5000"
+).replace(/\/+$/, "");
+
 // ✅ create instance
 const API = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: `${API_ORIGIN}/api`,
 });
 
 // interceptor

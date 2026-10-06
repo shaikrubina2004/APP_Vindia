@@ -856,3 +856,7 @@
   .ac-alert-error { flex-wrap: wrap; }
   .ac-alert-error button { margin-left: 0; }
 }
+
+.ac-wbs-scope-bar {
+  margin: -8px 0 20px;
+}

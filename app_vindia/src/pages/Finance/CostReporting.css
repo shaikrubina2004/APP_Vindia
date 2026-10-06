@@ -551,3 +551,48 @@
   .ca-donut-section{ flex-direction: column; }
   .ca-wf-row       { grid-template-columns: 1fr 1fr; }
 }
+/* ── WBS breakdown drill-down (Variance tab) ── */
+.ca-wbs-toggle {
+  padding: 0.3rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--ca-border);
+  background: #fff;
+  color: var(--ca-navy);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ca-wbs-toggle:hover { background: var(--ca-bg); }
+.ca-wbs-row td {
+  background: var(--ca-bg);
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--ca-border);
+}
+.ca-wbs-loading, .ca-wbs-empty {
+  color: var(--ca-muted);
+  font-size: 0.8rem;
+  padding: 0.4rem 0;
+}
+.ca-wbs-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--ca-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ca-wbs-table th {
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ca-muted);
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--ca-border);
+}
+.ca-wbs-table td {
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--ca-border);
+  font-size: 0.8rem;
+}
+.ca-wbs-table tr:last-child td { border-bottom: none; }

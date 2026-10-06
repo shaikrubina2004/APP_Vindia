@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../context/useAuth";
 import {
   ArrowRight,
   Banknote,
@@ -27,6 +28,7 @@ import accountantService from "../../services/accountantService";
 import { useProject } from "../../context/ProjectContext";
 import { FINANCE_PERMISSIONS } from "../../config/financePermissions";
 import { ROLES } from "../../roles";
+import FinanceWbsSelector from "../../components/accountant/FinanceWbsSelector";
 
 import "./AccountantDashboard.css";
 
@@ -358,18 +360,33 @@ function StatusPill({ label, value, tone = "neutral" }) {
 }
 
 const AccountantDashboard = () => {
+  const { user } = useAuth();
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const employeeName = user?.employee_name || user?.name || "there";
   const { activeProject } = useProject();
   const [status, setStatus] = useState("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [data, setData] = useState(EMPTY_DASHBOARD);
   const [isNewContract, setIsNewContract] = useState(true);
+  // WBS scope. Reset whenever the project itself changes — a WBS id
+  // from a previous project is meaningless (and potentially wrong) for
+  // a newly selected one.
+  const [wbsContext, setWbsContext] = useState(null);
+
+  useEffect(() => {
+    setWbsContext(null);
+  }, [activeProject?.id]);
 
   const fetchDashboard = useCallback(async () => {
     setStatus("loading");
     setErrorMessage("");
 
     try {
-      const response = await accountantService.getDashboard(activeProject?.id ?? null);
+      const response = await accountantService.getDashboard(
+        activeProject?.id ?? null,
+        activeProject?.id ? wbsContext?.wbs_id ?? null : null
+      );
       const normalized = normalizeDashboard(response?.data?.data);
 
       setData(normalized.data);
@@ -382,7 +399,7 @@ const AccountantDashboard = () => {
       );
       setStatus("error");
     }
-  }, [activeProject?.id]);
+  }, [activeProject?.id, wbsContext?.wbs_id]);
 
   useEffect(() => {
     fetchDashboard();
@@ -412,7 +429,7 @@ const AccountantDashboard = () => {
         <div className="ac-hero-copy">
           <div className="ac-hero-kicker">
             <span className="ac-live-dot" />
-            ACCOUNTING OPERATIONS
+            {greeting}, {employeeName} 👋
           </div>
           <h1>Accountant Dashboard</h1>
           <p>Monitor financial transactions, accounting controls and daily work in one place.</p>
@@ -421,7 +438,14 @@ const AccountantDashboard = () => {
         <div className="ac-hero-actions">
           <div className="ac-scope">
             <span className="ac-scope-label">Current scope</span>
-            <strong>{scopeLabel}</strong>
+            <strong>
+              Project: {scopeLabel}
+              {wbsContext && (
+                <>
+                  {" "}· WBS: {wbsContext.wbs_code} — {wbsContext.wbs_name}
+                </>
+              )}
+            </strong>
           </div>
           <button
             type="button"
@@ -435,6 +459,24 @@ const AccountantDashboard = () => {
           </button>
         </div>
       </header>
+
+      {/* Reuses the existing ProjectContext selection (activeProject) —
+          this page does not introduce a second, duplicate project
+          picker. It only adds the WBS/Milestone narrowing that doesn't
+          exist anywhere else yet. When no project is selected,
+          FinanceWbsSelector shows its own "select a project first"
+          state and disables its selects automatically. */}
+      <div className="ac-wbs-scope-bar">
+        <FinanceWbsSelector
+          projectId={activeProject?.id || null}
+          projectLabel={scopeLabel}
+          value={wbsContext?.wbs_id}
+          onChange={setWbsContext}
+          fetchWbs={accountantService.getFinanceWbs}
+          label="Dashboard WBS / Milestone Scope"
+          helperText="Optional — narrows every metric below to one WBS. Leave unset to see the whole project (or all projects)."
+        />
+      </div>
 
       {status === "loading" && (
         <div className="ac-loading-shell" aria-live="polite">

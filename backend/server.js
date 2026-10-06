@@ -9,6 +9,7 @@ const fs = require("fs");
 
 /* ── Upload directory ───────────────────────── */
 const uploadDir = path.join(__dirname, "uploads");
+
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -16,8 +17,10 @@ if (!fs.existsSync(uploadDir)) {
 /* ── Multer config ───────────────────────── */
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+  filename: (req, file, cb) =>
+    cb(null, Date.now() + "-" + file.originalname),
 });
+
 const upload = multer({ storage });
 
 /* ═════════ ROUTES IMPORT ═════════ */
@@ -62,8 +65,12 @@ const progressRoutes = require("./routes/progressRoutes");
 const siteEngineerDashboardRoutes = require("./routes/siteEngineerDashboardRoutes");
 const materialRequestRoutes = require("./routes/materialRequestRoutes");
 const procurementRoutes = require("./routes/procurementRoutes");
+const operationsRoutes = require("./routes/operationsRoutes");
+const officeAdminRoutes = require("./routes/officeAdminRoutes");
 
-const operationsNotificationsRoutes = require("./routes/operationsNotifications");
+const operationsNotificationsRoutes = require(
+  "./routes/operationsNotifications"
+);
 
 const snagRoutes = require("./routes/snagRoutes");
 const siteProgressRoutes = require("./routes/siteProgressRoutes");
@@ -87,6 +94,7 @@ const structuralRoutes = require("./routes/structuralRoutes");
 const seDailyRoutes = require("./routes/seDailyupdatesRoutes");
 const rfiRoutes = require("./routes/rfiRoutes");
 const seNotificationRoutes = require("./routes/seNotificationRoutes");
+const siteEngineerNotificationRoutes = require("./routes/siteEngineerNotificationRoutes");
 
 /* QS */
 const qsRoutes = require("./routes/qsRoutes");
@@ -94,7 +102,6 @@ const boqRoutes = require("./routes/boqRoutes");
 const costReportRoutes = require("./routes/costReportRoutes");
 const quantityReportRoutes = require("./routes/Quantityreportroutes");
 const qsNotifRoutes = require("./routes/qsNotificationRoutes");
-const measurementRoutes = require("./routes/measurementRoutes");
 
 // ✅ NEW: Site Measurements (SE submits actual quantities against BOQ)
 const siteMeasurementRoutes = require("./routes/siteMeasurementRoutes");
@@ -119,7 +126,6 @@ const inventoryItemRoutes = require("./routes/inventoryItemRoutes");
 const deliveryRoutes = require("./routes/deliveryRoutes");
 const goodsReceiptRoutes = require("./routes/goodsReceiptRoutes");
 const inventoryTransactionRoutes = require("./routes/inventoryTransactionRoutes");
-const operationsNotificationRoutes = require("./routes/operationsNotifications");
 
 /* ✅ Accountant */
 const accountantRoutes = require("./routes/accountantRoutes");
@@ -130,7 +136,10 @@ const threeDModelRoutes = require("./routes/threeDModelRoutes");
 /* ✅ Digital Marketing */
 const campaignRoutes = require("./routes/campaignRoutes");
 const marketingRoutes = require("./routes/marketingRoutes");
-const digitalMarketingNotificationRoutes = require("./routes/digitalMarketingNotificationRoutes");
+const digitalMarketingNotificationRoutes = require(
+  "./routes/digitalMarketingNotificationRoutes"
+);
+
 const { errorHandler } = require("./middleware/errorHandler");
 const ceoDailyReportRoutes = require("./routes/ceoDailyReportRoutes");
 const ceoAlertRoutes       = require("./routes/ceoAlertRoutes");
@@ -159,6 +168,10 @@ app.get("/", async (req, res) => {
 
 /* ═════════ ROUTES ═════════ */
 
+// Client account isolation.
+const clientFence = require("./middleware/clientFence");
+app.use("/api", clientFence);
+
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/employees", employeeRoutes);
@@ -179,6 +192,7 @@ app.use("/api/structural", structuralRoutes);
 app.use("/api/se-daily-reports", seDailyRoutes);
 app.use("/api/rfis", rfiRoutes);
 app.use("/api/se-notifications", seNotificationRoutes);
+app.use("/api/site-engineer-notifications", siteEngineerNotificationRoutes);
 app.use("/api/manager-reports", managerReportsRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/settings", settingsRoutes);
@@ -194,13 +208,12 @@ app.use("/api/boq", boqRoutes);
 app.use("/api/cost-report", costReportRoutes);
 app.use("/api/quantity-report", quantityReportRoutes);
 
-/* ⚠️ Old measurement sheets (QS measurement sheets — kept for backward compat) */
-app.use("/api/measurement", measurementRoutes);
-app.use("/api/measurements", measurementRoutes);
+/* Measurement lifecycle uses the SE site-measurements -> QS quantity-report workflow. */
 
 // ✅ NEW: Site measurements — SE submits actual quantities against a BOQ
 // Used by QSMeasurements.jsx: POST /api/site-measurements
 app.use("/api/site-measurements", siteMeasurementRoutes);
+
 app.use("/api/approvals", approvalRoutes);
 
 app.use("/api/timesheets", timesheetRoutes);
@@ -208,6 +221,7 @@ app.use("/api/daily-reports", dailyRoutes);
 app.use("/api/analysis", analysisRoutes);
 app.use("/api/mep-notifications", mepNotifRoutes);
 app.use("/api/client", clientRoutes);
+app.use("/api/project-approvals", require("./routes/projectApprovalRoutes"));
 
 app.use("/api/incidents", incidentRoutes);
 
@@ -222,7 +236,10 @@ app.use("/api/architect-designs", architectDesignRoutes);
 app.use("/api/architect-drawings", architectDrawingUploadRoutes);
 app.use("/api/architect-assign", architectAssignRoutes);
 app.use("/api/architect-notifications", architectNotifRoutes);
+
 app.use("/api/procurement", procurementRoutes);
+app.use("/api/operations", operationsRoutes);
+app.use("/api/office-admin", officeAdminRoutes);
 app.use("/api/operations-notifications", operationsNotificationsRoutes);
 
 /* ✅ Site Engineer */
@@ -244,7 +261,6 @@ app.use("/api/inventory/items", inventoryItemRoutes);
 app.use("/api/inventory", inventoryTransactionRoutes);
 app.use("/api/deliveries", deliveryRoutes);
 app.use("/api/goods-receipts", goodsReceiptRoutes);
-app.use("/api/operations-notifications", operationsNotificationRoutes);
 
 /* Shared */
 app.use("/api/drawings", drawingUploadRoutes);
@@ -279,14 +295,19 @@ app.use(errorHandler);
 
 /* ═════════ BDA FOLLOW-UP CRON JOBS ═════════
    Runs once a day at 08:00 (server local time):
-     1. generateFollowUpNotifications — reminds BDAs about
-        today's / overdue / tomorrow's follow-ups.
-     2. escalateOverdueFollowUps — the "missed follow-up
-        goes to the backup BDA" behaviour, configured in
-        backend/config/bdaEscalation.js.
+
+    1. generateFollowUpNotifications — reminds BDAs about
+       today's / overdue / tomorrow's follow-ups.
+
+    2. escalateOverdueFollowUps — the "missed follow-up
+       goes to the backup BDA" behaviour, configured in
+       backend/config/bdaEscalation.js.
+
    Previously neither of these was ever scheduled — the
-   functions existed but nothing called cron.schedule(). */
+   functions existed but nothing called cron.schedule().
+*/
 const cron = require("node-cron");
+
 const {
   generateFollowUpNotifications,
   escalateOverdueFollowUps,

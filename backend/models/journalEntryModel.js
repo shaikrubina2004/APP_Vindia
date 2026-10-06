@@ -27,10 +27,20 @@ const JournalEntry = {
       values.push(filters.status);
       where += ` AND je.status = $${values.length}`;
     }
+    if (filters.wbs_id === "unassigned") {
+      where += ` AND je.wbs_id IS NULL AND je.project_id IS NOT NULL`;
+    } else if (filters.wbs_id) {
+      values.push(filters.wbs_id);
+      where += ` AND je.wbs_id = $${values.length}`;
+    }
     const result = await pool.query(
-      `SELECT je.*, p.name AS project_name
+      `SELECT je.*, p.name AS project_name,
+              w.code AS wbs_code, w.name AS wbs_name, w.parent_id AS wbs_parent_id,
+              m.code AS milestone_code, m.name AS milestone_name
        FROM journal_entries je
        LEFT JOIN projects p ON p.id = je.project_id
+       LEFT JOIN wbs w ON w.id = je.wbs_id
+       LEFT JOIN wbs m ON m.id = COALESCE(w.parent_id, w.id)
        ${where}
        ORDER BY je.entry_date DESC, je.id DESC`,
       values
@@ -40,9 +50,13 @@ const JournalEntry = {
 
   getById: async (id) => {
     const header = await pool.query(
-      `SELECT je.*, p.name AS project_name
+      `SELECT je.*, p.name AS project_name,
+              w.code AS wbs_code, w.name AS wbs_name, w.parent_id AS wbs_parent_id,
+              m.code AS milestone_code, m.name AS milestone_name
        FROM journal_entries je
        LEFT JOIN projects p ON p.id = je.project_id
+       LEFT JOIN wbs w ON w.id = je.wbs_id
+       LEFT JOIN wbs m ON m.id = COALESCE(w.parent_id, w.id)
        WHERE je.id = $1`,
       [id]
     );
@@ -65,7 +79,7 @@ const JournalEntry = {
   // insert, so it is available immediately and the column can carry a
   // real NOT NULL constraint from row creation — no insert-then-backfill
   // step, unlike the earlier id-based approach.
-  create: async ({ entry_date, description, project_id, lines, created_by }) => {
+  create: async ({ entry_date, description, project_id, wbs_id, lines, created_by }) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -78,10 +92,10 @@ const JournalEntry = {
 
       const header = await client.query(
         `INSERT INTO journal_entries
-           (entry_number, entry_date, description, project_id, status, total_debit, total_credit, created_by)
-         VALUES ($1,$2,$3,$4,'draft',$5,$6,$7)
+           (entry_number, entry_date, description, project_id, wbs_id, status, total_debit, total_credit, created_by)
+         VALUES ($1,$2,$3,$4,$5,'draft',$6,$7,$8)
          RETURNING *`,
-        [entryNumber, entry_date, description, project_id || null, totalDebit, totalCredit, created_by]
+        [entryNumber, entry_date, description, project_id || null, wbs_id || null, totalDebit, totalCredit, created_by]
       );
       const entry = header.rows[0];
 
@@ -109,7 +123,7 @@ const JournalEntry = {
   // userId: when ownershipRequired is true, only the entry's own creator
   // may edit it (Decision: journal entries enforce own-draft-only editing,
   // stricter than the rest of the app, flagged explicitly — see manifest).
-  updateDraft: async (id, { entry_date, description, project_id, lines }, userId, ownershipRequired = true) => {
+  updateDraft: async (id, { entry_date, description, project_id, wbs_id, lines }, userId, ownershipRequired = true) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -139,11 +153,12 @@ const JournalEntry = {
            entry_date = COALESCE($1, entry_date),
            description = COALESCE($2, description),
            project_id = $3,
-           total_debit = $4,
-           total_credit = $5,
+           wbs_id = $4,
+           total_debit = $5,
+           total_credit = $6,
            updated_at = NOW()
-         WHERE id = $6 RETURNING *`,
-        [entry_date, description, project_id || null, totalDebit, totalCredit, id]
+         WHERE id = $7 RETURNING *`,
+        [entry_date, description, project_id || null, wbs_id || null, totalDebit, totalCredit, id]
       );
 
       if (Array.isArray(lines)) {
@@ -288,14 +303,15 @@ const JournalEntry = {
 
       const reversalHeader = await client.query(
         `INSERT INTO journal_entries
-           (entry_number, entry_date, description, project_id, status, total_debit, total_credit,
+           (entry_number, entry_date, description, project_id, wbs_id, status, total_debit, total_credit,
             created_by, posted_by, posted_at, reversed_entry_id)
-         VALUES ($1, CURRENT_DATE, $2, $3, 'posted', $4, $5, $6, $6, NOW(), $7)
+         VALUES ($1, CURRENT_DATE, $2, $3, $4, 'posted', $5, $6, $7, $7, NOW(), $8)
          RETURNING *`,
         [
           reversalNumber,
           `Reversal of ${original.rows[0].entry_number}`,
           original.rows[0].project_id,
+          original.rows[0].wbs_id, // inherited — same WBS context as the original
           original.rows[0].total_credit, // swapped
           original.rows[0].total_debit,  // swapped
           userId,

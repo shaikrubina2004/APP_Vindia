@@ -97,7 +97,7 @@ const CreatePO = () => {
   };
 
   const addItemRow = () => {
-    setItems((prev) => [...prev, { item_name: "", unit: "", ordered_qty: "" }]);
+    setItems((prev) => [...prev, { item_name: "", unit: "", ordered_qty: "", unit_price: "" }]);
   };
 
   const removeItemRow = (index) => {
@@ -122,6 +122,10 @@ const CreatePO = () => {
       setSaveError("Every line item needs a name and a positive quantity.");
       return;
     }
+    if (items.some((it) => it.unit_price !== "" && !(Number(it.unit_price) >= 0))) {
+      setSaveError("Unit price must be a number of 0 or more.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -133,6 +137,7 @@ const CreatePO = () => {
           item_name: it.item_name.trim(),
           unit: it.unit || null,
           ordered_qty: Number(it.ordered_qty),
+          unit_price: it.unit_price === "" || it.unit_price == null ? null : Number(it.unit_price),
         })),
       });
       navigate(`/operations/procurement/purchase-orders/${res.data.id}`);
@@ -142,6 +147,11 @@ const CreatePO = () => {
       setSaving(false);
     }
   };
+
+  const orderTotal = items.reduce(
+    (sum, it) => sum + (Number(it.ordered_qty) || 0) * (Number(it.unit_price) || 0),
+    0
+  );
 
   if (loading) return <div className="cpo-state">Loading…</div>;
 
@@ -203,6 +213,7 @@ const CreatePO = () => {
               <th>Item Name</th>
               <th>Unit</th>
               <th>Ordered Qty</th>
+              <th>Unit Price (₹)</th>
               <th></th>
             </tr>
           </thead>
@@ -233,6 +244,16 @@ const CreatePO = () => {
                   />
                 </td>
                 <td>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={it.unit_price ?? ""}
+                    onChange={(e) => updateItem(i, "unit_price", e.target.value)}
+                    placeholder="optional"
+                  />
+                </td>
+                <td>
                   <button
                     type="button"
                     className="cpo-remove-btn"
@@ -246,6 +267,13 @@ const CreatePO = () => {
           </tbody>
         </table>
       </div>
+
+      <p className="cpo-hint" style={{ margin: "12px 0 0", fontSize: 13, color: "#475569" }}>
+        Order total: <b>₹{orderTotal.toLocaleString("en-IN")}</b>
+        {orderTotal > 100000
+          ? " — above ₹1,00,000, so this PO will go to the Operations Manager for approval before it is issued."
+          : ""}
+      </p>
 
       {saveError && <p className="cpo-save-error">{saveError}</p>}
 

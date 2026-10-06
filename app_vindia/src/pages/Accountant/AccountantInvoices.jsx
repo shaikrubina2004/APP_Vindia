@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import accountantService from "../../services/accountantService";
 import { getProjects } from "../../services/projectService";
+import FinanceWbsSelector, { WbsBadge } from "../../components/accountant/FinanceWbsSelector";
 import "./AccountantInvoices.css";
 
 const money = (value) => {
@@ -37,6 +38,7 @@ const emptyForm = {
   issue_date: today(),
   due_date: "",
   notes: "",
+  wbs_id: "",
 };
 
 const statusLabel = (status) => {
@@ -149,6 +151,7 @@ export default function AccountantInvoices() {
     if (!form.client_name.trim()) return setFormError("Enter the client name.");
     if (!Number.isFinite(amount) || amount <= 0) return setFormError("Enter a valid invoice amount.");
     if (!Number.isFinite(tax) || tax < 0) return setFormError("Tax amount cannot be negative.");
+    if (!form.wbs_id) return setFormError("Select a WBS / Milestone for this invoice.");
     if (form.due_date && form.issue_date && form.due_date < form.issue_date) {
       return setFormError("Due date cannot be earlier than the issue date.");
     }
@@ -164,6 +167,7 @@ export default function AccountantInvoices() {
         due_date: form.due_date || null,
         notes: form.notes.trim() || null,
         status: "pending",
+        wbs_id: Number(form.wbs_id),
       });
       setShowCreate(false);
       setNotice("Invoice recorded successfully.");
@@ -231,7 +235,7 @@ export default function AccountantInvoices() {
         ) : (
           <div className="ai-table-wrap">
             <table className="ai-table">
-              <thead><tr><th>Invoice</th><th>Client / Project</th><th>Amount</th><th>Issue Date</th><th>Due Date</th><th>Status</th><th /></tr></thead>
+              <thead><tr><th>Invoice</th><th>Client / Project</th><th>WBS</th><th>Amount</th><th>Issue Date</th><th>Due Date</th><th>Status</th><th /></tr></thead>
               <tbody>
                 {filtered.map((invoice) => {
                   const current = String(invoice.effectiveStatus || invoice.status || "pending").toLowerCase();
@@ -240,6 +244,7 @@ export default function AccountantInvoices() {
                     <tr key={invoice.id}>
                       <td><button className="ai-invoice-link" onClick={() => setSelected(invoice)}>{invoice.invoice_number || `#${invoice.id}`}</button></td>
                       <td><div className="ai-client"><strong>{invoice.client_name || "—"}</strong><span>{invoice.project_name || "Project not assigned"}</span></div></td>
+                      <td><WbsBadge code={invoice.wbs_code} name={invoice.wbs_name} milestoneCode={invoice.milestone_code} milestoneName={invoice.milestone_name} /></td>
                       <td><strong>{money(total)}</strong><span className="ai-subvalue">Base {money(invoice.amount)}</span></td>
                       <td>{dateOnly(invoice.issue_date)}</td>
                       <td>{dateOnly(invoice.due_date)}</td>
@@ -274,12 +279,21 @@ function CreateModal({ form, projects, saving, error, onChange, onClose, onSubmi
   const subtotal = Number(form.amount || 0);
   const tax = Number(form.tax_amount || 0);
   const total = subtotal + tax;
+  const selectedProject = projects.find((p) => String(p.id) === String(form.project_id));
   return <div className="ai-modal-backdrop" onMouseDown={onClose}><div className="ai-modal" onMouseDown={(e) => e.stopPropagation()}>
     <div className="ai-modal-head"><div><span>NEW TRANSACTION</span><h2>Record Invoice</h2><p>The server will generate the invoice number automatically.</p></div><button className="ai-close" onClick={onClose}><Icon name="close" /></button></div>
     <form onSubmit={onSubmit}>
       {error && <div className="ai-form-error">{error}</div>}
       <div className="ai-form-section"><div className="ai-form-section-title"><Icon name="building" size={17} /><div><strong>Client & Project</strong><span>Choose the project and customer for this invoice.</span></div></div>
-        <div className="ai-form-grid two"><Field label="Project" required><select value={form.project_id} onChange={(e) => onChange("project_id", e.target.value)}><option value="">Select project…</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field><Field label="Client name" required><input value={form.client_name} onChange={(e) => onChange("client_name", e.target.value)} placeholder="Client / customer name" /></Field></div>
+        <div className="ai-form-grid two"><Field label="Project" required><select value={form.project_id} onChange={(e) => { onChange("project_id", e.target.value); onChange("wbs_id", ""); }}><option value="">Select project…</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field><Field label="Client name" required><input value={form.client_name} onChange={(e) => onChange("client_name", e.target.value)} placeholder="Client / customer name" /></Field></div>
+        <FinanceWbsSelector
+          projectId={form.project_id || null}
+          projectLabel={selectedProject?.name}
+          value={form.wbs_id}
+          onChange={(ctx) => onChange("wbs_id", ctx ? String(ctx.wbs_id) : "")}
+          fetchWbs={accountantService.getFinanceWbs}
+          required
+        />
       </div>
       <div className="ai-form-section"><div className="ai-form-section-title"><Icon name="invoice" size={17} /><div><strong>Invoice Details</strong><span>Record the base amount, tax and dates.</span></div></div>
         <div className="ai-form-grid four"><Field label="Base amount" required><input type="number" min="0.01" step="0.01" value={form.amount} onChange={(e) => onChange("amount", e.target.value)} placeholder="0.00" /></Field><Field label="Tax amount"><input type="number" min="0" step="0.01" value={form.tax_amount} onChange={(e) => onChange("tax_amount", e.target.value)} placeholder="0.00" /></Field><Field label="Issue date" required><input type="date" value={form.issue_date} onChange={(e) => onChange("issue_date", e.target.value)} /></Field><Field label="Due date"><input type="date" value={form.due_date} min={form.issue_date || undefined} onChange={(e) => onChange("due_date", e.target.value)} /></Field></div>
@@ -304,7 +318,7 @@ function InvoiceDrawer({ invoice, onClose }) {
     <div className="ai-drawer-head"><div><span>INVOICE RECORD</span><h2>{invoice.invoice_number || `#${invoice.id}`}</h2></div><button className="ai-close" onClick={onClose}><Icon name="close" /></button></div>
     <div className="ai-drawer-status"><StatusBadge status={current} /><span>{invoice.project_name || "No project"}</span></div>
     <div className="ai-drawer-total"><span>Total invoice value</span><strong>{money(total)}</strong><small>Base {money(base)} · Tax {money(tax)}</small></div>
-    <div className="ai-detail-list"><Detail label="Client" value={invoice.client_name || "—"} /><Detail label="Project" value={invoice.project_name || "—"} /><Detail label="Issue date" value={dateOnly(invoice.issue_date)} /><Detail label="Due date" value={dateOnly(invoice.due_date)} /><Detail label="Paid date" value={dateOnly(invoice.paid_date)} /><Detail label="Notes" value={invoice.notes || "No notes recorded."} /></div>
+    <div className="ai-detail-list"><Detail label="Client" value={invoice.client_name || "—"} /><Detail label="Project" value={invoice.project_name || "—"} /><Detail label="WBS Classification" value={<WbsBadge code={invoice.wbs_code} name={invoice.wbs_name} milestoneCode={invoice.milestone_code} milestoneName={invoice.milestone_name} />} /><Detail label="Issue date" value={dateOnly(invoice.issue_date)} /><Detail label="Due date" value={dateOnly(invoice.due_date)} /><Detail label="Paid date" value={dateOnly(invoice.paid_date)} /><Detail label="Notes" value={invoice.notes || "No notes recorded."} /></div>
     <div className="ai-drawer-note"><Icon name="file" size={16} /><span>Accountant access allows invoice recording and viewing. Payment/status changes remain outside this page.</span></div>
   </aside></div>;
 }

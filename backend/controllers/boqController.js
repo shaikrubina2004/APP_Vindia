@@ -93,11 +93,52 @@ function formatBoq(r) {
   };
 }
 
+async function canAccessBoqProject(req, projectId) {
+  const role = String(req.user?.role || "").trim().toLowerCase();
+  if (role === "ceo" || role === "quantity_surveyor") return true;
+  const id = Number(projectId);
+  if (!Number.isInteger(id) || id <= 0) return false;
+
+  if (role === "client" || role === "site_engineer") {
+    const column = role === "client" ? "client_user_id" : "site_engineer_id";
+    const result = await pool.query(`SELECT 1 FROM projects WHERE id = $1 AND ${column} = $2 LIMIT 1`, [id, req.user.id]);
+    return result.rows.length > 0;
+  }
+
+  if (role === "project_manager") {
+    const employee = await pool.query(`SELECT id FROM employees WHERE user_id = $1 LIMIT 1`, [req.user.id]);
+    if (!employee.rows.length) return false;
+    const result = await pool.query(`SELECT 1 FROM projects WHERE id = $1 AND manager_id = $2 LIMIT 1`, [id, employee.rows[0].id]);
+    return result.rows.length > 0;
+  }
+  return false;
+}
+
 // ── GET PROJECTS ──
 exports.getProjects = async (req, res) => {
   try {
+    const role = String(req.user?.role || "").trim().toLowerCase();
+    const params = [];
+    let where = "WHERE p.status IS DISTINCT FROM 'Archived'";
+
+    if (role === "site_engineer") {
+      params.push(req.user.id);
+      where += ` AND p.site_engineer_id = $${params.length}`;
+    } else if (role === "project_manager") {
+      const employee = await pool.query(
+        `SELECT id FROM employees WHERE user_id = $1 LIMIT 1`, [req.user.id]
+      );
+      if (!employee.rows.length) return res.json([]);
+      params.push(employee.rows[0].id);
+      where += ` AND p.manager_id = $${params.length}`;
+    } else if (role === "client") {
+      params.push(req.user.id);
+      where += ` AND p.client_user_id = $${params.length}`;
+    }
+
     const result = await pool.query(
-      `SELECT id, name FROM projects ORDER BY name ASC`
+      `SELECT p.id, p.name FROM projects p ${where} ORDER BY p.name ASC`,
+      params
     );
     res.json(result.rows);
   } catch (err) {
@@ -110,6 +151,9 @@ exports.getProjects = async (req, res) => {
 exports.getMilestones = async (req, res) => {
   try {
     const { projectId } = req.params;
+    if (!(await canAccessBoqProject(req, projectId))) {
+      return res.status(403).json({ error: "You are not authorized to access this project." });
+    }
     const result = await pool.query(
       `SELECT id, name, code, status, progress
        FROM wbs
@@ -155,6 +199,7 @@ exports.getAllBoqs = async (req, res) => {console.log("✅ getAllBoqs called —
   console.log("✅ File location check — this is the UPDATED controller");
   try {
     const { projectId, status, milestoneId, role } = req.query;
+    const authRole = String(req.user?.role || "").trim().toLowerCase();
     const conditions = [];
     const values     = [];
 
@@ -171,8 +216,24 @@ exports.getAllBoqs = async (req, res) => {console.log("✅ getAllBoqs called —
       conditions.push(`b.milestone_id = $${values.length}`);
     }
 
+    // Server-side role/project scope. Never trust the frontend role query.
+    if (authRole === "site_engineer") {
+      values.push(req.user.id);
+      conditions.push(`p.site_engineer_id = $${values.length}`);
+    } else if (authRole === "project_manager") {
+      const employee = await pool.query(
+        `SELECT id FROM employees WHERE user_id = $1 LIMIT 1`, [req.user.id]
+      );
+      if (!employee.rows.length) return res.json([]);
+      values.push(employee.rows[0].id);
+      conditions.push(`p.manager_id = $${values.length}`);
+    } else if (authRole === "client") {
+      values.push(req.user.id);
+      conditions.push(`p.client_user_id = $${values.length}`);
+    }
+
     // CHANGED: role=se — only return BOQs relevant to SE measurement workflow
-    if (role === "se") {
+    if (authRole === "site_engineer") {
       conditions.push(`(
         b.status IN ('measurement_pending', 'measurement_received', 'rejected_by_se')
         OR EXISTS (
@@ -240,6 +301,9 @@ exports.getBoqById = async (req, res) => {
     if (!result.rows.length) {
       return res.status(404).json({ error: "BOQ not found" });
     }
+    if (!(await canAccessBoqProject(req, result.rows[0].project_id))) {
+      return res.status(403).json({ error: "You are not authorized to access this project's BOQ." });
+    }
     res.json(formatBoq(result.rows[0]));
   } catch (err) {
     console.error("getBoqById:", err.message);
@@ -270,6 +334,9 @@ exports.createBoq = async (req, res) => {
     );
     if (!projCheck.rows.length) {
       return res.status(404).json({ error: "Project not found" });
+    }
+    if (!(await canAccessBoqProject(req, projectId))) {
+      return res.status(403).json({ error: "You are not authorized to create a BOQ for this project." });
     }
 
     const wbsCheck = await pool.query(

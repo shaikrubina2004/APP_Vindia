@@ -1,91 +1,52 @@
 const express = require("express");
 const router = express.Router();
-
-// ── Auth middleware ───────────────────────────────────────────────────────
 const protect = require("../middleware/authMiddleware");
+const c = require("../controllers/clientController");
 
-// ── Auth guard — every client route requires a valid JWT ──────────────────
+// Every client route needs a valid JWT and the client role (CEO may preview).
 router.use(protect);
+router.use(protect.requireRole("client", "ceo"));
+// (clientFence in server.js additionally stops client tokens reaching any other /api route)
 
-// ── Single controller for all client endpoints ─────────────────────────────
-const {
-  // Milestones
-  getClientMilestones,
-  getClientMilestoneById,
-  // Daily logs
-  getClientDailyLogs,
-  getClientDailyLogById,
-  // Site photos
-  getClientSitePhotos,
-  // Invoices
-  getClientInvoices,
-  getClientInvoiceById,
-  // BOQ
-  getClientBoq,
-  // Payments
-  getClientPayments,
-  // Shared files
-  getClientSharedFiles,
-  // Incidents
-  getClientIncidents,
-  getClientIncidentById,
-  createClientIncident,
-  // RFI
-  getClientRfis,
-  getClientRfiById,
-  createClientRfi,
-} = require("../controllers/clientController");
+// Projects (switcher)
+router.get("/projects", c.getClientProjects);
 
-// ═══════════════════════════════════════════════════════════════════════════
-// MILESTONES
-// ═══════════════════════════════════════════════════════════════════════════
-router.get("/milestones", getClientMilestones);
-router.get("/milestones/:id", getClientMilestoneById);
+// Milestones
+router.get("/milestones", c.getClientMilestones);
+router.get("/milestones/:id", c.getClientMilestoneById);
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DAILY LOGS
-// ═══════════════════════════════════════════════════════════════════════════
-router.get("/daily-logs", getClientDailyLogs);
-router.get("/daily-logs/:id", getClientDailyLogById);
+// Daily logs
+router.get("/daily-logs", c.getClientDailyLogs);
+router.get("/daily-logs/:id", c.getClientDailyLogById);
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SITE PHOTOS
-// ═══════════════════════════════════════════════════════════════════════════
-router.get("/site-photos", getClientSitePhotos);
+// Site photos
+router.get("/site-photos", c.getClientSitePhotos);
 
-// ═══════════════════════════════════════════════════════════════════════════
-// INVOICES
-// ═══════════════════════════════════════════════════════════════════════════
-router.get("/invoices", getClientInvoices);
-router.get("/invoices/:id", getClientInvoiceById);
+// Finance (finalised BOQs only)
+router.get("/invoices", c.getClientInvoices);
+router.get("/invoices/:id", c.getClientInvoiceById);
+router.get("/boq", c.getClientBoq);
+router.get("/payments", c.getClientPayments);
 
-// ═══════════════════════════════════════════════════════════════════════════
-// BOQ & ESTIMATES
-// ═══════════════════════════════════════════════════════════════════════════
-router.get("/boq", getClientBoq);
+// Documents
+router.get("/shared-files", c.getClientSharedFiles);
+router.get("/approvals", c.getClientApprovals);
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PAYMENTS
-// ═══════════════════════════════════════════════════════════════════════════
-router.get("/payments", getClientPayments);
+// Incidents (client's own tickets)
+router.get("/incidents", c.getClientIncidents);
+router.get("/incidents/:id", c.getClientIncidentById);
+router.post("/incidents", c.createClientIncident);
+router.post("/incidents/:id/comments", c.addClientIncidentComment);
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SHARED FILES
-// ═══════════════════════════════════════════════════════════════════════════
-router.get("/shared-files", getClientSharedFiles);
+// RFIs
+router.get("/rfi", c.getClientRfis);
+router.get("/rfi/:id", c.getClientRfiById);
+router.post("/rfi", c.createClientRfi);
+router.post("/rfi/:id/respond", c.respondClientRfi);
 
-// ═══════════════════════════════════════════════════════════════════════════
-// INCIDENTS
-// ═══════════════════════════════════════════════════════════════════════════
-router.get("/incidents", getClientIncidents);
-router.get("/incidents/:id", getClientIncidentById);
-router.post("/incidents", createClientIncident);
-
-// ═══════════════════════════════════════════════════════════════════════════
-// RFI
-// ═══════════════════════════════════════════════════════════════════════════
-router.get("/rfi", getClientRfis);
-router.get("/rfi/:id", getClientRfiById);
-router.post("/rfi", createClientRfi);
+// Notifications (read-all BEFORE /:id/read)
+router.get("/notifications", c.getClientNotifications);
+router.patch("/notifications/read-all", c.markAllClientNotificationsRead);
+router.patch("/notifications/:id/read", c.markClientNotificationRead);
 
 module.exports = router;

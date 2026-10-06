@@ -14,7 +14,7 @@ const pool = require("../config/db");
    Anything not in a role's list is never inserted for that role. */
 const ROLE_TYPES = {
   logistics_coordinator: [
-    "delivery",   // delivery created / dispatched / in transit
+    "delivery",   // delivery created / dispatched / in transit / PO issued
     "delay",      // delivery running late
     "receipt",    // inventory confirmed goods into stock
     "incident",   // incident raised or assigned to them
@@ -30,7 +30,24 @@ const ROLE_TYPES = {
     "daily_update", // Operations Manager reviewed their daily update
   ],
   procurement_officer: [
-    "receipt", "delay", "incident", "task",
+    "receipt",   // goods received against their PO
+    "delay",     // a delivery on their PO is late
+    "request",   // a material request was approved and is waiting for a PO
+    "approval",  // their PO was approved / rejected by the Operations Manager
+    "incident", "task", "daily_update",
+  ],
+
+  operations_manager: [
+    "approval",  // PO / material request / office request waiting for approval
+    "delay",     // late delivery
+    "receipt",   // goods received with a shortage or damage
+    "low_stock", // stock at or below minimum
+    "incident", "task", "daily_update",
+  ],
+
+  office_administrator: [
+    "request",   // office request approved / rejected
+    "incident", "task", "daily_update",
   ],
 
    finance_manager: [
@@ -131,12 +148,19 @@ const notifyRole = async (
   }
 };
 
+/* All handlers below run behind `protect` (see routes/operationsNotifications.js)
+   and are scoped to the logged-in user — nobody can read or clear someone
+   else's notifications any more. */
+
 /* GET /api/operations-notifications/:userId */
 const getNotifications = async (req, res) => {
   try {
     const userId = Number(req.params.userId);
     if (!Number.isInteger(userId)) {
       return res.status(400).json({ error: "Invalid user id" });
+    }
+    if (userId !== Number(req.user.id)) {
+      return res.status(403).json({ error: "You can only read your own notifications" });
     }
 
     const result = await pool.query(
@@ -162,8 +186,8 @@ const markOneRead = async (req, res) => {
       return res.status(400).json({ error: "Invalid notification id" });
     }
     await pool.query(
-      `UPDATE operations_notifications SET is_read = TRUE WHERE id = $1`,
-      [id]
+      `UPDATE operations_notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2`,
+      [id, req.user.id]
     );
     res.json({ success: true });
   } catch (err) {
@@ -178,6 +202,9 @@ const markAllRead = async (req, res) => {
     const userId = Number(req.params.userId);
     if (!Number.isInteger(userId)) {
       return res.status(400).json({ error: "Invalid user id" });
+    }
+    if (userId !== Number(req.user.id)) {
+      return res.status(403).json({ error: "You can only update your own notifications" });
     }
     await pool.query(
       `UPDATE operations_notifications SET is_read = TRUE WHERE user_id = $1`,

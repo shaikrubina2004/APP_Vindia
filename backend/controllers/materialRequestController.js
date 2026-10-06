@@ -1,4 +1,11 @@
 const pool = require("../config/db");
+const ops = require("../config/operations");
+const { notifyRole } = require("./operationsNotificationsController");
+const {
+  insertNotification: notifySiteEngineer,
+} = require("./siteEngineerNotificationsController");
+
+const isPrivileged = (role) => ["operations_manager", "ceo"].includes(role);
 
 /* ─────────────────────────────
    HELPER: Calculate total qty
@@ -20,12 +27,29 @@ exports.getRequests = async (req, res) => {
       });
     }
 
+    // Approvers / Operations staff see every request (optionally ?status=);
+    // everybody else — e.g. a Site Engineer — sees only their own.
+    // Previously EVERYONE got only their own rows, so approvers saw nothing.
+    const seeAll = ops.MATERIAL_REQUEST_VIEW_ALL_ROLES.includes(req.user.role);
+    const values = [];
+    let where = "WHERE 1=1";
+
+    if (!seeAll) {
+      values.push(userId);
+      where += ` AND mr.created_by = $${values.length}`;
+    }
+    if (req.query.status && req.query.status !== "all") {
+      values.push(req.query.status);
+      where += ` AND mr.status = $${values.length}`;
+    }
+
     const result = await pool.query(
-      `SELECT *
-       FROM material_requests
-       WHERE created_by = $1
-       ORDER BY created_at DESC`,
-      [userId]
+      `SELECT mr.*, u.name AS requested_by_name
+       FROM material_requests mr
+       LEFT JOIN users u ON u.id = mr.created_by
+       ${where}
+       ORDER BY mr.created_at DESC`,
+      values
     );
 
     res.status(200).json(result.rows);
@@ -118,6 +142,7 @@ VALUES ($1,$2,$3,$4,'requested',$5,$6,$7,$8,0,0,$9)
 exports.updateRequest = async (req, res) => {
   try {
     const { status } = req.body;
+    const reason = String(req.body.reason || "").trim() || null;
     const { id } = req.params;
 
     // Only Procurement / PM workflow statuses belong here.
@@ -128,7 +153,7 @@ exports.updateRequest = async (req, res) => {
     }
 
     const check = await pool.query(
-      `SELECT id, status
+      `SELECT id, status, created_by, project, purpose
        FROM material_requests
        WHERE id = $1`,
       [id]
@@ -149,13 +174,56 @@ exports.updateRequest = async (req, res) => {
       });
     }
 
+    // Audit trail: who decided, when, and (for a rejection) why.
     const result = await pool.query(
       `UPDATE material_requests
-       SET status = $1
-       WHERE id = $2
+       SET status = $1,
+           approved_by = $2,
+           approved_at = NOW(),
+           rejection_reason = $3
+       WHERE id = $4 AND status = 'requested'
        RETURNING *`,
-      [status, id]
+      [status, req.user.id, status === "rejected" ? reason : null, id]
     );
+
+    if (!result.rows.length) {
+      return res.status(409).json({
+        error: "This request was already decided by someone else",
+      });
+    }
+
+    const mr = check.rows[0];
+    const label = `${mr.project || "Project"} — ${mr.purpose || "material request"}`;
+
+    // Approved -> Procurement has a new job. Notification failures never
+    // fail the approval itself.
+    try {
+      if (status === "approved") {
+        await notifyRole(
+          "procurement_officer",
+          "request",
+          "Approved request awaiting a PO",
+          label,
+          "/operations/procurement/purchase-requests",
+          "info",
+          null,
+          Number(id)
+        );
+      }
+      if (mr.created_by) {
+        await notifySiteEngineer(
+          mr.created_by,
+          "material",
+          status === "approved" ? "Material request approved" : "Material request rejected",
+          status === "approved" ? label : `${label}${reason ? ` — ${reason}` : ""}`,
+          "/site-engineer/materials",
+          status === "approved" ? "ok" : "warn",
+          null
+        );
+      }
+    } catch (notifyErr) {
+      console.error("Material request notification failed:", notifyErr.message);
+    }
 
     return res.json(result.rows[0]);
 
@@ -186,12 +254,19 @@ exports.updateFullRequest = async (req, res) => {
     } = req.body;
 
     const check = await pool.query(
-      "SELECT status FROM material_requests WHERE id=$1",
+      "SELECT status, created_by FROM material_requests WHERE id=$1",
       [id]
     );
 
     if (!check.rows.length) {
       return res.status(404).json({ error: "Request not found" });
+    }
+
+    if (
+      Number(check.rows[0].created_by) !== Number(req.user.id) &&
+      !isPrivileged(req.user.role)
+    ) {
+      return res.status(403).json({ error: "You can only edit your own requests" });
     }
 
     if (check.rows[0].status !== "requested") {
@@ -246,12 +321,19 @@ exports.deleteRequest = async (req, res) => {
     const { id } = req.params;
 
     const check = await pool.query(
-      "SELECT status FROM material_requests WHERE id=$1",
+      "SELECT status, created_by FROM material_requests WHERE id=$1",
       [id]
     );
 
     if (!check.rows.length) {
       return res.status(404).json({ error: "Not found" });
+    }
+
+    if (
+      Number(check.rows[0].created_by) !== Number(req.user.id) &&
+      !isPrivileged(req.user.role)
+    ) {
+      return res.status(403).json({ error: "You can only delete your own requests" });
     }
 
     if (check.rows[0].status !== "requested") {

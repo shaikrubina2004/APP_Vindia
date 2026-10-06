@@ -27,12 +27,22 @@ const ledgerController = require("../controllers/ledgerController");
 const bankReconciliationController = require("../controllers/bankReconciliationController");
 const taxRegisterController = require("../controllers/taxRegisterController");
 const pettyCashController = require("../controllers/pettyCashController");
+const financeWbsController = require("../controllers/financeWbsController");
 
 // Accountant + Finance Manager + CEO can enter these APIs
 router.use(
   protect,
   requireRole("accountant", "finance_manager", "ceo")
 );
+
+/* ============================================================
+   FINANCE WBS OPTIONS
+   Protected, finance-shaped view of the EXISTING wbs table (no
+   labour/material/equipment detail — see financeWbsController.js).
+   Backs the Project -> WBS/Milestone -> Activity selector used by
+   every finance create/edit form.
+   ============================================================ */
+router.get("/wbs", financeWbsController.getFinanceWbsOptions);
 
 /* Dashboard
    Phase 4A: dedicated Accountant dashboard (task-oriented view),

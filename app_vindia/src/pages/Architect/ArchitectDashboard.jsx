@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/useAuth";
 import {
   ChevronLeft, ChevronRight, MoreVertical, Plus,
   Check, Droplet, Flag, Sparkles, Briefcase, AlertTriangle, ListChecks,
@@ -194,10 +195,7 @@ function TimelineRow({ inc, onClick }) {
 // ─── MAIN ───────────────────────────────────────────────────────────────────
 export default function ArchitectDashboard() {
   const navigate = useNavigate();
-  const [user] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("user") || "{}"); }
-    catch { return {}; }
-  });
+  const { user } = useAuth();
 
   // Used by the shared CheckInButton — decides whether to skip location
   // capture for the CEO. Falls back to role if designation isn't stored yet.

@@ -19,6 +19,12 @@ const Ledger = {
       values.push(filters.project_id);
       where += ` AND je.project_id = $${values.length}`;
     }
+    if (filters.wbs_id === "unassigned") {
+      where += ` AND je.wbs_id IS NULL AND je.project_id IS NOT NULL`;
+    } else if (filters.wbs_id) {
+      values.push(filters.wbs_id);
+      where += ` AND je.wbs_id = $${values.length}`;
+    }
 
     const result = await pool.query(
       `SELECT
@@ -27,6 +33,12 @@ const Ledger = {
          je.description        AS entry_description,
          je.project_id,
          p.name                AS project_name,
+         je.wbs_id,
+         w.code                AS wbs_code,
+         w.name                AS wbs_name,
+         w.parent_id            AS wbs_parent_id,
+         m.code                 AS milestone_code,
+         m.name                 AS milestone_name,
          a.id                  AS account_id,
          a.account_code,
          a.account_name,
@@ -37,6 +49,8 @@ const Ledger = {
        JOIN journal_entries je ON je.id = jl.journal_entry_id
        JOIN chart_of_accounts a ON a.id = jl.account_id
        LEFT JOIN projects p ON p.id = je.project_id
+       LEFT JOIN wbs w ON w.id = je.wbs_id
+       LEFT JOIN wbs m ON m.id = COALESCE(w.parent_id, w.id)
        ${where}
        ORDER BY a.account_code ASC, je.entry_date ASC, je.id ASC`,
       values
