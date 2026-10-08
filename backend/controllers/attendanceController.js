@@ -6,12 +6,29 @@ const pool = require("../config/db");
    and app_vindia/src/pages/hr/Attendance.jsx)
    ══════════════════════════════════════════════════════════ */
 const HOLIDAYS = new Set([
-  "2024-01-26","2024-08-15","2024-10-02","2024-12-25",
-  "2025-01-01","2025-01-14","2025-01-26","2025-03-17",
-  "2025-04-14","2025-05-01","2025-08-15","2025-10-02","2025-12-25",
-  "2026-01-01","2026-01-15","2026-01-26","2026-03-19",
-  "2026-04-15","2026-05-01","2026-08-26","2026-09-14",
-  "2026-10-20","2026-12-25",
+  "2024-01-26",
+  "2024-08-15",
+  "2024-10-02",
+  "2024-12-25",
+  "2025-01-01",
+  "2025-01-14",
+  "2025-01-26",
+  "2025-03-17",
+  "2025-04-14",
+  "2025-05-01",
+  "2025-08-15",
+  "2025-10-02",
+  "2025-12-25",
+  "2026-01-01",
+  "2026-01-15",
+  "2026-01-26",
+  "2026-03-19",
+  "2026-04-15",
+  "2026-05-01",
+  "2026-08-26",
+  "2026-09-14",
+  "2026-10-20",
+  "2026-12-25",
 ]);
 
 // Sunday or a listed public holiday = not a working day.
@@ -69,7 +86,7 @@ function parseShiftTimes(shiftTimingStr) {
 
   // Default: 09:00 – 18:00
   let shiftStartMin = 9 * 60;
-  let shiftEndMin   = 18 * 60;
+  let shiftEndMin = 18 * 60;
 
   if (!shiftTimingStr) return { shiftStartMin, shiftEndMin };
 
@@ -80,12 +97,16 @@ function parseShiftTimes(shiftTimingStr) {
 
   if (matches.length >= 2) {
     shiftStartMin = toMin(
-      matches[0][2] ? `${matches[0][1]}:${matches[0][2]}` : `${matches[0][1]}:00`,
-      matches[0][3]
+      matches[0][2]
+        ? `${matches[0][1]}:${matches[0][2]}`
+        : `${matches[0][1]}:00`,
+      matches[0][3],
     );
     shiftEndMin = toMin(
-      matches[1][2] ? `${matches[1][1]}:${matches[1][2]}` : `${matches[1][1]}:00`,
-      matches[1][3]
+      matches[1][2]
+        ? `${matches[1][1]}:${matches[1][2]}`
+        : `${matches[1][1]}:00`,
+      matches[1][3],
     );
   }
 
@@ -101,11 +122,11 @@ function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
   const { shiftStartMin, shiftEndMin } = parseShiftTimes(shiftTimingStr);
 
   // ── Thresholds ────────────────────────────────────────────────────────────
-  const LATE_CUTOFF    = shiftStartMin + 30;  // e.g. 9:00 shift → 9:30
-  const ABSENT_CUTOFF  = shiftStartMin + 60;  // e.g. 9:00 shift → 10:00
-  const NOON           = 12 * 60;             // 12:00
-  const AFT_START      = 13 * 60;             // 13:00 — afternoon window start
-  const AFT_END        = 14 * 60;             // 15:00 — afternoon window end
+  const LATE_CUTOFF = shiftStartMin + 30; // e.g. 9:00 shift → 9:30
+  const ABSENT_CUTOFF = shiftStartMin + 60; // e.g. 9:00 shift → 10:00
+  const NOON = 12 * 60; // 12:00
+  const AFT_START = 13 * 60; // 13:00 — afternoon window start
+  const AFT_END = 14 * 60; // 15:00 — afternoon window end
 
   // ── No check-in → Absent ─────────────────────────────────────────────────
   if (!checkInStr) {
@@ -117,9 +138,9 @@ function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
   // ── Afternoon-only check-in (13:00–15:00) → Half Day / Afternoon Present ─
   if (checkInMin >= AFT_START && checkInMin < AFT_END) {
     return {
-      status:      "Half Day",
+      status: "Half Day",
       lateMinutes: 0,
-      remarks:     "Afternoon Present",
+      remarks: "Afternoon Present",
     };
   }
 
@@ -133,21 +154,21 @@ function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
   //    Late     : shift_start < check-in < late_cutoff  (e.g. 9:01–9:29)
   //    Late edge: check-in == late_cutoff            (9:30 is still "late")
   let lateMinutes = 0;
-  let isLate      = false;
+  let isLate = false;
 
   if (checkInMin > shiftStartMin && checkInMin <= LATE_CUTOFF) {
     // Between 9:00 and 9:30 (inclusive) → Late
     lateMinutes = checkInMin - shiftStartMin;
-    isLate      = true;
+    isLate = true;
   }
   // checkInMin <= shiftStartMin → on time (Present), lateMinutes stays 0
 
   // ── No checkout yet → employee still on site ─────────────────────────────
   if (!checkOutStr) {
     return {
-      status:      isLate ? "Late" : "Present",
+      status: isLate ? "Late" : "Present",
       lateMinutes,
-      remarks:     isLate ? `Late by ${lateMinutes} min` : "",
+      remarks: isLate ? `Late by ${lateMinutes} min` : "",
     };
   }
 
@@ -156,17 +177,17 @@ function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
   // ── Checked out before noon → Afternoon Absent (Half Day) ────────────────
   if (checkOutMin < NOON) {
     return {
-      status:      "Half Day",
+      status: "Half Day",
       lateMinutes,
-      remarks:     isLate ? "Late + Afternoon Absent" : "Afternoon Absent",
+      remarks: isLate ? "Late + Afternoon Absent" : "Afternoon Absent",
     };
   }
 
   // ── Stayed till shift end or beyond → full Present / Late ────────────────
   return {
-    status:      isLate ? "Late" : "Present",
+    status: isLate ? "Late" : "Present",
     lateMinutes,
-    remarks:     isLate ? `Late by ${lateMinutes} min` : "Full Day",
+    remarks: isLate ? `Late by ${lateMinutes} min` : "Full Day",
   };
 }
 
@@ -178,11 +199,11 @@ async function getShiftAndStatus(userId) {
      FROM employees e
      WHERE e.user_id = $1
      LIMIT 1`,
-    [userId]
+    [userId],
   );
   return {
     shiftTiming: r.rows[0]?.shift_timing || null,
-    empStatus:   (r.rows[0]?.status || "").toLowerCase(),
+    empStatus: (r.rows[0]?.status || "").toLowerCase(),
     designation: r.rows[0]?.designation || "",
   };
 }
@@ -226,7 +247,8 @@ exports.markAttendance = async (req, res) => {
     }
 
     // employee_id here is users.id — fetch shift/designation via employees.user_id
-    const { shiftTiming, empStatus, designation } = await getShiftAndStatus(employee_id);
+    const { shiftTiming, empStatus, designation } =
+      await getShiftAndStatus(employee_id);
 
     // CEOs are exempt from location capture — enforced here regardless
     // of what the client sent.
@@ -234,14 +256,16 @@ exports.markAttendance = async (req, res) => {
 
     let finalStatus, lateMinutes, finalRemarks;
     if (empStatus === "work_from_home") {
-      finalStatus   = "WFH";
-      lateMinutes   = 0;
-      finalRemarks  = "WFH";
+      finalStatus = "WFH";
+      lateMinutes = 0;
+      finalRemarks = "WFH";
     } else {
       const derived = deriveStatus(check_in, null, shiftTiming);
-      finalStatus   = derived.status;
-      lateMinutes   = derived.lateMinutes;
-      finalRemarks  = derived.remarks || (lateMinutes > 0 ? `Late by ${lateMinutes} min` : "");
+      finalStatus = derived.status;
+      lateMinutes = derived.lateMinutes;
+      finalRemarks =
+        derived.remarks ||
+        (lateMinutes > 0 ? `Late by ${lateMinutes} min` : "");
     }
 
     const result = await pool.query(
@@ -258,10 +282,10 @@ exports.markAttendance = async (req, res) => {
         shift || "Morning",
         lateMinutes,
         remarks || finalRemarks,
-        skipLocation ? null : check_in_lat ?? null,
-        skipLocation ? null : check_in_lng ?? null,
-        skipLocation ? null : check_in_address ?? null,
-      ]
+        skipLocation ? null : (check_in_lat ?? null),
+        skipLocation ? null : (check_in_lng ?? null),
+        skipLocation ? null : (check_in_address ?? null),
+      ],
     );
     return res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -275,13 +299,8 @@ exports.markAttendance = async (req, res) => {
 // ─── Update Attendance (Check Out) ───────────────────────────────────────────
 exports.updateAttendance = async (req, res) => {
   const { id } = req.params;
-  const {
-    status,
-    check_out,
-    check_out_lat,
-    check_out_lng,
-    check_out_address,
-  } = req.body || {};
+  const { status, check_out, check_out_lat, check_out_lng, check_out_address } =
+    req.body || {};
 
   // Check-out only path (no manual status override)
   if (check_out && !status) {
@@ -295,7 +314,7 @@ exports.updateAttendance = async (req, res) => {
          FROM attendance a
          LEFT JOIN employees e ON e.user_id = a.employee_id
          WHERE a.id = $1`,
-        [id]
+        [id],
       );
       if (existing.rows.length === 0) {
         return res.status(404).json({ message: "Attendance record not found" });
@@ -320,11 +339,11 @@ exports.updateAttendance = async (req, res) => {
           derived.status,
           derived.lateMinutes,
           derived.remarks || "",
-          skipLocation ? null : check_out_lat ?? null,
-          skipLocation ? null : check_out_lng ?? null,
-          skipLocation ? null : check_out_address ?? null,
+          skipLocation ? null : (check_out_lat ?? null),
+          skipLocation ? null : (check_out_lng ?? null),
+          skipLocation ? null : (check_out_address ?? null),
           id,
-        ]
+        ],
       );
       return res.status(200).json(result.rows[0]);
     } catch (error) {
@@ -344,7 +363,7 @@ exports.updateAttendance = async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE attendance SET status = $1 WHERE id = $2 RETURNING *`,
-      [status, id]
+      [status, id],
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Attendance record not found" });
@@ -372,7 +391,7 @@ exports.addLocationPing = async (req, res) => {
        FROM attendance a
        LEFT JOIN employees e ON e.user_id = a.employee_id
        WHERE a.id = $1`,
-      [id]
+      [id],
     );
 
     if (existing.rows.length === 0) {
@@ -384,17 +403,21 @@ exports.addLocationPing = async (req, res) => {
     // Belt-and-braces server-side checks, independent of the client:
     // don't record pings after checkout, and never for CEOs.
     if (row.check_out) {
-      return res.status(409).json({ error: "Already checked out — tracking stopped" });
+      return res
+        .status(409)
+        .json({ error: "Already checked out — tracking stopped" });
     }
     if (isCeoDesignation(row.designation)) {
-      return res.status(403).json({ error: "Location tracking is not captured for this role" });
+      return res
+        .status(403)
+        .json({ error: "Location tracking is not captured for this role" });
     }
 
     const result = await pool.query(
       `INSERT INTO attendance_tracking (attendance_id, employee_id, lat, lng, recorded_at)
        VALUES ($1, $2, $3, $4, COALESCE($5, NOW()))
        RETURNING *`,
-      [id, row.employee_id, lat, lng, recorded_at || null]
+      [id, row.employee_id, lat, lng, recorded_at || null],
     );
 
     return res.status(201).json(result.rows[0]);
@@ -418,13 +441,14 @@ exports.getAttendanceTrack = async (req, res) => {
        FROM attendance_tracking
        WHERE attendance_id = $1
        ORDER BY recorded_at ASC`,
-      [id]
+      [id],
     );
 
     const base = {
       count: result.rows.length,
       first_recorded_at: result.rows[0]?.recorded_at || null,
-      last_recorded_at: result.rows[result.rows.length - 1]?.recorded_at || null,
+      last_recorded_at:
+        result.rows[result.rows.length - 1]?.recorded_at || null,
     };
 
     if (!isViewerCEO) {
@@ -449,10 +473,9 @@ exports.getTodayAttendance = async (req, res) => {
     const today = new Date().toISOString().slice(0, 10);
     const result = await pool.query(
       `SELECT * FROM attendance WHERE employee_id = $1 AND date = $2 LIMIT 1`,
-      [employee_id, today]
+      [employee_id, today],
     );
-    if (result.rows.length === 0)
-      return res.status(404).json({ message: "No record for today" });
+    if (result.rows.length === 0) return res.status(200).json(null); // no check-in yet today (not an error)
     return res.status(200).json(result.rows[0]);
   } catch (error) {
     console.error(error);
@@ -475,11 +498,11 @@ exports.getAllAttendance = async (req, res) => {
        FROM attendance
        LEFT JOIN users     u ON u.id          = attendance.employee_id
        LEFT JOIN employees e ON e.user_id     = attendance.employee_id
-       ORDER BY date DESC`
+       ORDER BY date DESC`,
     );
 
     const rows = result.rows.map((row) =>
-      sanitizeLocationForViewer(row, isViewerCEO)
+      sanitizeLocationForViewer(row, isViewerCEO),
     );
 
     res.status(200).json(rows);
@@ -529,7 +552,7 @@ exports.getTodayAllEmployees = async (req, res) => {
        LEFT JOIN attendance a
          ON a.employee_id = e.user_id AND a.date = $1
        ORDER BY e.name ASC`,
-      [today]
+      [today],
     );
 
     const todayIsNonWorking = isNonWorkingDay(today);
@@ -543,28 +566,28 @@ exports.getTodayAllEmployees = async (req, res) => {
         if (todayIsNonWorking && !isWfh) {
           return {
             ...row,
-            status:       "Holiday",
-            check_in:     null,
-            check_out:    null,
+            status: "Holiday",
+            check_in: null,
+            check_out: null,
             late_minutes: 0,
-            remarks:      HOLIDAYS.has(today) ? "Holiday" : "Week Off",
+            remarks: HOLIDAYS.has(today) ? "Holiday" : "Week Off",
           };
         }
 
         return {
           ...row,
-          status:       isWfh ? "WFH" : "Absent",
-          check_in:     null,
-          check_out:    null,
+          status: isWfh ? "WFH" : "Absent",
+          check_in: null,
+          check_out: null,
           late_minutes: 0,
-          remarks:      isWfh ? "WFH" : "",
+          remarks: isWfh ? "WFH" : "",
         };
       }
       return row;
     });
 
     const sanitized = allRows.map((row) =>
-      sanitizeLocationForViewer(row, isViewerCEO)
+      sanitizeLocationForViewer(row, isViewerCEO),
     );
 
     res.status(200).json(sanitized);
@@ -582,7 +605,7 @@ exports.getAttendanceByEmployee = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM attendance WHERE employee_id = $1 ORDER BY date DESC`,
-      [id]
+      [id],
     );
     res.status(200).json(result.rows);
   } catch (error) {
@@ -597,7 +620,7 @@ exports.getAttendanceByDate = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM attendance WHERE date = $1 ORDER BY employee_id`,
-      [date]
+      [date],
     );
     res.status(200).json(result.rows);
   } catch (error) {
@@ -610,14 +633,12 @@ exports.getAttendanceByDate = async (req, res) => {
 exports.getAttendanceByDateRange = async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to)
-    return res
-      .status(400)
-      .json({ message: "From and To dates are required" });
+    return res.status(400).json({ message: "From and To dates are required" });
 
   try {
     const result = await pool.query(
       `SELECT * FROM attendance WHERE date BETWEEN $1 AND $2 ORDER BY date DESC`,
-      [from, to]
+      [from, to],
     );
     res.status(200).json(result.rows);
   } catch (error) {
@@ -632,9 +653,7 @@ exports.getAttendanceByDateRange = async (req, res) => {
 exports.exportAttendanceByDateRange = async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to) {
-    return res
-      .status(400)
-      .json({ message: "From and To dates are required" });
+    return res.status(400).json({ message: "From and To dates are required" });
   }
 
   try {
@@ -661,14 +680,26 @@ exports.exportAttendanceByDateRange = async (req, res) => {
        LEFT JOIN employees e ON e.user_id = a.employee_id
        WHERE a.date BETWEEN $1 AND $2
        ORDER BY a.date ASC, name ASC`,
-      [from, to]
+      [from, to],
     );
 
     const headers = [
-      "Date", "Name", "Designation", "Department", "Status",
-      "Check In", "Check Out", "Shift", "Late Minutes", "Remarks",
-      "Check In Lat", "Check In Lng", "Check In Address",
-      "Check Out Lat", "Check Out Lng", "Check Out Address",
+      "Date",
+      "Name",
+      "Designation",
+      "Department",
+      "Status",
+      "Check In",
+      "Check Out",
+      "Shift",
+      "Late Minutes",
+      "Remarks",
+      "Check In Lat",
+      "Check In Lng",
+      "Check In Address",
+      "Check Out Lat",
+      "Check Out Lng",
+      "Check Out Address",
     ];
 
     const escapeCsv = (value) => {
@@ -679,13 +710,25 @@ exports.exportAttendanceByDateRange = async (req, res) => {
 
     const rows = result.rows.map((r) =>
       [
-        r.date, r.name, r.designation, r.department, r.status,
-        r.check_in, r.check_out, r.shift, r.late_minutes, r.remarks,
-        r.check_in_lat, r.check_in_lng, r.check_in_address,
-        r.check_out_lat, r.check_out_lng, r.check_out_address,
+        r.date,
+        r.name,
+        r.designation,
+        r.department,
+        r.status,
+        r.check_in,
+        r.check_out,
+        r.shift,
+        r.late_minutes,
+        r.remarks,
+        r.check_in_lat,
+        r.check_in_lng,
+        r.check_in_address,
+        r.check_out_lat,
+        r.check_out_lng,
+        r.check_out_address,
       ]
         .map(escapeCsv)
-        .join(",")
+        .join(","),
     );
 
     const csv = [headers.join(","), ...rows].join("\n");
@@ -693,7 +736,7 @@ exports.exportAttendanceByDateRange = async (req, res) => {
     res.setHeader("Content-Type", "text/csv");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="attendance_${from}_to_${to}.csv"`
+      `attachment; filename="attendance_${from}_to_${to}.csv"`,
     );
     res.status(200).send(csv);
   } catch (error) {
@@ -709,7 +752,7 @@ exports.getTotalEmployees = async (req, res) => {
     const result = await pool.query(
       `SELECT COUNT(*) AS total
        FROM employees e
-       INNER JOIN users u ON u.id = e.user_id`
+       INNER JOIN users u ON u.id = e.user_id`,
     );
     res.status(200).json({ total: parseInt(result.rows[0].total) });
   } catch (error) {

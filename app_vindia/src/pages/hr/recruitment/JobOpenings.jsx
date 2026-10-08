@@ -1,13 +1,12 @@
-// ===== FILE: APP_Vindia/app_vindia/src/pages/hr/recruitment/JobOpenings.jsx =====
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import recruitmentService from "../../../services/recruitmentService";
 import { getProjects } from "../../../services/projectService";
+import api from "../../../services/api";
 import "./JobOpenings.css";
 
-// Same department list AddEmployee.jsx uses (DEPT_MAP), so a hired
-// candidate's department pre-fills cleanly later.
-const DEPARTMENTS = [
+// Used ONLY if the departments API call fails, so the dropdown is never empty.
+const FALLBACK_DEPARTMENTS = [
   "HR",
   "IT",
   "Operations",
@@ -19,11 +18,20 @@ const DEPARTMENTS = [
   "Management",
 ];
 
+// Roles in the roles table that are not real hirable jobs (e.g. portal
+// accounts). Add more names here (exact spelling) to hide them from the
+// Job Title dropdown.
+const EXCLUDED_ROLES = ["Client"];
+
+// Special <option> value for the "Other (enter manually)" choice.
+const OTHER_VALUE = "__other__";
+
 const STATUS_OPTIONS = ["all", "open", "closed"];
 
 const EMPTY_FORM = {
-  title: "",
-  department: "",
+  title: "", // a role name from the DB, or OTHER_VALUE
+  customTitle: "", // typed text, used only when title === OTHER_VALUE
+  department: "", // department NAME (job_openings.department is a text column)
   project_id: "",
   vacancies: 1,
   description: "",
@@ -36,6 +44,8 @@ const JobOpenings = () => {
   const [error, setError] = useState(null);
   const [openings, setOpenings] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [departments, setDepartments] = useState([]); // [{ id, name }]
+  const [roles, setRoles] = useState([]); // [{ id, name, department_id }]
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -75,6 +85,27 @@ const JobOpenings = () => {
     })();
   }, []);
 
+  // Departments + roles come straight from the database, so anything
+  // added there later shows up here with no code change.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get("/users/departments");
+        setDepartments(res.data || []);
+      } catch (err) {
+        console.warn("Could not load departments, using fallback list", err);
+        setDepartments(FALLBACK_DEPARTMENTS.map((name, i) => ({ id: i + 1, name })));
+      }
+      try {
+        const res = await api.get("/roles");
+        setRoles(res.data || []);
+      } catch (err) {
+        console.warn("Could not load roles", err);
+        setRoles([]);
+      }
+    })();
+  }, []);
+
   const formatDate = (d) =>
     d
       ? new Date(d).toLocaleDateString("en-IN", {
@@ -103,6 +134,19 @@ const JobOpenings = () => {
     0
   );
 
+  // Roles shown in the Job Title dropdown: only the chosen department's
+  // roles, or every role if no department is chosen yet. Names are
+  // de-duplicated and sorted.
+  const roleOptions = useMemo(() => {
+    const selectedDept = departments.find((d) => d.name === form.department);
+    const pool = selectedDept
+      ? roles.filter((r) => Number(r.department_id) === Number(selectedDept.id))
+      : roles;
+    return [...new Set(pool.map((r) => r.name))]
+      .filter((name) => !EXCLUDED_ROLES.includes(name))
+      .sort((a, b) => a.localeCompare(b));
+  }, [roles, departments, form.department]);
+
   const openModal = () => {
     setForm(EMPTY_FORM);
     setFormError(null);
@@ -114,11 +158,35 @@ const JobOpenings = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Changing the department resets the title if the picked role does not
+  // belong to the new department (manual "Other" entries are kept).
+  const handleDepartmentChange = (e) => {
+    const department = e.target.value;
+    setForm((prev) => {
+      const dept = departments.find((d) => d.name === department);
+      let title = prev.title;
+      if (title && title !== OTHER_VALUE && dept) {
+        const stillValid = roles.some(
+          (r) => r.name === title && Number(r.department_id) === Number(dept.id)
+        );
+        if (!stillValid) title = "";
+      }
+      return { ...prev, department, title };
+    });
+  };
+
   const handleCreate = async () => {
     setFormError(null);
 
-    if (!form.title.trim()) {
-      setFormError("Job title is required.");
+    const finalTitle =
+      form.title === OTHER_VALUE ? form.customTitle.trim() : form.title.trim();
+
+    if (!finalTitle) {
+      setFormError(
+        form.title === OTHER_VALUE
+          ? "Please type the job title."
+          : "Please select a job title."
+      );
       return;
     }
     if (!(Number(form.vacancies) >= 1)) {
@@ -129,7 +197,7 @@ const JobOpenings = () => {
     setSaving(true);
     try {
       await recruitmentService.createJobOpening({
-        title: form.title.trim(),
+        title: finalTitle,
         department: form.department || null,
         project_id: form.project_id || null,
         vacancies: Number(form.vacancies),
@@ -282,24 +350,18 @@ const JobOpenings = () => {
           <div className="jo-modal" onClick={(e) => e.stopPropagation()}>
             <h2>New Job Opening</h2>
 
-            <label className="jo-field">
-              Job Title *
-              <input
-                name="title"
-                value={form.title}
-                onChange={handleFormChange}
-                placeholder="e.g. Site Supervisor"
-              />
-            </label>
-
             <div className="jo-field-row">
               <label className="jo-field">
                 Department
-                <select name="department" value={form.department} onChange={handleFormChange}>
+                <select
+                  name="department"
+                  value={form.department}
+                  onChange={handleDepartmentChange}
+                >
                   <option value="">Select department…</option>
-                  {DEPARTMENTS.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.name}>
+                      {d.name}
                     </option>
                   ))}
                 </select>
@@ -316,6 +378,32 @@ const JobOpenings = () => {
                 />
               </label>
             </div>
+
+            <label className="jo-field">
+              Job Title *
+              <select name="title" value={form.title} onChange={handleFormChange}>
+                <option value="">Select job title…</option>
+                {roleOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+                <option value={OTHER_VALUE}>Other (enter manually)</option>
+              </select>
+            </label>
+
+            {form.title === OTHER_VALUE && (
+              <label className="jo-field">
+                Enter job title *
+                <input
+                  name="customTitle"
+                  value={form.customTitle}
+                  onChange={handleFormChange}
+                  placeholder="e.g. Site Supervisor"
+                  autoFocus
+                />
+              </label>
+            )}
 
             <label className="jo-field">
               Project (optional)
