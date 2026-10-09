@@ -12,6 +12,8 @@ import Dashboard from "../pages/ceo/Dashboard";
 import CEOPanel from "../pages/ceo/CEOPanel";
 import UserManagement from "../pages/ceo/UserManagement";
 import ProjectManagement from "../pages/ceo/ProjectManagement";
+import ClientManagement from "../pages/ceo/ClientManagement";
+import ClientDetails from "../pages/ceo/ClientDetails";
 
 /* ── HR ──────────────────────────────────────────────────── */
 import HRDashboard from "../pages/hr/HRDashboard";
@@ -222,6 +224,29 @@ const AppRoutes = () => {
             <ProtectedRoute allowedRoles={[ROLES.CEO]}>
               <CEOLayout>
                 <UserManagement />
+              </CEOLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* CEO Client Management — separate from the client portal at /client/* */}
+        <Route
+          path="/ceo/clients"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+              <CEOLayout>
+                <ClientManagement />
+              </CEOLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/ceo/clients/:clientId"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO]}>
+              <CEOLayout>
+                <ClientDetails />
               </CEOLayout>
             </ProtectedRoute>
           }

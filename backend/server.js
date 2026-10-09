@@ -109,6 +109,8 @@ const siteMeasurementRoutes = require("./routes/siteMeasurementRoutes");
 /* Others */
 const mepNotifRoutes = require("./routes/mepNotificationsRoutes");
 const clientRoutes = require("./routes/clientRoutes");
+/* ✅ CEO Client Management (JWT + CEO role enforced inside the router) */
+const ceoClientRoutes = require("./routes/ceoClientRoutes");
 
 const leadRoutes = require("./routes/leadRoutes");
 const reportRoutes = require("./routes/reportRoutes");
@@ -198,6 +200,9 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/settings", settingsRoutes);
 
 /* ✅ CEO */
+// Client Management is mounted BEFORE the generic /api/ceo router so the
+// more specific path is always matched first.
+app.use("/api/ceo/clients", ceoClientRoutes);
 app.use("/api/ceo", require("./routes/ceoRoutes"));
 app.use("/api/ceo-notifications", require("./routes/ceoNotificationRoutes"));
 
