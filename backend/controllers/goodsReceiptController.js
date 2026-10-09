@@ -1,5 +1,6 @@
 const pool = require("../config/db");
 const { notifyRole } = require("./operationsNotificationsController");
+const Procurement = require("../models/procurementModel");
 
 const generateGrnCode = async () => {
   const result = await pool.query(`SELECT grn_code FROM goods_receipts ORDER BY id DESC LIMIT 1`);
@@ -87,6 +88,15 @@ exports.createGoodsReceipt = async (req, res) => {
       if (!it.item_id) {
         return res.status(400).json({ error: "Every line must be mapped to an inventory item_id (Item Master)" });
       }
+      const delivered = Number(it.delivered_qty || 0);
+      const accepted = Number(it.accepted_qty || 0);
+      const damaged = Number(it.damaged_qty || 0);
+      if (accepted < 0 || damaged < 0) {
+        return res.status(400).json({ error: "Accepted and damaged quantities cannot be negative" });
+      }
+      if (delivered > 0 && accepted + damaged > delivered) {
+        return res.status(400).json({ error: "Accepted + damaged quantity cannot exceed the delivered quantity" });
+      }
     }
 
     const grn_code = await generateGrnCode();
@@ -126,6 +136,35 @@ exports.createGoodsReceipt = async (req, res) => {
       "UPDATE deliveries SET receipt_status='received', updated_at=NOW() WHERE id=$1",
       [delivery_id]
     );
+
+    // ── Close the loop (same transaction) ─────────────────────────
+    // 1) Re-derive the PO status (issued -> partially_fulfilled -> fulfilled).
+    const poId = delivery.rows[0].purchase_order_id;
+    if (poId) {
+      await Procurement.recomputePOStatus(client, poId);
+    }
+
+    // 2) Push accepted quantity back to the Site Engineer's material request,
+    //    so the "Receive" button on site has delivered quantity to confirm.
+    let mrId = delivery.rows[0].material_request_id;
+    if (!mrId && poId) {
+      const poRow = await client.query(
+        "SELECT material_request_id FROM purchase_orders WHERE id = $1",
+        [poId]
+      );
+      mrId = poRow.rows[0]?.material_request_id || null;
+    }
+    if (mrId) {
+      const totalAccepted = items.reduce((sum, it) => sum + Number(it.accepted_qty || 0), 0);
+      if (totalAccepted > 0) {
+        await client.query(
+          `UPDATE material_requests
+           SET delivered_qty = LEAST(COALESCE(delivered_qty, 0) + $1, COALESCE(total_qty, 0))
+           WHERE id = $2 AND status = 'approved'`,
+          [totalAccepted, mrId]
+        );
+      }
+    }
 
     await client.query("COMMIT");
 
