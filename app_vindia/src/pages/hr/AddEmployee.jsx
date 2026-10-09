@@ -7,12 +7,20 @@ import {
   getEmployees,
   getNextEmployeeCode,
 } from "../../services/employeeService";
+import api from "../../services/api";
 
 import "./AddEmployee.css";
 
-// ─── Fetch roles from your backend ───────────────────────────────────────────
-const getRoles = () =>
-  fetch("http://localhost:5000/api/roles").then((r) => r.json());
+// Base URL for uploaded files (e.g. http://localhost:5000), taken from the
+// shared api client so it is not hardcoded in five places.
+const FILE_BASE = (api.defaults.baseURL || "http://localhost:5000/api").replace(
+  /\/api\/?$/,
+  "",
+);
+
+// Roles that are not real employee designations (portal accounts).
+// Add more exact names here to hide them from the Designation dropdown.
+const EXCLUDED_ROLES = ["Client"];
 
 export default function AddEmployee() {
   const navigate = useNavigate();
@@ -52,6 +60,7 @@ export default function AddEmployee() {
 
   const [employees, setEmployees] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [departments, setDepartments] = useState([]); // [{ id, name }] from DB
   const [managerId, setManagerId] = useState("");
   const [errors, setErrors] = useState({});
   const [autoCode, setAutoCode] = useState(""); // ← auto-generated employee code
@@ -71,10 +80,11 @@ export default function AddEmployee() {
     );
   };
 
-  // ─── Load employees + roles on mount ────────────────────────────────────────
+  // ─── Load employees + roles + departments on mount ──────────────────────────
   useEffect(() => {
     fetchEmployees();
     fetchRoles();
+    fetchDepartments();
     if (!isEditingExisting) {
       fetchNextCode();
     }
@@ -101,10 +111,21 @@ export default function AddEmployee() {
 
   const fetchRoles = async () => {
     try {
-      const data = await getRoles();
+      const res = await api.get("/roles");
+      const data = res.data;
       setRoles(Array.isArray(data) ? data : data.data || []);
     } catch (err) {
       console.error("Failed to load roles", err);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const res = await api.get("/users/departments");
+      const data = res.data;
+      setDepartments(Array.isArray(data) ? data : data.data || []);
+    } catch (err) {
+      console.error("Failed to load departments", err);
     }
   };
 
@@ -239,18 +260,11 @@ export default function AddEmployee() {
     setForm((prev) => ({ ...prev, [name]: finalValue }));
   };
 
-  // ─── Department map ──────────────────────────────────────────────────────────
-  const DEPT_MAP = {
-    1: "HR",
-    2: "IT",
-    3: "Operations",
-    4: "Construction",
-    5: "Business",
-    6: "Finance",
-    7: "Design",
-    8: "Marketing",
-    9: "Management",
-  };
+  // ─── Department lookup (id -> name), straight from the departments table ────
+  const deptMap = departments.reduce((acc, d) => {
+    acc[d.id] = d.name;
+    return acc;
+  }, {});
 
   const handleRoleChange = (e) => {
     const selectedRoleName = e.target.value;
@@ -259,7 +273,7 @@ export default function AddEmployee() {
       ...prev,
       role: selectedRoleName,
       department: selectedRole
-        ? DEPT_MAP[selectedRole.department_id] || prev.department
+        ? deptMap[selectedRole.department_id] || prev.department
         : prev.department,
     }));
   };
@@ -461,14 +475,15 @@ export default function AddEmployee() {
     }
   };
 
-  // ─── Group roles by department ───────────────────────────────────────────────
-  const rolesByDept = roles.reduce((acc, role) => {
-    const deptName =
-      DEPT_MAP[role.department_id] || `Dept ${role.department_id}`;
-    if (!acc[deptName]) acc[deptName] = [];
-    acc[deptName].push(role);
-    return acc;
-  }, {});
+  // ─── Group active roles by department (names come from the DB) ──────────────
+  const rolesByDept = roles
+    .filter((r) => r.is_active && !EXCLUDED_ROLES.includes(r.name))
+    .reduce((acc, role) => {
+      const deptName = deptMap[role.department_id] || `Dept ${role.department_id}`;
+      if (!acc[deptName]) acc[deptName] = [];
+      acc[deptName].push(role);
+      return acc;
+    }, {});
 
   return (
     <div className="add-employee-page">
@@ -605,13 +620,11 @@ export default function AddEmployee() {
                 <option value="">Select Designation</option>
                 {Object.entries(rolesByDept).map(([deptName, deptRoles]) => (
                   <optgroup key={deptName} label={deptName}>
-                    {deptRoles
-                      .filter((r) => r.is_active)
-                      .map((r) => (
-                        <option key={r.id} value={r.name}>
-                          {r.name}
-                        </option>
-                      ))}
+                    {deptRoles.map((r) => (
+                      <option key={r.id} value={r.name}>
+                        {r.name}
+                      </option>
+                    ))}
                   </optgroup>
                 ))}
               </select>
@@ -906,7 +919,7 @@ export default function AddEmployee() {
                   "default-cert.pdf",
                 ].includes(form.profile_photo) && (
                   <a
-                    href={`http://localhost:5000/uploads/${form.profile_photo}`}
+                    href={`${FILE_BASE}/uploads/${form.profile_photo}`}
                     target="_blank"
                     rel="noreferrer"
                     className="view-btn"
@@ -946,7 +959,7 @@ export default function AddEmployee() {
                   "default-cert.pdf",
                 ].includes(form.id_proof) && (
                   <a
-                    href={`http://localhost:5000/uploads/${form.id_proof}`}
+                    href={`${FILE_BASE}/uploads/${form.id_proof}`}
                     target="_blank"
                     rel="noreferrer"
                     className="view-btn"
@@ -983,7 +996,7 @@ export default function AddEmployee() {
                   "default-cert.pdf",
                 ].includes(form.offer_letter) && (
                   <a
-                    href={`http://localhost:5000/uploads/${form.offer_letter}`}
+                    href={`${FILE_BASE}/uploads/${form.offer_letter}`}
                     target="_blank"
                     rel="noreferrer"
                     className="view-btn"
@@ -1020,7 +1033,7 @@ export default function AddEmployee() {
                   "default-cert.pdf",
                 ].includes(form.certificates) && (
                   <a
-                    href={`http://localhost:5000/uploads/${form.certificates}`}
+                    href={`${FILE_BASE}/uploads/${form.certificates}`}
                     target="_blank"
                     rel="noreferrer"
                     className="view-btn"

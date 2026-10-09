@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
+const { requireRole } = authMiddleware;
 const upload = require("../middleware/upload");
 
 const {
@@ -15,20 +16,24 @@ const {
   getBirthdays,
 } = require("../controllers/employeeController");
 
+// Only HR Manager and CEO may create, edit or delete employees.
+const HR_ONLY = requireRole("hr_manager", "ceo");
+
 // ✅ GENERATE NEXT EMPLOYEE CODE (must be before /:id routes)
-router.get("/generate-code", authMiddleware, getNextEmployeeCode);
+router.get("/generate-code", authMiddleware, HR_ONLY, getNextEmployeeCode);
 
 // ✅ BIRTHDAYS (must be before /:id routes, otherwise Express treats
 //    "birthdays" as an :id param on the route below)
 router.get("/birthdays", authMiddleware, getBirthdays);
 
 // ✅ BACKFILL MISSING EMPLOYEE CODES
-router.post("/backfill-codes", authMiddleware, backfillEmployeeCodes);
+router.post("/backfill-codes", authMiddleware, HR_ONLY, backfillEmployeeCodes);
 
 // ✅ CREATE EMPLOYEE (WITH FILE UPLOAD)
 router.post(
   "/",
   authMiddleware,
+  HR_ONLY,
   upload.fields([
     { name: "profile_photo", maxCount: 1 },
     { name: "id_proof", maxCount: 1 },
@@ -79,7 +84,7 @@ router.get("/me", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ GET
+// ✅ GET (reads stay login-only for now; to be tightened after usage check)
 router.get("/", authMiddleware, getAllEmployees);
 router.get("/:id", authMiddleware, getEmployeeById);
 
@@ -87,6 +92,7 @@ router.get("/:id", authMiddleware, getEmployeeById);
 router.put(
   "/:id",
   authMiddleware,
+  HR_ONLY,
   upload.fields([
     { name: "profile_photo", maxCount: 1 },
     { name: "id_proof", maxCount: 1 },
@@ -97,6 +103,6 @@ router.put(
 );
 
 // ✅ DELETE
-router.delete("/:id", authMiddleware, deleteEmployee);
+router.delete("/:id", authMiddleware, HR_ONLY, deleteEmployee);
 
 module.exports = router;
