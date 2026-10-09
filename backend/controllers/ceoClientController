@@ -1,0 +1,634 @@
+// backend/controllers/ceoClientController.js
+// ─────────────────────────────────────────────────────────────────────────────
+// CEO Client Management
+//
+// DATA MODEL (verified from existing code — no new tables):
+//   • A "client" is a row in `users` whose role (roles.code) is 'client'.
+//   • A project belongs to a client through projects.client_user_id → users.id.
+//   • Finance records are tied to projects by project_id:
+//       invoices   (amount, status, due_date)
+//       payments   (payment_type='incoming', status='completed', invoice_id)
+//       expenses   (status IN ('approved','paid'))   ← same rule Finance uses
+//   • Milestones are top-level rows of `wbs` (parent_id IS NULL).
+//
+// COUNTING RULES
+//   • Total clients            = every users row with the client role.
+//   • Active project           = projects.status in (active, in progress).
+//   • Completed project        = projects.status = completed.
+//   • Clients with active      = DISTINCT clients with ≥ 1 active project.
+//   • Clients with completed   = DISTINCT clients with ≥ 1 completed project.
+//   • Clients without projects = clients with 0 rows in projects.
+//   A client with many projects is therefore counted ONCE in each card.
+//
+// DUPLICATE-TOTAL PROTECTION
+//   Every one-to-many table (expenses, invoices, payments, wbs …) is
+//   aggregated in its own CTE grouped by project_id BEFORE it is joined to
+//   projects, so no total can be multiplied by another table's row count.
+// ─────────────────────────────────────────────────────────────────────────────
+const pool = require("../config/db");
+
+/* ── constants ───────────────────────────────────────────────────────────── */
+const CLIENT_ROLE_SQL = `LOWER(r.code) = 'client'`;
+const ACTIVE_STATUSES = ["active", "in progress", "in_progress"];
+const COMPLETED_STATUSES = ["completed"];
+const OPEN_INVOICE_STATUSES = ["pending", "overdue", "partial", "partially_paid"];
+
+const SORT_COLUMNS = {
+  name: "c.name",
+  projects: "c.total_projects",
+  value: "c.total_budget",
+};
+
+/* ── helpers ─────────────────────────────────────────────────────────────── */
+const sendError = (res, status, message) =>
+  res.status(status).json({ success: false, message });
+
+const parseId = (raw) => {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 && n < 2147483647 ? n : null;
+};
+
+const num = (v) => (v === null || v === undefined ? 0 : Number(v));
+
+/**
+ * Optional columns on `users` (phone / created_at) are not guaranteed by any
+ * migration in the repo, so we detect them once from information_schema
+ * instead of assuming. Column names come ONLY from fixed literals below.
+ */
+let userColsPromise = null;
+const getUserColumns = () => {
+  if (!userColsPromise) {
+    userColsPromise = pool
+      .query(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = current_schema() AND table_name = 'users'`,
+      )
+      .then((r) => new Set(r.rows.map((x) => x.column_name)))
+      .catch((err) => {
+        userColsPromise = null; // retry next request
+        console.error("ceoClient: column detection failed:", err.message);
+        return new Set();
+      });
+  }
+  return userColsPromise;
+};
+
+const userFieldSql = async () => {
+  const cols = await getUserColumns();
+  const phoneCol = ["phone", "mobile", "phone_number"].find((c) => cols.has(c));
+  return {
+    userPhone: phoneCol ? `NULLIF(TRIM(u.${phoneCol}::text), '')` : `NULL::text`,
+    userCreated: cols.has("created_at") ? `u.created_at` : `NULL::timestamptz`,
+    hasStatus: cols.has("status"),
+  };
+};
+
+/** Builds the per-client aggregate CTE used by both list + detail. */
+const clientAggregateCte = (fields) => `
+  clients AS (
+    SELECT u.id, u.name, u.email,
+           ${fields.hasStatus ? "u.status" : "NULL::text"} AS status,
+           ${fields.userPhone} AS user_phone,
+           ${fields.userCreated} AS created_at
+    FROM users u
+    JOIN roles r ON r.id = u.role_id
+    WHERE ${CLIENT_ROLE_SQL}
+  ),
+  proj AS (
+    SELECT p.client_user_id AS client_id,
+           COUNT(*)::int AS total_projects,
+           COUNT(*) FILTER (WHERE LOWER(TRIM(p.status)) = ANY($A)) ::int AS active_projects,
+           COUNT(*) FILTER (WHERE LOWER(TRIM(p.status)) = ANY($C)) ::int AS completed_projects,
+           COALESCE(SUM(p.budget), 0) AS total_budget,
+           (ARRAY_AGG(NULLIF(TRIM(p.phone), '') ORDER BY p.created_at DESC)
+              FILTER (WHERE NULLIF(TRIM(p.phone), '') IS NOT NULL))[1] AS project_phone
+    FROM projects p
+    WHERE p.client_user_id IS NOT NULL
+    GROUP BY p.client_user_id
+  )`;
+
+/* ═════════════════════════════════════════════════════════════════════════
+   GET /api/ceo/clients
+   query: search, project_filter, sort, order, page, limit
+   project_filter: all | with_projects | no_projects | active | completed | other
+   ═════════════════════════════════════════════════════════════════════════ */
+exports.getClients = async (req, res) => {
+  try {
+    const fields = await userFieldSql();
+
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
+    const sortKey = SORT_COLUMNS[req.query.sort] ? req.query.sort : "name";
+    const order = String(req.query.order).toLowerCase() === "desc" ? "DESC" : "ASC";
+    const filter = String(req.query.project_filter || "all");
+    const search = String(req.query.search || "").trim().slice(0, 100);
+
+    // $1 = active statuses, $2 = completed statuses
+    const params = [ACTIVE_STATUSES, COMPLETED_STATUSES];
+    const cte = clientAggregateCte(fields)
+      .replace("$A", "$1")
+      .replace("$C", "$2");
+
+    const where = [];
+    if (search) {
+      params.push(`%${search}%`);
+      const likeIdx = params.length;
+      params.push(search.replace(/\D/g, "") || "-1");
+      const idIdx = params.length;
+      where.push(
+        `(c.name ILIKE $${likeIdx} OR c.email ILIKE $${likeIdx}
+          OR ('CL-' || LPAD(c.id::text, 4, '0')) ILIKE $${likeIdx}
+          OR c.id::text = $${idIdx})`,
+      );
+    }
+    switch (filter) {
+      case "with_projects":
+        where.push("c.total_projects > 0");
+        break;
+      case "no_projects":
+        where.push("c.total_projects = 0");
+        break;
+      case "active":
+        where.push("c.active_projects > 0");
+        break;
+      case "completed":
+        where.push("c.completed_projects > 0");
+        break;
+      case "other": // has projects but none active/completed (pending, rejected…)
+        where.push(
+          "c.total_projects > 0 AND c.active_projects = 0 AND c.completed_projects = 0",
+        );
+        break;
+      default:
+        break;
+    }
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    const baseSelect = `
+      WITH ${cte},
+      c AS (
+        SELECT cl.id, cl.name, cl.email, cl.status, cl.created_at,
+               COALESCE(cl.user_phone, pr.project_phone) AS phone,
+               COALESCE(pr.total_projects, 0)     AS total_projects,
+               COALESCE(pr.active_projects, 0)    AS active_projects,
+               COALESCE(pr.completed_projects, 0) AS completed_projects,
+               COALESCE(pr.total_budget, 0)       AS total_budget
+        FROM clients cl
+        LEFT JOIN proj pr ON pr.client_id = cl.id
+      )`;
+
+    // Page of rows + filtered total
+    const listSql = `${baseSelect}
+      SELECT c.*, COUNT(*) OVER()::int AS filtered_total
+      FROM c ${whereSql}
+      ORDER BY ${SORT_COLUMNS[sortKey]} ${order}, c.name ASC, c.id ASC
+      LIMIT ${limit} OFFSET ${(page - 1) * limit}`;
+
+    // Summary cards — always over ALL clients (never affected by filters)
+    const summarySql = `${baseSelect}
+      SELECT COUNT(*)::int                                          AS total_clients,
+             COUNT(*) FILTER (WHERE active_projects > 0)::int       AS with_active,
+             COUNT(*) FILTER (WHERE completed_projects > 0)::int    AS with_completed,
+             COUNT(*) FILTER (WHERE total_projects = 0)::int        AS without_projects
+      FROM c`;
+
+    const [listRes, summaryRes, unlinkedRes] = await Promise.all([
+      pool.query(listSql, params),
+      pool.query(summarySql, [ACTIVE_STATUSES, COMPLETED_STATUSES]),
+      pool.query(`SELECT COUNT(*)::int AS n FROM projects WHERE client_user_id IS NULL`),
+    ]);
+
+    const filteredTotal = listRes.rows[0]?.filtered_total ?? 0;
+
+    return res.json({
+      success: true,
+      data: {
+        summary: {
+          total_clients: summaryRes.rows[0].total_clients,
+          clients_with_active_projects: summaryRes.rows[0].with_active,
+          clients_with_completed_projects: summaryRes.rows[0].with_completed,
+          clients_without_projects: summaryRes.rows[0].without_projects,
+          // Projects that have no client_user_id cannot be attributed to any
+          // client account (legacy / free-text client names).
+          projects_without_client_account: unlinkedRes.rows[0].n,
+        },
+        clients: listRes.rows.map((r) => ({
+          id: r.id,
+          client_code: `CL-${String(r.id).padStart(4, "0")}`,
+          name: r.name,
+          email: r.email,
+          phone: r.phone || null,
+          status: r.status || null,
+          created_at: r.created_at || null,
+          total_projects: r.total_projects,
+          active_projects: r.active_projects,
+          completed_projects: r.completed_projects,
+          total_budget: num(r.total_budget),
+        })),
+        pagination: {
+          page,
+          limit,
+          total: filteredTotal,
+          total_pages: Math.max(Math.ceil(filteredTotal / limit), 1),
+        },
+      },
+    });
+  } catch (err) {
+    console.error("ceoClient.getClients:", err);
+    return sendError(res, 500, "Failed to load clients.");
+  }
+};
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Shared: per-project financials (no join fan-out)
+   ═════════════════════════════════════════════════════════════════════════ */
+async function fetchClientProjects(clientId) {
+  const sql = `
+    WITH cp AS (
+      SELECT id FROM projects WHERE client_user_id = $1
+    ),
+    exp AS (          -- recorded expenditure (same rule as Finance dashboard)
+      SELECT project_id, SUM(amount) AS total
+      FROM expenses
+      WHERE status IN ('approved','paid') AND project_id IN (SELECT id FROM cp)
+      GROUP BY project_id
+    ),
+    inv_paid AS (     -- completed incoming money per invoice
+      SELECT invoice_id, SUM(amount) AS paid
+      FROM payments
+      WHERE payment_type = 'incoming' AND status = 'completed'
+        AND invoice_id IS NOT NULL
+      GROUP BY invoice_id
+    ),
+    inv AS (          -- open invoice balance per project
+      SELECT i.project_id,
+             COUNT(*) FILTER (WHERE LOWER(i.status) = ANY($2))::int AS open_invoices,
+             COUNT(*) FILTER (WHERE LOWER(i.status) = ANY($2)
+                              AND i.due_date IS NOT NULL
+                              AND i.due_date < CURRENT_DATE)::int  AS overdue_invoices,
+             COALESCE(SUM(GREATEST(i.amount - COALESCE(ip.paid, 0), 0))
+                      FILTER (WHERE LOWER(i.status) = ANY($2)), 0) AS outstanding,
+             COALESCE(SUM(i.amount), 0) AS invoiced
+      FROM invoices i
+      LEFT JOIN inv_paid ip ON ip.invoice_id = i.id
+      WHERE i.project_id IN (SELECT id FROM cp)
+      GROUP BY i.project_id
+    ),
+    ledger AS (       -- client payments logged in Finance
+      SELECT project_id, SUM(amount) AS received
+      FROM payments
+      WHERE payment_type = 'incoming' AND status = 'completed'
+        AND project_id IN (SELECT id FROM cp)
+      GROUP BY project_id
+    )
+    SELECT p.id, p.name, p.location, p.building_type, p.floors, p.plot_size,
+           p.start_date, p.end_date, p.status, p.progress, p.budget,
+           p.spent        AS spent_project_record,
+           p.client_paid  AS client_paid_project_record,
+           p.manager_id, p.site_engineer_id, p.coordinator_id, p.architect_id,
+           m.name  AS manager_name,
+           s.name  AS site_engineer_name,
+           co.name AS coordinator_name,
+           ar.name AS architect_name,
+           COALESCE(exp.total, 0)         AS expenditure_ledger,
+           COALESCE(ledger.received, 0)   AS payments_ledger,
+           COALESCE(inv.outstanding, 0)   AS outstanding_invoices,
+           COALESCE(inv.open_invoices, 0)    AS open_invoices,
+           COALESCE(inv.overdue_invoices, 0) AS overdue_invoices,
+           COALESCE(inv.invoiced, 0)      AS invoiced_total
+    FROM projects p
+    LEFT JOIN employees m  ON m.id  = p.manager_id
+    LEFT JOIN users s      ON s.id  = p.site_engineer_id
+    LEFT JOIN users co     ON co.id = p.coordinator_id
+    LEFT JOIN users ar     ON ar.id = p.architect_id
+    LEFT JOIN exp    ON exp.project_id    = p.id
+    LEFT JOIN inv    ON inv.project_id    = p.id
+    LEFT JOIN ledger ON ledger.project_id = p.id
+    WHERE p.client_user_id = $1
+    ORDER BY p.created_at DESC NULLS LAST, p.id DESC`;
+
+  const { rows } = await pool.query(sql, [clientId, OPEN_INVOICE_STATUSES]);
+
+  // Extra team members, one query for all projects (no fan-out on the above)
+  const ids = rows.map((r) => r.id);
+  let extra = [];
+  if (ids.length) {
+    try {
+      const t = await pool.query(
+        `SELECT id, project_id, name, role, type, status
+         FROM team_members
+         WHERE project_id = ANY($1::int[]) AND LOWER(COALESCE(status,'active')) = 'active'
+         ORDER BY name ASC`,
+        [ids],
+      );
+      extra = t.rows;
+    } catch (e) {
+      console.error("ceoClient: team_members lookup failed:", e.message);
+    }
+  }
+
+  return rows.map((r) => {
+    const core = [
+      ["Project Manager", r.manager_name],
+      ["Project Coordinator", r.coordinator_name],
+      ["Site Engineer", r.site_engineer_name],
+      ["Architect", r.architect_name],
+    ]
+      .filter(([, name]) => !!name)
+      .map(([role, name]) => ({ role, name }));
+
+    const members = extra
+      .filter((m) => m.project_id === r.id)
+      .map((m) => ({ role: m.role, name: m.name, type: m.type || null }));
+
+    return {
+      id: r.id,
+      name: r.name,
+      location: r.location,
+      building_type: r.building_type,
+      floors: r.floors,
+      plot_size: r.plot_size,
+      start_date: r.start_date,
+      end_date: r.end_date,
+      status: r.status,
+      progress: num(r.progress),
+      budget: num(r.budget),
+      financials: {
+        budget: num(r.budget),
+        expenditure_ledger: num(r.expenditure_ledger),
+        expenditure_project_record: num(r.spent_project_record),
+        payments_ledger: num(r.payments_ledger),
+        payments_project_record: num(r.client_paid_project_record),
+        outstanding_invoices: num(r.outstanding_invoices),
+        open_invoices: r.open_invoices,
+        overdue_invoices: r.overdue_invoices,
+        invoiced_total: num(r.invoiced_total),
+      },
+      team: { core, members },
+    };
+  });
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   GET /api/ceo/clients/:clientId
+   ═════════════════════════════════════════════════════════════════════════ */
+exports.getClientById = async (req, res) => {
+  try {
+    const clientId = parseId(req.params.clientId);
+    if (!clientId) return sendError(res, 400, "Invalid client id.");
+
+    const fields = await userFieldSql();
+    const profileRes = await pool.query(
+      `SELECT u.id, u.name, u.email,
+              ${fields.hasStatus ? "u.status" : "NULL::text"} AS status,
+              ${fields.userPhone} AS user_phone,
+              ${fields.userCreated} AS created_at,
+              (SELECT NULLIF(TRIM(p.phone), '') FROM projects p
+                WHERE p.client_user_id = u.id AND NULLIF(TRIM(p.phone), '') IS NOT NULL
+                ORDER BY p.created_at DESC NULLS LAST LIMIT 1) AS project_phone
+       FROM users u
+       JOIN roles r ON r.id = u.role_id
+       WHERE u.id = $1 AND ${CLIENT_ROLE_SQL}`,
+      [clientId],
+    );
+    if (!profileRes.rows.length) return sendError(res, 404, "Client not found.");
+    const u = profileRes.rows[0];
+
+    const projects = await fetchClientProjects(clientId);
+
+    const sum = (fn) => projects.reduce((a, p) => a + fn(p), 0);
+    const isIn = (p, list) => list.includes(String(p.status || "").trim().toLowerCase());
+
+    return res.json({
+      success: true,
+      data: {
+        profile: {
+          id: u.id,
+          client_code: `CL-${String(u.id).padStart(4, "0")}`,
+          name: u.name,
+          email: u.email,
+          phone: u.user_phone || u.project_phone || null,
+          phone_source: u.user_phone ? "account" : u.project_phone ? "project_contact" : null,
+          status: u.status || null,
+          created_at: u.created_at || null,
+        },
+        counts: {
+          total_projects: projects.length,
+          active_projects: projects.filter((p) => isIn(p, ACTIVE_STATUSES)).length,
+          completed_projects: projects.filter((p) => isIn(p, COMPLETED_STATUSES)).length,
+        },
+        financial_summary: {
+          total_budget: sum((p) => p.financials.budget),
+          expenditure_ledger: sum((p) => p.financials.expenditure_ledger),
+          expenditure_project_record: sum((p) => p.financials.expenditure_project_record),
+          payments_ledger: sum((p) => p.financials.payments_ledger),
+          payments_project_record: sum((p) => p.financials.payments_project_record),
+          outstanding_invoices: sum((p) => p.financials.outstanding_invoices),
+          open_invoices: sum((p) => p.financials.open_invoices),
+          overdue_invoices: sum((p) => p.financials.overdue_invoices),
+        },
+        projects,
+      },
+    });
+  } catch (err) {
+    console.error("ceoClient.getClientById:", err);
+    return sendError(res, 500, "Failed to load client.");
+  }
+};
+
+/* ═════════════════════════════════════════════════════════════════════════
+   GET /api/ceo/clients/:clientId/projects
+   ═════════════════════════════════════════════════════════════════════════ */
+exports.getClientProjects = async (req, res) => {
+  try {
+    const clientId = parseId(req.params.clientId);
+    if (!clientId) return sendError(res, 400, "Invalid client id.");
+
+    const exists = await pool.query(
+      `SELECT 1 FROM users u JOIN roles r ON r.id = u.role_id
+       WHERE u.id = $1 AND ${CLIENT_ROLE_SQL}`,
+      [clientId],
+    );
+    if (!exists.rows.length) return sendError(res, 404, "Client not found.");
+
+    const projects = await fetchClientProjects(clientId);
+    return res.json({ success: true, data: { projects, total: projects.length } });
+  } catch (err) {
+    console.error("ceoClient.getClientProjects:", err);
+    return sendError(res, 500, "Failed to load client projects.");
+  }
+};
+
+/* ═════════════════════════════════════════════════════════════════════════
+   GET /api/ceo/clients/:clientId/activity
+   Each section is fetched independently: if one source table/column is
+   unavailable, only that section reports an error — the rest still render.
+   ═════════════════════════════════════════════════════════════════════════ */
+exports.getClientActivity = async (req, res) => {
+  try {
+    const clientId = parseId(req.params.clientId);
+    if (!clientId) return sendError(res, 400, "Invalid client id.");
+
+    const exists = await pool.query(
+      `SELECT 1 FROM users u JOIN roles r ON r.id = u.role_id
+       WHERE u.id = $1 AND ${CLIENT_ROLE_SQL}`,
+      [clientId],
+    );
+    if (!exists.rows.length) return sendError(res, 404, "Client not found.");
+
+    const pr = await pool.query(
+      `SELECT id, name FROM projects WHERE client_user_id = $1`,
+      [clientId],
+    );
+    const ids = pr.rows.map((p) => p.id);
+    const names = pr.rows.map((p) => p.name).filter(Boolean);
+
+    const safe = async (fn) => {
+      try {
+        return { ok: true, ...(await fn()) };
+      } catch (e) {
+        console.error("ceoClient.activity section failed:", e.message);
+        return { ok: false, error: "This section could not be loaded." };
+      }
+    };
+
+    if (!ids.length) {
+      return res.json({ success: true, data: { has_projects: false } });
+    }
+
+    const DONE = `(UPPER(COALESCE(w.status,'')) IN ('DONE','COMPLETED') OR COALESCE(w.progress,0) >= 100)`;
+
+    const [updates, milestones, invoices, incidents, rfis] = await Promise.all([
+      safe(async () => {
+        const r = await pool.query(
+          `SELECT s.id, s.project_id, p.name AS project_name, s.report_date,
+                  s.work_done, s.issues, s.delay_type, u.name AS submitted_by_name
+           FROM site_engineer_daily_updates s
+           JOIN projects p ON p.id = s.project_id
+           LEFT JOIN users u ON u.email = s.submitted_by
+           WHERE s.project_id = ANY($1::int[])
+           ORDER BY s.report_date DESC NULLS LAST, s.id DESC
+           LIMIT 8`,
+          [ids],
+        );
+        return { items: r.rows };
+      }),
+
+      safe(async () => {
+        const agg = await pool.query(
+          `SELECT COUNT(*)::int AS total,
+                  COUNT(*) FILTER (WHERE ${DONE})::int AS done,
+                  COUNT(*) FILTER (WHERE NOT ${DONE}
+                        AND w.due_date IS NOT NULL AND w.due_date < CURRENT_DATE)::int AS delayed,
+                  COUNT(*) FILTER (WHERE NOT ${DONE}
+                        AND NOT (w.due_date IS NOT NULL AND w.due_date < CURRENT_DATE)
+                        AND COALESCE(w.progress,0) > 0)::int AS in_progress,
+                  COUNT(*) FILTER (WHERE NOT ${DONE}
+                        AND NOT (w.due_date IS NOT NULL AND w.due_date < CURRENT_DATE)
+                        AND COALESCE(w.progress,0) = 0)::int AS pending
+           FROM wbs w
+           WHERE w.project_id = ANY($1::int[]) AND w.parent_id IS NULL`,
+          [ids],
+        );
+        const attention = await pool.query(
+          `SELECT w.id, w.project_id, p.name AS project_name, w.name, w.progress,
+                  w.due_date,
+                  CASE WHEN w.due_date < CURRENT_DATE THEN 'delayed' ELSE 'upcoming' END AS kind
+           FROM wbs w JOIN projects p ON p.id = w.project_id
+           WHERE w.project_id = ANY($1::int[]) AND w.parent_id IS NULL
+             AND NOT ${DONE}
+             AND w.due_date IS NOT NULL
+             AND w.due_date <= CURRENT_DATE + INTERVAL '30 days'
+           ORDER BY w.due_date ASC
+           LIMIT 10`,
+          [ids],
+        );
+        return { overview: agg.rows[0], attention: attention.rows };
+      }),
+
+      safe(async () => {
+        const r = await pool.query(
+          `WITH inv_paid AS (
+             SELECT invoice_id, SUM(amount) AS paid
+             FROM payments
+             WHERE payment_type='incoming' AND status='completed' AND invoice_id IS NOT NULL
+             GROUP BY invoice_id)
+           SELECT i.id, i.invoice_number, i.project_id, p.name AS project_name,
+                  i.amount, GREATEST(i.amount - COALESCE(ip.paid,0), 0) AS balance,
+                  i.status, i.due_date,
+                  (i.due_date IS NOT NULL AND i.due_date < CURRENT_DATE) AS is_overdue
+           FROM invoices i
+           JOIN projects p ON p.id = i.project_id
+           LEFT JOIN inv_paid ip ON ip.invoice_id = i.id
+           WHERE i.project_id = ANY($1::int[]) AND LOWER(i.status) = ANY($2)
+           ORDER BY i.due_date ASC NULLS LAST
+           LIMIT 10`,
+          [ids, OPEN_INVOICE_STATUSES],
+        );
+        return { items: r.rows };
+      }),
+
+      safe(async () => {
+        const r = await pool.query(
+          `SELECT i.id, i.incident_no, i.title, i.priority, i.status, i.created_at,
+                  i.project_id, p.name AS project_name
+           FROM incidents i JOIN projects p ON p.id = i.project_id
+           WHERE i.project_id = ANY($1::int[]) AND i.is_deleted = false
+           ORDER BY i.created_at DESC
+           LIMIT 6`,
+          [ids],
+        );
+        const open = await pool.query(
+          `SELECT COUNT(*)::int AS n FROM incidents
+           WHERE project_id = ANY($1::int[]) AND is_deleted = false
+             AND LOWER(COALESCE(status,'')) NOT IN ('closed','resolved','done','completed')`,
+          [ids],
+        );
+        return { items: r.rows, open_count: open.rows[0].n };
+      }),
+
+      // rfis only stores project_name (text) — the only link available.
+      safe(async () => {
+        if (!names.length) return { items: [], open_count: 0 };
+        const r = await pool.query(
+          `SELECT r.id, r.subject, r.priority, r.status, r.created_at, r.project_name
+           FROM rfis r
+           WHERE r.project_name = ANY($1::text[])
+           ORDER BY r.created_at DESC
+           LIMIT 6`,
+          [names],
+        );
+        const open = await pool.query(
+          `SELECT COUNT(*)::int AS n FROM rfis
+           WHERE project_name = ANY($1::text[])
+             AND LOWER(COALESCE(status,'')) NOT IN ('closed','resolved','answered','completed')`,
+          [names],
+        );
+        return { items: r.rows, open_count: open.rows[0].n };
+      }),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        has_projects: true,
+        recent_updates: updates,
+        milestones,
+        outstanding_invoices: invoices,
+        incidents,
+        rfis,
+        // `approvals` has no project_id / client link in the current schema,
+        // so pending approvals cannot be attributed to a client truthfully.
+        pending_approvals: {
+          ok: false,
+          available: false,
+          error:
+            "Approvals are not linked to projects in the current database, so they cannot be shown per client.",
+        },
+      },
+    });
+  } catch (err) {
+    console.error("ceoClient.getClientActivity:", err);
+    return sendError(res, 500, "Failed to load client activity.");
+  }
+};
