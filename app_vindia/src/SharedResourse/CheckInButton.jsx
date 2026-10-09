@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
-import axios from "axios";
+import api from "../services/api";
 import { isCEO, getCurrentLocation } from "../utils/geolocation";
 import LocationConfirmModal from "./LocationConfirmModal";
 
-const API = "http://localhost:5000/api";
+// All requests below go through the shared `api` client, which attaches the
+// login token. (This file used plain axios before, which sent no token.)
 
 // How often to ping location once checked in. 3 min is a reasonable
 // balance between tracking granularity, battery usage, and API load —
@@ -65,9 +66,9 @@ const CheckInButton = ({ employeeId, designation }) => {
   const fetchTodayAttendance = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        `${API}/attendance/today?employee_id=${employeeId}`
-      );
+      const res = await api.get("/attendance/today", {
+        params: { employee_id: employeeId },
+      });
       setAttendance(res.data || null);
     } catch (err) {
       if (err.response?.status !== 404) console.error(err);
@@ -83,7 +84,7 @@ const CheckInButton = ({ employeeId, designation }) => {
     const loc = await getCurrentLocation();
     if (!loc) return; // permission denied / no fix this cycle — just skip it
     try {
-      await axios.post(`${API}/attendance/${attendanceId}/track`, {
+      await api.post(`/attendance/${attendanceId}/track`, {
         lat: loc.lat,
         lng: loc.lng,
         recorded_at: new Date().toISOString(),
@@ -119,7 +120,7 @@ const CheckInButton = ({ employeeId, designation }) => {
       shiftStart.setHours(9, 0, 0, 0);
       const lateMinutes = Math.floor(Math.max(0, now - shiftStart) / 60000);
 
-      const res = await axios.post(`${API}/attendance`, {
+      const res = await api.post("/attendance", {
         employee_id:      employeeId,
         date:             dateStr,
         check_in:         timeStr,
@@ -148,7 +149,7 @@ const CheckInButton = ({ employeeId, designation }) => {
     try {
       const timeStr = new Date().toTimeString().slice(0, 8);
 
-      const res = await axios.put(`${API}/attendance/${attendance.id}`, {
+      const res = await api.put(`/attendance/${attendance.id}`, {
         check_out:         timeStr,
         check_out_lat:     lat,
         check_out_lng:     lng,

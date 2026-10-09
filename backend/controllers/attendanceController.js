@@ -64,13 +64,15 @@ function isNonWorkingDay(dateStr) {
 //   locality, district, state). CEOs are exempt from capture entirely
 //   — enforced here, server-side, regardless of what the client sends.
 //
-//   On READ, raw lat/lng are only returned to a viewer who declares
-//   themselves CEO (see viewer_designation below) — everyone else only
-//   gets the short address text. This mirrors the same client-declared
-//   role pattern the rest of this app already uses (see leads endpoints
-//   taking `role`/`name` as query params) rather than a hardened,
-//   server-verified session — if/when real auth is added, this check
-//   should move there instead.
+//   On READ, raw lat/lng are only returned when the LOGGED-IN user (taken
+//   from the verified token, req.user.role) is the CEO. Everyone else only
+//   gets the short address text. The old client-supplied
+//   `viewer_designation` query parameter is no longer trusted.
+
+// ─── Who is calling? (from the verified login token, never from the client) ──
+const isHrOrCeoUser = (req) => ["hr_manager", "ceo"].includes(req.user?.role);
+const isCeoUser = (req) => req.user?.role === "ceo";
+const isSameUser = (a, b) => String(a) === String(b);
 
 function parseShiftTimes(shiftTimingStr) {
   // Handles formats: "9AM-6PM", "9:00 AM - 6:00 PM", "09:00 - 18:00", "9:30 PM - 6:30 AM"
@@ -227,10 +229,12 @@ function sanitizeLocationForViewer(row, isViewerCEO) {
 }
 
 // ─── Mark Attendance (Check In) ──────────────────────────────────────────────
+// A normal employee can only check in for THEMSELVES (employee_id is taken
+// from the login token). HR / CEO may pass another employee_id.
 exports.markAttendance = async (req, res) => {
   try {
     const {
-      employee_id,
+      employee_id: bodyEmployeeId,
       date,
       check_in,
       shift,
@@ -239,6 +243,10 @@ exports.markAttendance = async (req, res) => {
       check_in_lng,
       check_in_address,
     } = req.body;
+
+    const employee_id = isHrOrCeoUser(req)
+      ? bodyEmployeeId || req.user.id
+      : req.user.id;
 
     if (!employee_id || !date || !check_in) {
       return res
@@ -297,6 +305,8 @@ exports.markAttendance = async (req, res) => {
 };
 
 // ─── Update Attendance (Check Out) ───────────────────────────────────────────
+// Check-out: only on your OWN record (HR/CEO may do any).
+// Manual status change: HR / CEO only.
 exports.updateAttendance = async (req, res) => {
   const { id } = req.params;
   const { status, check_out, check_out_lat, check_out_lng, check_out_address } =
@@ -320,6 +330,13 @@ exports.updateAttendance = async (req, res) => {
         return res.status(404).json({ message: "Attendance record not found" });
       }
       const row = existing.rows[0];
+
+      if (!isHrOrCeoUser(req) && !isSameUser(row.employee_id, req.user.id)) {
+        return res
+          .status(403)
+          .json({ message: "You can only check out your own attendance" });
+      }
+
       const derived = deriveStatus(row.check_in, check_out, row.shift_timing);
       const skipLocation = isCeoDesignation(row.designation);
 
@@ -353,6 +370,11 @@ exports.updateAttendance = async (req, res) => {
   }
 
   // HR manual status update
+  if (!isHrOrCeoUser(req)) {
+    return res
+      .status(403)
+      .json({ message: "Only HR or CEO can change attendance status" });
+  }
   if (!status) {
     return res.status(400).json({ message: "Status is required" });
   }
@@ -377,6 +399,7 @@ exports.updateAttendance = async (req, res) => {
 
 // ─── Add Location Ping (live tracking between check-in and check-out) ───────
 // Called every few minutes by the client while an employee is checked in.
+// Only the owner of the attendance record may add pings to it.
 exports.addLocationPing = async (req, res) => {
   const { id } = req.params; // attendance_id
   const { lat, lng, recorded_at } = req.body;
@@ -399,6 +422,12 @@ exports.addLocationPing = async (req, res) => {
     }
 
     const row = existing.rows[0];
+
+    if (!isSameUser(row.employee_id, req.user.id)) {
+      return res
+        .status(403)
+        .json({ error: "You can only add location pings to your own attendance" });
+    }
 
     // Belt-and-braces server-side checks, independent of the client:
     // don't record pings after checkout, and never for CEOs.
@@ -428,12 +457,11 @@ exports.addLocationPing = async (req, res) => {
 };
 
 // ─── Get Location Track for an Attendance Record ─────────────────────────────
-// Accepts ?viewer_designation=ceo — same client-declared-role pattern as
-// the rest of this file. Only the CEO gets raw lat/lng points; everyone
-// else just gets the ping count and time range.
+// Route is HR/CEO only. Only the CEO (from the login token) gets raw
+// lat/lng points; HR just gets the ping count and time range.
 exports.getAttendanceTrack = async (req, res) => {
   const { id } = req.params;
-  const isViewerCEO = isCeoDesignation(req.query.viewer_designation);
+  const isViewerCEO = isCeoUser(req);
 
   try {
     const result = await pool.query(
@@ -463,9 +491,17 @@ exports.getAttendanceTrack = async (req, res) => {
 };
 
 // ─── Get Today's Attendance (for Check-In button) ────────────────────────────
-// employee_id param = users.id
+// employee_id param = users.id. Allowed for yourself, or for HR / CEO.
+// Returns 200 with `null` when there is no check-in yet today (not an error).
 exports.getTodayAttendance = async (req, res) => {
-  const { employee_id } = req.query;
+  // Every role's dashboard shares CheckInButton, so this must work for all
+  // of them. For a normal employee the lookup ALWAYS uses the logged-in
+  // user (from the token) and ignores whatever id the page sent; HR / CEO
+  // may look up another employee by passing employee_id.
+  const employee_id = isHrOrCeoUser(req)
+    ? req.query.employee_id || req.user.id
+    : req.user.id;
+
   if (!employee_id)
     return res.status(400).json({ error: "employee_id required" });
 
@@ -486,15 +522,17 @@ exports.getTodayAttendance = async (req, res) => {
 };
 
 // ─── Get All Attendance (historical list) ────────────────────────────────────
-// Accepts ?viewer_designation=ceo — only that viewer gets raw lat/lng.
+// Route is HR/CEO only. Only the CEO (from the login token) gets raw lat/lng.
 exports.getAllAttendance = async (req, res) => {
   try {
-    const isViewerCEO = isCeoDesignation(req.query.viewer_designation);
+    const isViewerCEO = isCeoUser(req);
 
     const result = await pool.query(
       `SELECT
          attendance.*,
-         COALESCE(e.name, u.name) AS name
+         COALESCE(e.name, u.name) AS name,
+         e.designation,
+         e.department
        FROM attendance
        LEFT JOIN users     u ON u.id          = attendance.employee_id
        LEFT JOIN employees e ON e.user_id     = attendance.employee_id
@@ -517,10 +555,10 @@ exports.getAllAttendance = async (req, res) => {
 // attendance is matched via COALESCE(e.user_id, e.id) = users.id based key.
 // Employees with no user account (user_id IS NULL) show as Absent since
 // they cannot log in and punch attendance.
-// Accepts ?viewer_designation=ceo — only that viewer gets raw lat/lng.
+// Route is HR/CEO only. Only the CEO (from the login token) gets raw lat/lng.
 exports.getTodayAllEmployees = async (req, res) => {
   try {
-    const isViewerCEO = isCeoDesignation(req.query.viewer_designation);
+    const isViewerCEO = isCeoUser(req);
     const today = new Date().toISOString().slice(0, 10);
 
     // Employees who have a linked user account — match attendance via user_id
@@ -600,8 +638,16 @@ exports.getTodayAllEmployees = async (req, res) => {
 };
 
 // ─── Get Attendance by Employee ───────────────────────────────────────────────
+// Allowed for yourself, or for HR / CEO.
 exports.getAttendanceByEmployee = async (req, res) => {
   const { id } = req.params;
+
+  if (!isHrOrCeoUser(req) && !isSameUser(id, req.user.id)) {
+    return res
+      .status(403)
+      .json({ error: "You can only view your own attendance" });
+  }
+
   try {
     const result = await pool.query(
       `SELECT * FROM attendance WHERE employee_id = $1 ORDER BY date DESC`,
@@ -647,14 +693,16 @@ exports.getAttendanceByDateRange = async (req, res) => {
   }
 };
 
-// ─── Export Attendance by Date Range as CSV (for CEO "Download") ────────────
-// This endpoint is reached only via the CEO-only Download button on the
-// Attendance page, so raw coordinates are included unconditionally.
+// ─── Export Attendance by Date Range as CSV ──────────────────────────────────
+// Route is HR/CEO only. The GPS coordinate columns are only filled in for
+// the CEO; for HR those columns are exported blank (addresses stay).
 exports.exportAttendanceByDateRange = async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to) {
     return res.status(400).json({ message: "From and To dates are required" });
   }
+
+  const includeCoords = isCeoUser(req);
 
   try {
     const result = await pool.query(
@@ -720,11 +768,11 @@ exports.exportAttendanceByDateRange = async (req, res) => {
         r.shift,
         r.late_minutes,
         r.remarks,
-        r.check_in_lat,
-        r.check_in_lng,
+        includeCoords ? r.check_in_lat : null,
+        includeCoords ? r.check_in_lng : null,
         r.check_in_address,
-        r.check_out_lat,
-        r.check_out_lng,
+        includeCoords ? r.check_out_lat : null,
+        includeCoords ? r.check_out_lng : null,
         r.check_out_address,
       ]
         .map(escapeCsv)
@@ -760,3 +808,21 @@ exports.getTotalEmployees = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch employee count" });
   }
 };
+
+// ─── Safety net ──────────────────────────────────────────────────────────────
+// Every handler above reads the logged-in user from req.user, which is set by
+// the auth middleware in attendanceRoutes.js (router.use(auth)). If a route is
+// ever mounted WITHOUT that middleware (for example an old routes file next to
+// this controller), answer 401 instead of crashing the whole server.
+Object.keys(exports).forEach((name) => {
+  const handler = exports[name];
+  if (typeof handler !== "function") return;
+  exports[name] = (req, res, next) => {
+    if (!req.user) {
+      return res
+        .status(401)
+        .json({ message: "Not authenticated. Replace attendanceRoutes.js too." });
+    }
+    return handler(req, res, next);
+  };
+});
