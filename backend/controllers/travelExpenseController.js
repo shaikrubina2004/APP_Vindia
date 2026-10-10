@@ -17,6 +17,14 @@ const isHRRole = (role = "") =>
 const isArchitectRole = (role = "") =>
   role.toLowerCase().replace(/\s+/g, "_") === "architect";
 
+// ── Who is calling? (from the verified login token, never from the client) ───
+const callerRole = (req) =>
+  String(req.user?.role || "").toLowerCase().replace(/\s+/g, "_");
+const isCeoUser = (req) => callerRole(req) === "ceo";
+const isHrUser = (req) => isHRRole(callerRole(req));
+const isHrOrCeoUser = (req) => isCeoUser(req) || isHrUser(req);
+const isSameUser = (a, b) => String(a) === String(b);
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Generate request_no like TR-2026-0042 */
@@ -32,13 +40,11 @@ async function generateRequestNo() {
 }
 
 // ── POST /api/travel-expenses ─────────────────────────────────────────────────
-// Employee submits a new request
+// Employee submits a new request. The submitter is the LOGGED-IN user: user_id
+// comes from the token, and name / designation / department are read from the
+// employee record when one exists (the browser values are only a fallback).
 exports.createRequest = async (req, res) => {
   const {
-    user_id,
-    employee_name,
-    designation,
-    department,
     trip_title,
     origin,
     destination,
@@ -52,6 +58,33 @@ exports.createRequest = async (req, res) => {
     receipts,        // array: [{ expense_type, file_name, file_url, file_size_kb }]
     route_to_ceo,    // boolean — set by frontend when submitter is HR
   } = req.body;
+
+  const user_id = req.user.id;
+
+  let employee_name = req.body.employee_name;
+  let designation = req.body.designation;
+  let department = req.body.department;
+
+  try {
+    const emp = await pool.query(
+      `SELECT name, designation, department
+       FROM employees WHERE user_id = $1 LIMIT 1`,
+      [user_id]
+    );
+    if (emp.rows.length) {
+      employee_name = emp.rows[0].name || employee_name;
+      designation = emp.rows[0].designation || designation;
+      department = emp.rows[0].department || department;
+    }
+  } catch (err) {
+    console.error("createRequest employee lookup failed:", err.message);
+  }
+
+  // An HR user's request must always be routed to the CEO, whatever the
+  // browser claimed as the designation.
+  if (isHrUser(req) && !isHRRole(designation || "")) {
+    designation = callerRole(req);
+  }
 
   // Required field validation
   if (
@@ -168,12 +201,31 @@ exports.createRequest = async (req, res) => {
 };
 
 // ── GET /api/travel-expenses ──────────────────────────────────────────────────
-// HR: all requests. Employee: own requests via ?user_id=
-// PM: ?role=project_manager  — sees only pm_status=Pending (non-HR)
+// Normal employee: ONLY their own requests (forced from the token).
 // HR: ?role=hr_manager       — sees pm_status=Approved (ready for HR review)
-// CEO: ?role=ceo             — sees all HR-submitted requests pending final approval
+// CEO: ?role=ceo / ceo_all   — sees HR-submitted requests
+// PM:  ?role=project_manager — sees only pm_status=Pending (non-HR)
+// A role view is only allowed when the logged-in user really has that role.
 exports.getRequests = async (req, res) => {
-  const { user_id, status, role } = req.query;
+  const { status, role } = req.query;
+  let { user_id } = req.query;
+
+  if (role) {
+    let allowed = false;
+    if (role === "ceo" || role === "ceo_all") allowed = isCeoUser(req);
+    else if (role === "hr_manager") allowed = isHrOrCeoUser(req);
+    else if (role === "project_manager")
+      allowed = callerRole(req) === "project_manager" || isCeoUser(req);
+
+    if (!allowed) {
+      return res
+        .status(403)
+        .json({ message: "You are not allowed to use this view" });
+    }
+  } else if (!isHrOrCeoUser(req)) {
+    // Everyone else can only ever see their own requests.
+    user_id = String(req.user.id);
+  }
 
   let query = `
     SELECT ter.*,
@@ -237,6 +289,7 @@ exports.getRequests = async (req, res) => {
 };
 
 // ── GET /api/travel-expenses/:id ─────────────────────────────────────────────
+// Allowed for the person who submitted it, or HR / CEO.
 exports.getRequestById = async (req, res) => {
   const { id } = req.params;
   try {
@@ -251,12 +304,19 @@ exports.getRequestById = async (req, res) => {
     if (!reqResult.rows.length)
       return res.status(404).json({ message: "Not found" });
 
+    const row = reqResult.rows[0];
+    if (!isHrOrCeoUser(req) && !isSameUser(row.user_id, req.user.id)) {
+      return res
+        .status(403)
+        .json({ message: "You can only view your own travel requests" });
+    }
+
     const receipts = await pool.query(
       `SELECT * FROM travel_expense_receipts WHERE request_id = $1 ORDER BY uploaded_at`,
       [id]
     );
 
-    res.json({ ...reqResult.rows[0], receipts: receipts.rows });
+    res.json({ ...row, receipts: receipts.rows });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch request" });
@@ -264,10 +324,17 @@ exports.getRequestById = async (req, res) => {
 };
 
 // ── PUT /api/travel-expenses/:id/pm-status ────────────────────────────────────
-// Project Manager approves / rejects (non-HR requests only)
+// Project Manager approves / rejects (non-HR requests only).
+// Only a Project Manager (or the CEO) may call this.
 exports.pmUpdateStatus = async (req, res) => {
   const { id } = req.params;
   const { pm_status, pm_reviewed_by, pm_review_note } = req.body;
+
+  if (callerRole(req) !== "project_manager" && !isCeoUser(req)) {
+    return res
+      .status(403)
+      .json({ message: "Only a Project Manager can review this step" });
+  }
 
   if (!["Approved", "Rejected"].includes(pm_status)) {
     return res.status(400).json({ message: "Invalid pm_status" });
@@ -292,9 +359,14 @@ exports.pmUpdateStatus = async (req, res) => {
 };
 
 // ── GET /api/travel-expenses/:id/manual-expenses ─────────────────────────────
-// Returns the manual_expenses JSONB array stored on the request row
+// Returns the manual_expenses JSONB array stored on the request row (HR / CEO)
 exports.getManualExpenses = async (req, res) => {
   const { id } = req.params;
+
+  if (!isHrOrCeoUser(req)) {
+    return res.status(403).json({ message: "Only HR or CEO can view this" });
+  }
+
   try {
     const result = await pool.query(
       `SELECT COALESCE(manual_expenses, '[]'::jsonb) AS manual_expenses
@@ -314,6 +386,12 @@ exports.getManualExpenses = async (req, res) => {
 exports.saveManualExpenses = async (req, res) => {
   const { id } = req.params;
   const { expenses } = req.body; // [{ category, type, description, amount }]
+
+  if (!isHrOrCeoUser(req)) {
+    return res
+      .status(403)
+      .json({ message: "Only HR or CEO can enter manual expenses" });
+  }
 
   if (!Array.isArray(expenses)) {
     return res.status(400).json({ message: "expenses array required" });
@@ -340,12 +418,23 @@ exports.saveManualExpenses = async (req, res) => {
 // ── PUT /api/travel-expenses/:id/status ───────────────────────────────────────
 // HR approves/rejects regular (non-HR-submitted) requests after PM approval.
 // CEO approves/rejects HR-submitted requests.
+// The reviewer's role comes from the login token — the old `reviewer_role`
+// value sent by the browser is no longer trusted. The person who submitted a
+// request may also cancel their own request.
 exports.updateStatus = async (req, res) => {
   const { id } = req.params;
-  const { status, reviewed_by, review_note, reviewer_role } = req.body;
+  const { status, reviewed_by, review_note } = req.body;
 
   if (!["Approved", "Rejected", "Cancelled"].includes(status)) {
     return res.status(400).json({ message: "Invalid status" });
+  }
+
+  // Approve / reject is for HR or CEO only (checked before any lookup).
+  // Only "Cancelled" can also come from the request's owner — handled below.
+  if (status !== "Cancelled" && !isHrOrCeoUser(req)) {
+    return res.status(403).json({
+      message: "Only HR or the CEO can approve or reject travel requests",
+    });
   }
 
   try {
@@ -358,19 +447,30 @@ exports.updateStatus = async (req, res) => {
 
     const row = check.rows[0];
     const submitterIsHR = isHRRole(row.designation);
+    const isOwner = isSameUser(row.user_id, req.user.id);
+    const ownerCancelling = status === "Cancelled" && isOwner;
 
-    // Guard: HR-submitted requests must be reviewed by CEO only
-    if (submitterIsHR && reviewer_role !== "ceo") {
+    // Only HR / CEO can approve or reject; the owner can cancel their own.
+    if (!ownerCancelling && !isHrOrCeoUser(req)) {
       return res.status(403).json({
-        message: "Only the CEO can approve or reject HR travel requests",
+        message: "Only HR or the CEO can approve or reject travel requests",
       });
     }
 
-    // Guard: Regular requests must have PM approval before HR acts
-    if (!submitterIsHR && row.pm_status !== "Approved") {
-      return res.status(403).json({
-        message: "Project Manager must approve first",
-      });
+    if (!ownerCancelling) {
+      // Guard: HR-submitted requests must be reviewed by CEO only
+      if (submitterIsHR && !isCeoUser(req)) {
+        return res.status(403).json({
+          message: "Only the CEO can approve or reject HR travel requests",
+        });
+      }
+
+      // Guard: Regular requests must have PM approval before HR acts
+      if (!submitterIsHR && row.pm_status !== "Approved") {
+        return res.status(403).json({
+          message: "Project Manager must approve first",
+        });
+      }
     }
 
     const result = await pool.query(
@@ -405,3 +505,20 @@ exports.updateStatus = async (req, res) => {
     res.status(500).json({ error: "Failed to update status" });
   }
 };
+
+// ─── Safety net ──────────────────────────────────────────────────────────────
+// Every handler above reads the logged-in user from req.user, set by the auth
+// middleware in travelExpenseRoutes.js. If a route is ever mounted without it,
+// answer 401 instead of crashing the server.
+Object.keys(exports).forEach((name) => {
+  const handler = exports[name];
+  if (typeof handler !== "function") return;
+  exports[name] = (req, res, next) => {
+    if (!req.user) {
+      return res
+        .status(401)
+        .json({ message: "Not authenticated. Replace travelExpenseRoutes.js too." });
+    }
+    return handler(req, res, next);
+  };
+});

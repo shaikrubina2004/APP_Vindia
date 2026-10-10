@@ -530,12 +530,14 @@ exports.getAllAttendance = async (req, res) => {
     const result = await pool.query(
       `SELECT
          attendance.*,
-         COALESCE(e.name, u.name) AS name,
-         e.designation,
-         e.department
+         COALESCE(e.name, u.name)             AS name,
+         COALESCE(e.designation, r.name)      AS designation,
+         COALESCE(e.department,  d.name)      AS department
        FROM attendance
-       LEFT JOIN users     u ON u.id          = attendance.employee_id
-       LEFT JOIN employees e ON e.user_id     = attendance.employee_id
+       LEFT JOIN users       u ON u.id          = attendance.employee_id
+       LEFT JOIN employees   e ON e.user_id     = attendance.employee_id
+       LEFT JOIN roles       r ON r.id          = u.role_id
+       LEFT JOIN departments d ON d.id          = r.department_id
        ORDER BY date DESC`,
     );
 
@@ -708,9 +710,9 @@ exports.exportAttendanceByDateRange = async (req, res) => {
     const result = await pool.query(
       `SELECT
          a.date,
-         COALESCE(e.name, u.name)   AS name,
-         e.designation,
-         e.department,
+         COALESCE(e.name, u.name)        AS name,
+         COALESCE(e.designation, r.name) AS designation,
+         COALESCE(e.department,  d.name) AS department,
          a.status,
          a.check_in,
          a.check_out,
@@ -724,8 +726,10 @@ exports.exportAttendanceByDateRange = async (req, res) => {
          a.check_out_lng,
          a.check_out_address
        FROM attendance a
-       LEFT JOIN users     u ON u.id      = a.employee_id
-       LEFT JOIN employees e ON e.user_id = a.employee_id
+       LEFT JOIN users       u ON u.id      = a.employee_id
+       LEFT JOIN employees   e ON e.user_id = a.employee_id
+       LEFT JOIN roles       r ON r.id      = u.role_id
+       LEFT JOIN departments d ON d.id      = r.department_id
        WHERE a.date BETWEEN $1 AND $2
        ORDER BY a.date ASC, name ASC`,
       [from, to],
