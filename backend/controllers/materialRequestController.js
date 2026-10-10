@@ -253,6 +253,15 @@ exports.updateFullRequest = async (req, res) => {
       notes,
     } = req.body;
 
+    // Guard: this is the full-edit route. A body without purpose/items (e.g. a
+    // { status } payload sent by mistake) must never blank out the request.
+    if (!purpose || !items) {
+      return res.status(400).json({
+        error:
+          "Purpose and items are required. To approve or reject use PUT /material-request/status/:id",
+      });
+    }
+
     const check = await pool.query(
       "SELECT status, created_by FROM material_requests WHERE id=$1",
       [id]

@@ -92,6 +92,27 @@ exports.createDelivery = async (req, res) => {
     }
 
     const userId = req.user?.id;
+
+    // Enforce the PO approval gate on the server (not just in the UI):
+    // only issued / partially_fulfilled POs may have deliveries scheduled.
+    let linkedMaterialRequestId = material_request_id || null;
+    if (purchase_order_id) {
+      const po = await pool.query(
+        "SELECT status, material_request_id FROM purchase_orders WHERE id = $1",
+        [purchase_order_id]
+      );
+      if (!po.rows.length) {
+        return res.status(404).json({ error: "Purchase order not found" });
+      }
+      if (!["issued", "partially_fulfilled"].includes(po.rows[0].status)) {
+        return res.status(400).json({
+          error: `Cannot schedule a delivery for a purchase order in status "${po.rows[0].status}"`,
+        });
+      }
+      // Always carry the PO's material request so the receipt can update it.
+      linkedMaterialRequestId = linkedMaterialRequestId || po.rows[0].material_request_id || null;
+    }
+
     const delivery_code = await generateDeliveryCode();
 
     await client.query("BEGIN");
@@ -101,7 +122,7 @@ exports.createDelivery = async (req, res) => {
         (delivery_code, material_request_id, purchase_order_id, project_id, vendor_id, expected_date, remarks, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        RETURNING *`,
-      [delivery_code, material_request_id || null, purchase_order_id || null, project_id, vendor_id || null, expected_date || null, remarks || null, userId]
+      [delivery_code, linkedMaterialRequestId, purchase_order_id || null, project_id, vendor_id || null, expected_date || null, remarks || null, userId]
     );
 
     const deliveryId = delivery.rows[0].id;

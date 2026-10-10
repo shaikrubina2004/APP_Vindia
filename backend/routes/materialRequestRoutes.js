@@ -17,6 +17,14 @@ router.get(
   controller.getRequests
 );
 
+// Department-wide list (used by the Operations dashboard). Same visibility
+// rules as "/" — approvers/Operations staff see all, others only their own.
+router.get(
+  "/department",
+  authMiddleware,
+  controller.getRequests
+);
+
 // Create request
 router.post(
   "/",

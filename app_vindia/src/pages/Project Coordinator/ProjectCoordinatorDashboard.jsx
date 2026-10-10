@@ -216,14 +216,24 @@ const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
   const [updating, setUpdating] = useState(false);
 
   const handleUpdate = async (id, status) => {
+    // Rejections should carry a reason (stored as rejection_reason, shown to the Site Engineer).
+    let reason = null;
+    if (status === "rejected") {
+      reason = window.prompt("Reason for rejection:");
+      if (reason === null) return; // cancelled
+      reason = reason.trim() || null;
+    }
+
     setUpdating(true);
     try {
-      await api.put(`/material-request/${id}`, { status });
+      // FIX: approve/reject lives at /material-request/status/:id.
+      // PUT /material-request/:id is the full-edit route (creator-only) and returned 403.
+      await api.put(`/material-request/status/${id}`, { status, reason });
       onUpdate();
       setView("list");
     } catch (err) {
       console.error(err);
-      alert("Update failed");
+      alert(err?.response?.data?.error || "Update failed");
     } finally {
       setUpdating(false);
     }
