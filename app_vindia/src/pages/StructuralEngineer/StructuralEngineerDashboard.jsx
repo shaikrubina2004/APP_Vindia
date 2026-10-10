@@ -24,6 +24,13 @@ ChartJS.register(BarElement, CategoryScale, LinearScale, ArcElement, Tooltip, Le
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+// The backend now requires a login on every /api/structural route, so these
+// plain fetch() calls must send the token (axios calls already do).
+const authHeaders = () => {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 // ─── Skeleton ─────────────────────────────────────────────────────────────
 const DashboardSkeleton = () => (
   <div className="se-container">
@@ -81,7 +88,7 @@ const projectId = selectedProject?.id || null;
       const url = projectId
         ? `${BASE}/api/structural/dashboard?project_id=${projectId}`
         : `${BASE}/api/structural/dashboard`;
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: authHeaders() });
       if (!res.ok) throw new Error("Failed to fetch dashboard");
       return res.json();
     },
@@ -93,7 +100,9 @@ const projectId = selectedProject?.id || null;
   const { data: activity } = useQuery({
     queryKey: ["recentActivity"],
     queryFn: () =>
-      fetch(`${BASE}/api/structural/recent-activity`).then((res) => res.json()),
+      fetch(`${BASE}/api/structural/recent-activity`, { headers: authHeaders() }).then(
+        (res) => (res.ok ? res.json() : []),
+      ),
   });
 
   if (isLoading) return <DashboardSkeleton />;

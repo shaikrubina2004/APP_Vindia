@@ -9,12 +9,13 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// ─── Optional: attach auth token if you add JWT later ─────────────────────
-// api.interceptors.request.use((config) => {
-//   const token = localStorage.getItem("token");
-//   if (token) config.headers.Authorization = `Bearer ${token}`;
-//   return config;
-// });
+// ─── Attach the login token to every request ──────────────────────────────
+// The backend now requires a login on every /api/structural route.
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
 // ─── Dashboard ─────────────────────────────────────────────────────────────
 export const fetchDashboard = () =>

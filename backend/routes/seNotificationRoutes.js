@@ -21,12 +21,16 @@ const TYPE_LINK = {
   upload: "/structural-engineer/shared/uploads",
 };
 
-// ── Safe role checker ───────────────────────────────────────
+// ── ONE role check used by every route below ─────────────────────────────────
+// (Before, some routes used includes("structural") and others used
+// === "structural_engineer", so they disagreed.)
 function isStructuralEngineer(user) {
-  const role = user?.role?.toLowerCase?.() || "";
-
-  return role.includes("structural");
+  const role = String(user?.role || "")
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  return role === "structural_engineer";
 }
+
 // ── Helper: shape a DB row into the frontend-expected object ─────────────────
 function shapeRow(n) {
   return {
@@ -37,10 +41,8 @@ function shapeRow(n) {
     description: n.description || n.message,
     created_at: n.created_at,
     is_read: n.is_read,
-link:
-  n.link ||
-  TYPE_LINK[n.type] ||
-  "/structural-engineer/dashboard",  };
+    link: n.link || TYPE_LINK[n.type] || "/structural-engineer/dashboard",
+  };
 }
 
 // ── GET /  – unread notifications for the logged-in SE ───────────────────────
@@ -93,10 +95,10 @@ router.get("/count", protect, async (req, res) => {
   }
 });
 
-// ── PATCH /read-all  – mark every unread notification read ───────────────────
+// ── PATCH /read-all  – mark every unread SE notification read ────────────────
 router.patch("/read-all", protect, async (req, res) => {
   try {
-    if (req.user?.role !== "structural_engineer") {
+    if (!isStructuralEngineer(req.user)) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
@@ -114,10 +116,11 @@ router.patch("/read-all", protect, async (req, res) => {
   }
 });
 
-// ── PATCH /:id/read  – mark a single notification read ───────────────────────
+// ── PATCH /:id/read  – mark a single SE notification read ────────────────────
+// The role filter stops this from marking another role's notification read.
 router.patch("/:id/read", protect, async (req, res) => {
   try {
-    if (req.user?.role !== "structural_engineer") {
+    if (!isStructuralEngineer(req.user)) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
@@ -129,7 +132,10 @@ router.patch("/:id/read", protect, async (req, res) => {
     }
 
     const result = await pool.query(
-      `UPDATE notifications SET is_read = true WHERE id = $1 RETURNING id`,
+      `UPDATE notifications
+          SET is_read = true
+        WHERE id = $1 AND role = 'structural_engineer'
+        RETURNING id`,
       [realId],
     );
 

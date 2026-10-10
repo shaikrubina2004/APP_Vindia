@@ -4,15 +4,66 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/db");
 const multer = require("multer");
+const path = require("path");
 const protect = require("../middleware/authMiddleware");
+const { requireRole } = protect;
 const createSENotification = require("../utils/createSENotification");
 
+// Every route in this file now requires a valid login token.
+router.use(protect);
+
+// Structural Engineer area (the CEO may also look).
+const SE_OR_CEO = requireRole("structural_engineer", "ceo");
+
+// Drawing approval is done by Architect / MEP / Manager. The column that gets
+// updated comes from the LOGGED-IN user's role, never from the request body.
+const STATUS_COLUMN_BY_ROLE = {
+  architect: { column: "architect_status", label: "Architect" },
+  mep_engineer: { column: "mep_status", label: "MEP Engineer" },
+  project_manager: { column: "manager_status", label: "Manager" },
+  ceo: { column: "manager_status", label: "Manager" },
+};
+const DRAWING_STATUS_ROLES = requireRole(
+  "architect",
+  "mep_engineer",
+  "project_manager",
+  "ceo",
+);
+
 // ── Multer ────────────────────────────────────────────────────────────────────
+// Only drawing-type files, max 25 MB, and a cleaned-up file name. (/uploads is
+// served publicly, so HTML / script files must never be accepted here.)
+const ALLOWED_EXT = [".pdf", ".png", ".jpg", ".jpeg", ".dwg", ".dxf"];
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, "uploads/"),
-  filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  filename: (_req, file, cb) => {
+    const safe = path
+      .basename(file.originalname)
+      .replace(/[^\w.\-]+/g, "_");
+    cb(null, `${Date.now()}-${safe}`);
+  },
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_EXT.includes(ext)) {
+      return cb(
+        new Error(`File type ${ext || "(none)"} is not allowed. Use: ${ALLOWED_EXT.join(", ")}`),
+      );
+    }
+    cb(null, true);
+  },
+});
+
+// Turn a multer error into a clean 400 instead of a server error.
+const uploadDrawingFile = (req, res, next) =>
+  upload.single("file")(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 📊  DASHBOARD
@@ -20,7 +71,7 @@ const upload = multer({ storage });
 //     If provided → counts only drawings for that project.
 //     If omitted  → counts all drawings (fallback).
 // ═══════════════════════════════════════════════════════════════════════════
-router.get("/dashboard", async (req, res) => {
+router.get("/dashboard", SE_OR_CEO, async (req, res) => {
   try {
     const { project_id } = req.query; // optional filter
 
@@ -98,7 +149,7 @@ router.get("/dashboard", async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // 📤  UPLOAD DRAWING
 // ═══════════════════════════════════════════════════════════════════════════
-router.post("/upload-drawing", upload.single("file"), async (req, res) => {
+router.post("/upload-drawing", SE_OR_CEO, uploadDrawingFile, async (req, res) => {
   try {
     const { name, version, uploaded_by, project_id } = req.body;
 
@@ -128,7 +179,7 @@ router.post("/upload-drawing", upload.single("file"), async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // 📄  GET DRAWINGS
 // ═══════════════════════════════════════════════════════════════════════════
-router.get("/drawings", async (req, res) => {
+router.get("/drawings", SE_OR_CEO, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT * FROM drawings ORDER BY created_at DESC",
@@ -143,7 +194,7 @@ router.get("/drawings", async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // ❌  DELETE DRAWING
 // ═══════════════════════════════════════════════════════════════════════════
-router.delete("/drawings/:id", async (req, res) => {
+router.delete("/drawings/:id", SE_OR_CEO, async (req, res) => {
   try {
     await pool.query("DELETE FROM drawings WHERE id = $1", [req.params.id]);
     return res.json({ message: "Deleted successfully" });
@@ -155,22 +206,24 @@ router.delete("/drawings/:id", async (req, res) => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🔄  UPDATE DRAWING STATUS
+//     Which approval column is changed depends on who is logged in.
 // ═══════════════════════════════════════════════════════════════════════════
-router.put("/drawings/:id/status", async (req, res) => {
+router.put("/drawings/:id/status", DRAWING_STATUS_ROLES, async (req, res) => {
   try {
     const { id } = req.params;
-    const { role, status } = req.body;
+    const { status } = req.body;
 
-    const COLUMN_MAP = {
-      architect: "architect_status",
-      mep: "mep_status",
-      manager: "manager_status",
-    };
-
-    const column = COLUMN_MAP[role];
-    if (!column) {
-      return res.status(400).json({ error: "Invalid role" });
+    const mapping = STATUS_COLUMN_BY_ROLE[req.user.role];
+    if (!mapping) {
+      return res.status(403).json({ error: "Your role cannot approve drawings" });
     }
+
+    const allowedStatuses = ["approved", "rejected", "pending"];
+    if (!allowedStatuses.includes(String(status || "").toLowerCase())) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    const { column, label: roleName } = mapping;
 
     let drawingName = `Drawing #${id}`;
     try {
@@ -182,6 +235,7 @@ router.put("/drawings/:id/status", async (req, res) => {
       /* ignore */
     }
 
+    // `column` always comes from the fixed map above, never from user input.
     await pool.query(`UPDATE drawings SET ${column} = $1 WHERE id = $2`, [
       status,
       id,
@@ -193,7 +247,6 @@ router.put("/drawings/:id/status", async (req, res) => {
       pending: "warn",
     };
     const severity = severityMap[status?.toLowerCase()] || "info";
-    const roleName = role.charAt(0).toUpperCase() + role.slice(1);
 
     await createSENotification({
       type: "drawing",
@@ -212,7 +265,7 @@ router.put("/drawings/:id/status", async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // 📌  RECENT ACTIVITY
 // ═══════════════════════════════════════════════════════════════════════════
-router.get("/recent-activity", async (req, res) => {
+router.get("/recent-activity", SE_OR_CEO, async (req, res) => {
   try {
     const drawings = await pool.query(
       "SELECT name, created_at FROM drawings ORDER BY created_at DESC LIMIT 3",
@@ -247,7 +300,7 @@ router.get("/recent-activity", async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // 🔔  GET SE NOTIFICATIONS
 // ═══════════════════════════════════════════════════════════════════════════
-router.get("/notifications", async (req, res) => {
+router.get("/notifications", SE_OR_CEO, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, title, description, is_read, created_at
@@ -264,12 +317,14 @@ router.get("/notifications", async (req, res) => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🔕  MARK NOTIFICATION AS READ
+//     Only Structural Engineer notifications can be touched here.
 // ═══════════════════════════════════════════════════════════════════════════
-router.patch("/notifications/:id/read", async (req, res) => {
+router.patch("/notifications/:id/read", SE_OR_CEO, async (req, res) => {
   try {
-    await pool.query("UPDATE notifications SET is_read = true WHERE id = $1", [
-      req.params.id,
-    ]);
+    await pool.query(
+      "UPDATE notifications SET is_read = true WHERE id = $1 AND role = 'structural_engineer'",
+      [req.params.id],
+    );
     res.json({ message: "Marked as read" });
   } catch (err) {
     res.status(500).json({ error: "Failed to update" });
