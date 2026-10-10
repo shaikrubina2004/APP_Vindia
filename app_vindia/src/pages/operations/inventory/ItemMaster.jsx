@@ -1,10 +1,25 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, Pencil, Trash2, X, PackageX } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, PackageX, Package } from "lucide-react";
 import { getItems, createItem, updateItem, deleteItem } from "../../../services/inventoryService";
 import Toast from "../../../components/Toast";
 import "./ItemMaster.css";
 
 const emptyForm = { item_name: "", category: "", unit: "", description: "", minimum_stock: 0, maximum_stock: "" };
+
+// Soft colour pairs so each category gets a consistent, recognisable pill.
+const CATEGORY_COLORS = [
+  { bg: "#eff8ff", fg: "#175cd3" },
+  { bg: "#fef6ee", fg: "#b93815" },
+  { bg: "#f4f3ff", fg: "#5925dc" },
+  { bg: "#ecfdf3", fg: "#027a48" },
+  { bg: "#fdf2fa", fg: "#c11574" },
+  { bg: "#fffaeb", fg: "#b54708" },
+];
+const categoryColor = (name = "") => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return CATEGORY_COLORS[h % CATEGORY_COLORS.length];
+};
 
 const SkeletonRow = () => (
   <tr>
@@ -95,13 +110,16 @@ const ItemMaster = () => {
         <button onClick={openCreate} className="ops-btn ops-btn-primary"><Plus size={16} /> New Item</button>
       </div>
 
-      <div className="im-search">
-        <Search size={16} className="im-search-icon" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search item name or code…" className="ops-input im-search-input" />
+      <div className="im-toolbar">
+        <div className="im-search">
+          <Search size={16} className="im-search-icon" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search item name or code…" className="ops-input im-search-input" />
+        </div>
+        <span className="im-count">{loading ? "Loading…" : `${items.length} item${items.length !== 1 ? "s" : ""}`}</span>
       </div>
 
       <div className="ops-card ops-table-wrap">
-        <table className="ops-table">
+        <table className="ops-table im-table">
           <thead>
             <tr>
               <th>Code</th><th>Name</th><th>Category</th><th>Unit</th><th>Min / Max</th><th>Status</th><th style={{ textAlign: "right" }}>Actions</th>
@@ -115,19 +133,39 @@ const ItemMaster = () => {
             ) : (
               items.map((it) => (
                 <tr key={it.id}>
-                  <td className="im-code">{it.item_code}</td>
-                  <td className="im-name">{it.item_name}</td>
-                  <td>{it.category || "—"}</td>
-                  <td>{it.unit}</td>
-                  <td>{it.minimum_stock} / {it.maximum_stock ?? "—"}</td>
+                  <td><span className="im-code">{it.item_code}</span></td>
+                  <td>
+                    <div className="im-name-cell">
+                      <span className="im-avatar"><Package size={16} /></span>
+                      <div className="im-name-text">
+                        <span className="im-name">{it.item_name}</span>
+                        {it.description && <span className="im-desc" title={it.description}>{it.description}</span>}
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    {it.category ? (
+                      <span className="im-category" style={{ background: categoryColor(it.category).bg, color: categoryColor(it.category).fg }}>
+                        {it.category}
+                      </span>
+                    ) : <span className="im-muted">—</span>}
+                  </td>
+                  <td><span className="im-unit">{it.unit}</span></td>
+                  <td>
+                    <div className="im-range">
+                      <span><em>Min</em> {it.minimum_stock}</span>
+                      <span className="im-range-sep" />
+                      <span><em>Max</em> {it.maximum_stock ?? "—"}</span>
+                    </div>
+                  </td>
                   <td>
                     <span className={`ops-badge ${it.status === "active" ? "ops-badge-emerald" : "ops-badge-gray"}`}>
                       <span className="ops-badge-dot" />{it.status}
                     </span>
                   </td>
                   <td style={{ textAlign: "right" }}>
-                    <button onClick={() => openEdit(it)} className="im-action-btn im-action-edit"><Pencil size={15} /></button>
-                    <button onClick={() => setConfirmDelete(it)} className="im-action-btn im-action-delete"><Trash2 size={15} /></button>
+                    <button onClick={() => openEdit(it)} className="im-action-btn im-action-edit" title="Edit item" aria-label="Edit item"><Pencil size={15} /></button>
+                    <button onClick={() => setConfirmDelete(it)} className="im-action-btn im-action-delete" title="Delete item" aria-label="Delete item"><Trash2 size={15} /></button>
                   </td>
                 </tr>
               ))

@@ -214,22 +214,18 @@ const CoordProjectCard = ({ proj, isActive, isLoading, onClick }) => (
 const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
   const [view, setView] = useState("list");
   const [updating, setUpdating] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
 
-  const handleUpdate = async (id, status) => {
-    // Rejections should carry a reason (stored as rejection_reason, shown to the Site Engineer).
-    let reason = null;
-    if (status === "rejected") {
-      reason = window.prompt("Reason for rejection:");
-      if (reason === null) return; // cancelled
-      reason = reason.trim() || null;
-    }
-
+  const handleUpdate = async (id, status, rejectReason = null) => {
     setUpdating(true);
     try {
       // FIX: approve/reject lives at /material-request/status/:id.
       // PUT /material-request/:id is the full-edit route (creator-only) and returned 403.
-      await api.put(`/material-request/status/${id}`, { status, reason });
+      await api.put(`/material-request/status/${id}`, { status, reason: rejectReason });
       onUpdate();
+      setRejecting(false);
+      setReason("");
       setView("list");
     } catch (err) {
       console.error(err);
@@ -285,7 +281,7 @@ const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
         ) : (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <button onClick={() => setView("list")} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#64748b" }}>←</button>
+              <button onClick={() => { setView("list"); setRejecting(false); setReason(""); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#64748b" }}>←</button>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Review Request</h3>
               <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748b", marginLeft: "auto" }}>✕</button>
             </div>
@@ -325,22 +321,54 @@ const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
                 <strong>Notes:</strong> {view.notes}
               </div>
             )}
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                onClick={() => handleUpdate(view.id, "approved")}
-                disabled={updating}
-                style={{ flex: 1, padding: "10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: updating ? 0.6 : 1 }}
-              >
-                {updating ? "Saving…" : "✓ Approve"}
-              </button>
-              <button
-                onClick={() => handleUpdate(view.id, "rejected")}
-                disabled={updating}
-                style={{ flex: 1, padding: "10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: updating ? 0.6 : 1 }}
-              >
-                {updating ? "Saving…" : "✗ Reject"}
-              </button>
-            </div>
+            {rejecting ? (
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 14 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>
+                  Reason for rejection
+                </label>
+                <textarea
+                  autoFocus
+                  rows={3}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Tell the Site Engineer why this request is rejected…"
+                  style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", border: "1px solid #fca5a5", borderRadius: 8, fontSize: 13, fontFamily: "inherit", resize: "vertical", outline: "none", background: "#fff" }}
+                />
+                <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                  <button
+                    onClick={() => { setRejecting(false); setReason(""); }}
+                    disabled={updating}
+                    style={{ flex: 1, padding: "10px", background: "#fff", color: "#475569", border: "1px solid #cbd5e1", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleUpdate(view.id, "rejected", reason.trim() || null)}
+                    disabled={updating || !reason.trim()}
+                    style={{ flex: 1, padding: "10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: updating || !reason.trim() ? 0.5 : 1 }}
+                  >
+                    {updating ? "Saving…" : "Confirm Reject"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  onClick={() => handleUpdate(view.id, "approved")}
+                  disabled={updating}
+                  style={{ flex: 1, padding: "10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: updating ? 0.6 : 1 }}
+                >
+                  {updating ? "Saving…" : "✓ Approve"}
+                </button>
+                <button
+                  onClick={() => setRejecting(true)}
+                  disabled={updating}
+                  style={{ flex: 1, padding: "10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: updating ? 0.6 : 1 }}
+                >
+                  ✗ Reject
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

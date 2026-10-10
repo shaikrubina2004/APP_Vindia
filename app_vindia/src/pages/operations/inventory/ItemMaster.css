@@ -1,8 +1,17 @@
 @import "../../../styles/opsShared.css";
 
+/* ── Toolbar ───────────────────────────── */
+.im-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 .im-search {
   position: relative;
-  max-width: 320px;
+  flex: 1;
+  max-width: 340px;
 }
 .im-search-icon {
   position: absolute;
@@ -11,28 +20,182 @@
   transform: translateY(-50%);
   color: #94a3b8;
   pointer-events: none;
+  z-index: 1;
 }
-.im-search-input {
+.im-search .im-search-input {
   width: 100%;
-  padding-left: 36px;
+  padding: 10px 12px 10px 40px;
+}
+.im-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ops-primary);
+  background: var(--ops-primary-soft);
+  padding: 5px 12px;
+  border-radius: 999px;
 }
 
-.im-code { color: #94a3b8; }
-.im-name { font-weight: 500; color: #1e293b; }
+/* ── Table (scoped to Item Master only) ── */
+.ops-card.ops-table-wrap {
+  border-color: #c9dbec;
+}
+.im-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.im-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #1e5a96;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 14px 18px;
+  border-bottom: none;
+}
+.im-table tbody td {
+  padding: 14px 18px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.im-table tbody td {
+  background: #fff;
+  border-bottom: 1px solid #dbe7f2;
+}
+.im-table tbody tr:nth-child(even) td {
+  background: #f1f6fb;
+}
+.im-table tbody tr {
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.im-table tbody tr:hover td {
+  background: #e3eef8;
+}
+.im-table tbody tr:hover td:first-child {
+  box-shadow: inset 3px 0 0 #1e5a96;
+}
+.im-table tbody tr:last-child td {
+  border-bottom: none;
+}
 
+/* ── Cells ─────────────────────────────── */
+.im-code {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #475467;
+  background: #f2f4f7;
+  border: 1px solid #e4e7ec;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.im-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 200px;
+}
+.im-avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ops-primary);
+  background: linear-gradient(135deg, #e8f1f8, #d6e7f5);
+}
+.im-name-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.im-name {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 13.5px;
+}
+.im-desc {
+  font-size: 11.5px;
+  color: #94a3b8;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.im-category {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 650;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.im-muted { color: #cbd5e1; }
+
+.im-unit {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #344054;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+
+.im-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+}
+.im-range em {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #98a2b3;
+  margin-right: 4px;
+}
+.im-range-sep {
+  width: 1px;
+  height: 14px;
+  background: #e2e8f0;
+}
+
+/* ── Actions ───────────────────────────── */
 .im-action-btn {
-  background: none;
-  border: none;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   cursor: pointer;
-  padding: 6px;
+  padding: 7px;
   border-radius: 8px;
   color: #64748b;
   display: inline-flex;
   transition: all 0.15s ease;
-  margin-left: 4px;
+  margin-left: 6px;
 }
-.im-action-edit:hover { background: #eff6ff; color: #2563eb; }
-.im-action-delete:hover { background: #fef2f2; color: #dc2626; }
+.im-action-edit:hover { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
+.im-action-delete:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+
+@media (max-width: 640px) {
+  .im-search { max-width: 100%; }
+  .im-desc { max-width: 160px; }
+}
 
 .im-form {
   display: flex;
