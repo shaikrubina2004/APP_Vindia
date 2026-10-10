@@ -1157,24 +1157,12 @@ export default function SEDailyUpdates() {
             >
               ✏ Edit
             </button>
-            {r.approved ? (
+                        {r.approved ? (
               <span className="sed-approved-big">✓ Approved</span>
             ) : (
-              <button
-                className="sed-save-btn"
-                onClick={async () => {
-                  try {
-                    await API.put(`/se-daily-reports/approve/${r.id}`);
-                    showToast("Log approved!");
-                    await loadData();
-                    setView("week");
-                  } catch {
-                    showToast("Approval failed", "error");
-                  }
-                }}
-              >
-                ✓ Approve
-              </button>
+              <span className="sed-approved-big" style={{ opacity: 0.7 }}>
+                ⏳ Awaiting manager approval
+              </span>
             )}
           </div>
         </div>
