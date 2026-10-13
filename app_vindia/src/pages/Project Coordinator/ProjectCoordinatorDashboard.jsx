@@ -153,7 +153,7 @@ const DetailRow = ({ icon, label, value }) => (
 function useCountUp(target, dur = 800) {
   const [v, setV] = useState(0);
   useEffect(() => {
-    if (!target) { setV(0); return; }
+    if (!target) return undefined;
     let cur = 0;
     const step = Math.ceil(target / (dur / 16));
     const t = setInterval(() => {
@@ -161,8 +161,8 @@ function useCountUp(target, dur = 800) {
       if (cur >= target) { setV(target); clearInterval(t); } else setV(cur);
     }, 16);
     return () => clearInterval(t);
-  }, [target]);
-  return v;
+  }, [target, dur]);
+  return target ? v : 0;
 }
 
 /* ── Stat card ───────────────────────────────────────────── */
@@ -214,22 +214,16 @@ const CoordProjectCard = ({ proj, isActive, isLoading, onClick }) => (
 const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
   const [view, setView] = useState("list");
   const [updating, setUpdating] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
-  const [reason, setReason] = useState("");
 
-  const handleUpdate = async (id, status, rejectReason = null) => {
+  const handleUpdate = async (id, status) => {
     setUpdating(true);
     try {
-      // FIX: approve/reject lives at /material-request/status/:id.
-      // PUT /material-request/:id is the full-edit route (creator-only) and returned 403.
-      await api.put(`/material-request/status/${id}`, { status, reason: rejectReason });
+      await api.put(`/material-request/${id}`, { status });
       onUpdate();
-      setRejecting(false);
-      setReason("");
       setView("list");
     } catch (err) {
       console.error(err);
-      alert(err?.response?.data?.error || "Update failed");
+      alert("Update failed");
     } finally {
       setUpdating(false);
     }
@@ -281,7 +275,7 @@ const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
         ) : (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <button onClick={() => { setView("list"); setRejecting(false); setReason(""); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#64748b" }}>←</button>
+              <button onClick={() => setView("list")} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#64748b" }}>←</button>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Review Request</h3>
               <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748b", marginLeft: "auto" }}>✕</button>
             </div>
@@ -321,54 +315,22 @@ const MaterialRequestModal = ({ requests, onClose, onUpdate }) => {
                 <strong>Notes:</strong> {view.notes}
               </div>
             )}
-            {rejecting ? (
-              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 14 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>
-                  Reason for rejection
-                </label>
-                <textarea
-                  autoFocus
-                  rows={3}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Tell the Site Engineer why this request is rejected…"
-                  style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", border: "1px solid #fca5a5", borderRadius: 8, fontSize: 13, fontFamily: "inherit", resize: "vertical", outline: "none", background: "#fff" }}
-                />
-                <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                  <button
-                    onClick={() => { setRejecting(false); setReason(""); }}
-                    disabled={updating}
-                    style={{ flex: 1, padding: "10px", background: "#fff", color: "#475569", border: "1px solid #cbd5e1", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleUpdate(view.id, "rejected", reason.trim() || null)}
-                    disabled={updating || !reason.trim()}
-                    style={{ flex: 1, padding: "10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: updating || !reason.trim() ? 0.5 : 1 }}
-                  >
-                    {updating ? "Saving…" : "Confirm Reject"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", gap: 10 }}>
-                <button
-                  onClick={() => handleUpdate(view.id, "approved")}
-                  disabled={updating}
-                  style={{ flex: 1, padding: "10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: updating ? 0.6 : 1 }}
-                >
-                  {updating ? "Saving…" : "✓ Approve"}
-                </button>
-                <button
-                  onClick={() => setRejecting(true)}
-                  disabled={updating}
-                  style={{ flex: 1, padding: "10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: updating ? 0.6 : 1 }}
-                >
-                  ✗ Reject
-                </button>
-              </div>
-            )}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => handleUpdate(view.id, "approved")}
+                disabled={updating}
+                style={{ flex: 1, padding: "10px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: updating ? 0.6 : 1 }}
+              >
+                {updating ? "Saving…" : "✓ Approve"}
+              </button>
+              <button
+                onClick={() => handleUpdate(view.id, "rejected")}
+                disabled={updating}
+                style={{ flex: 1, padding: "10px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: updating ? 0.6 : 1 }}
+              >
+                {updating ? "Saving…" : "✗ Reject"}
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -400,8 +362,6 @@ const ProjectCoordinatorDashboard = () => {
   const storedUser  = JSON.parse(localStorage.getItem("user") || "{}");
   const employeeId  = storedUser?.employee_id || storedUser?.id || null;
   const designation = storedUser?.designation || storedUser?.role || null;
-  console.log("FULL USER:", storedUser);
-  console.log("EMPLOYEE ID:", employeeId);
 
   /* ── Load projects ─────────────────────────────────────── */
   useEffect(() => {

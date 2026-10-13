@@ -1,6 +1,10 @@
 const express = require("express");
 const router  = express.Router();
 const wbs     = require("../controllers/wbsController");
+const { protect } = require("../middleware/authMiddleware");
+
+// Every WBS/milestone route needs a logged-in user (was fully open before)
+router.use(protect);
 
 // ── IMPORTANT: specific named routes MUST come before /:id params ──
 

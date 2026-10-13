@@ -1,5 +1,5 @@
 const pool = require("../config/db");
-const { insertNotification } = require("./pcNotificationsController");
+const { notifyAllCoordinators } = require("./pcNotificationsController");
 
 // ✅ Helper to parse floor string into rows
 function parseFloors(floorsString) {
@@ -130,19 +130,17 @@ exports.createProject = async (req, res) => {
       }
     }
 
-    // ✅ Send notification to coordinator
+    // ✅ Every project coordinator gets every new project (they create the milestones)
     try {
-      if (coordinator_id) {
-        await insertNotification(
-          coordinator_id,
-          "project",
-          "New Project Created",
-          `Project "${name}" is created`,
-          "/project-coordinator/dashboard",
-          "info",
-          newProject.id,
-        );
-      }
+      await notifyAllCoordinators(
+        "project",
+        "New Project Created",
+        `Project "${name}" is created`,
+        "/project-coordinator/dashboard",
+        "info",
+        newProject.id,
+        coordinator_id,
+      );
     } catch (notifErr) {
       console.warn("⚠️ Notification failed (non-critical):", notifErr.message);
     }

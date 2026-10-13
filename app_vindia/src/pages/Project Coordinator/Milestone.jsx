@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { RadialBarChart, RadialBar, ResponsiveContainer, Tooltip } from "recharts";
 import "./Milestone.css";
+import authFetch from "../../utils/authFetch";
 
 /* ══════════════════════════════════════════
    CONSTANTS
 ══════════════════════════════════════════ */
-const API = "http://localhost:5000";
+const API = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE || "http://localhost:5000").replace(/\/+$/, "");
 const today = new Date();
 today.setHours(0, 0, 0, 0); // normalize to midnight for accurate date comparisons
 
@@ -505,7 +506,7 @@ const SEAlertBanner = ({ projectId, milestones, onApply }) => {
     if (!projectId || projectId === "All") return;
     setLoading(true);
     try {
-      const res  = await fetch(`${API}/api/wbs/se-alerts?project_id=${projectId}`);
+      const res  = await authFetch(`${API}/api/wbs/se-alerts?project_id=${projectId}`);
       const data = await res.json();
       setAlerts(Array.isArray(data) ? data : []);
     } catch (e) { console.error(e); }
@@ -517,7 +518,7 @@ const SEAlertBanner = ({ projectId, milestones, onApply }) => {
   const handleApply = async (alert) => {
     setApplying(alert.id);
     try {
-      await fetch(`${API}/api/wbs/se-alerts/${alert.id}/apply`, { method: "POST" });
+      await authFetch(`${API}/api/wbs/se-alerts/${alert.id}/apply`, { method: "POST" });
       await load();
       onApply();
     } catch (e) { window.alert("Apply failed: " + e.message); }
@@ -526,7 +527,7 @@ const SEAlertBanner = ({ projectId, milestones, onApply }) => {
 
   const handleDismiss = async (alertId) => {
     try {
-      await fetch(`${API}/api/wbs/se-alerts/${alertId}/dismiss`, { method: "POST" });
+      await authFetch(`${API}/api/wbs/se-alerts/${alertId}/dismiss`, { method: "POST" });
       setAlerts((p) => p.filter((a) => a.id !== alertId));
     } catch (e) { console.error(e); }
   };
@@ -621,7 +622,7 @@ const PlanningPopup = ({ projects, templates, selectedTemplate, existingProjectI
 
   const loadTemplate = async () => {
     try {
-      const res  = await fetch(`${API}/api/templates/${selectedTemplate}`);
+      const res  = await authFetch(`${API}/api/templates/${selectedTemplate}`);
       const data = await res.json();
       const map = {}; const roots = [];
       data.forEach((item) => { map[item.id] = { id: item.id, code: item.code, title: item.name, subtasks: [] }; });
@@ -632,7 +633,7 @@ const PlanningPopup = ({ projects, templates, selectedTemplate, existingProjectI
 
   const loadExisting = async () => {
     try {
-      const res  = await fetch(`${API}/api/wbs/${projId}`);
+      const res  = await authFetch(`${API}/api/wbs/${projId}`);
       const data = await res.json();
       const t = data.map((p) => ({ id: p.id, code: p.code, title: p.name, subtasks: (p.tasks||[]).map((s) => ({ id: s.id, code: s.code, title: s.name })) }));
       setTasks(t); setEditMode(true); setStep(2);
@@ -643,7 +644,7 @@ const PlanningPopup = ({ projects, templates, selectedTemplate, existingProjectI
     setSaving(true);
     try {
       const items = flattenForBackend(tasks);
-      const res = await fetch(`${API}/api/wbs/auto-plan`, {
+      const res = await authFetch(`${API}/api/wbs/auto-plan`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_id: projId, items }),
       });
@@ -813,8 +814,8 @@ export default function Milestone() {
   const [existingProjIds,   setExistingProjIds]   = useState([]);
 
   useEffect(() => {
-    fetch(`${API}/api/projects`).then(r=>r.json()).then(d=>setProjects(Array.isArray(d)?d:[])).catch(console.error);
-    fetch(`${API}/api/templates`).then(r=>r.json()).then(d=>{
+    authFetch(`${API}/api/projects`).then(r=>r.json()).then(d=>setProjects(Array.isArray(d)?d:[])).catch(console.error);
+    authFetch(`${API}/api/templates`).then(r=>r.json()).then(d=>{
       const a=Array.isArray(d)?d:[];
       setTemplates(a);
       if(a.length) setSelectedTemplate(a[0].id);
@@ -823,7 +824,7 @@ export default function Milestone() {
 
   const refreshExisting = useCallback(async () => {
     try {
-      const res  = await fetch(`${API}/api/wbs`);
+      const res  = await authFetch(`${API}/api/wbs`);
       const data = await res.json();
       if(Array.isArray(data)) setExistingProjIds([...new Set(data.map(r=>String(r.project_id)))]);
     } catch(e) { console.error(e); }
@@ -836,10 +837,10 @@ export default function Milestone() {
     try {
       let data;
       if (!pid || pid === "All") {
-        const res = await fetch(`${API}/api/wbs`);
+        const res = await authFetch(`${API}/api/wbs`);
         data = await res.json();
       } else {
-        const res = await fetch(`${API}/api/wbs/${pid}`);
+        const res = await authFetch(`${API}/api/wbs/${pid}`);
         data = await res.json();
       }
       setMilestones(Array.isArray(data) ? convertWBS(data, projects) : []);
@@ -855,7 +856,7 @@ export default function Milestone() {
   }, [selectedProject, projects, fetchWBS]);
 
   const patchWBS = useCallback(async (id, body) => {
-    const res = await fetch(`${API}/api/wbs/${id}`, {
+    const res = await authFetch(`${API}/api/wbs/${id}`, {
       method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body),
     });
     if(!res.ok) throw new Error("Update failed");

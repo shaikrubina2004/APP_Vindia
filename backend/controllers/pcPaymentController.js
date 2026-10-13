@@ -8,7 +8,7 @@
 //
 // Instead this controller reads the SAME finance tables (invoices + payments)
 // that the Accountant writes to, filters them down to:
-//   • only projects where this user is the assigned coordinator
+//   • all projects (coordinators see every project)
 //   • only client receivables (incoming money), never vendor payouts
 // and reshapes them into exactly what the PC Payment page renders.
 
@@ -55,12 +55,12 @@ exports.getCoordinatorPayments = async (req, res) => {
       return res.status(401).json({ success: false, error: "Not authenticated" });
     }
 
-    // 1. Projects assigned to this coordinator.
-    const params = [userId];
-    let projectFilter = "WHERE p.coordinator_id = $1";
+    // 1. Every project (coordinators see all projects created by the manager).
+    const params = [];
+    let projectFilter = "";
     if (project_id) {
       params.push(project_id);
-      projectFilter += ` AND p.id = $${params.length}`;
+      projectFilter = `WHERE p.id = $${params.length}`;
     }
 
     const projectsResult = await pool.query(
@@ -174,15 +174,15 @@ exports.getInvoiceTransactions = async (req, res) => {
       return res.status(400).json({ success: false, error: "Invalid invoice id" });
     }
 
-    // Ownership check — the coordinator may only open invoices on their projects.
+    // The invoice must belong to a project (route is already limited to PC / PM / CEO).
     const owns = await pool.query(
       `SELECT 1 FROM invoices i
        JOIN projects p ON p.id = i.project_id
-       WHERE i.id = $1 AND p.coordinator_id = $2`,
-      [invoiceId, userId]
+       WHERE i.id = $1`,
+      [invoiceId]
     );
     if (!owns.rows.length) {
-      return res.status(403).json({ success: false, error: "Not your project" });
+      return res.status(404).json({ success: false, error: "Invoice not found" });
     }
 
     const result = await pool.query(

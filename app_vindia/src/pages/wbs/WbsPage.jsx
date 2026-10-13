@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import authFetch from "../../utils/authFetch";
 import "./WBSSection.css";
 
 const API = "http://localhost:5000/api";
@@ -32,7 +33,7 @@ function WBSSection({ selectedProject }) {
   useEffect(() => {
     if (!selectedProject?.id) return;
     setLoading(true);
-    fetch(`${API}/wbs/${selectedProject.id}`)
+    authFetch(`${API}/wbs/${selectedProject.id}`)
       .then((r) => r.json())
       .then((data) => {
         setWbsTree(Array.isArray(data) ? data : []);
@@ -83,7 +84,7 @@ function WBSSection({ selectedProject }) {
     try {
       if (newTask.type === "task") {
         // Top-level WBS item
-        const res = await fetch(`${API}/wbs`, {
+        const res = await authFetch(`${API}/wbs`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -97,7 +98,7 @@ function WBSSection({ selectedProject }) {
       } else {
         // Child task (subtask)
         const parent = wbsTree.find((w) => w.id === newTask.wbsId);
-        const res = await fetch(`${API}/wbs/task`, {
+        const res = await authFetch(`${API}/wbs/task`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -149,7 +150,7 @@ function WBSSection({ selectedProject }) {
     };
 
     try {
-      const res = await fetch(`${API}/wbs/${endpointMap[tab]}`, {
+      const res = await authFetch(`${API}/wbs/${endpointMap[tab]}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task_id: drawer.taskId, ...addRowForm }),

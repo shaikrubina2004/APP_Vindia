@@ -1,4 +1,5 @@
 import axios from "axios";
+import { API_ORIGIN } from "../../services/api";
 import React, { useState, useEffect } from "react";
 import { createUpdate, getUpdates, updateUpdate } 
 from "../../services/pcDailyUpdateService";
@@ -160,22 +161,12 @@ export default function DailyUpdates() {
     // ✅ LOAD PROJECTS ON PAGE LOAD
   
 
-useEffect(() => {
-  fetchProjects();
-  fetchRoles();
-}, []);
 
-  useEffect(() => {
-  if (form.projectId) {
-    fetchLogs(form.projectId);
-  }
-}, [form.projectId]);
 
 const fetchLogs = async (projectId) => {
   try {
     const res = await getUpdates(projectId);
 
-    console.log("API RESPONSE:", res.data); // 👈 keep this
 
     const mapped = res.data.map(log => ({
       ...log,
@@ -199,7 +190,6 @@ const fetchProjects = async () => {
 
     const projectList = res.data; // adjust if needed
 
-    console.log("PROJECT API:", projectList);
 
     setProjects(projectList);
 
@@ -219,10 +209,10 @@ const fetchProjects = async () => {
 const fetchRoles = async () => {
   try {
     const res = await axios.get(
-      "http://localhost:5000/api/pc-daily-updates/roles"
+      `${API_ORIGIN}/api/pc-daily-updates/roles`,
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
     );
 
-    console.log("ROLES:", res.data);
 
     setRoles(res.data); // ✅ no .data.data here
 
@@ -231,6 +221,17 @@ const fetchRoles = async () => {
   }
 };
 
+
+  // Load projects + roles once, and reload the log list whenever the project changes.
+  // (Declared after the fetch helpers so they are defined before use.)
+  useEffect(() => {
+    fetchProjects();
+    fetchRoles();
+  }, []);
+
+  useEffect(() => {
+    if (form.projectId) fetchLogs(form.projectId);
+  }, [form.projectId]);
 
   const todayLog = logs.find(
   l =>
@@ -286,7 +287,6 @@ const fetchRoles = async () => {
     const payload = {
       ...form,
       project_id: Number(form.projectId),
-      coordinator_id: 101,
       date: todayStr,
       day: todayDay,
 
@@ -324,14 +324,6 @@ const fetchRoles = async () => {
 
   setSubmit(false);
 };
-
-  const mapLog = (d) => ({
-    ...d,
-    taskUpdates: d.task_updates  ? JSON.parse(d.task_updates)  : [],
-    meetings:    d.meetings      ? JSON.parse(d.meetings)       : [],
-    delayHours:  d.delay_hours,
-    delayImpact: d.delay_impact,
-  });
 
   const handleEdit = (log) => {
     setEditId(log.id);
@@ -458,7 +450,7 @@ const fetchRoles = async () => {
               onChange={e => {
               const id = e.target.value;
 
-              setForm(prev => ({
+              setForm(() => ({
                 ...EMPTY_FORM,
                 projectId: id
               }));
