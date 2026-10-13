@@ -13,6 +13,7 @@ import React, {
 } from "react";
 import api from "../../services/api";
 import "../../styles/Labourregistry.css";
+import useMyProjects from "../../hooks/useMyProjects";
 
 /* ── Constants ───────────────────────────────────────────── */
 const PAGE_SIZE = 10;
@@ -87,7 +88,9 @@ export default function LabourRegistry() {
   const [page, setPage]             = useState(1);
   const [expandedId, setExp]        = useState(null);
   const [updating, setUpdating]     = useState(null);
-  const [projects, setProjects]     = useState([]);
+  // Only the project(s) this engineer is assigned to (was: every company project, errors swallowed)
+  const { projects, activeProject, loading: projLoading, error: projError, reload: reloadProjects } = useMyProjects();
+  const [filterProject, setFP]      = useState("all");
   const [editId, setEditId] = useState(null);
   const photoRef  = useRef(null);
   const idDocRef  = useRef(null);
@@ -96,7 +99,6 @@ export default function LabourRegistry() {
   useEffect(() => {
     alive.current = true;
     loadWorkers();
-    loadProjects();
     return () => { alive.current = false; };
   }, []);
 
@@ -117,9 +119,10 @@ export default function LabourRegistry() {
   }
 }
 
-  async function loadProjects() {
-    try { const r = await api.get("/projects"); setProjects(Array.isArray(r?.data) ? r.data : []); } catch {}
-  }
+  // Default the form to the engineer's active project once it is known.
+  useEffect(() => {
+    if (activeProject) setForm(f => (f.project_id ? f : { ...f, project_id: String(activeProject.id) }));
+  }, [activeProject]);
 
   const setF = useCallback((k, v) => {
     setForm(f => ({ ...f, [k]: v }));
@@ -134,6 +137,7 @@ export default function LabourRegistry() {
     if (!f.trade)                                       e.trade     = "Select a trade";
     if (!f.phone || f.phone.trim().length < 8)          e.phone     = "Valid phone number required";
     if (!f.id_number || f.id_number.trim().length < 4)  e.id_number = "ID number required";
+    if (!f.project_id)                                  e.project_id = "Select the project this worker is assigned to";
     if (!f.contractor_name || f.contractor_name.trim().length < 2) e.contractor_name = "Contractor name required";
     if (!f.emergency_contact_name) e.emergency_contact_name = "Emergency contact name required";
     if (!f.emergency_contact_phone) e.emergency_contact_phone = "Emergency contact phone required";
@@ -166,14 +170,14 @@ if (editId) {
     headers: { "Content-Type": "multipart/form-data" }
   });
 }      await loadWorkers();
-      setForm({ ...BLANK });
+      setForm({ ...BLANK, project_id: activeProject ? String(activeProject.id) : "" });
       setEditId(null);
       setStatus("Worker registered successfully ✓");
       setTab("registry");
     } catch (err) {
       setStatus(err?.response?.data?.error || "Registration failed — check connection");
     } finally { if (alive.current) setSub(false); }
-  }, [form]);
+  }, [form, activeProject]);
 
   /* ── Update status ──────────────────────────────────────── */
   const updateStatus = useCallback(async (id, status) => {
@@ -201,8 +205,9 @@ if (editId) {
     }
     if (filterTrade  !== "all") list = list.filter(w => w.trade  === filterTrade);
     if (filterStatus !== "all") list = list.filter(w => (w.status||"active") === filterStatus);
+    if (filterProject !== "all") list = list.filter(w => String(w.project_id || "") === String(filterProject));
     return list;
-  }, [workers, search, filterTrade, filterStatus]);
+  }, [workers, search, filterTrade, filterStatus, filterProject]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
@@ -372,11 +377,21 @@ if (editId) {
                       {errors.trade && <div className="lr-error">{errors.trade}</div>}
                     </div>
                     <div className="lr-field">
-                      <label className="lr-label">Project</label>
-                      <select className="lr-select" value={form.project_id||""} onChange={e=>setF("project_id",e.target.value)}>
-                        <option value="">Select project</option>
+                      <label className="lr-label">Project *</label>
+                      <select className="lr-select" value={form.project_id||""} onChange={e=>setF("project_id",e.target.value)}
+                              disabled={projLoading || projects.length === 0}>
+                        <option value="">
+                          {projLoading ? "Loading your projects…" : projects.length === 0 ? "No project assigned to you" : "Select project"}
+                        </option>
                         {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
+                      {errors.project_id && <div className="lr-error">{errors.project_id}</div>}
+                      {projError && (
+                        <div className="lr-error">{projError} — <button type="button" className="lr-btn lr-btn--ghost lr-btn--sm" onClick={reloadProjects}>Retry</button></div>
+                      )}
+                      {!projLoading && !projError && projects.length === 0 && (
+                        <div className="lr-error">You are not assigned to a project yet. Ask your Project Manager to assign you.</div>
+                      )}
                     </div>
                     <div className="lr-field">
                       <label className="lr-label">Daily Wage (₹)</label>
@@ -454,7 +469,7 @@ if (editId) {
                   <button type="submit" className="lr-btn lr-btn--primary" disabled={submitting}>
                     {submitting ? "Registering…" : "✓ Register Worker"}
                   </button>
-                  <button type="button" className="lr-btn lr-btn--ghost" onClick={()=>{ setForm({...BLANK}); setErrors({}); setStatus(""); }}>
+                  <button type="button" className="lr-btn lr-btn--ghost" onClick={()=>{ setForm({ ...BLANK, project_id: activeProject ? String(activeProject.id) : "" }); setErrors({}); setStatus(""); }}>
                     Clear Form
                   </button>
                   {submitStatus && (
@@ -508,6 +523,12 @@ if (editId) {
               </svg>
               <input value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} placeholder="Search name, ID number, contractor, phone…"/>
             </div>
+            {projects.length > 0 && (
+              <select className="lr-select lr-select--sm" value={filterProject} onChange={e=>{setFP(e.target.value);setPage(1);}}>
+                <option value="all">All my projects</option>
+                {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            )}
             <select className="lr-select lr-select--sm" value={filterTrade} onChange={e=>{setFT(e.target.value);setPage(1);}}>
               <option value="all">All trades</option>
               {TRADES.map(t=><option key={t} value={t}>{t}</option>)}
@@ -516,8 +537,8 @@ if (editId) {
               <option value="all">All status</option>
               {Object.entries(STATUS_CFG).map(([v,c])=><option key={v} value={v}>{c.label}</option>)}
             </select>
-            {(search||filterTrade!=="all"||filterStatus!=="all") && (
-              <button className="lr-btn lr-btn--ghost lr-btn--sm" onClick={()=>{setSearch("");setFT("all");setFS("all");setPage(1);}}>Clear</button>
+            {(search||filterTrade!=="all"||filterStatus!=="all"||filterProject!=="all") && (
+              <button className="lr-btn lr-btn--ghost lr-btn--sm" onClick={()=>{setSearch("");setFT("all");setFS("all");setFP("all");setPage(1);}}>Clear</button>
             )}
           </div>
 

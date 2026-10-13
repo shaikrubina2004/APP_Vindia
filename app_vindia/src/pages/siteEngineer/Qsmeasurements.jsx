@@ -7,6 +7,7 @@ import React, {
 import api from "../../services/api";
 import "../../styles/shared-pages.css";
 import "../../styles/Qsmeasurements.css";
+import { todayISO } from "../../utils/localDate";
 
 /* ─────────────────────────────────────────────────────────
    CONSTANTS
@@ -41,7 +42,7 @@ const safeArr = (v) => {
   return [];
 };
 const toNum   = (v) => parseFloat(v) || 0;
-const nowISO  = ()  => new Date().toISOString().slice(0, 10);
+const nowISO  = ()  => todayISO();
 const fmtDate = (s) => s
   ? new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
   : "—";

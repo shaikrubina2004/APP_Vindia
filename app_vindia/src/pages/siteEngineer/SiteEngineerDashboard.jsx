@@ -8,6 +8,8 @@ import { useNotifications } from "../../context/Notificationcontext";
 import { useAutoReminders } from "../../hooks/useAutoReminders";
 import CheckInButton from "../../SharedResourse/CheckInButton";
 import "../../styles/siteEngineer.css";
+import { todayISO } from "../../utils/localDate";
+import useMyProjects from "../../hooks/useMyProjects";
 
 /* ── helpers ─────────────────────────────────────────────── */
 function makeKey(item) {
@@ -25,7 +27,8 @@ function fmtDate(d) {
 function fmtTime(d) {
   return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
-function nowISO() { return new Date().toISOString().slice(0, 10); }
+// Local calendar day (was UTC — wrong for part of every morning in India)
+function nowISO() { return todayISO(); }
 
 /* ── badge components ────────────────────────────────────── */
 function PriorityBadge({ p }) {
@@ -148,8 +151,16 @@ const [measurements, setMeasurements] = useState([]);
 
   const loaded = useRef(false);
 
+  // Real assigned project(s) — replaces the hard-coded "Al-Noor Residential Tower › Phase 2 › Block C".
+  const { projects: myProjects, activeProject, setActiveProject, loading: projectsLoading } = useMyProjects();
+
   // ── clock ──────────────────────────────────────────────────
- 
+  // Was never wired: `time` was set once at load, so the date/time in the hero froze
+  // (and stayed on yesterday after midnight). Tick every 30 s.
+  useEffect(() => {
+    const id = setInterval(() => setTime(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   // ── data load ──────────────────────────────────────────────
   useEffect(() => {
@@ -450,11 +461,41 @@ const pendingMeasurements = useMemo(
           <div className="dash-hero-left">
             <div className="dash-crumb">
               <span className="dash-crumb-dot" />
-              Al-Noor Residential Tower
-              <span className="dash-crumb-sep">›</span>
-              Phase 2
-              <span className="dash-crumb-sep">›</span>
-              <strong>Block C · ANT-PH2</strong>
+              {projectsLoading ? (
+                "Loading your project…"
+              ) : !activeProject ? (
+                <strong>No project assigned yet — ask your Project Manager</strong>
+              ) : (
+                <>
+                  {myProjects.length > 1 ? (
+                    <select
+                      className="dash-crumb-select"
+                      value={activeProject.id}
+                      onChange={(e) => setActiveProject(e.target.value)}
+                      aria-label="Switch project"
+                      title={`You are assigned to ${myProjects.length} projects`}
+                    >
+                      {myProjects.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    activeProject.name
+                  )}
+                  {activeProject.location && (
+                    <>
+                      <span className="dash-crumb-sep">›</span>
+                      {activeProject.location}
+                    </>
+                  )}
+                  {activeProject.current_phase && (
+                    <>
+                      <span className="dash-crumb-sep">›</span>
+                      <strong>{activeProject.current_phase}</strong>
+                    </>
+                  )}
+                </>
+              )}
             </div>
             <div className="dash-hero-role">Site Engineer</div>
             <h1 className="dash-hero-title">Dashboard</h1>

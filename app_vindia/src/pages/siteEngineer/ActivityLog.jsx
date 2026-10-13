@@ -5,6 +5,7 @@ import React, {
 import api from "../../services/api";
 import "../../styles/shared-pages.css";
 import "../../styles/ActivityLog.css";
+import { todayISO } from "../../utils/localDate";
 
 /* ── constants ───────────────────────────────────────────── */
 const FILTERS_KEY = "activityLog:filters:v3";
@@ -65,7 +66,7 @@ function dayKey(iso) {
 }
 
 function isToday(iso) {
-  return iso?.slice(0, 10) === new Date().toISOString().slice(0, 10);
+  return iso?.slice(0, 10) === todayISO();
 }
 
 /* ── sample data for offline demo ────────────────────────── */

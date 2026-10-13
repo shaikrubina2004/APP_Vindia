@@ -5,6 +5,7 @@ import React, {
 import api from "../../services/api";
 import operationsWbsService from "../../services/operationsWbsService";
 import "../../styles/shared-pages.css";
+import { addDaysISO } from "../../utils/localDate";
 
 const DRAFT_KEY = "matreq:draft:v3";
 const QUEUE_KEY = "matreq:queue:v3";
@@ -116,8 +117,7 @@ function StatusBadge({ s }) {
 }
 
 function plusDays(n) {
-  const d = new Date(); d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return addDaysISO(n);
 }
 /* ── Shared styles ──────────────────────────────────────── */
 const inp = {

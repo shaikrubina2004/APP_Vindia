@@ -287,10 +287,9 @@ async function transitionTimesheet(req, res, sheetId, action, comment = "") {
   }
 
   const submittedAt = ["submitted", "resubmitted"].includes(action) ? "NOW()" : "submitted_at";
-  // Parameters are built together with the SQL. Previously $2 (approver id) was
-  // always sent but only referenced when approving — PostgreSQL rejects an
-  // unreferenced parameter ("could not determine data type of parameter $2"),
-  // so submit / review / reject / request-changes / reopen all failed.
+  // Parameters are built together with the SQL. Previously $2 (approver id) was always sent but only
+  // referenced when approving — PostgreSQL rejects an unreferenced parameter ("could not determine
+  // data type of parameter $2"), so submit / review / reject / request-changes / reopen all failed.
   const updateParams = [action, sheetId];
   let approvedFields = "";
   if (action === "approved") {

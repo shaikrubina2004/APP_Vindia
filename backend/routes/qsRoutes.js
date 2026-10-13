@@ -33,9 +33,8 @@ router.get("/daily-updates/:id", c.getDailyUpdateById);
 router.post("/daily-updates", c.createDailyUpdate);
 router.patch("/daily-updates/:id", c.updateDailyUpdate);
 router.delete("/daily-updates/:id", c.deleteDailyUpdate);
-// Approval belongs to the Project Manager (the only screen that calls this).
-// Before, any role the router admits — including the QS approving their own
-// update, or a Site Engineer — could approve.
+// Approval belongs to the Project Manager (the only screen that calls this). Before, any role the
+// router admits — including the QS approving their own update, or a Site Engineer — could approve.
 router.put("/daily-updates/approve/:id", requireRole("project_manager", "project_coordinator", "ceo"), async (req, res) => {
   try {
     const pool = require("../config/db");

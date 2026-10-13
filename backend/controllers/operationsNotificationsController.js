@@ -22,7 +22,6 @@ const ROLE_TYPES = {
     "daily_update", // Operations Manager reviewed their daily update
   ],
   inventory_controller: [
-    "request",    // a request was approved — check whether stock can cover it
     "delivery",   // delivery arrived, waiting to be received into stock
     "low_stock",  // item hit or fell below minimum stock
     "receipt",    // goods receipt posted
@@ -35,6 +34,12 @@ const ROLE_TYPES = {
     "delay",     // a delivery on their PO is late
     "request",   // a material request was approved and is waiting for a PO
     "approval",  // their PO was approved / rejected by the Operations Manager
+    "incident", "task", "daily_update",
+  ],
+
+  project_manager: [
+    "approval",  // a Site Engineer asked for an approval assigned to the PM
+    "diary",     // a Site Engineer submitted the daily diary
     "incident", "task", "daily_update",
   ],
 

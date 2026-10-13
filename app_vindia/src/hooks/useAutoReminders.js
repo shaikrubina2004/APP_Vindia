@@ -4,6 +4,7 @@
 import { useEffect, useRef } from "react";
 import api from "../services/api";
 import { useNotifications } from "../context/Notificationcontext";
+import { todayISO as localTodayISO, addDaysISO } from "../utils/localDate";
 
 const CHECKED_KEY = "se:reminders:checked:v1";
 const ls = {
@@ -11,13 +12,12 @@ const ls = {
   save: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+const todayISO = localTodayISO;
 function daysAgo(iso, n) {
   return (Date.now() - new Date(iso).getTime()) > n * 86_400_000;
 }
 function isTomorrow(iso) {
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-  return iso?.slice(0, 10) === tomorrow.toISOString().slice(0, 10);
+  return iso?.slice(0, 10) === addDaysISO(1);
 }
 function isToday(iso) { return iso?.slice(0, 10) === todayISO(); }
 function isPast(iso) { return iso && iso.slice(0, 10) < todayISO(); }
