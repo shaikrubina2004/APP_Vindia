@@ -69,6 +69,11 @@ const StructuralEngineerDashboard = () => {
 // ✅ CORRECT — use activeProject which is what the context provides
 const { activeProject: selectedProject } = useProject() || {};
 const projectId = selectedProject?.id || null;
+// "Open Incidents" in the project selector is a placeholder (id = null) meaning
+// "not project-specific", so no project filter is applied for it.
+const hasRealProject =
+  !!selectedProject && selectedProject.id !== null && selectedProject.id !== undefined;
+const projectName = selectedProject?.name || selectedProject?.project_name;
 
   // ── Current user, for the check-in button ──────────────────
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -121,18 +126,24 @@ const projectId = selectedProject?.id || null;
     ],
   };
 
+  // Real incident split: open vs resolved (the old chart subtracted incidents
+  // from drawings, which meant nothing).
+  const resolvedIncidents = stats.resolvedIncidents || 0;
+  const hasIncidentData = stats.pendingIncidents + resolvedIncidents > 0;
   const pieData = {
-    labels: ["Completed", "Pending"],
+    labels: ["Open", "Resolved"],
     datasets: [
       {
-        data: [
-          Math.max(0, stats.totalDrawings - stats.pendingIncidents),
-          stats.pendingIncidents,
-        ],
-        backgroundColor: ["#22c55e", "#ef4444"],
+        data: [stats.pendingIncidents, resolvedIncidents],
+        backgroundColor: ["#ef4444", "#22c55e"],
       },
     ],
   };
+
+  const fmtDate = (d) =>
+    d
+      ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+      : "";
 
   return (
     <div className="se-container">
@@ -144,16 +155,14 @@ const projectId = selectedProject?.id || null;
       </div>
 
       {/* Project label */}
-      {selectedProject && (
-        <p style={{ color: "#6366f1", fontWeight: 600, marginBottom: 12 }}>
-          📁 Project: {selectedProject.name || selectedProject.project_name}
-        </p>
-      )}
+      <p style={{ color: "#6366f1", fontWeight: 600, marginBottom: 12 }}>
+        📁 {hasRealProject ? `Project: ${projectName}` : "Showing: all projects"}
+      </p>
 
       {/* Alert strip */}
       {stats.pendingIncidents > 0 && (
         <div className="se-alert">
-          ⚠️ {stats.pendingIncidents} critical issues need attention
+          ⚠️ {stats.pendingIncidents} open incident{stats.pendingIncidents !== 1 ? "s" : ""} need attention
         </div>
       )}
 
@@ -166,11 +175,9 @@ const projectId = selectedProject?.id || null;
           <div className="card-icon">📐</div>
           <h3>Total Drawings</h3>
           <p><CountUp end={stats.totalDrawings} duration={1.5} /></p>
-          {selectedProject && (
-            <small style={{ color: "#94a3b8", fontSize: 11 }}>
-              in {selectedProject.name || selectedProject.project_name}
-            </small>
-          )}
+          <small style={{ color: "#94a3b8", fontSize: 11 }}>
+            {hasRealProject ? `in ${projectName}` : "across all projects"}
+          </small>
         </div>
 
         <div
@@ -234,25 +241,46 @@ const projectId = selectedProject?.id || null;
             onClick={() => navigate("/structural-engineer/incidents")}
             style={{ cursor: "pointer" }}
           >
-            <h3>Distribution</h3>
-            <Doughnut data={pieData} options={{ maintainAspectRatio: false }} />
+            <h3>Incident Status</h3>
+            {hasIncidentData ? (
+              <Doughnut data={pieData} options={{ maintainAspectRatio: false }} />
+            ) : (
+              <p style={{ color: "#94a3b8", textAlign: "center", marginTop: 60 }}>
+                No incidents yet
+              </p>
+            )}
           </div>
         </ErrorBoundary>
       </div>
 
       {/* ── ACTIVITY ────────────────────────────────────────────────────── */}
-      <div
-        className="se-activity-box"
-        onClick={() => navigate("/structural-engineer/daily-updates")}
-        style={{ cursor: "pointer" }}
-      >
+      <div className="se-activity-box">
         <h2>Recent Activity</h2>
         <ul>
-          {activity?.map((item, i) => (
-            <li key={i}>
-              {item.type === "drawing" ? "📄" : "⚠️"} {item.text}
-            </li>
-          ))}
+          {Array.isArray(activity) && activity.length === 0 && (
+            <li style={{ color: "#94a3b8" }}>No recent activity</li>
+          )}
+          {Array.isArray(activity) &&
+            activity.map((item, i) => (
+              <li
+                key={i}
+                style={{ cursor: "pointer" }}
+                onClick={() =>
+                  navigate(
+                    item.type === "drawing"
+                      ? "/structural-engineer/shared/drawings"
+                      : "/structural-engineer/incidents",
+                  )
+                }
+              >
+                {item.type === "drawing" ? "📄" : "⚠️"} {item.text}
+                {item.at && (
+                  <span style={{ color: "#94a3b8", marginLeft: 8, fontSize: 12 }}>
+                    · {fmtDate(item.at)}
+                  </span>
+                )}
+              </li>
+            ))}
         </ul>
       </div>
     </div>

@@ -112,13 +112,30 @@ router.get("/dashboard", SE_OR_CEO, async (req, res) => {
       }
     }
 
-    // ── Pending incidents ──────────────────────────────────────────────
+    // ── Incidents (open vs resolved) ───────────────────────────────────
+    // Same rules as the Incidents page: statuses are 'Pending', 'In Progress',
+    // 'Resolved', 'Closed' (capitalised), and a user sees only incidents they
+    // created or that are assigned to them. (The old query looked for the
+    // lowercase 'pending', so it always returned 0.)
     let incidentsCount = 0;
+    let resolvedCount = 0;
     try {
+      const incParams = [req.user.id];
+      let projectFilter = "";
+      if (project_id) {
+        incParams.push(project_id);
+        projectFilter = " AND project_id = $2";
+      }
       const ir = await pool.query(
-        "SELECT COUNT(*) FROM incidents WHERE status = 'pending'",
+        `SELECT
+           COUNT(*) FILTER (WHERE status NOT IN ('Resolved','Closed')) AS open,
+           COUNT(*) FILTER (WHERE status IN ('Resolved','Closed'))     AS resolved
+         FROM incidents
+         WHERE (created_by_id = $1 OR assigned_to_id = $1)${projectFilter}`,
+        incParams,
       );
-      incidentsCount = parseInt(ir.rows[0].count, 10);
+      incidentsCount = parseInt(ir.rows[0].open, 10) || 0;
+      resolvedCount = parseInt(ir.rows[0].resolved, 10) || 0;
     } catch {
       console.log("⚠️  incidents table missing");
     }
@@ -137,7 +154,8 @@ router.get("/dashboard", SE_OR_CEO, async (req, res) => {
     return res.json({
       totalDrawings: drawingsCount,
       latestVersion,
-      pendingIncidents: incidentsCount,
+      pendingIncidents: incidentsCount, // open incidents (kept name for the UI)
+      resolvedIncidents: resolvedCount,
       notifications: notificationsCount,
     });
   } catch (err) {
@@ -271,10 +289,14 @@ router.get("/recent-activity", SE_OR_CEO, async (req, res) => {
       "SELECT name, created_at FROM drawings ORDER BY created_at DESC LIMIT 3",
     );
 
+    // Only incidents this user created or was assigned (same as the Incidents page).
     let incidents = { rows: [] };
     try {
       incidents = await pool.query(
-        "SELECT title, created_at FROM incidents ORDER BY created_at DESC LIMIT 2",
+        `SELECT title, created_at FROM incidents
+         WHERE created_by_id = $1 OR assigned_to_id = $1
+         ORDER BY created_at DESC LIMIT 2`,
+        [req.user.id],
       );
     } catch {
       /* incidents table may not exist */
@@ -284,10 +306,12 @@ router.get("/recent-activity", SE_OR_CEO, async (req, res) => {
       ...drawings.rows.map((d) => ({
         type: "drawing",
         text: `New drawing uploaded: ${d.name}`,
+        at: d.created_at,
       })),
       ...incidents.rows.map((i) => ({
         type: "incident",
         text: `Issue reported: ${i.title}`,
+        at: i.created_at,
       })),
     ];
 
