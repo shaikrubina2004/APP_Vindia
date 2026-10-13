@@ -5,6 +5,8 @@ import { ClipboardList, Users, Laptop, AlertTriangle, RefreshCw, Plus, Inbox, Do
 import officeAdminService from "../../../services/officeAdminService";
 import CheckInButton from "../../../SharedResourse/CheckInButton";
 import StatusBadge from "../shared/StatusBadge";
+import OpsHero from "../shared/OpsHero";
+import { useAuth } from "../../../context/useAuth";
 import { fmtDate, fmtDateTime, errorText } from "../shared/opsFormat";
 import "../shared/operationsHub.css";
 
@@ -20,7 +22,10 @@ const Kpi = ({ icon: Icon, tone, label, value, sub, to }) => (
 export default function OfficeAdministratorDashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  const user = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; } })();
+  const { user } = useAuth();
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const employeeName = user?.employee_name || user?.name || "there";
 
   const load = useCallback(async () => {
     setError("");
@@ -38,14 +43,18 @@ export default function OfficeAdministratorDashboard() {
   const s = data.stats;
   return (
     <div className="ops-page">
-      <div className="ops-header">
-        <div><h1 className="ops-title">Office Administration</h1><p className="ops-subtitle">Requests, visitors and company assets</p></div>
-        <div className="ops-flex-center">
-          <CheckInButton employeeId={user?.id || null} designation={user?.designation || user?.role || null} />
-          <button className="ops-icon-btn" onClick={load} title="Refresh"><RefreshCw size={16} /></button>
-          <Link to="/operations/administrator/requests" className="ops-btn ops-btn-primary"><Plus size={16} /> New request</Link>
-        </div>
-      </div>
+      <OpsHero
+        eyebrow="Office Administration"
+        title={`${greeting}, ${employeeName} 👋`}
+        subtitle="Requests, visitors and company assets — all in one place."
+        actions={
+          <>
+            <CheckInButton employeeId={user?.id || null} designation={user?.designation || user?.role || null} />
+            <button className="ops-icon-btn" onClick={load} title="Refresh" aria-label="Refresh dashboard"><RefreshCw size={16} /></button>
+            <Link to="/operations/administrator/requests" className="ops-btn ops-btn-primary"><Plus size={16} /> New request</Link>
+          </>
+        }
+      />
 
       <div className="ops-kpi-grid hub-kpi-4">
         <Kpi icon={ClipboardList} tone="indigo" label="Open requests" value={s.open_requests}

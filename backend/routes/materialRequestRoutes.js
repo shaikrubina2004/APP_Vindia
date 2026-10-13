@@ -55,6 +55,15 @@ router.put(
   controller.updateRequest
 );
 
+// Assign project + WBS to a request created before WBS tracking existed
+// (the migration does not backfill, and a PO needs it).
+router.put(
+  "/:id/wbs",
+  authMiddleware,
+  requireRole("project_coordinator", "procurement_officer", "operations_manager", "ceo"),
+  controller.assignWbs
+);
+
 // Delivery
 router.post(
   "/delivery",

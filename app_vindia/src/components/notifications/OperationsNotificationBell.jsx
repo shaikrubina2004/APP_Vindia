@@ -38,7 +38,7 @@ const SEV_COLOR = {
    backend/controllers/operationsNotificationsController.js            */
 const ROLE_FILTERS = {
   logistics_coordinator: ["all", "delivery", "delay", "receipt", "incident", "task", "daily_update"],
-  inventory_controller:  ["all", "delivery", "low_stock", "receipt", "incident", "task", "daily_update"],
+  inventory_controller:  ["all", "request", "delivery", "low_stock", "receipt", "incident", "task", "daily_update"],
   operations_manager:    ["all", "approval", "delay", "receipt", "low_stock", "daily_update", "incident", "task"],
   office_administrator:  ["all", "request", "daily_update", "incident", "task"],
   finance_manager:       ["all", "incident", "task"],

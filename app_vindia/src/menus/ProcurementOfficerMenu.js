@@ -24,6 +24,12 @@ export const procurementOfficerMenu = [
   },
 
   {
+    name: "Delivery Follow-up",
+    path: "/operations/procurement/delivery-follow-up",
+    icon: "truck",
+  },
+
+  {
     name: "Incidents",
     path: "/operations/procurement/incidents",
     icon: "alert-triangle",

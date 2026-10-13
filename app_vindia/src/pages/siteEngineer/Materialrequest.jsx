@@ -3,6 +3,7 @@ import React, {
   useCallback, useEffect, useMemo, useRef, useState,
 } from "react";
 import api from "../../services/api";
+import operationsWbsService from "../../services/operationsWbsService";
 import "../../styles/shared-pages.css";
 
 const DRAFT_KEY = "matreq:draft:v3";
@@ -13,8 +14,15 @@ const UNITS      = ["nos","kg","tonne","m³","m²","m","bag","litre","roll","set
 const CATEGORIES = ["Concrete & Cement","Steel & Rebar","Formwork","Masonry","MEP","Finishing","Safety","Other"];
 const BLANK_ITEM = { description: "", category: "Steel & Rebar", qty: "", unit: "kg", spec: "" };
 const BLANK      = {
-  project: "", zone: "", required_by: "",
-  purpose: "", linked_activity: "",
+  project: "",
+  project_id: "",
+  wbs_id: "",
+  wbs_code: "",
+  wbs_name: "",
+  zone: "",
+  required_by: "",
+  purpose: "",
+  linked_activity: "",
   items: [{ ...BLANK_ITEM }],
   notes: "",
 };
@@ -44,6 +52,16 @@ async function flushQueue() {
   ls.save(QUEUE_KEY, rem);
 }
 
+function flattenWbs(rows = []) {
+  const result = [];
+  const visit = (row, level = 0) => {
+    result.push({ ...row, _level: level });
+    (row.tasks || []).forEach((task) => visit(task, level + 1));
+  };
+  rows.forEach((row) => visit(row, 0));
+  return result;
+}
+
 function stableKey(it) {
   if (!it) return "";
   if (it.id != null) return String(it.id);
@@ -59,6 +77,14 @@ function validate(f) {
 
   if (!f.required_by) {
     e.required_by = "Required-by date is needed";
+  }
+
+  if (!f.project_id) {
+    e.project_id = "Select a project";
+  }
+
+  if (!f.wbs_id) {
+    e.wbs_id = "Select a WBS activity";
   }
 
   const validItems = f.items.filter(
@@ -124,6 +150,9 @@ const grid2    = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 };
   const autoSave = useRef(null);
   const alive    = useRef(true);
   const [editingId, setEditingId] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [wbsRows, setWbsRows] = useState([]);
+  const [wbsLoading, setWbsLoading] = useState(false);
   
   useEffect(() => {
     alive.current = true;
@@ -131,6 +160,61 @@ const grid2    = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 };
     flushQueue().catch(() => {});
     return () => { alive.current = false; clearTimeout(autoSave.current); };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      try {
+        const res = await api.get("/projects");
+        const list = Array.isArray(res.data)
+          ? res.data
+          : res.data?.projects || [];
+
+        if (active) setProjects(list);
+      } catch (err) {
+        console.error("PROJECT LOAD ERROR:", err);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!form.project_id) {
+      setWbsRows([]);
+      return;
+    }
+
+    let active = true;
+    setWbsLoading(true);
+
+    operationsWbsService
+      .getProjectWbsTree(form.project_id)
+      .then((res) => {
+        if (!active) return;
+        setWbsRows(
+          flattenWbs(
+            Array.isArray(res.data) ? res.data : []
+          )
+        );
+      })
+      .catch((err) => {
+        if (active) {
+          setWbsRows([]);
+          console.error("WBS LOAD ERROR:", err);
+        }
+      })
+      .finally(() => {
+        if (active) setWbsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [form.project_id]);
 
   useEffect(() => {
     clearTimeout(autoSave.current);
@@ -184,6 +268,52 @@ const grid2    = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 };
     setErrors(e => { const c = { ...e }; delete c[k]; return c; });
     setStatus("");
   }, []);
+
+  const handleProjectChange = useCallback((value) => {
+    const selected = projects.find(
+      (p) => String(p.id) === String(value)
+    );
+
+    setForm((f) => ({
+      ...f,
+      project_id: value,
+      project: selected?.name || "",
+      wbs_id: "",
+      wbs_code: "",
+      wbs_name: "",
+    }));
+
+    setErrors((e) => {
+      const next = { ...e };
+      delete next.project_id;
+      delete next.wbs_id;
+      return next;
+    });
+
+    setStatus("");
+  }, [projects]);
+
+  const handleWbsChange = useCallback((value) => {
+    const selected = wbsRows.find(
+      (row) => String(row.id) === String(value)
+    );
+
+    setForm((f) => ({
+      ...f,
+      wbs_id: value,
+      wbs_code: selected?.code || "",
+      wbs_name: selected?.name || "",
+      linked_activity: selected?.name || f.linked_activity,
+    }));
+
+    setErrors((e) => {
+      const next = { ...e };
+      delete next.wbs_id;
+      return next;
+    });
+
+    setStatus("");
+  }, [wbsRows]);
 
   const setItem   = useCallback((i, k, v) => setForm(f => { const items = [...f.items]; items[i] = { ...items[i], [k]: v }; return { ...f, items }; }), []);
   const addItem   = useCallback(() => setForm(f => ({ ...f, items: [...f.items, { ...BLANK_ITEM }] })), []);
@@ -273,7 +403,7 @@ const grid2    = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 };
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".12em", color: "var(--color-text-tertiary)", marginBottom: 4 }}>Procurement</div>
         <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0 }}>Material Request</h1>
-        <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 4 }}>Request materials → sent to Procurement for approval</div>
+        <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 4 }}>Request materials → Project Coordinator approval → Procurement</div>
       </div>
 
       {/* 2-COLUMN GRID */}
@@ -300,8 +430,53 @@ const grid2    = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 };
                   <div style={secTitle}>Request Details</div>
                   <div style={grid2}>
                     <div>
-                      <label style={lbl}>Project / Site</label>
-                      <input style={inp} value={form.project} onChange={e => setF("project", e.target.value)} placeholder="Block C · Phase 2" />
+                      <label style={lbl}>Project / Site *</label>
+                      <select
+                        style={inp}
+                        value={form.project_id}
+                        onChange={(e) => handleProjectChange(e.target.value)}
+                      >
+                        <option value="">Select project…</option>
+                        {projects.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.project_id && (
+                        <div style={{ fontSize: 11, color: "#b83232", marginTop: 4 }}>
+                          {errors.project_id}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label style={lbl}>WBS Activity *</label>
+                      <select
+                        style={inp}
+                        value={form.wbs_id}
+                        onChange={(e) => handleWbsChange(e.target.value)}
+                        disabled={!form.project_id || wbsLoading}
+                      >
+                        <option value="">
+                          {!form.project_id
+                            ? "Select project first…"
+                            : wbsLoading
+                              ? "Loading WBS…"
+                              : "Select WBS activity…"}
+                        </option>
+                        {wbsRows.map((row) => (
+                          <option key={row.id} value={row.id}>
+                            {row.code ? `${row.code} — ` : ""}
+                            {"  ".repeat(row._level || 0)}
+                            {row.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.wbs_id && (
+                        <div style={{ fontSize: 11, color: "#b83232", marginTop: 4 }}>
+                          {errors.wbs_id}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label style={lbl}>Zone / Area</label>
@@ -448,6 +623,8 @@ const grid2    = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 };
                           <div style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "flex", gap: 12, flexWrap: "wrap" }}>
                             {r.zone          && <span>Zone: {r.zone}</span>}
                             {r.required_by   && <span>Required by: {fmtDate(r.required_by)}</span>}
+                            {r.project_name && <span>Project: {r.project_name}</span>}
+                            {r.wbs_code && <span>WBS: {r.wbs_code} — {r.wbs_name || ""}</span>}
                             {r.linked_activity && <span>Activity: {r.linked_activity}</span>}
                             {r.createdAt     && <span>Raised: {new Date(r.createdAt).toLocaleDateString("en-GB")}</span>}
                           </div>

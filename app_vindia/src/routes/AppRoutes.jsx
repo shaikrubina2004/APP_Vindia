@@ -223,7 +223,9 @@ import BDAReportsWithRole from "../pages/business-development/business-developme
 
 /* ── OPERATIONS & ADMINISTRATION ─────────────────────────── */
 
-import OfficeAdministratorDashboard from "../pages/operations/administrator/OfficeAdministratorDashboard";
+import OfficeAdministratorRoutes from "./OfficeAdministratorRoutes";
+import DeliveryFollowUp from "../pages/operations/procurement/DeliveryFollowUp";
+import ProjectManagerLabour from "../pages/projects/projectmanager/Projectmanagerlabour";
 
 import ProcurementOfficerDashboard from "../pages/operations/procurement/ProcurementOfficerDashboard";
 
@@ -316,6 +318,11 @@ import RoleLayout from "../layouts/RoleLayout";
 
 
 const AppRoutes = () => {
+
+// Every internal (non-client) role. Used by shared pages such as Timesheet —
+  // dashboardRouter sends employee-type roles to /timesheet, so that route MUST
+  // admit them or ProtectedRoute redirects back to /timesheet forever.
+  const INTERNAL_ROLES = Object.values(ROLES).filter((role) => role !== ROLES.CLIENT);
 
   const PROJECT_ROLES = [
 
@@ -1905,7 +1912,7 @@ const AppRoutes = () => {
 
             <ProtectedRoute
 
-              allowedRoles={[ROLES.CEO, ROLES.HR_MANAGER, ...PROJECT_ROLES]}
+allowedRoles={INTERNAL_ROLES}
 
             >
 
@@ -2191,24 +2198,40 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-<Route
-
-          path="/operations/administrator/dashboard"
-
+{/* Office Administrator — every screen is declared in routes/OfficeAdministratorRoutes.jsx
+            (was a single dashboard route, so Requests / Visitors / Assets were unreachable). */}
+        <Route
+          path="/operations/administrator/*"
           element={
-
             <ProtectedRoute allowedRoles={[ROLES.OFFICE_ADMINISTRATOR]}>
-
               <OfficeAdministratorLayout>
-
-                <OfficeAdministratorDashboard />
-
+                <OfficeAdministratorRoutes />
               </OfficeAdministratorLayout>
-
             </ProtectedRoute>
-
           }
+        />
 
+        <Route
+          path="/operations/procurement/delivery-follow-up"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <DeliveryFollowUp />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Was linked from the PM menu but never routed (404). */}
+        <Route
+          path="/pm/labour"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
+              <ProjectManagerLayout>
+                <ProjectManagerLabour />
+              </ProjectManagerLayout>
+            </ProtectedRoute>
+          }
         />
 
 

@@ -57,9 +57,16 @@ const Procurement = {
   ───────────────────────────── */
   getApprovedUnlinkedRequests: async () => {
     const result = await pool.query(
-      `SELECT mr.*, u.name AS requested_by_name
+      `SELECT
+         mr.*,
+         u.name AS requested_by_name,
+         w.code AS wbs_code,
+         w.name AS wbs_name,
+         p.name AS project_name
        FROM material_requests mr
        LEFT JOIN users u ON u.id = mr.created_by
+       LEFT JOIN wbs w ON w.id = mr.wbs_id
+       LEFT JOIN projects p ON p.id = mr.project_id
        WHERE mr.status = 'approved'
          AND NOT EXISTS (
            SELECT 1 FROM purchase_orders po
@@ -93,11 +100,23 @@ const Procurement = {
     try {
       await client.query("BEGIN");
 
+      if (!material_request_id) {
+        const e = new Error("A purchase order must originate from an approved material request");
+        e.status = 400;
+        throw e;
+      }
+
+      let resolvedProjectId = null;
+      let resolvedWbsId = null;
+
       // Serialise on the material request so two officers cannot both raise
       // a PO for the same request.
       if (material_request_id) {
         const mr = await client.query(
-          "SELECT id, status FROM material_requests WHERE id = $1 FOR UPDATE",
+          `SELECT id, status, project_id, wbs_id
+           FROM material_requests
+           WHERE id = $1
+           FOR UPDATE`,
           [material_request_id]
         );
         if (!mr.rows.length) {
@@ -110,6 +129,29 @@ const Procurement = {
           e.status = 400;
           throw e;
         }
+
+        if (!mr.rows[0].project_id || !mr.rows[0].wbs_id) {
+          const e = new Error(
+            "This material request is missing its project/WBS reference. Edit or recreate the request with a valid WBS activity."
+          );
+          e.status = 400;
+          throw e;
+        }
+
+        resolvedProjectId = mr.rows[0].project_id;
+        resolvedWbsId = mr.rows[0].wbs_id;
+
+        if (
+          project_id &&
+          String(project_id) !== String(mr.rows[0].project_id)
+        ) {
+          const e = new Error(
+            "The PO project does not match the approved material request project"
+          );
+          e.status = 400;
+          throw e;
+        }
+
         const dup = await client.query(
           `SELECT po_code FROM purchase_orders
            WHERE material_request_id = $1 AND status NOT IN ('cancelled','rejected')
@@ -134,15 +176,16 @@ const Procurement = {
 
       const poResult = await client.query(
         `INSERT INTO purchase_orders
-           (po_code, material_request_id, vendor_id, project_id, status, created_by,
+           (po_code, material_request_id, vendor_id, project_id, wbs_id, status, created_by,
             total_amount, expected_delivery_date, payment_terms, remarks, approval_required)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          RETURNING *`,
         [
           po_code,
           material_request_id,
           vendor_id,
-          project_id,
+          resolvedProjectId || project_id,
+          resolvedWbsId,
           status,
           created_by,
           total,

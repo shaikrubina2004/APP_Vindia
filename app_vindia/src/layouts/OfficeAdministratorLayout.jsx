@@ -1,4 +1,5 @@
 import "../styles/rolePortal.css";
+import "../styles/opsTheme.css";
 import AppLayout from "./AppLayout";
 import OfficeAdministratorMenu from "../menus/OfficeAdministratorMenu";
 import { ProjectProvider } from "../context/ProjectContext";

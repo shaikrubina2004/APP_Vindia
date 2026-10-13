@@ -218,9 +218,13 @@ const moneyOps = (v) => {
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? n : NaN;
 };
+// `pending` is the other module's default for a NEW request. It only means
+// "waiting for the Operations Manager" when the request was flagged as over the
+// office spend limit — that case is stored as `awaiting_approval`. Mapping every
+// `pending` to awaiting_approval made every small request look blocked.
 const requestStatusOut = (s) =>
   ({
-    pending: "awaiting_approval",
+    pending: "open",
     approved: "open",
     completed: "resolved",
     cancelled: "closed",
@@ -232,7 +236,7 @@ exports.getDashboard = async (req, res) => {
       await opsPool.query(`
       SELECT
         (SELECT COUNT(*) FROM office_requests WHERE status IN ('pending','approved','in_progress','awaiting_approval','open'))::int AS open_requests,
-        (SELECT COUNT(*) FROM office_requests WHERE status IN ('pending','awaiting_approval'))::int AS awaiting_approval,
+        (SELECT COUNT(*) FROM office_requests WHERE status = 'awaiting_approval')::int AS awaiting_approval,
         (SELECT COUNT(*) FROM office_requests WHERE priority='urgent' AND status IN ('pending','approved','in_progress','awaiting_approval','open'))::int AS urgent,
         (SELECT COUNT(*) FROM office_requests WHERE COALESCE(needed_by,due_date) < CURRENT_DATE AND status IN ('pending','approved','in_progress','awaiting_approval','open'))::int AS overdue,
         (SELECT COUNT(*) FROM office_requests WHERE status IN ('completed','resolved','closed') AND COALESCE(resolved_at,completed_at) >= date_trunc('month',CURRENT_DATE))::int AS resolved_this_month,
@@ -285,7 +289,7 @@ exports.getRequests = async (req, res) => {
           "r.status IN ('pending','approved','in_progress','awaiting_approval','open')",
         );
       else if (status === "awaiting_approval")
-        where.push("r.status IN ('pending','awaiting_approval')");
+        where.push("r.status = 'awaiting_approval'");
       else {
         vals.push(status);
         where.push(`r.status=$${vals.length}`);
@@ -389,7 +393,7 @@ exports.updateRequestStatusV2 = async (req, res) => {
     const id = req.params.id;
     const map = {
       open: "approved",
-      awaiting_approval: "pending",
+      awaiting_approval: "awaiting_approval",
       in_progress: "in_progress",
       resolved: "completed",
       closed: "completed",
@@ -406,8 +410,12 @@ exports.updateRequestStatusV2 = async (req, res) => {
     ).rows[0];
     if (!cur) return res.status(404).json({ error: "Request not found" });
     const manager = ["operations_manager", "ceo"].includes(req.user.role);
+    // Only a request that is actually over the limit needs the manager.
+    const needsManager =
+      cur.status === "awaiting_approval" ||
+      (cur.status === "pending" && cur.approval_required === true);
     if (
-      (cur.status === "pending" || cur.status === "awaiting_approval") &&
+      needsManager &&
       [
         "open",
         "approved",
@@ -426,8 +434,7 @@ exports.updateRequestStatusV2 = async (req, res) => {
         .status(400)
         .json({ error: "A note is required to reject a request" });
     const decided =
-      (cur.status === "pending" || cur.status === "awaiting_approval") &&
-      ["open", "approved", "rejected"].includes(status);
+      needsManager && ["open", "approved", "rejected"].includes(status);
     const r = await opsPool.query(
       `UPDATE office_requests SET status=$1, completed_at=CASE WHEN $1 IN ('completed','cancelled') THEN NOW() ELSE completed_at END, resolution_note=COALESCE($2,resolution_note), approved_by=CASE WHEN $4 THEN $3 ELSE approved_by END, approved_at=CASE WHEN $4 THEN NOW() ELSE approved_at END, updated_at=NOW() WHERE id=$5 RETURNING *`,
       [map[status], note, req.user.id, decided, id],

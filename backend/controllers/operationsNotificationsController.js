@@ -22,6 +22,7 @@ const ROLE_TYPES = {
     "daily_update", // Operations Manager reviewed their daily update
   ],
   inventory_controller: [
+    "request",    // a request was approved — check whether stock can cover it
     "delivery",   // delivery arrived, waiting to be received into stock
     "low_stock",  // item hit or fell below minimum stock
     "receipt",    // goods receipt posted

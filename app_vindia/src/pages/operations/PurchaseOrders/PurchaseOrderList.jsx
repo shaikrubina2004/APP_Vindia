@@ -96,6 +96,7 @@ const PurchaseOrderList = () => {
               <th>PO Code</th>
               <th>Vendor</th>
               <th>Project</th>
+              <th>WBS</th>
               <th>Items</th>
               <th>Status</th>
               <th>Created</th>
@@ -110,6 +111,7 @@ const PurchaseOrderList = () => {
                 <td>{po.po_code}</td>
                 <td>{po.vendor_name || "—"}</td>
                 <td>{po.project_name || "—"}</td>
+                <td>{po.wbs_code ? `${po.wbs_code} — ${po.wbs_name || ""}` : "—"}</td>
                 <td>{Array.isArray(po.items) ? po.items.length : 0}</td>
                 <td>
                   <span className={statusClass(po.status)}>

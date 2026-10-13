@@ -3,7 +3,6 @@ import { Search, ClipboardList, RefreshCw } from "lucide-react";
 import operationsService from "../../../services/operationsService";
 import StatusBadge from "../shared/StatusBadge";
 import OpsModal from "../shared/OpsModal";
-import ReasonModal from "../shared/ReasonModal";
 import { fmtDate, parseItems, isOverdue, errorText } from "../shared/opsFormat";
 import "../shared/operationsHub.css";
 
@@ -16,7 +15,6 @@ export default function MaterialRequestsOverview() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(null);
-  const [reject, setReject] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -30,15 +28,10 @@ export default function MaterialRequestsOverview() {
     (tab === "all" || r.status === tab) &&
     (!q || `${r.project} ${r.zone} ${r.purpose} ${r.requested_by_name}`.toLowerCase().includes(q.toLowerCase()))), [rows, tab, q]);
 
-  const approve = async (r) => {
-    try { await operationsService.decideMaterialRequest(r.id, "approved"); setOpen(null); await load(); }
-    catch (e) { setError(errorText(e, "Approval failed")); }
-  };
-
   return (
     <div className="ops-page">
       <div className="ops-header">
-        <div><h1 className="ops-title">Material Requests</h1><p className="ops-subtitle">Every site request, from request to delivery</p></div>
+        <div><h1 className="ops-title">Material Requests</h1><p className="ops-subtitle">Site request → Project Coordinator approves → Operations fulfils. Read-only view.</p></div>
         <button className="ops-icon-btn" onClick={load} title="Refresh"><RefreshCw size={16} /></button>
       </div>
       {error && <div className="ops-alert ops-alert-error">{error}</div>}
@@ -72,14 +65,12 @@ export default function MaterialRequestsOverview() {
           })}</tbody></table></div>)}
       </div>
 
-      {open && !reject && (
+      {open && (
         <OpsModal wide title={`Request — ${open.project || ""}`} onClose={() => setOpen(null)}
-          footer={<>
-            {open.status === "requested" && <>
-              <button className="ops-btn ops-btn-danger" onClick={() => setReject(open)}>Reject</button>
-              <button className="ops-btn ops-btn-primary" onClick={() => approve(open)}>Approve</button></>}
-            {open.status !== "requested" && <button className="ops-btn ops-btn-outline" onClick={() => setOpen(null)}>Close</button>}
-          </>}>
+          footer={<button className="ops-btn ops-btn-outline" onClick={() => setOpen(null)}>Close</button>}>
+          {open.status === "requested" && (
+            <div className="hub-warn-note">Waiting for the Project Coordinator to approve. Operations picks it up once it is approved.</div>
+          )}
           <dl className="hub-detail">
             <dt>Status</dt><dd><StatusBadge status={open.status} /></dd>
             <dt>Zone</dt><dd>{open.zone || "—"}</dd><dt>Purpose</dt><dd>{open.purpose || "—"}</dd>
@@ -93,9 +84,6 @@ export default function MaterialRequestsOverview() {
             <tbody>{parseItems(open.items).map((i, k) => (<tr key={k}><td className="hub-strong">{i.name || i.item_name}</td><td>{i.qty}</td><td>{i.unit || "—"}</td></tr>))}</tbody>
           </table></div>
         </OpsModal>)}
-      {reject && <ReasonModal title="Reject request" confirmText="Reject"
-        onConfirm={async (reason) => { await operationsService.decideMaterialRequest(reject.id, "rejected", reason); setReject(null); setOpen(null); await load(); }}
-        onClose={() => setReject(null)} />}
     </div>
   );
 }

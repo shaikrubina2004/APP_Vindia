@@ -14,6 +14,22 @@ const calcTotal = (items) => {
   return items.reduce((sum, it) => sum + Number(it.qty || 0), 0);
 };
 
+/* Validate that the selected WBS belongs to the selected project.
+   BUG FIXED: the arguments were passed as [projectId, wbsId] while the SQL reads
+   "w.id = $1 AND w.project_id = $2", i.e. swapped — it looked for "WBS #<project>
+   inside project #<wbs>", so every valid request was rejected with "WBS does not
+   belong to the project" and no Site Engineer could create a material request. */
+const validateWbsReference = async (projectId, wbsId) => {
+  const result = await pool.query(
+    `SELECT w.id, w.code, w.name, w.project_id, p.name AS project_name
+     FROM wbs w
+     JOIN projects p ON p.id = w.project_id
+     WHERE w.id = $1 AND w.project_id = $2`,
+    [wbsId, projectId]
+  );
+  return result.rows[0] || null;
+};
+
 /* ─────────────────────────────
    GET ALL REQUESTS
 ───────────────────────────── */
@@ -44,9 +60,16 @@ exports.getRequests = async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT mr.*, u.name AS requested_by_name
+      `SELECT
+         mr.*,
+         u.name AS requested_by_name,
+         w.code AS wbs_code,
+         w.name AS wbs_name,
+         p.name AS project_name
        FROM material_requests mr
        LEFT JOIN users u ON u.id = mr.created_by
+       LEFT JOIN wbs w ON w.id = mr.wbs_id
+       LEFT JOIN projects p ON p.id = mr.project_id
        ${where}
        ORDER BY mr.created_at DESC`,
       values
@@ -68,6 +91,8 @@ exports.createRequest = async (req, res) => {
   try {
     const {
       project,
+      project_id,
+      wbs_id,
       zone,
       purpose,
       items,
@@ -79,6 +104,24 @@ exports.createRequest = async (req, res) => {
     if (!purpose || !items) {
       return res.status(400).json({
         error: "Purpose and items are required",
+      });
+    }
+
+    const projectId = Number(project_id);
+    const wbsId = Number(wbs_id);
+
+    if (!Number.isInteger(projectId) || projectId <= 0) {
+      return res.status(400).json({ error: "A valid project_id is required" });
+    }
+
+    if (!Number.isInteger(wbsId) || wbsId <= 0) {
+      return res.status(400).json({ error: "A valid wbs_id is required" });
+    }
+
+    const wbs = await validateWbsReference(projectId, wbsId);
+    if (!wbs) {
+      return res.status(400).json({
+        error: "Selected WBS activity does not belong to the selected project",
       });
     }
     const userId = req.user?.id;
@@ -97,23 +140,27 @@ if (!userId) {
     const result = await pool.query(
       `INSERT INTO material_requests
       (
-  project,
-  zone,
-  purpose,
-  items,
-  status,
-  required_by,
-  linked_activity,
-  notes,
-  total_qty,
-  delivered_qty,
-  received_qty,
-  created_by
-)
-VALUES ($1,$2,$3,$4,'requested',$5,$6,$7,$8,0,0,$9)
+        project,
+        project_id,
+        wbs_id,
+        zone,
+        purpose,
+        items,
+        status,
+        required_by,
+        linked_activity,
+        notes,
+        total_qty,
+        delivered_qty,
+        received_qty,
+        created_by
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,'requested',$7,$8,$9,$10,0,0,$11)
       RETURNING *`,
       [
-        project,
+        wbs.project_name,
+        projectId,
+        wbsId,
         zone,
         purpose,
         JSON.stringify(parsedItems),
@@ -175,16 +222,31 @@ exports.updateRequest = async (req, res) => {
     }
 
     // Audit trail: who decided, when, and (for a rejection) why.
-    const result = await pool.query(
-      `UPDATE material_requests
-       SET status = $1,
-           approved_by = $2,
-           approved_at = NOW(),
-           rejection_reason = $3
-       WHERE id = $4 AND status = 'requested'
-       RETURNING *`,
-      [status, req.user.id, status === "rejected" ? reason : null, id]
-    );
+    // If the audit columns have not been migrated yet (Postgres 42703 =
+    // undefined_column) fall back to a plain status update so approvals are
+    // never blocked by a pending migration (run `npm run migrate:ops-compat`).
+    let result;
+    try {
+      result = await pool.query(
+        `UPDATE material_requests
+         SET status = $1,
+             approved_by = $2,
+             approved_at = NOW(),
+             rejection_reason = $3
+         WHERE id = $4 AND status = 'requested'
+         RETURNING *`,
+        [status, req.user.id, status === "rejected" ? reason : null, id]
+      );
+    } catch (auditErr) {
+      if (auditErr.code !== "42703") throw auditErr;
+      console.warn("material_requests audit columns missing — run `npm run migrate:ops-compat`. Using status-only update.");
+      result = await pool.query(
+        `UPDATE material_requests SET status = $1
+         WHERE id = $2 AND status = 'requested'
+         RETURNING *`,
+        [status, id]
+      );
+    }
 
     if (!result.rows.length) {
       return res.status(409).json({
@@ -205,6 +267,17 @@ exports.updateRequest = async (req, res) => {
           "Approved request awaiting a PO",
           label,
           "/operations/procurement/purchase-requests",
+          "info",
+          null,
+          Number(id)
+        );
+        // Operations takes over: Inventory checks whether stock already covers it.
+        await notifyRole(
+          "inventory_controller",
+          "request",
+          "Approved request — check stock first",
+          label,
+          "/operations/inventory/stock-out",
           "info",
           null,
           Number(id)
@@ -245,6 +318,8 @@ exports.updateFullRequest = async (req, res) => {
 
     const {
       project,
+      project_id,
+      wbs_id,
       zone,
       purpose,
       items,
@@ -259,6 +334,24 @@ exports.updateFullRequest = async (req, res) => {
       return res.status(400).json({
         error:
           "Purpose and items are required. To approve or reject use PUT /material-request/status/:id",
+      });
+    }
+
+    const projectId = Number(project_id);
+    const wbsId = Number(wbs_id);
+
+    if (!Number.isInteger(projectId) || projectId <= 0) {
+      return res.status(400).json({ error: "A valid project_id is required" });
+    }
+
+    if (!Number.isInteger(wbsId) || wbsId <= 0) {
+      return res.status(400).json({ error: "A valid wbs_id is required" });
+    }
+
+    const wbs = await validateWbsReference(projectId, wbsId);
+    if (!wbs) {
+      return res.status(400).json({
+        error: "Selected WBS activity does not belong to the selected project",
       });
     }
 
@@ -292,17 +385,21 @@ exports.updateFullRequest = async (req, res) => {
     const result = await pool.query(
       `UPDATE material_requests
        SET project=$1,
-           zone=$2,
-           purpose=$3,
-           items=$4,
-           total_qty=$5,
-           required_by=$6,
-           linked_activity=$7,
-           notes=$8
-       WHERE id=$9
+           project_id=$2,
+           wbs_id=$3,
+           zone=$4,
+           purpose=$5,
+           items=$6,
+           total_qty=$7,
+           required_by=$8,
+           linked_activity=$9,
+           notes=$10
+       WHERE id=$11
        RETURNING *`,
       [
-        project,
+        wbs.project_name,
+        projectId,
+        wbsId,
         zone,
         purpose,
         JSON.stringify(parsedItems),
@@ -545,5 +642,48 @@ exports.receiveMaterial = async (req, res) => {
     res.status(500).json({
       error: "Failed to receive material",
     });
+  }
+};
+/* ─────────────────────────────
+   ASSIGN PROJECT / WBS TO A LEGACY REQUEST
+   PUT /api/material-request/:id/wbs   Body: { project_id, wbs_id }
+   The WBS migration intentionally does not backfill requests created before it,
+   and a PO can only be raised from a request that carries project + WBS — so
+   every older approved request was stuck. This lets the people who hold the
+   project context (PC / Procurement / Ops Manager / CEO) assign it once.
+   Only requests that are not yet delivered/rejected and have no live PO.
+───────────────────────────── */
+exports.assignWbs = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const projectId = Number(req.body.project_id);
+    const wbsId = Number(req.body.wbs_id);
+    if (!Number.isInteger(projectId) || projectId <= 0 || !Number.isInteger(wbsId) || wbsId <= 0) {
+      return res.status(400).json({ error: "project_id and wbs_id are required" });
+    }
+    const wbs = await validateWbsReference(projectId, wbsId);
+    if (!wbs) {
+      return res.status(400).json({ error: "Selected WBS does not belong to the selected project" });
+    }
+    const cur = await pool.query("SELECT id, status FROM material_requests WHERE id = $1", [id]);
+    if (!cur.rows.length) return res.status(404).json({ error: "Request not found" });
+    if (["delivered", "rejected"].includes(cur.rows[0].status)) {
+      return res.status(400).json({ error: `A ${cur.rows[0].status} request cannot be re-coded` });
+    }
+    const live = await pool.query(
+      "SELECT po_code FROM purchase_orders WHERE material_request_id = $1 AND status NOT IN ('cancelled','rejected') LIMIT 1",
+      [id]
+    );
+    if (live.rows.length) {
+      return res.status(409).json({ error: `Purchase order ${live.rows[0].po_code} already exists \u2014 cancel it before changing the WBS` });
+    }
+    const result = await pool.query(
+      "UPDATE material_requests SET project_id = $1, wbs_id = $2, project = COALESCE($3, project) WHERE id = $4 RETURNING *",
+      [projectId, wbsId, wbs.project_name, id]
+    );
+    return res.json({ ...result.rows[0], wbs_code: wbs.code, wbs_name: wbs.name, project_name: wbs.project_name });
+  } catch (err) {
+    console.error("ASSIGN WBS ERROR:", err.message);
+    return res.status(500).json({ error: "Failed to assign WBS" });
   }
 };

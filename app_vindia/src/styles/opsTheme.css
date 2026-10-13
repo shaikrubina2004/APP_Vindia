@@ -1,0 +1,558 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   opsTheme.css — Operations & Administration visual upgrade
+   ───────────────────────────────────────────────────────────────────────
+   Brings the two best-looking portals into the Operations screens:
+     • Project Coordinator : Plus Jakarta Sans, soft blue canvas, summary cards
+                             with a coloured accent bar, lift-on-hover, shimmer
+                             skeletons, pulsing status dots, gradient buttons.
+     • CEO                 : gradient hero banner, white 16px cards with layered
+                             shadows, one blue accent + ok / warn / bad palette.
+   It only re-skins existing `ops-*` / `hub-*` classes (design tokens first,
+   then the few components that hard-code colours), so every Ops page —
+   Manager, Office Admin, Logistics, Inventory — updates without code changes.
+   Everything is scoped to `.ops-page` / `.ops-modal*`; nothing leaks to other
+   portals. Load it from the Ops layouts (after opsShared.css).
+   ═══════════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/* ── 1. Tokens (override opsShared defaults, same names) ───────────────── */
+.ops-page,
+.ops-modal-overlay {
+  --ops-primary: #2563eb;
+  --ops-primary-2: #3b82f6;
+  --ops-primary-dark: #1e3a8a;
+  --ops-primary-soft: #eff6ff;
+  --ops-surface: #ffffff;
+  --ops-border: #e2e8f0;
+  --ops-border-soft: #eef2f7;
+  --ops-text: #0a2540;
+  --ops-muted: #64748b;
+  --ops-subtle: #94a3b8;
+  --ops-radius: 16px;
+  --ops-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 4px 14px rgba(15, 23, 42, .06);
+  --ops-shadow-hover: 0 10px 28px rgba(37, 99, 235, .14);
+  --ops-ok: #16a34a;
+  --ops-warn: #f59e0b;
+  --ops-bad: #dc2626;
+  --ops-violet: #7c3aed;
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ── 2. Canvas — soft blue wash behind every Ops page ──────────────────── */
+.page-content:has(.ops-page) {
+  background: linear-gradient(160deg, #f0f6ff 0%, #eef3f9 55%, #f8fbff 100%);
+}
+
+/* ── 3. Entrance motion (PC fadeUp, staggered) ─────────────────────────── */
+@keyframes opsFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes opsShimmer {
+  0% {
+    background-position: -400px 0;
+  }
+
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+@keyframes opsPulse {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: .45;
+    transform: scale(.8);
+  }
+}
+
+.ops-page>* {
+  animation: opsFadeUp .42s ease both;
+}
+
+.ops-page>*:nth-child(2) {
+  animation-delay: .04s;
+}
+
+.ops-page>*:nth-child(3) {
+  animation-delay: .08s;
+}
+
+.ops-page>*:nth-child(4) {
+  animation-delay: .12s;
+}
+
+.ops-page>*:nth-child(n+5) {
+  animation-delay: .16s;
+}
+
+/* ── 4. Page header (eyebrow + heavier title, like PC breadcrumb/title) ── */
+.ops-title {
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--ops-text);
+}
+
+.ops-eyebrow,
+.ops-greeting {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ops-subtle);
+  margin: 0 0 4px;
+}
+
+.ops-greeting {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ops-primary);
+}
+
+/* ── 5. CEO-style hero banner ──────────────────────────────────────────── */
+.ops-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 26px 30px;
+  border-radius: 20px;
+  color: #fff;
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%);
+  box-shadow: 0 12px 32px rgba(37, 99, 235, .26);
+}
+
+.ops-hero::before,
+.ops-hero::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .08);
+  pointer-events: none;
+}
+
+.ops-hero::before {
+  right: -70px;
+  top: -90px;
+  width: 280px;
+  height: 280px;
+}
+
+.ops-hero::after {
+  right: 160px;
+  bottom: -120px;
+  width: 200px;
+  height: 200px;
+  background: rgba(255, 255, 255, .05);
+}
+
+.ops-hero-main {
+  position: relative;
+  z-index: 1;
+  min-width: 260px;
+}
+
+.ops-hero-eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  opacity: .75;
+}
+
+.ops-hero-title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+
+.ops-hero-sub {
+  margin: 6px 0 0;
+  font-size: 14px;
+  opacity: .88;
+  max-width: 560px;
+  line-height: 1.5;
+}
+
+.ops-hero-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ops-hero-actions .ops-btn-primary {
+  background: #fff;
+  color: #1e40af;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .18);
+}
+
+.ops-hero-actions .ops-btn-primary:hover:not(:disabled) {
+  background: #eff6ff;
+}
+
+.ops-hero-actions .ops-icon-btn {
+  background: rgba(255, 255, 255, .16);
+  border-color: rgba(255, 255, 255, .3);
+  color: #fff;
+}
+
+.ops-hero-actions .ops-icon-btn:hover {
+  background: rgba(255, 255, 255, .28);
+}
+
+/* ── 6. Cards (CEO white 16px, layered shadow) ─────────────────────────── */
+.ops-card {
+  border-radius: var(--ops-radius);
+  border: 1px solid var(--ops-border);
+  box-shadow: var(--ops-shadow);
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+
+.ops-card-header {
+  border-bottom: 1px solid var(--ops-border-soft);
+}
+
+.ops-card-header h2 {
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--ops-text);
+}
+
+/* ── 7. KPI / summary cards (PC accent bar + lift) ─────────────────────── */
+.ops-kpi-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1.5px solid var(--ops-border);
+  background: #fff;
+  box-shadow: var(--ops-shadow);
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.ops-kpi-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 4px;
+  background: var(--ops-primary);
+}
+
+.ops-kpi-card:has(.ops-tone-amber)::before {
+  background: var(--ops-warn);
+}
+
+.ops-kpi-card:has(.ops-tone-red)::before {
+  background: var(--ops-bad);
+}
+
+.ops-kpi-card:has(.ops-tone-emerald)::before {
+  background: var(--ops-ok);
+}
+
+.ops-kpi-card:has(.ops-tone-violet)::before {
+  background: var(--ops-violet);
+}
+
+.ops-kpi-card:has(.ops-tone-sky)::before {
+  background: #0ea5e9;
+}
+
+.ops-kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--ops-shadow-hover);
+  border-color: #bfdbfe;
+}
+
+.ops-kpi-value {
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--ops-text);
+}
+
+.ops-kpi-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--ops-subtle);
+}
+
+/* ── 8. Buttons (PC gradient primary, outlined secondary) ──────────────── */
+.ops-btn {
+  border-radius: 10px;
+  font-weight: 700;
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease;
+}
+
+.ops-btn-primary {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border: none;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, .25);
+}
+
+.ops-btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, .32);
+}
+
+.ops-btn-outline {
+  background: #fff;
+  border: 1.5px solid #dbeafe;
+  color: #2563eb;
+}
+
+.ops-btn-outline:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #2563eb;
+  transform: translateY(-1px);
+}
+
+.ops-btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.ops-icon-btn {
+  border-radius: 10px;
+  border: 1.5px solid #e2eaf4;
+  background: #fff;
+  transition: all .18s ease;
+}
+
+.ops-icon-btn:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+
+/* ── 9. Tabs → segmented pill control ──────────────────────────────────── */
+.ops-tabs {
+  background: #eef3fa;
+  padding: 4px;
+  border-radius: 12px;
+  gap: 2px;
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+.ops-tab {
+  border-radius: 9px;
+  font-weight: 600;
+  color: var(--ops-muted);
+  transition: all .18s ease;
+}
+
+.ops-tab:hover {
+  color: var(--ops-primary);
+}
+
+.ops-tab-active,
+.ops-tab.ops-tab-active {
+  background: #fff;
+  color: var(--ops-primary);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, .14);
+}
+
+/* ── 10. Tables ────────────────────────────────────────────────────────── */
+.ops-table th {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ops-subtle);
+  background: #f8fbff;
+  border-bottom: 1px solid var(--ops-border);
+}
+
+.ops-table tbody tr {
+  transition: background .15s ease;
+}
+
+.ops-table tbody tr:hover {
+  background: #f5f9ff;
+}
+
+.hub-clickable:hover {
+  background: #eaf2ff !important;
+}
+
+/* ── 11. Status badges — pulsing dot for things that need attention ───── */
+.ops-badge {
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+
+.ops-badge-red .ops-badge-dot,
+.ops-badge-amber .ops-badge-dot {
+  animation: opsPulse 1.8s ease infinite;
+}
+
+/* ── 12. Forms ─────────────────────────────────────────────────────────── */
+.ops-input,
+.ops-select,
+.ops-textarea {
+  border-radius: 10px;
+  border: 1.5px solid var(--ops-border);
+  background: #fff;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.ops-input:focus,
+.ops-select:focus,
+.ops-textarea:focus {
+  border-color: var(--ops-primary-2);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, .16);
+  outline: none;
+}
+
+.ops-label {
+  font-weight: 600;
+  color: #334155;
+}
+
+/* ── 13. Modal ─────────────────────────────────────────────────────────── */
+.ops-modal-overlay {
+  backdrop-filter: blur(3px);
+  background: rgba(15, 23, 42, .45);
+}
+
+.ops-modal {
+  border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, .28);
+}
+
+.ops-modal-header h2 {
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+
+/* ── 14. Skeleton (PC shimmer) ─────────────────────────────────────────── */
+.ops-skeleton {
+  border-radius: 12px;
+  background: linear-gradient(90deg, #e8eef5 25%, #f4f8fc 50%, #e8eef5 75%);
+  background-size: 400px 100%;
+  animation: opsShimmer 1.4s ease infinite;
+}
+
+/* ── 15. Alerts ────────────────────────────────────────────────────────── */
+.ops-alert {
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+/* ── 16. Hub components (dashboard widgets) ────────────────────────────── */
+.hub-stage {
+  border-radius: 14px;
+}
+
+.hub-stage:hover {
+  background: #f0f6ff;
+  transform: translateY(-2px);
+}
+
+.hub-stage-dot {
+  box-shadow: 0 6px 16px rgba(37, 99, 235, .22);
+}
+
+.hub-stage-count {
+  font-weight: 800;
+}
+
+.hub-attention a {
+  border: 1px solid transparent;
+}
+
+.hub-attention a:hover {
+  background: #f5f9ff;
+  border-color: #dbeafe;
+}
+
+.hub-tile {
+  background: #f5f9ff;
+  border: 1px solid #e3edfb;
+  border-radius: 14px;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+a.hub-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ops-shadow-hover);
+}
+
+.hub-bar-fill {
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+}
+
+/* ── 17. Responsive ────────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .ops-page {
+    padding: 16px 14px 32px;
+  }
+
+  .ops-hero {
+    padding: 20px 18px;
+    border-radius: 16px;
+  }
+
+  .ops-hero-title {
+    font-size: 21px;
+  }
+
+  .ops-hero-actions {
+    width: 100%;
+  }
+
+  .ops-tabs {
+    width: 100%;
+  }
+
+  .hub-search input {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* ── 18. Respect reduced-motion preferences ────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+
+  .ops-page>*,
+  .ops-skeleton,
+  .ops-badge-dot {
+    animation: none !important;
+  }
+
+  .ops-kpi-card,
+  .ops-btn,
+  .ops-card {
+    transition: none !important;
+  }
+}

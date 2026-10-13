@@ -183,15 +183,9 @@ const getDashboard = async (req, res) => {
 const getApprovals = async (req, res) => {
   const warnings = [];
 
-  const [materialRequests, purchaseOrders, officeRequests] = await Promise.all([
-    section("material_requests", warnings, () =>
-      many(`SELECT mr.id, mr.project, mr.zone, mr.purpose, mr.items, mr.required_by,
-                   mr.total_qty, mr.notes, mr.created_at, u.name AS requested_by_name
-            FROM material_requests mr
-            LEFT JOIN users u ON u.id = mr.created_by
-            WHERE mr.status = 'requested'
-            ORDER BY mr.required_by ASC NULLS LAST, mr.created_at ASC`), []),
-
+  // Material requests are decided by the Project Coordinator, not here — the
+  // Operations Manager only sees them (read-only) on the Material Requests page.
+  const [purchaseOrders, officeRequests] = await Promise.all([
     section("purchase_orders", warnings, () =>
       many(`SELECT po.id, po.po_code, po.total_amount, po.expected_delivery_date, po.remarks,
                    po.created_at, v.name AS vendor_name, p.name AS project_name,
@@ -217,14 +211,12 @@ const getApprovals = async (req, res) => {
   ]);
 
   res.json({
-    material_requests: materialRequests,
     purchase_orders: purchaseOrders,
     office_requests: officeRequests,
     counts: {
-      material_requests: materialRequests.length,
       purchase_orders: purchaseOrders.length,
       office_requests: officeRequests.length,
-      total: materialRequests.length + purchaseOrders.length + officeRequests.length,
+      total: purchaseOrders.length + officeRequests.length,
     },
     warnings,
   });
@@ -307,3 +299,4 @@ const getReports = async (req, res) => {
 exports.getDashboard = safeHandler(getDashboard);
 exports.getApprovals = safeHandler(getApprovals);
 exports.getReports = safeHandler(getReports);
+  

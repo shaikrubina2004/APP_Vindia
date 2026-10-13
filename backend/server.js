@@ -209,6 +209,10 @@ app.use("/api/ceo-notifications", require("./routes/ceoNotificationRoutes"));
 /* ✅ QS */
 app.use("/api/qs/notifications", qsNotifRoutes);
 app.use("/api/qs", qsRoutes);
+
+/* ✅ 3D Visualizer notifications — route + controller existed but were never
+   mounted, so the 3D Visualizer bell always failed. (protect is applied inside.) */
+app.use("/api/3d-notifications", require("./routes/threeDNotificationsRoutes"));
 app.use("/api/boq", boqRoutes);
 app.use("/api/cost-report", costReportRoutes);
 app.use("/api/quantity-report", quantityReportRoutes);
