@@ -152,7 +152,19 @@ const ceoInsightsRoutes    = require("./routes/ceoInsightsRoutes");
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use(
+  express.json({
+    limit: "10mb",
+    // Keep the untouched request body so the Meta webhook can verify
+    // Facebook's X-Hub-Signature-256 header (see controllers/metaController.js).
+    // Only done for /api/meta/* so no other route pays for the extra copy.
+    verify: (req, _res, buf) => {
+      if (req.originalUrl && req.originalUrl.startsWith("/api/meta/")) {
+        req.rawBody = buf;
+      }
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/uploads", express.static(uploadDir));
