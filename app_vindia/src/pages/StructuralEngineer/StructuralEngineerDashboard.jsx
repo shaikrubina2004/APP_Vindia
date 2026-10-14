@@ -145,6 +145,11 @@ const projectName = selectedProject?.name || selectedProject?.project_name;
       ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
       : "";
 
+  const logLabel =
+    { none: "Not filed", filed: "Awaiting approval", approved: "Approved" }[
+      stats.todayLog
+    ] || "Not filed";
+
   return (
     <div className="se-container">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
@@ -160,9 +165,14 @@ const projectName = selectedProject?.name || selectedProject?.project_name;
       </p>
 
       {/* Alert strip */}
-      {stats.pendingIncidents > 0 && (
-        <div className="se-alert">
-          ⚠️ {stats.pendingIncidents} open incident{stats.pendingIncidents !== 1 ? "s" : ""} need attention
+      {(stats.urgentIncidents || 0) > 0 && (
+        <div
+          className="se-alert"
+          style={{ cursor: "pointer" }}
+          onClick={() => navigate("/structural-engineer/incidents")}
+        >
+          ⚠️ {stats.urgentIncidents} incident{stats.urgentIncidents !== 1 ? "s" : ""} need
+          urgent attention (P1 or overdue)
         </div>
       )}
 
@@ -208,6 +218,37 @@ const projectName = selectedProject?.name || selectedProject?.project_name;
           <div className="card-icon">🔔</div>
           <h3>Notifications</h3>
           <p><CountUp end={stats.notifications} duration={1.5} /></p>
+        </div>
+      </div>
+
+      {/* ── WORK QUEUE: RFIs + today's daily log ───────────────────────── */}
+      <div className="se-cards" style={{ marginTop: 16 }}>
+        <div
+          className="se-card warning"
+          onClick={() => navigate("/structural-engineer/rfi")}
+        >
+          <div className="card-icon">❓</div>
+          <h3>Open RFIs</h3>
+          <p><CountUp end={stats.openRfis || 0} duration={1.5} /></p>
+          <small style={{ color: "#94a3b8", fontSize: 11 }}>
+            Waiting for your response
+          </small>
+        </div>
+
+        <div
+          className="se-card primary"
+          onClick={() => navigate("/structural-engineer/daily-updates")}
+        >
+          <div className="card-icon">📝</div>
+          <h3>Today's Daily Log</h3>
+          <p style={{ fontSize: 22 }}>{logLabel}</p>
+          <small style={{ color: "#94a3b8", fontSize: 11 }}>
+            {stats.todayLog === "none"
+              ? "Tap to file today's log"
+              : stats.todayLog === "filed"
+                ? "Submitted — Project Manager to approve"
+                : "Approved by the Project Manager"}
+          </small>
         </div>
       </div>
 

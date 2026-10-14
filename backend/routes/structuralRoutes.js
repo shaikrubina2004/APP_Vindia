@@ -113,10 +113,11 @@ router.get("/dashboard", SE_OR_CEO, async (req, res) => {
     }
 
     // ── Incidents (open vs resolved) ───────────────────────────────────
-    // Same rules as the Incidents page: statuses are 'Pending', 'In Progress',
-    // 'Resolved', 'Closed' (capitalised), and a user sees only incidents they
-    // created or that are assigned to them. (The old query looked for the
-    // lowercase 'pending', so it always returned 0.)
+    // Same source and rules as the Incidents page: it reads the view
+    // v_incident_overview (which exposes created_by_id / assigned_to_id; the
+    // raw incidents table calls them created_by / assigned_to). Statuses are
+    // 'Pending', 'In Progress', 'Resolved', 'Closed' (capitalised), and a user
+    // sees only incidents they created or that are assigned to them.
     let incidentsCount = 0;
     let resolvedCount = 0;
     try {
@@ -130,14 +131,67 @@ router.get("/dashboard", SE_OR_CEO, async (req, res) => {
         `SELECT
            COUNT(*) FILTER (WHERE status NOT IN ('Resolved','Closed')) AS open,
            COUNT(*) FILTER (WHERE status IN ('Resolved','Closed'))     AS resolved
-         FROM incidents
+         FROM v_incident_overview
          WHERE (created_by_id = $1 OR assigned_to_id = $1)${projectFilter}`,
         incParams,
       );
       incidentsCount = parseInt(ir.rows[0].open, 10) || 0;
       resolvedCount = parseInt(ir.rows[0].resolved, 10) || 0;
-    } catch {
-      console.log("⚠️  incidents table missing");
+    } catch (e) {
+      console.log("⚠️  incidents count failed:", e.message);
+    }
+
+    // ── Urgent incidents: still open AND (priority P1 OR past deadline) ──
+    let urgentCount = 0;
+    try {
+      const urgParams = [req.user.id];
+      let urgProject = "";
+      if (project_id) {
+        urgParams.push(project_id);
+        urgProject = " AND project_id = $2";
+      }
+      const ur = await pool.query(
+        `SELECT COUNT(*) AS urgent
+           FROM v_incident_overview
+          WHERE (created_by_id = $1 OR assigned_to_id = $1)${urgProject}
+            AND status NOT IN ('Resolved','Closed')
+            AND (priority = 'P1' OR deadline_at < NOW())`,
+        urgParams,
+      );
+      urgentCount = parseInt(ur.rows[0].urgent, 10) || 0;
+    } catch (e) {
+      console.log("⚠️  urgent incidents failed:", e.message);
+    }
+
+    // ── Open RFIs waiting for a Structural Engineer to respond ─────────
+    // (RFIs are addressed to a ROLE, same as the RFI page: status 'open' =
+    // nobody has responded yet.)
+    let openRfis = 0;
+    try {
+      const rr = await pool.query(
+        `SELECT COUNT(*) AS open FROM rfis
+          WHERE LOWER(assigned_to_role) = 'structural_engineer'
+            AND status = 'open'`,
+      );
+      openRfis = parseInt(rr.rows[0].open, 10) || 0;
+    } catch (e) {
+      console.log("⚠️  open RFIs failed:", e.message);
+    }
+
+    // ── Today's daily log for THIS engineer: none / filed / approved ───
+    let todayLog = "none";
+    try {
+      const lr = await pool.query(
+        `SELECT approved FROM se_daily_reports
+          WHERE date = CURRENT_DATE
+            AND (user_id = $1 OR user_id IS NULL)
+          ORDER BY (user_id IS NULL) ASC
+          LIMIT 1`,
+        [req.user.id],
+      );
+      if (lr.rows.length) todayLog = lr.rows[0].approved ? "approved" : "filed";
+    } catch (e) {
+      console.log("⚠️  today's log failed:", e.message);
     }
 
     // ── Unread SE notifications ────────────────────────────────────────
@@ -156,6 +210,9 @@ router.get("/dashboard", SE_OR_CEO, async (req, res) => {
       latestVersion,
       pendingIncidents: incidentsCount, // open incidents (kept name for the UI)
       resolvedIncidents: resolvedCount,
+      urgentIncidents: urgentCount, // open AND (P1 or overdue)
+      openRfis,
+      todayLog, // 'none' | 'filed' | 'approved'
       notifications: notificationsCount,
     });
   } catch (err) {
@@ -293,13 +350,13 @@ router.get("/recent-activity", SE_OR_CEO, async (req, res) => {
     let incidents = { rows: [] };
     try {
       incidents = await pool.query(
-        `SELECT title, created_at FROM incidents
+        `SELECT title, created_at FROM v_incident_overview
          WHERE created_by_id = $1 OR assigned_to_id = $1
          ORDER BY created_at DESC LIMIT 2`,
         [req.user.id],
       );
-    } catch {
-      /* incidents table may not exist */
+    } catch (e) {
+      console.log("⚠️  recent incidents failed:", e.message);
     }
 
     const activity = [
