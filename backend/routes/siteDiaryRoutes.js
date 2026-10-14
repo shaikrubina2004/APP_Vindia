@@ -53,6 +53,11 @@ router.get(
   c.getDiary
 );
 
+// Review list + approval for the Project Manager / Coordinator / CEO.
+// Declared before any "/:id" style route.
+router.get("/review", auth, auth.requireRole(...c.DIARY_REVIEW_ROLES), c.getDiaryForReview);
+router.put("/approve/:id", auth, auth.requireRole(...c.DIARY_REVIEW_ROLES), c.approveDiary);
+
 // Get Milestones
 router.get(
   "/milestones",

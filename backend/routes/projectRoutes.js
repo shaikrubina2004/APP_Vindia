@@ -9,6 +9,7 @@ const {
   getCoordinators,
   getArchitects,
   getClients,
+  getMyProjects,
 } = require("../controllers/projectController");
 
 /* ── AUTH ──
@@ -30,6 +31,8 @@ const notClient = (req, res, next) =>
 // ✅ Routes
 router.post("/", authMiddleware, CAN_CREATE, createProject);
 router.get("/", authMiddleware, getAllProjects);
+// "Which project(s) am I assigned to?" — must stay above any "/:id" route.
+router.get("/mine", authMiddleware, getMyProjects);
 router.get("/site-engineers", authMiddleware, notClient, getSiteEngineers);
 router.get("/managers", authMiddleware, notClient, getManagers);
 router.get("/coordinators", authMiddleware, notClient, getCoordinators); // ✅ added

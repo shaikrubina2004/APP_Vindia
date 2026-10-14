@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import "../../styles/shared-pages.css";
 import "../../styles/DailyDiary.css";
+import { todayISO } from "../../utils/localDate";
 
 /* ─────────────────────────────────────────────────────────
    CONSTANTS
@@ -73,7 +74,8 @@ async function flushQueue() {
   ls.save(QUEUE_KEY, rem);
 }
 
-function nowISO() { return new Date().toISOString().slice(0, 10); }
+// Local calendar day (was UTC — wrong for part of every morning in India)
+function nowISO() { return todayISO(); }
 
 function validate(f) {
   const e = {};

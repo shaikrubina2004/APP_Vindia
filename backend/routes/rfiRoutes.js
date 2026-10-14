@@ -123,12 +123,12 @@ async function getRfiProjectNames(req, roleCode) {
   const role = String(roleCode || req.user?.role || "").trim().toLowerCase();
   const userId = req.user?.id;
   if (!userId) return null;
-  if (["client", "site_engineer", "architect", "project_coordinator"].includes(role)) {
+  // project_coordinator is intentionally NOT project-scoped: coordinators see every project.
+  if (["client", "site_engineer", "architect"].includes(role)) {
     const column = {
       client: "client_user_id",
       site_engineer: "site_engineer_id",
       architect: "architect_id",
-      project_coordinator: "coordinator_id",
     }[role];
     const result = await pool.query(
       `SELECT name FROM projects WHERE ${column} = $1 AND status IS DISTINCT FROM 'Archived'`,
@@ -155,8 +155,8 @@ async function getRfiProjectNames(req, roleCode) {
 function buildRoleWhere(view, { roleCodeParam, roleNameParam, userIdParam, projectNamesParam }) {
   const roleRaised = `(LOWER(r.raised_by_role) IN (LOWER(${roleCodeParam}), LOWER(${roleNameParam})))`;
   const roleAssigned = `(LOWER(r.assigned_to_role) IN (LOWER(${roleCodeParam}), LOWER(${roleNameParam})))`;
-  const ownRaised = `r.raised_by_id = ${userIdParam}`;
-  const ownAssigned = `r.assigned_to_user_id = ${userIdParam}`;
+  const ownRaised = `r.raised_by_id::text = ${userIdParam}::text`;
+  const ownAssigned = `r.assigned_to_user_id::text = ${userIdParam}::text`;
   const projectScope = projectNamesParam ? `r.project_name = ANY(${projectNamesParam}::text[])` : null;
   const raised = projectScope ? `(${ownRaised} OR (${roleRaised} AND ${projectScope}))` : `(${ownRaised} OR ${roleRaised})`;
   const assigned = projectScope ? `(${ownAssigned} OR (${roleAssigned} AND ${projectScope}))` : `(${ownAssigned} OR ${roleAssigned})`;
@@ -216,7 +216,7 @@ router.get("/:id", protect, async (req, res) => {
       `SELECT * FROM rfis
        WHERE id = $1
          AND (
-           raised_by_id = $2 OR assigned_to_user_id = $2 OR
+           raised_by_id::text = $2::text OR assigned_to_user_id::text = $2::text OR
            (LOWER(raised_by_role) IN (LOWER($3), LOWER($4)) AND ($5::text[] IS NULL OR project_name = ANY($5::text[]))) OR
            (LOWER(assigned_to_role) IN (LOWER($3), LOWER($4)) AND ($5::text[] IS NULL OR project_name = ANY($5::text[])))
          )`,
@@ -341,7 +341,7 @@ router.post("/:id/respond", protect, upload.single("file"), async (req, res) => 
       `SELECT * FROM rfis
        WHERE id = $1
          AND (
-           raised_by_id = $2 OR assigned_to_user_id = $2 OR
+           raised_by_id::text = $2::text OR assigned_to_user_id::text = $2::text OR
            (LOWER(raised_by_role) IN (LOWER($3), LOWER($4)) AND ($5::text[] IS NULL OR project_name = ANY($5::text[]))) OR
            (LOWER(assigned_to_role) IN (LOWER($3), LOWER($4)) AND ($5::text[] IS NULL OR project_name = ANY($5::text[])))
          )`,
@@ -400,7 +400,7 @@ router.patch("/:id/status", protect, async (req, res) => {
       `UPDATE rfis SET status=$1, updated_at=NOW()
        WHERE id=$2
          AND (
-           raised_by_id = $3 OR assigned_to_user_id = $3 OR
+           raised_by_id::text = $3::text OR assigned_to_user_id::text = $3::text OR
            (LOWER(raised_by_role) IN (LOWER($4), LOWER($5)) AND ($6::text[] IS NULL OR project_name = ANY($6::text[]))) OR
            (LOWER(assigned_to_role) IN (LOWER($4), LOWER($5)) AND ($6::text[] IS NULL OR project_name = ANY($6::text[])))
          )

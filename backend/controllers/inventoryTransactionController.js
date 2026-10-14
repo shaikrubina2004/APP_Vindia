@@ -60,9 +60,10 @@ exports.getTransactions = async (req, res) => {
   }
 };
 
-/* helper: current available qty for item in a project */
-const getAvailableQty = async (item_id, project_id) => {
-  const result = await pool.query(
+/* helper: current available qty for item in a project.
+   Pass a transaction client to read inside the transaction. */
+const getAvailableQty = async (item_id, project_id, db = pool) => {
+  const result = await db.query(
     `SELECT COALESCE(SUM(quantity),0)::numeric AS qty
      FROM inventory_transactions WHERE item_id=$1 AND project_id=$2`,
     [item_id, project_id]
@@ -70,10 +71,20 @@ const getAvailableQty = async (item_id, project_id) => {
   return Number(result.rows[0].qty);
 };
 
-/* POST /api/inventory/issue   body: { item_id, project_id, quantity, remarks } */
+/* Serialise stock movements per item+site: two people issuing the last 10
+   bags at the same moment can no longer both pass the availability check. */
+const lockStock = (client, item_id, project_id) =>
+  client.query("SELECT pg_advisory_xact_lock($1, $2)", [Number(item_id), Number(project_id)]);
+
+/* POST /api/inventory/issue
+   body: { item_id, project_id, quantity, remarks, material_request_id? }
+   With material_request_id the issue fulfils a Site Engineer request: the
+   request's delivered_qty goes up (capped at what was asked for) so the
+   engineer can confirm receipt on site. */
 exports.createIssue = async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { item_id, project_id, quantity, remarks } = req.body;
+    const { item_id, project_id, quantity, remarks, material_request_id } = req.body;
     const qty = Number(quantity);
     const userId = req.user?.id;
 
@@ -81,18 +92,47 @@ exports.createIssue = async (req, res) => {
       return res.status(400).json({ error: "item_id, project_id and a positive quantity are required" });
     }
 
-    const available = await getAvailableQty(item_id, project_id);
+    await client.query("BEGIN");
+    await lockStock(client, item_id, project_id);
+
+    const available = await getAvailableQty(item_id, project_id, client);
     if (qty > available) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ error: `Only ${available} available in stock for this project` });
     }
 
-    const result = await pool.query(
+    if (material_request_id) {
+      const mr = await client.query(
+        "SELECT id, status, total_qty, delivered_qty FROM material_requests WHERE id = $1 FOR UPDATE",
+        [material_request_id]
+      );
+      if (!mr.rows.length) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Material request not found" });
+      }
+      if (mr.rows[0].status !== "approved") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "Stock can only be issued against an approved material request" });
+      }
+      const nextDelivered = Math.min(
+        Number(mr.rows[0].total_qty || 0),
+        Number(mr.rows[0].delivered_qty || 0) + qty
+      );
+      await client.query("UPDATE material_requests SET delivered_qty = $1 WHERE id = $2", [
+        nextDelivered,
+        material_request_id,
+      ]);
+    }
+
+    const result = await client.query(
       `INSERT INTO inventory_transactions
-         (item_id, project_id, transaction_type, quantity, reference_type, remarks, created_by)
-       VALUES ($1,$2,'ISSUE',$3,'MATERIAL_ISSUE',$4,$5)
+         (item_id, project_id, transaction_type, quantity, reference_type, reference_id, remarks, created_by)
+       VALUES ($1,$2,'ISSUE',$3,'MATERIAL_ISSUE',$4,$5,$6)
        RETURNING *`,
-      [item_id, project_id, -qty, remarks || null, userId]
+      [item_id, project_id, -qty, material_request_id || null, remarks || null, userId]
     );
+
+    await client.query("COMMIT");
 
     // If this issue dropped stock to/below minimum, alert Inventory Controllers.
     const remaining = available - qty;
@@ -101,22 +141,20 @@ exports.createIssue = async (req, res) => {
       [item_id]
     );
     if (itemInfo.rows.length && remaining <= Number(itemInfo.rows[0].minimum_stock)) {
-      await notifyRole(
-        "inventory_controller",
-        "low_stock",
-        `Low stock: ${itemInfo.rows[0].item_name}`,
-        `${remaining} ${itemInfo.rows[0].unit} left — at or below minimum (${itemInfo.rows[0].minimum_stock}).`,
-        "/operations/inventory/stock-out",
-        remaining <= 0 ? "critical" : "warn",
-        project_id,
-        item_id
-      );
+      const lowTitle = `Low stock: ${itemInfo.rows[0].item_name}`;
+      const lowText = `${remaining} ${itemInfo.rows[0].unit} left — at or below minimum (${itemInfo.rows[0].minimum_stock}).`;
+      const sev = remaining <= 0 ? "critical" : "warn";
+      await notifyRole("inventory_controller", "low_stock", lowTitle, lowText, "/operations/inventory/stock-out", sev, project_id, item_id);
+      await notifyRole("operations_manager", "low_stock", lowTitle, lowText, "/operations/manager/inventory", sev, project_id, item_id);
     }
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    try { await client.query("ROLLBACK"); } catch (_) { /* already closed */ }
     console.error("ISSUE ERROR:", err.message);
     res.status(500).json({ error: "Failed to issue material" });
+  } finally {
+    client.release();
   }
 };
 
@@ -158,16 +196,18 @@ exports.createTransfer = async (req, res) => {
     if (!item_id || !from_project_id || !to_project_id || !Number.isFinite(qty) || qty <= 0) {
       return res.status(400).json({ error: "item_id, from_project_id, to_project_id and a positive quantity are required" });
     }
-    if (from_project_id === to_project_id) {
+    if (Number(from_project_id) === Number(to_project_id)) {
       return res.status(400).json({ error: "from_project_id and to_project_id must differ" });
     }
 
-    const available = await getAvailableQty(item_id, from_project_id);
+    await client.query("BEGIN");
+    await lockStock(client, item_id, from_project_id);
+
+    const available = await getAvailableQty(item_id, from_project_id, client);
     if (qty > available) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ error: `Only ${available} available at the source site` });
     }
-
-    await client.query("BEGIN");
 
     const out = await client.query(
       `INSERT INTO inventory_transactions

@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import api from "../../services/api";
 import "../../styles/Labourreport.css";
+import { todayISO } from "../../utils/localDate";
 
 /* ── Constants ───────────────────────────────────────────── */
 const PAGE_SIZE = 8;
@@ -27,7 +28,8 @@ const STATUS_CFG = {
 
 const BLANK_TRADE_ROW = { trade: "", count: "", contractor: "", zone: "", activity: "" };
 
-function nowISO() { return new Date().toISOString().slice(0, 10); }
+// Local calendar day (was UTC — wrong for part of every morning in India)
+function nowISO() { return todayISO(); }
 function fmtDate(s) {
   return s ? new Date(s).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—";
 }

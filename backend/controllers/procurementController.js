@@ -49,13 +49,6 @@ exports.createPurchaseOrder = async (req, res) => {
       return res.status(400).json({ error: "vendor_id is required" });
     }
 
-    if (!project_id) {
-      // material_requests.project is a free-text field, not a projects.id FK,
-      // so it can't be resolved automatically — the Procurement Officer must
-      // confirm the numeric project on the Create PO screen.
-      return res.status(400).json({ error: "project_id is required" });
-    }
-
     const parsedItems =
       typeof items === "string" ? JSON.parse(items) : items;
 

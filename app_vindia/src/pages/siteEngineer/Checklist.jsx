@@ -5,6 +5,7 @@ import React, {
 import api from "../../services/api";
 import "../../styles/shared-pages.css";
 import "../../styles/Checklist.css";
+import { todayISO as localTodayISO } from "../../utils/localDate";
 
 /* ── constants ───────────────────────────────────────────── */
 const CL_DRAFT     = "se:checklist:draft:v3";
@@ -60,7 +61,7 @@ const DEFAULT_ITEMS = [
 /* ── helpers ─────────────────────────────────────────────── */
 let _uid = 0;
 function uid() { return `${Date.now().toString(36)}-${(++_uid).toString(36)}`; }
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+const todayISO = localTodayISO;
 
 const lsCl = {
   load: k => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch { return null; } },

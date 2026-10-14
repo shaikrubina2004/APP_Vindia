@@ -287,9 +287,15 @@ async function transitionTimesheet(req, res, sheetId, action, comment = "") {
   }
 
   const submittedAt = ["submitted", "resubmitted"].includes(action) ? "NOW()" : "submitted_at";
-  const approvedFields = action === "approved"
-    ? `approved_by = $2, approved_at = NOW(),`
-    : "";
+  // Parameters are built together with the SQL. Previously $2 (approver id) was always sent but only
+  // referenced when approving — PostgreSQL rejects an unreferenced parameter ("could not determine
+  // data type of parameter $2"), so submit / review / reject / request-changes / reopen all failed.
+  const updateParams = [action, sheetId];
+  let approvedFields = "";
+  if (action === "approved") {
+    updateParams.push(requester.id);
+    approvedFields = `approved_by = $3, approved_at = NOW(),`;
+  }
 
   const result = await pool.query(
     `UPDATE timesheets
@@ -297,9 +303,9 @@ async function transitionTimesheet(req, res, sheetId, action, comment = "") {
             ${approvedFields}
             submitted_at = ${submittedAt},
             updated_at = NOW()
-      WHERE id = $3
+      WHERE id = $2
       RETURNING *`,
-    [action, requester.id, sheetId]
+    updateParams
   );
 
   await pool.query(

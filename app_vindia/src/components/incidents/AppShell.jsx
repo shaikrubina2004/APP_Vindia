@@ -122,7 +122,7 @@ export default function AppShell() {
   /* ── Fetch users with their roles ── */
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await API.get("/users");
+      const res = await API.get("/users/assignable");
       const normalised = (Array.isArray(res.data) ? res.data : []).map((u) => ({
         id: u.id,
         name: u.name,
@@ -214,7 +214,7 @@ export default function AppShell() {
 
         const [incRes, usersRes] = await Promise.all([
           API.get(incUrl),
-          API.get("/users"),
+          API.get("/users/assignable"),
         ]);
 
         const normalisedInc = incRes.data.data.map(normaliseIncident);

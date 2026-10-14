@@ -187,6 +187,24 @@ const PROCUREMENT_ROUTES = {
   task: "/operations/procurement/incidents?page=tasks",
 };
 
+/* Project Manager — previously had NO bell at all (role missing from the map below). */
+const PROJECT_MANAGER_ROUTES = {
+  default:      "/project-manager/dashboard",
+  approval:     "/project-manager/approvals",
+  diary:        "/pm/daily-updates",
+  daily_update: "/pm/daily-updates",
+  incident:     "/pm/incidents",
+  task:         "/pm/incidents?page=tasks",
+};
+
+const ProjectManagerBell = ({ userId }) => (
+  <OperationsNotificationBell
+    userId={userId}
+    role="project_manager"
+    routes={PROJECT_MANAGER_ROUTES}
+  />
+);
+
 const ProcurementBell = ({ userId }) => (
   <OperationsNotificationBell
     userId={userId}
@@ -199,7 +217,7 @@ const ProcurementBell = ({ userId }) => (
 const SITE_ENGINEER_ROUTES = {
   default: "/site-engineer/dashboard",
   incident: "/site-engineer/incidents",
-  task: "/site-engineer/activity",
+  task: "/site-engineer/incidents?page=tasks",
   approval: "/site-engineer/approvals",
   material: "/site-engineer/materials",
   snag: "/site-engineer/snag-list",
@@ -278,6 +296,7 @@ const BdaBell = ({ userId }) => <BDANotificationBell bdaEmail={userId} />;
    and remounted the bell on each render, wiping its state and re-fetching. */
 const NOTIFICATION_COMPONENTS = {
   project_coordinator: NotificationBell,
+  project_manager: ProjectManagerBell,
   structural_engineer: SENotificationBell,
   quantity_surveyor: QSNotificationBell,
   mep_engineer: MEPNotificationBell,

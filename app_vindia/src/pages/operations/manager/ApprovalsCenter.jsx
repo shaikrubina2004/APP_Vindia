@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
-import { ClipboardList, FileText, Building2, CheckCircle2, RefreshCw } from "lucide-react";
+import { FileText, Building2, CheckCircle2, RefreshCw } from "lucide-react";
 import operationsService from "../../../services/operationsService";
 import officeAdminService from "../../../services/officeAdminService";
 import PurchaseOrderModal from "../shared/PurchaseOrderModal";
 import ReasonModal from "../shared/ReasonModal";
 import StatusBadge from "../shared/StatusBadge";
-import { inr, fmtDate, parseItems, isOverdue, errorText } from "../shared/opsFormat";
+import { inr, fmtDate, errorText } from "../shared/opsFormat";
 import "../shared/operationsHub.css";
 
 export default function ApprovalsCenter() {
@@ -26,12 +26,6 @@ export default function ApprovalsCenter() {
 
   const flash = (msg) => { setNotice(msg); setTimeout(() => setNotice(""), 3500); };
 
-  const approveMR = async (row) => {
-    setBusyId(`mr-${row.id}`);
-    try { await operationsService.decideMaterialRequest(row.id, "approved"); flash("Material request approved — Procurement has been notified."); await load(); }
-    catch (e) { setError(errorText(e, "Approval failed")); }
-    finally { setBusyId(null); }
-  };
   const approveOffice = async (row) => {
     setBusyId(`or-${row.id}`);
     try { await officeAdminService.updateRequestStatus(row.id, "in_progress"); flash(`${row.request_code} approved.`); await load(); }
@@ -40,14 +34,12 @@ export default function ApprovalsCenter() {
   };
 
   const confirmReject = async (reason) => {
-    if (reject.kind === "mr") await operationsService.decideMaterialRequest(reject.row.id, "rejected", reason);
-    else await officeAdminService.updateRequestStatus(reject.row.id, "rejected", reason);
+    await officeAdminService.updateRequestStatus(reject.row.id, "rejected", reason);
     flash("Rejected."); setReject(null); await load();
   };
 
   const tabs = [
     { v: "purchase_orders", label: "Purchase orders", icon: FileText, n: data?.counts.purchase_orders },
-    { v: "material_requests", label: "Material requests", icon: ClipboardList, n: data?.counts.material_requests },
     { v: "office_requests", label: "Office requests", icon: Building2, n: data?.counts.office_requests },
   ];
 
@@ -56,7 +48,7 @@ export default function ApprovalsCenter() {
       <div className="ops-header">
         <div>
           <h1 className="ops-title">Approvals</h1>
-          <p className="ops-subtitle">{data ? `${data.counts.total} item(s) waiting for a decision` : "Loading…"}</p>
+          <p className="ops-subtitle">{data ? `${data.counts.total} item(s) waiting for a decision` : "Loading…"} · Material requests are approved by the Project Coordinator</p>
         </div>
         <button className="ops-icon-btn" onClick={load} title="Refresh"><RefreshCw size={16} /></button>
       </div>
@@ -87,23 +79,6 @@ export default function ApprovalsCenter() {
                 <td><div className="hub-row-actions"><button className="ops-btn ops-btn-primary ops-btn-sm" onClick={() => setPoOpen(p.id)}>Review</button></div></td>
               </tr>))}</tbody>
           </table></div>
-        ) : tab === "material_requests" ? (
-          <div className="ops-table-wrap"><table className="ops-table">
-            <thead><tr><th>Project</th><th>Purpose</th><th>Items</th><th>Required by</th><th>Requested by</th><th /></tr></thead>
-            <tbody>{data.material_requests.map((m) => {
-              const items = parseItems(m.items);
-              return (<tr key={m.id}>
-                <td className="hub-strong">{m.project || "—"}{m.zone ? <><br /><span className="ops-muted">{m.zone}</span></> : null}</td>
-                <td>{m.purpose || "—"}</td>
-                <td>{items.slice(0, 3).map((i) => `${i.name || i.item_name} (${i.qty})`).join(", ")}{items.length > 3 ? ` +${items.length - 3} more` : ""}</td>
-                <td className={isOverdue(m.required_by) ? "hub-late" : ""}>{fmtDate(m.required_by)}</td>
-                <td>{m.requested_by_name || "—"}</td>
-                <td><div className="hub-row-actions">
-                  <button className="ops-btn ops-btn-outline ops-btn-sm" disabled={busyId === `mr-${m.id}`} onClick={() => setReject({ kind: "mr", row: m })}>Reject</button>
-                  <button className="ops-btn ops-btn-primary ops-btn-sm" disabled={busyId === `mr-${m.id}`} onClick={() => approveMR(m)}>Approve</button>
-                </div></td></tr>);
-            })}</tbody>
-          </table></div>
         ) : (
           <div className="ops-table-wrap"><table className="ops-table">
             <thead><tr><th>Request</th><th>Title</th><th>Category</th><th>Priority</th><th>Estimate</th><th>Requested by</th><th /></tr></thead>
@@ -113,7 +88,7 @@ export default function ApprovalsCenter() {
                 <td style={{ textTransform: "capitalize" }}>{String(o.category).replace("_", " ")}</td>
                 <td><StatusBadge status={o.priority} /></td><td className="hub-strong">{inr(o.cost_estimate)}</td><td>{o.requested_by_name || "—"}</td>
                 <td><div className="hub-row-actions">
-                  <button className="ops-btn ops-btn-outline ops-btn-sm" disabled={busyId === `or-${o.id}`} onClick={() => setReject({ kind: "or", row: o })}>Reject</button>
+                  <button className="ops-btn ops-btn-outline ops-btn-sm" disabled={busyId === `or-${o.id}`} onClick={() => setReject({ row: o })}>Reject</button>
                   <button className="ops-btn ops-btn-primary ops-btn-sm" disabled={busyId === `or-${o.id}`} onClick={() => approveOffice(o)}>Approve</button>
                 </div></td></tr>))}</tbody>
           </table></div>

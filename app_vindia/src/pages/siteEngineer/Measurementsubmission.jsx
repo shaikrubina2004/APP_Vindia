@@ -7,6 +7,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
 import "../../styles/Measurementsubmission.css";
+import { todayISO } from "../../utils/localDate";
 
 const PAGE_SIZE  = 8;
 const UNITS      = ["sqm","sqft","cu m","RMT","m","nos","kg","tonnes","bags","litre","LS"];
@@ -25,7 +26,8 @@ const BLANK_FORM = {
   project_id:"", milestone_id:"",
 };
 
-function nowISO() { return new Date().toISOString().slice(0,10); }
+// Local calendar day (was UTC — wrong for part of every morning in India)
+function nowISO() { return todayISO(); }
 function fmtDate(s) { return s ? new Date(s).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—"; }
 function stableKey(it) { return it?.id!=null?String(it.id):`${it?.title||""}|${it?.createdAt||""}`; }
 

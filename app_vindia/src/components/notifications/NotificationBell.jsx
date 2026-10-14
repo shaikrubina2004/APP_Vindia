@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./NotificationBell.css";
+import authFetch from "../../utils/authFetch";
+import { API_ORIGIN } from "../../services/api";
+
+const BASE = `${API_ORIGIN}/api/pc-notifications`;
 
 const TYPE_CFG = {
   project:  { label: "Project",   color: "#0ea5e9", bg: "#e0f2fe" },
@@ -8,6 +12,7 @@ const TYPE_CFG = {
   incident: { label: "Incident",  color: "#dc2626", bg: "#fef2f2" },
   task:     { label: "Task",      color: "#7c3aed", bg: "#f5f3ff" },
   milestone:{ label: "Milestone", color: "#0891b2", bg: "#ecfeff" },
+  work:     { label: "Daily Update", color: "#059669", bg: "#ecfdf5" },
 };
 
 const SEV_COLOR = {
@@ -17,7 +22,8 @@ const SEV_COLOR = {
   ok:       "#10b981",
 };
 
-const FILTERS = ["all", "project", "milestone", "incident", "task", "payment"];
+const FILTERS = ["all", "project", "milestone", "work", "incident", "task", "payment"];
+const FILTER_LABEL = { work: "Daily" };
 
 export default function NotificationBell({ userId }) {
   const navigate = useNavigate();
@@ -29,7 +35,7 @@ export default function NotificationBell({ userId }) {
   const fetchNotifs = useCallback(async () => {
     if (!userId) return;
     try {
-      const res  = await fetch(`http://localhost:5000/api/pc-notifications/${userId}`);
+      const res  = await authFetch(`${BASE}/${userId}`);
       const data = await res.json();
       setNotifs(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -43,7 +49,9 @@ export default function NotificationBell({ userId }) {
   // Poll every 10 seconds (reduced from 30)
   useEffect(() => {
     if (!userId) return;
-    const interval = setInterval(fetchNotifs, 10000);
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchNotifs();
+    }, 15000);
     return () => clearInterval(interval);
   }, [userId, fetchNotifs]);
 
@@ -59,14 +67,14 @@ export default function NotificationBell({ userId }) {
   const markRead = async (id) => {
     setNotifs(p => p.map(n => n.id === id ? { ...n, is_read: true } : n));
     try {
-      await fetch(`http://localhost:5000/api/pc-notifications/${id}/read`, { method: "PATCH" });
+      await authFetch(`${BASE}/${id}/read`, { method: "PATCH" });
     } catch (err) { console.error(err); }
   };
 
   const markAllRead = async () => {
     setNotifs(p => p.map(n => ({ ...n, is_read: true })));
     try {
-      await fetch(`http://localhost:5000/api/pc-notifications/read-all/${userId}`, { method: "PATCH" });
+      await authFetch(`${BASE}/read-all/${userId}`, { method: "PATCH" });
     } catch (err) { console.error(err); }
   };
 
@@ -80,8 +88,11 @@ export default function NotificationBell({ userId }) {
       task:      "/project-coordinator/incidents?page=tasks",
       incident:  "/project-coordinator/incidents",
       payment:   "/project-coordinator/payments",
+      work:      "/project-coordinator/daily",
     };
-    navigate(routes[n.type] ?? "/project-coordinator/dashboard");
+    // Prefer the exact link stored with the notification, else fall back by type
+    const target = n.link && n.link.startsWith("/project-coordinator") ? n.link : routes[n.type];
+    navigate(target ?? "/project-coordinator/dashboard");
   };
 
   const formatTime = (ts) => {
@@ -170,7 +181,7 @@ export default function NotificationBell({ userId }) {
                   className={`notif-filter-btn ${filter === f ? "active" : ""}`}
                   onClick={() => setFilter(f)}
                 >
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                  {FILTER_LABEL[f] ?? (f.charAt(0).toUpperCase() + f.slice(1))}
                 </button>
               ))}
             </div>

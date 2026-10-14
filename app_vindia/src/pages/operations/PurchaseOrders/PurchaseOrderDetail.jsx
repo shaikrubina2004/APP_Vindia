@@ -71,6 +71,13 @@ const PurchaseOrderDetail = () => {
           <span className="pod-meta-value">{po.project_name || "—"}</span>
         </div>
         <div className="pod-meta-item">
+          <span className="pod-meta-label">WBS Activity</span>
+          <span className="pod-meta-value">
+            {po.wbs_code
+              ? `${po.wbs_code} — ${po.wbs_name || ""}`
+              : "—"}
+          </span>
+
           <span className="pod-meta-label">Linked Material Request</span>
           <span className="pod-meta-value">
             {po.material_request_id ? `#${po.material_request_id}` : "—"}

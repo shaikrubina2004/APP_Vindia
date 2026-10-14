@@ -22,6 +22,7 @@ const TYPE_CFG = {
   daily_update: { label: "Daily Update", color: "#0891b2", bg: "#ecfeff" },
   approval:  { label: "Approval",  color: "#b45309", bg: "#fffbeb" },
   request:   { label: "Request",   color: "#4338ca", bg: "#eef2ff" },
+  diary:     { label: "Site Diary", color: "#0f766e", bg: "#f0fdfa" },
 };
 
 const SEV_COLOR = {
@@ -42,6 +43,7 @@ const ROLE_FILTERS = {
   operations_manager:    ["all", "approval", "delay", "receipt", "low_stock", "daily_update", "incident", "task"],
   office_administrator:  ["all", "request", "daily_update", "incident", "task"],
   finance_manager:       ["all", "incident", "task"],
+  project_manager:       ["all", "approval", "diary", "daily_update", "incident", "task"],
   procurement_officer:   ["all", "request", "approval", "receipt", "delay", "daily_update", "incident", "task"],
 
 };
@@ -57,6 +59,7 @@ const ROLE_TITLE = {
   logistics_coordinator: "Logistics",
   inventory_controller: "Inventory",
   finance_manager: "Finance",
+  project_manager: "Project",
   procurement_officer: "Procurement",
   operations_manager: "Operations",
   office_administrator: "Office Admin",

@@ -243,6 +243,11 @@ exports.getAllProjects = async (req, res) => {
     // Previously every logged-in role (clients included) received every project,
     // with budgets and other clients' names.
     const clientOnly = req.user?.role === "client";
+    // A Site Engineer only sees the project(s) they are assigned to. Previously every
+    // engineer got every project, so dropdowns (labour registry, diary, photos...)
+    // listed the whole company and nothing told them which site was theirs.
+    const engineerOnly = req.user?.role === "site_engineer";
+    const scoped = clientOnly || engineerOnly;
     const result = await pool.query(
       `SELECT 
         p.*,
@@ -257,14 +262,73 @@ exports.getAllProjects = async (req, res) => {
        LEFT JOIN users u ON p.coordinator_id = u.id
        LEFT JOIN users ua ON p.architect_id = ua.id
        LEFT JOIN users uc2 ON p.client_user_id = uc2.id
-       ${clientOnly ? "WHERE p.client_user_id = $1" : ""}
+       ${clientOnly ? "WHERE p.client_user_id = $1" : engineerOnly ? "WHERE p.site_engineer_id = $1" : ""}
        ORDER BY p.created_at DESC`,
-      clientOnly ? [req.user.id] : [],
+      scoped ? [req.user.id] : [],
     );
     return res.status(200).json(result.rows);
   } catch (err) {
     console.error("🔥 FETCH ERROR:", err.message);
     return res.status(500).json({ error: "Failed to fetch projects" });
+  }
+};
+
+/**
+ * ✅ Projects assigned to the logged-in user — "which site am I on?"
+ *   site_engineer       -> projects.site_engineer_id = me
+ *   project_manager     -> projects.manager_id (an EMPLOYEE id) -> employees.user_id = me
+ *   project_coordinator -> projects.coordinator_id = me
+ *   architect           -> projects.architect_id = me
+ *   client              -> projects.client_user_id = me
+ *   anyone else         -> all projects (CEO, finance, ...)
+ * Includes the current phase (first milestone not yet completed) when WBS exists.
+ */
+exports.getMyProjects = async (req, res) => {
+  try {
+    const role = req.user?.role;
+    const filters = {
+      site_engineer: "WHERE p.site_engineer_id = $1",
+      project_coordinator: "WHERE p.coordinator_id = $1",
+      architect: "WHERE p.architect_id = $1",
+      client: "WHERE p.client_user_id = $1",
+      project_manager:
+        "WHERE p.manager_id IN (SELECT e.id FROM employees e WHERE e.user_id = $1)",
+    };
+    const where = filters[role] || "";
+    const result = await pool.query(
+      `SELECT p.id, p.name, p.location, p.status, p.client, p.building_type, p.floors,
+              p.start_date, p.end_date,
+              m.name AS manager_name, s.name AS site_engineer_name
+         FROM projects p
+         LEFT JOIN employees m ON p.manager_id = m.id
+         LEFT JOIN users s ON p.site_engineer_id = s.id
+         ${where}
+        ORDER BY p.created_at DESC`,
+      where ? [req.user.id] : []
+    );
+
+    // Current phase = first top-level WBS milestone that is not complete (best effort).
+    let phases = new Map();
+    try {
+      const ids = result.rows.map((r) => r.id);
+      if (ids.length) {
+        const ph = await pool.query(
+          `SELECT DISTINCT ON (project_id) project_id, name
+             FROM wbs
+            WHERE project_id = ANY($1) AND parent_id IS NULL
+              AND COALESCE(progress, 0) < 100
+            ORDER BY project_id, created_at ASC`,
+          [ids]
+        );
+        phases = new Map(ph.rows.map((r) => [r.project_id, r.name]));
+      }
+    } catch (e) {
+      console.error("getMyProjects phase lookup skipped:", e.message);
+    }
+    return res.json(result.rows.map((r) => ({ ...r, current_phase: phases.get(r.id) || null })));
+  } catch (err) {
+    console.error("getMyProjects error:", err.message);
+    return res.status(500).json({ error: "Failed to fetch your projects" });
   }
 };
 

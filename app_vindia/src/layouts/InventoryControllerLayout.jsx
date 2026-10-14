@@ -1,3 +1,5 @@
+import "../styles/opsShared.css";
+import "../styles/opsTheme.css";
 import AppLayout from "./AppLayout";
 import { inventoryControllerMenu } from "../menus/InventoryControllerMenu";
 

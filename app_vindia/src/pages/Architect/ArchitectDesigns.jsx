@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import authFetch from "../../utils/authFetch";
 import ReactDOM from "react-dom";
 import { getArchitectProjects } from "../../services/architectprojectService";
 import "./ArchitectDesigns.css";
@@ -1568,9 +1569,10 @@ export default function DrawingManagementSystem() {
         if (activeRole === "Architect") {
           res = await getArchitectProjects(currentUser.id);
         } else {
-          res = await fetch("/api/projects").then((r) => r.json());
+          res = await authFetch("/api/projects").then((r) => r.json());
         }
-        const list = res?.data || res || [];
+        const raw  = res?.data || res || [];
+        const list = Array.isArray(raw) ? raw : [];
         setProjects(
           list.map((p) => ({
             id:             p.project_id   || p.id   || uid(),

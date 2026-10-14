@@ -37,6 +37,12 @@ const ROLE_TYPES = {
     "incident", "task", "daily_update",
   ],
 
+  project_manager: [
+    "approval",  // a Site Engineer asked for an approval assigned to the PM
+    "diary",     // a Site Engineer submitted the daily diary
+    "incident", "task", "daily_update",
+  ],
+
   operations_manager: [
     "approval",  // PO / material request / office request waiting for approval
     "delay",     // late delivery

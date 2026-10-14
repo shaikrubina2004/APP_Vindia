@@ -83,6 +83,7 @@ import Model from "../pages/3DVisualizer/Model";
 /* ── PROJECT MANAGER ─────────────────────────────────────── */
 
 import TeamManagement from "../pages/projects/projectmanager/TeamManagement";
+import ProjectManagerLabour from "../pages/projects/projectmanager/Projectmanagerlabour";
 
 import DailyUpdates from "../pages/projects/projectmanager/DailyUpdates";
 
@@ -223,7 +224,7 @@ import BDAReportsWithRole from "../pages/business-development/business-developme
 
 /* ── OPERATIONS & ADMINISTRATION ─────────────────────────── */
 
-import OfficeAdministratorDashboard from "../pages/operations/administrator/OfficeAdministratorDashboard";
+import OfficeAdministratorRoutes from "./OfficeAdministratorRoutes";
 
 import ProcurementOfficerDashboard from "../pages/operations/procurement/ProcurementOfficerDashboard";
 
@@ -488,6 +489,18 @@ const AppRoutes = () => {
 
         {/* ══ PROJECT MANAGER ═══════════════════════════════ */}
 
+
+        {/* Labour registered by Site Engineers — was in the PM menu but never routed (404). */}
+        <Route
+          path="/pm/labour"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
+              <ProjectManagerLayout>
+                <ProjectManagerLabour />
+              </ProjectManagerLayout>
+            </ProtectedRoute>
+          }
+        />
 
         <Route
 
@@ -2191,24 +2204,16 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-<Route
-
-          path="/operations/administrator/dashboard"
-
+        {/* Office Administrator — every screen lives in routes/OfficeAdministratorRoutes.jsx */}
+        <Route
+          path="/operations/administrator/*"
           element={
-
             <ProtectedRoute allowedRoles={[ROLES.OFFICE_ADMINISTRATOR]}>
-
               <OfficeAdministratorLayout>
-
-                <OfficeAdministratorDashboard />
-
+                <OfficeAdministratorRoutes />
               </OfficeAdministratorLayout>
-
             </ProtectedRoute>
-
           }
-
         />
 
 

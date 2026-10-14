@@ -1,6 +1,14 @@
 // backend/controllers/approvalController.js
 
 const pool = require("../config/db");
+const { notifyReviewers, notifyEngineer } = require("../utils/projectPeople");
+
+// Where each reviewer role opens the approvals list
+const REVIEW_LINK = {
+  project_manager: "/project-manager/approvals",
+  quantity_surveyor: "/quantity-surveyor/approvals",
+  architect: "/architect/approvals",
+};
 const normalizeRole = (role) =>
   String(role || "")
     .trim()
@@ -28,10 +36,7 @@ const REVIEWER_ROLES = [
 exports.createApproval = async (req, res) => {
   try {
 
-    console.log("========== APPROVAL UPLOAD DEBUG ==========");
-    console.log("BODY:", req.body);
-    console.log("FILES:", req.files);
-    console.log("============================================");
+    // (removed leftover debug logging of the request body / uploaded files)
 
     const {
       type,
@@ -127,6 +132,19 @@ exports.createApproval = async (req, res) => {
         JSON.stringify(uploadedAttachments), // ✅ FIX: pg needs a JSON string for jsonb columns
       ]
     );
+
+    // Tell the reviewers assigned to this engineer's project(s). Previously nobody
+    // was notified, so a request sat unseen until someone happened to open the page.
+    await notifyReviewers({
+      role: assign_to_role,
+      fromUserId: submittedBy,
+      type: "approval",
+      title: `Approval requested: ${title}`,
+      description: `${req.user?.name || "A Site Engineer"} needs your ${type || "approval"} review${zone ? ` · ${zone}` : ""}.`,
+      link: REVIEW_LINK[assign_to_role] || "/dashboard",
+      severity: "warn",
+      refId: result.rows[0].id,
+    });
 
     return res.status(201).json({
       success: true,
@@ -474,6 +492,21 @@ exports.reviewApproval = async (req, res) => {
         id,
       ]
     );
+
+    // Close the loop: the engineer is told the decision (and why, if not approved).
+    const decided = result.rows[0];
+    if (decided && decided.submitted_by) {
+      const label = { approved: "approved", rejected: "rejected", revision: "sent back for revision" }[status] || status;
+      await notifyEngineer({
+        userId: decided.submitted_by,
+        type: "approval",
+        title: `Your request was ${label}`,
+        description: `${decided.title}${rejection_reason ? ` — ${rejection_reason}` : ""}`,
+        link: "/site-engineer/approvals",
+        severity: status === "approved" ? "ok" : "warn",
+        refId: decided.id,
+      });
+    }
 
     return res.json({
       success: true,

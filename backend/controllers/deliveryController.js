@@ -4,8 +4,11 @@ const { notifyRole } = require("./operationsNotificationsController");
 /* ─────────────────────────────
    HELPER: generate delivery code
 ───────────────────────────── */
-const generateDeliveryCode = async () => {
-  const result = await pool.query(
+// Runs inside the create transaction and takes an advisory lock so two
+// coordinators cannot be handed the same DEL-000N.
+const generateDeliveryCode = async (client) => {
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('delivery_code'))");
+  const result = await client.query(
     `SELECT delivery_code FROM deliveries ORDER BY id DESC LIMIT 1`
   );
   let next = 1;
@@ -42,7 +45,7 @@ exports.getDeliveries = async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT d.*, p.name AS project_name, v.name AS vendor_name,
+      `SELECT d.*, p.name AS project_name, v.name AS vendor_name, po.po_code,
               COALESCE(
                 (SELECT json_agg(di.* ORDER BY di.id) FROM delivery_items di WHERE di.delivery_id = d.id),
                 '[]'
@@ -50,6 +53,7 @@ exports.getDeliveries = async (req, res) => {
        FROM deliveries d
        LEFT JOIN projects p ON p.id = d.project_id
        LEFT JOIN vendors v ON v.id = d.vendor_id
+       LEFT JOIN purchase_orders po ON po.id = d.purchase_order_id
        ${where}
        ORDER BY d.created_at DESC`,
       values
@@ -93,29 +97,32 @@ exports.createDelivery = async (req, res) => {
 
     const userId = req.user?.id;
 
-    // Enforce the PO approval gate on the server (not just in the UI):
-    // only issued / partially_fulfilled POs may have deliveries scheduled.
+    await client.query("BEGIN");
+
+    // A delivery can only be scheduled against a PO that is live: pending /
+    // rejected / cancelled / already fulfilled POs are refused.
+    // The delivery always carries its PO's material request, so a goods receipt can
+    // update that request (ported from the team's version).
     let linkedMaterialRequestId = material_request_id || null;
     if (purchase_order_id) {
-      const po = await pool.query(
-        "SELECT status, material_request_id FROM purchase_orders WHERE id = $1",
+      const po = await client.query(
+        "SELECT po_code, status, material_request_id FROM purchase_orders WHERE id = $1",
         [purchase_order_id]
       );
       if (!po.rows.length) {
+        await client.query("ROLLBACK");
         return res.status(404).json({ error: "Purchase order not found" });
       }
       if (!["issued", "partially_fulfilled"].includes(po.rows[0].status)) {
+        await client.query("ROLLBACK");
         return res.status(400).json({
-          error: `Cannot schedule a delivery for a purchase order in status "${po.rows[0].status}"`,
+          error: `${po.rows[0].po_code} is "${po.rows[0].status}" — deliveries can only be scheduled for issued purchase orders`,
         });
       }
-      // Always carry the PO's material request so the receipt can update it.
       linkedMaterialRequestId = linkedMaterialRequestId || po.rows[0].material_request_id || null;
     }
 
-    const delivery_code = await generateDeliveryCode();
-
-    await client.query("BEGIN");
+    const delivery_code = await generateDeliveryCode(client);
 
     const delivery = await client.query(
       `INSERT INTO deliveries
@@ -285,6 +292,29 @@ exports.markDelayed = async (req, res) => {
       [delay_reason || null, new_eta || null, id]
     );
     if (!result.rows.length) return res.status(404).json({ error: "Delivery not found" });
+
+    // Procurement chases the vendor commercially; the Operations Manager
+    // needs to know a site may be starved of material.
+    await notifyRole(
+      "procurement_officer",
+      "delay",
+      `Delivery ${result.rows[0].delivery_code} delayed`,
+      delay_reason || "No reason given",
+      "/operations/procurement/delivery-follow-up",
+      "warn",
+      result.rows[0].project_id,
+      result.rows[0].id
+    );
+    await notifyRole(
+      "operations_manager",
+      "delay",
+      `Delivery ${result.rows[0].delivery_code} delayed`,
+      delay_reason || "No reason given",
+      "/operations/manager/logistics",
+      "warn",
+      result.rows[0].project_id,
+      result.rows[0].id
+    );
 
     // A delay is owned by Logistics — they chase the vendor/transporter.
     await notifyRole(

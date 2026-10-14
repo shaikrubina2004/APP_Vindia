@@ -1,0 +1,239 @@
+.ops-wbs-page {
+  padding: 24px;
+  min-height: 100%;
+}
+
+.ops-wbs-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+
+.ops-wbs-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  margin-bottom: 5px;
+}
+
+.ops-wbs-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.ops-wbs-header p {
+  margin: 7px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.ops-wbs-project {
+  min-width: 280px;
+}
+
+.ops-wbs-project span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--color-text-secondary);
+}
+
+.ops-wbs-project select {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--color-border-tertiary);
+  border-radius: 8px;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+
+.ops-wbs-error {
+  padding: 11px 14px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.ops-wbs-kpis {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.ops-wbs-kpis > div {
+  padding: 14px;
+  border: 1px solid var(--color-border-tertiary);
+  border-radius: 10px;
+  background: var(--color-background-primary);
+}
+
+.ops-wbs-kpis span {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.ops-wbs-kpis strong {
+  display: block;
+  font-size: 19px;
+  color: var(--color-text-primary);
+}
+
+.ops-wbs-card {
+  overflow: hidden;
+  border: 1px solid var(--color-border-tertiary);
+  border-radius: 12px;
+  background: var(--color-background-primary);
+}
+
+.ops-wbs-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border-tertiary);
+}
+
+.ops-wbs-card-header strong {
+  font-size: 14px;
+}
+
+.ops-wbs-card-header span {
+  margin-left: 10px;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.ops-wbs-readonly {
+  margin-left: 0 !important;
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: #f1f5f9;
+}
+
+.ops-wbs-table-wrap {
+  overflow-x: auto;
+}
+
+.ops-wbs-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 980px;
+  font-size: 12px;
+}
+
+.ops-wbs-table th {
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+  background: var(--color-background-secondary);
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.ops-wbs-table td {
+  padding: 12px;
+  border-top: 1px solid var(--color-border-tertiary);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.ops-wbs-code {
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+}
+
+.ops-wbs-name {
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 500;
+  white-space: normal;
+}
+
+.ops-wbs-branch {
+  color: var(--color-text-tertiary);
+}
+
+.ops-wbs-status {
+  font-size: 11px;
+}
+
+.ops-wbs-progress {
+  min-width: 95px;
+}
+
+.ops-wbs-progress > span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 11px;
+}
+
+.ops-wbs-progress > div {
+  width: 80px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--color-background-secondary);
+}
+
+.ops-wbs-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #185fa5;
+}
+
+.ops-wbs-danger {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.ops-wbs-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+@media (max-width: 1100px) {
+  .ops-wbs-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .ops-wbs-page {
+    padding: 16px;
+  }
+
+  .ops-wbs-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ops-wbs-project {
+    min-width: 0;
+  }
+
+  .ops-wbs-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

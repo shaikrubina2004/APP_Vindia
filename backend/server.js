@@ -152,7 +152,19 @@ const ceoInsightsRoutes    = require("./routes/ceoInsightsRoutes");
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use(
+  express.json({
+    limit: "10mb",
+    // Keep the untouched request body so the Meta webhook can verify
+    // Facebook's X-Hub-Signature-256 header (see controllers/metaController.js).
+    // Only done for /api/meta/* so no other route pays for the extra copy.
+    verify: (req, _res, buf) => {
+      if (req.originalUrl && req.originalUrl.startsWith("/api/meta/")) {
+        req.rawBody = buf;
+      }
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/uploads", express.static(uploadDir));
@@ -209,6 +221,10 @@ app.use("/api/ceo-notifications", require("./routes/ceoNotificationRoutes"));
 /* ✅ QS */
 app.use("/api/qs/notifications", qsNotifRoutes);
 app.use("/api/qs", qsRoutes);
+
+/* 3D Visualizer notifications — route + controller existed but were never mounted, so that bell
+   always failed. (protect is applied inside the router.) */
+app.use("/api/3d-notifications", require("./routes/threeDNotificationsRoutes"));
 app.use("/api/boq", boqRoutes);
 app.use("/api/cost-report", costReportRoutes);
 app.use("/api/quantity-report", quantityReportRoutes);

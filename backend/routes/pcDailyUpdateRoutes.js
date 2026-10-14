@@ -2,15 +2,33 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/db");
 const { insertNotification } = require("../controllers/pcNotificationsController");
+const { protect, requireRole } = require("../middleware/authMiddleware");
+
+// Every route needs a logged-in user (these were fully open before).
+router.use(protect);
+
+// Only coordinators (and the CEO) may create / edit / delete updates.
+const writeAccess = requireRole("project_coordinator", "ceo");
+
+// Coordinators may only touch their own updates; the CEO may touch any.
+const assertOwner = async (req, res, id) => {
+  const { rows } = await pool.query(
+    `SELECT coordinator_id FROM pc_daily_updates WHERE id = $1`, [id]
+  );
+  if (!rows.length) { res.status(404).json({ message: "Update not found" }); return false; }
+  if (req.user.role !== "ceo" && Number(rows[0].coordinator_id) !== Number(req.user.id)) {
+    res.status(403).json({ message: "Not your update" }); return false;
+  }
+  return true;
+};
 
 /* =========================================================
    CREATE DAILY UPDATE
 ========================================================= */
-router.post("/", async (req, res) => {
+router.post("/", writeAccess, async (req, res) => {
   try {
     const {
       project_id,
-      coordinator_id,
       date,
       day,
       work,
@@ -32,6 +50,9 @@ router.post("/", async (req, res) => {
       coord_notes,
       approval_from
     } = req.body;
+
+    // Always the logged-in user - never trust (or hard-code) an id from the client.
+    const coordinator_id = req.user.id;
 
     const result = await pool.query(
       `INSERT INTO pc_daily_updates 
@@ -59,16 +80,6 @@ router.post("/", async (req, res) => {
         approval_from || "Project Manager"
       ]
     );
-    await insertNotification(
-  46,
-  "work",
-  "New Daily Update",
-  "Site engineer submitted update",
-  "/project-coordinator/daily",
-  "info",
-  project_id
-);
-
     // Update project progress
     await pool.query(
       `UPDATE projects SET progress = $1 WHERE id = $2`,
@@ -89,7 +100,8 @@ router.post("/", async (req, res) => {
         "Daily Update Submitted",
         `Update for ${projectName} submitted successfully`,
         "/project-coordinator/daily",
-        "ok"
+        "ok",
+        project_id
       );
     } catch (notifErr) {
       // Don't fail the main request if notification fails
@@ -148,9 +160,10 @@ router.get("/project/:project_id", async (req, res) => {
 /* =========================================================
    UPDATE DAILY UPDATE
 ========================================================= */
-router.put("/:id", async (req, res) => {
+router.put("/:id", writeAccess, async (req, res) => {
   try {
     const { id } = req.params;
+    if (!(await assertOwner(req, res, id))) return;
     const {
       work, progress, workers, absent, cementUsed, steelUsed,
       materialShort, issues, severity, delayHours, delayImpact,
@@ -210,8 +223,9 @@ router.get("/roles", async (req, res) => {
 /* =========================================================
    DELETE
 ========================================================= */
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", writeAccess, async (req, res) => {
   try {
+    if (!(await assertOwner(req, res, req.params.id))) return;
     await pool.query(
       `DELETE FROM pc_daily_updates WHERE id = $1`,
       [req.params.id]

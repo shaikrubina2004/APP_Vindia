@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import "../../styles/shared-pages.css";
 import "../../styles/Progress.css";
+import { todayISO } from "../../utils/localDate";
 
 const BASE_URL    = import.meta.env.VITE_API_URL;
 const DRAFT_KEY   = "progress:draft:v6";
@@ -55,7 +56,8 @@ async function flushQueue() {
   ls.save(QUEUE_KEY, rem);
 }
 
-function nowISO() { return new Date().toISOString().slice(0, 10); }
+// Local calendar day (was UTC — wrong for part of every morning in India)
+function nowISO() { return todayISO(); }
 
 function validate(f) {
   const e = {};

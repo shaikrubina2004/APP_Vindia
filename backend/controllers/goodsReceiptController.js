@@ -1,9 +1,11 @@
 const pool = require("../config/db");
 const { notifyRole } = require("./operationsNotificationsController");
-const Procurement = require("../models/procurementModel");
+const { recomputePOStatus } = require("../models/procurementModel");
 
-const generateGrnCode = async () => {
-  const result = await pool.query(`SELECT grn_code FROM goods_receipts ORDER BY id DESC LIMIT 1`);
+// Inside the receipt transaction; advisory lock prevents duplicate GRN numbers.
+const generateGrnCode = async (client) => {
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('grn_code'))");
+  const result = await client.query(`SELECT grn_code FROM goods_receipts ORDER BY id DESC LIMIT 1`);
   let next = 1;
   if (result.rows.length) {
     const last = result.rows[0].grn_code.split("-").pop();
@@ -75,34 +77,43 @@ exports.createGoodsReceipt = async (req, res) => {
       return res.status(400).json({ error: "delivery_id and at least one item are required" });
     }
 
-    const delivery = await pool.query("SELECT * FROM deliveries WHERE id=$1", [delivery_id]);
-    if (!delivery.rows.length) return res.status(404).json({ error: "Delivery not found" });
-    if (delivery.rows[0].status !== "delivered") {
-      return res.status(400).json({ error: "Only deliveries marked 'delivered' can be received into stock" });
-    }
-    if (delivery.rows[0].receipt_status === "received") {
-      return res.status(400).json({ error: "This delivery has already been received into stock" });
-    }
-
     for (const it of items) {
       if (!it.item_id) {
         return res.status(400).json({ error: "Every line must be mapped to an inventory item_id (Item Master)" });
       }
-      const delivered = Number(it.delivered_qty || 0);
       const accepted = Number(it.accepted_qty || 0);
       const damaged = Number(it.damaged_qty || 0);
-      if (accepted < 0 || damaged < 0) {
+      const delivered = Number(it.delivered_qty || 0);
+      if (accepted < 0 || damaged < 0 || !Number.isFinite(accepted) || !Number.isFinite(damaged)) {
         return res.status(400).json({ error: "Accepted and damaged quantities cannot be negative" });
       }
       if (delivered > 0 && accepted + damaged > delivered) {
-        return res.status(400).json({ error: "Accepted + damaged quantity cannot exceed the delivered quantity" });
+        return res.status(400).json({
+          error: "Accepted + damaged cannot exceed the delivered quantity on a line",
+        });
       }
     }
 
-    const grn_code = await generateGrnCode();
-    const projectId = delivery.rows[0].project_id;
-
     await client.query("BEGIN");
+
+    // Lock the delivery row so two people cannot receive the same delivery
+    // twice at the same moment (double stock-in).
+    const delivery = await client.query("SELECT * FROM deliveries WHERE id=$1 FOR UPDATE", [delivery_id]);
+    if (!delivery.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Delivery not found" });
+    }
+    if (delivery.rows[0].status !== "delivered") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Only deliveries marked 'delivered' can be received into stock" });
+    }
+    if (delivery.rows[0].receipt_status === "received") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "This delivery has already been received into stock" });
+    }
+
+    const grn_code = await generateGrnCode(client);
+    const projectId = delivery.rows[0].project_id;
 
     const gr = await client.query(
       `INSERT INTO goods_receipts (grn_code, delivery_id, project_id, received_by, remarks)
@@ -137,20 +148,18 @@ exports.createGoodsReceipt = async (req, res) => {
       [delivery_id]
     );
 
-    // ── Close the loop (same transaction) ─────────────────────────
-    // 1) Re-derive the PO status (issued -> partially_fulfilled -> fulfilled).
-    const poId = delivery.rows[0].purchase_order_id;
-    if (poId) {
-      await Procurement.recomputePOStatus(client, poId);
-    }
+    // Close the loop with Procurement: PO becomes partially_fulfilled /
+    // fulfilled from what was actually accepted into stock.
+    const poStatus = await recomputePOStatus(client, delivery.rows[0].purchase_order_id);
 
-    // 2) Push accepted quantity back to the Site Engineer's material request,
-    //    so the "Receive" button on site has delivered quantity to confirm.
+    // Push the accepted quantity back to the Site Engineer's material request, so
+    // the "Receive" button on site has a delivered quantity to confirm
+    // (ported from the team's version). Capped at what was requested.
     let mrId = delivery.rows[0].material_request_id;
-    if (!mrId && poId) {
+    if (!mrId && delivery.rows[0].purchase_order_id) {
       const poRow = await client.query(
         "SELECT material_request_id FROM purchase_orders WHERE id = $1",
-        [poId]
+        [delivery.rows[0].purchase_order_id]
       );
       mrId = poRow.rows[0]?.material_request_id || null;
     }
@@ -159,8 +168,8 @@ exports.createGoodsReceipt = async (req, res) => {
       if (totalAccepted > 0) {
         await client.query(
           `UPDATE material_requests
-           SET delivered_qty = LEAST(COALESCE(delivered_qty, 0) + $1, COALESCE(total_qty, 0))
-           WHERE id = $2 AND status = 'approved'`,
+              SET delivered_qty = LEAST(COALESCE(delivered_qty, 0) + $1, COALESCE(total_qty, 0))
+            WHERE id = $2 AND status = 'approved'`,
           [totalAccepted, mrId]
         );
       }
@@ -186,6 +195,36 @@ exports.createGoodsReceipt = async (req, res) => {
       projectId,
       delivery_id
     );
+
+    // Procurement hears about the receipt; the Operations Manager only when
+    // something is short or damaged (avoids notification noise).
+    const damagedTotal = items.reduce((s, it) => s + Number(it.damaged_qty || 0), 0);
+    const shortTotal = items.reduce(
+      (s, it) => s + Math.max(0, Number(it.ordered_qty || 0) - Number(it.accepted_qty || 0) - Number(it.damaged_qty || 0)),
+      0
+    );
+    await notifyRole(
+      "procurement_officer",
+      "receipt",
+      `${delivery.rows[0].delivery_code} received into stock`,
+      poStatus ? `Purchase order is now ${poStatus.replace("_", " ")}.` : `Goods receipt ${grn_code} confirmed.`,
+      "/operations/procurement/purchase-orders",
+      "ok",
+      projectId,
+      delivery_id
+    );
+    if (damagedTotal > 0 || shortTotal > 0) {
+      await notifyRole(
+        "operations_manager",
+        "receipt",
+        `${grn_code}: discrepancy on ${delivery.rows[0].delivery_code}`,
+        `${damagedTotal} damaged, ${shortTotal} short versus the order.`,
+        "/operations/manager/inventory",
+        "warn",
+        projectId,
+        delivery_id
+      );
+    }
 
     res.status(201).json({ ...gr.rows[0], items: itemsResult.rows });
   } catch (err) {

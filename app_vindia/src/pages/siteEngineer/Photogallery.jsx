@@ -13,6 +13,7 @@ import React, {
 import { useSearchParams } from "react-router-dom";
 import api from "../../services/api";
 import "../../styles/PhotoGallery.css";
+import { todayISO } from "../../utils/localDate";
 
 /* ── Constants ───────────────────────────────────────────── */
 const PAGE_SIZE = 12;
@@ -47,7 +48,8 @@ function enqueue(p) {
   ls.save(QUEUE_KEY, q);
 }
 
-function nowISO()   { return new Date().toISOString().slice(0, 10); }
+// Local calendar day (was UTC — wrong for part of every morning in India)
+function nowISO() { return todayISO(); }
 function stableKey(it) { return it?.id != null ? String(it.id) : `${it?.filename || ""}|${it?.createdAt || ""}`; }
 function fmtDate(s) {
   return s ? new Date(s + "T12:00:00").toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"short", year:"numeric" }) : "—";

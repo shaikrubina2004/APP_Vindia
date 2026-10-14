@@ -19,6 +19,34 @@ const CEO_ONLY = requireRole("ceo");
    given role, not the sensitive account-management data below. */
 router.get("/by-role/:role", authMiddleware, getUsersByRole);
 
+/* GET ASSIGNABLE USERS — used by the Incidents / Tasks screen so every internal
+   role (project coordinator, PM, site engineer, ...) can pick an assignee.
+   GET /api/users above is CEO-only, which made that dropdown fail with 403 for
+   everyone except the CEO. This returns only id / name / role (no email, no
+   status, no department) and is closed to client-portal users. */
+router.get(
+  "/assignable",
+  authMiddleware,
+  (req, res, next) =>
+    req.user?.role === "client"
+      ? res.status(403).json({ message: "Access denied." })
+      : next(),
+  async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT u.id, u.name, u.role_id, r.name AS role
+        FROM users u
+        LEFT JOIN roles r ON r.id = u.role_id
+        WHERE COALESCE(u.status, 'active') NOT IN ('inactive', 'disabled', 'blocked')
+        ORDER BY u.name
+      `);
+      res.json(result.rows);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
 /* GET USERS */
 router.get("/", authMiddleware, CEO_ONLY, async (req, res) => {
   try {

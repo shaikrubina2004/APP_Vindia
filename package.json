@@ -1,6 +1,43 @@
 {
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "migrate:ops": "node scripts/runSqlMigration.js migrations/operationsSchema.sql",
+    "migrate:ops-roles": "node scripts/runSqlMigration.js migrations/operationsRolesAndDepartment.sql"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
   "dependencies": {
-    "feather-icons": "^4.29.2",
-    "lucide-react": "^1.6.0"
-  }
+    "@supabase/supabase-js": "^2.104.1",
+    "archiver": "^8.0.0",
+    "axios": "^1.16.0",
+    "bcryptjs": "^3.0.3",
+    "chart.js": "^4.5.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^4.22.1",
+    "fuse.js": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.2.4",
+    "multer": "^2.1.1",
+    "node-cache": "^5.1.2",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^10.0.13",
+    "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.19.1",
+    "pg": "^8.20.0",
+    "react-chartjs-2": "^5.3.1",
+    "react-router-dom": "^7.13.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/pdfkit": "^0.17.6",
+    "nodemon": "^3.1.14"
+  },
+  "type": "commonjs"
 }

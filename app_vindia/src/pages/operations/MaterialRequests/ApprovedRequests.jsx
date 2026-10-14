@@ -67,7 +67,7 @@ const ApprovedRequests = () => {
       <div className="ar-header">
         <div>
           <h1>Approved Material Requests</h1>
-          <p>Requests approved by the Project Manager, waiting on a Purchase Order.</p>
+          <p>Requests approved by the Project Coordinator, waiting on a Purchase Order.</p>
         </div>
         <input
           className="ar-search"
@@ -89,6 +89,7 @@ const ApprovedRequests = () => {
           <thead>
             <tr>
               <th>Project</th>
+              <th>WBS</th>
               <th>Zone</th>
               <th>Purpose</th>
               <th>Items</th>
@@ -100,7 +101,8 @@ const ApprovedRequests = () => {
           <tbody>
             {filteredRequests.map((r) => (
               <tr key={r.id}>
-                <td>{r.project || "—"}</td>
+                <td>{r.project_name || r.project || "—"}</td>
+                <td>{r.wbs_code ? `${r.wbs_code} — ${r.wbs_name || ""}` : "—"}</td>
                 <td>{r.zone || "—"}</td>
                 <td>{r.purpose || "—"}</td>
                 <td>{itemCount(r.items)}</td>

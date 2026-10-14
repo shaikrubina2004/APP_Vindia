@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import operationsService from "../../../services/operationsService";
 import CheckInButton from "../../../SharedResourse/CheckInButton";
+import OpsHero from "../shared/OpsHero";
 import { inr, timeAgo, errorText } from "../shared/opsFormat";
 import "../shared/operationsHub.css";
 
@@ -88,22 +89,26 @@ export default function OperationsManagerDashboard() {
 
   return (
     <div className="ops-page">
-      <div className="ops-header">
-        <div>
-          <p className="ops-greeting">{greeting}, {employeeName} 👋</p>
-          <h1 className="ops-title">Operations Control Center</h1>
-          <p className="ops-subtitle">Requests → purchase → delivery → stock, across every active site</p>
-        </div>
-        <div className="ops-flex-center">
-          <CheckInButton employeeId={user?.id || null} designation={user?.designation || user?.role || null} />
-          <button className="ops-icon-btn" onClick={() => load(true)} title="Refresh">
-            <RefreshCw size={16} style={refreshing ? { animation: "logd-spin 1s linear infinite" } : undefined} />
-          </button>
-          <Link to="/operations/manager/approvals" className="ops-btn ops-btn-primary">
-            <CheckCircle2 size={16} /> Approvals
-          </Link>
-        </div>
-      </div>
+      <OpsHero
+        eyebrow="Operations & Administration"
+        title={`${greeting}, ${employeeName} 👋`}
+        subtitle={
+          attention.length === 0
+            ? "Everything is on track — nothing needs your attention right now."
+            : `${attention.length} thing${attention.length === 1 ? "" : "s"} need your attention today. Start with the red ones below.`
+        }
+        actions={
+          <>
+            <CheckInButton employeeId={user?.id || null} designation={user?.designation || user?.role || null} />
+            <button className="ops-icon-btn" onClick={() => load(true)} title="Refresh" aria-label="Refresh dashboard">
+              <RefreshCw size={16} style={refreshing ? { animation: "logd-spin 1s linear infinite" } : undefined} />
+            </button>
+            <Link to="/operations/manager/approvals" className="ops-btn ops-btn-primary">
+              <CheckCircle2 size={16} /> Review approvals
+            </Link>
+          </>
+        }
+      />
 
       {data.warnings?.length > 0 && (
         <div className="ops-alert ops-alert-warning">
@@ -114,8 +119,8 @@ export default function OperationsManagerDashboard() {
 
       <div className="ops-kpi-grid hub-kpi-4">
         <KpiCard icon={CheckCircle2} tone="amber" label="Pending approvals"
-          value={po.pending_approval + requests.requested + office.awaiting_approval}
-          sub={`${po.pending_approval} PO · ${requests.requested} requests · ${office.awaiting_approval} office`}
+          value={po.pending_approval + office.awaiting_approval}
+          sub={`${po.pending_approval} purchase orders · ${office.awaiting_approval} office requests`}
           to="/operations/manager/approvals" />
         <KpiCard icon={ShoppingCart} tone="indigo" label="Open purchase orders"
           value={po.issued + po.partially_fulfilled}
@@ -133,7 +138,7 @@ export default function OperationsManagerDashboard() {
         <div className="ops-card-header"><h2>Procurement pipeline</h2></div>
         <div className="hub-pipeline">
           <Stage icon={ClipboardList} tone="amber" count={requests.requested} name="Requested"
-            hint="awaiting approval" to="/operations/manager/material-requests" />
+            hint="with Project Coordinator" to="/operations/manager/material-requests" />
           <Stage icon={ShieldCheck} tone="sky" count={requests.awaiting_po} name="Approved"
             hint="waiting for a PO" alert={requests.overdue} to="/operations/manager/material-requests" />
           <Stage icon={FileText} tone="indigo" count={po.issued + po.partially_fulfilled + po.pending_approval} name="Purchase order"
