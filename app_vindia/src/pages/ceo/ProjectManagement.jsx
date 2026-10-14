@@ -30,6 +30,15 @@ const authFetch = (url, options = {}) =>
 
 const fmt = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
 
+/* Client dropdown label: "Name (Company) — email" */
+const clientLabel = (c) => {
+  const base =
+    c.company_name && c.company_name !== c.name
+      ? `${c.name} (${c.company_name})`
+      : c.name;
+  return c.email ? `${base} — ${c.email}` : base;
+};
+
 const fmtDate = (d) =>
   d
     ? new Date(d).toLocaleDateString("en-IN", {
@@ -275,6 +284,7 @@ function ProjectManagement() {
   const [coordinators, setCoordinators] = useState([]);
   const [architects, setArchitects] = useState([]);
   const [clients, setClients] = useState([]);
+  const [clientsStatus, setClientsStatus] = useState("loading"); // loading | ready | error
   useEffect(() => {
     authFetch("http://localhost:5000/api/projects/coordinators")
       .then((res) => res.json())
@@ -284,11 +294,6 @@ function ProjectManagement() {
     authFetch("http://localhost:5000/api/projects/architects")
       .then((res) => res.json())
       .then((data) => setArchitects(Array.isArray(data) ? data : []))
-      .catch(console.error);
-
-    authFetch("http://localhost:5000/api/projects/clients")
-      .then((res) => res.json())
-      .then((data) => setClients(Array.isArray(data) ? data : []))
       .catch(console.error);
   }, []);
 
@@ -362,6 +367,31 @@ function ProjectManagement() {
     phone: "",
   });
 
+  /* Registered client accounts (real users with the Client role) for the Client
+     dropdown. Re-fetched each time the Add Project modal opens so a client the
+     CEO has just created shows up without reloading the page. */
+  useEffect(() => {
+    if (!showProjectModal) return undefined;
+    let cancelled = false;
+    authFetch("http://localhost:5000/api/projects/clients")
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setClients(Array.isArray(data) ? data : []);
+        setClientsStatus("ready");
+      })
+      .catch((err) => {
+        console.error("Load clients error:", err);
+        if (!cancelled) setClientsStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showProjectModal]);
+
   const [payments, setPayments] = useState([
     {
       id: 1,
@@ -423,6 +453,10 @@ function ProjectManagement() {
         alert("Please fill required fields");
         return;
       }
+      if (!newProject.client_user_id) {
+        alert("Please select a registered client for this project.");
+        return;
+      }
       const res = await authFetch("http://localhost:5000/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -446,7 +480,12 @@ function ProjectManagement() {
           phone: newProject.phone,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // keep the modal open so nothing the user typed is lost
+        alert(data?.error || data?.message || "Could not create the project.");
+        return;
+      }
       if (data?.id) {
         setProjects((prev) => [data, ...prev]);
         setSelectedProject(data);
@@ -454,6 +493,7 @@ function ProjectManagement() {
       setNewProject({
         name: "",
         client: "",
+        client_user_id: "",
         phone: "",
         startDate: "",
         endDate: "",
@@ -757,8 +797,17 @@ function ProjectManagement() {
                     label="End Date"
                     value={fmtDate(sp.end_date)}
                   />
-                  <DetailRow icon="👤" label="Client" value={sp.client} />
-                  <DetailRow icon="📞" label="Phone" value={sp.phone} />
+                  <DetailRow icon="👤" label="Client" value={sp.client_user_name || sp.client} />
+                  {sp.client_company_name && sp.client_company_name !== (sp.client_user_name || sp.client) && (
+                    <DetailRow icon="🏢" label="Client Company" value={sp.client_company_name} />
+                  )}
+                  {sp.client_contact_person && (
+                    <DetailRow icon="🧑‍💼" label="Contact Person" value={sp.client_contact_person} />
+                  )}
+                  {sp.client_user_email && (
+                    <DetailRow icon="✉️" label="Client Email" value={sp.client_user_email} />
+                  )}
+                  <DetailRow icon="📞" label="Phone" value={sp.phone || sp.client_user_phone} />
                 </div>
               </div>
 
@@ -1190,6 +1239,7 @@ function ProjectManagement() {
                 <div className="form-group">
                   <label>Client *</label>
                   <select
+                    disabled={clientsStatus === "ready" && clients.length === 0}
                     value={newProject.client_user_id || ""}
                     onChange={(e) => {
                       const selected = clients.find(
@@ -1202,13 +1252,29 @@ function ProjectManagement() {
                       });
                     }}
                   >
-                    <option value="">Select Client</option>
+                    <option value="">
+                      {clientsStatus === "loading" && clients.length === 0
+                        ? "Loading clients…"
+                        : "Select Client"}
+                    </option>
                     {clients.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {clientLabel(c)}
                       </option>
                     ))}
                   </select>
+                  {clientsStatus === "ready" && clients.length === 0 && (
+                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#b45309" }}>
+                      No clients are registered yet. A CEO must register a client
+                      (CEO → Client Management → Create Client) before a project
+                      can be linked to them.
+                    </p>
+                  )}
+                  {clientsStatus === "error" && (
+                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#dc2626" }}>
+                      Could not load the client list. Close this form and try again.
+                    </p>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Phone Number</label>

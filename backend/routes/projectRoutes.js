@@ -37,6 +37,8 @@ router.get("/site-engineers", authMiddleware, notClient, getSiteEngineers);
 router.get("/managers", authMiddleware, notClient, getManagers);
 router.get("/coordinators", authMiddleware, notClient, getCoordinators); // ✅ added
 router.get("/architects", authMiddleware, notClient, getArchitects);
-router.get("/clients", authMiddleware, notClient, getClients);
+// Client dropdown for the Add Project form: read-only, CEO / Project Manager only
+// (it returns client names + emails). Creating clients is CEO-only: POST /api/ceo/clients.
+router.get("/clients", authMiddleware, requireRole("ceo", "project_manager"), getClients);
 
 module.exports = router;

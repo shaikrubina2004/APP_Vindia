@@ -54,10 +54,38 @@ exports.createProject = async (req, res) => {
     } = req.body;
 
     // ✅ Validation
-    if (!name || !client || !budget) {
+    if (!name || (!client && !client_user_id) || !budget) {
       return res.status(400).json({
         error: "Name, Client and Budget are required",
       });
+    }
+
+    // ✅ Client link: when a client account is chosen it must be a real, active
+    // CLIENT-role user. The stored `client` label is taken from that account so
+    // it can never drift from (or be spoofed against) the linked user.
+    let linkedClientId = null;
+    let clientLabel = client;
+    if (client_user_id !== undefined && client_user_id !== null && client_user_id !== "") {
+      const cid = Number(client_user_id);
+      if (!Number.isInteger(cid) || cid <= 0) {
+        return res.status(400).json({ error: "Invalid client selected" });
+      }
+      const clientRow = await pool.query(
+        `SELECT u.id, u.name
+           FROM users u
+           JOIN roles r ON r.id = u.role_id
+          WHERE u.id = $1
+            AND LOWER(r.code) = 'client'
+            AND LOWER(COALESCE(u.status, 'active')) NOT IN ('inactive', 'disabled', 'blocked', 'suspended')`,
+        [cid],
+      );
+      if (!clientRow.rows.length) {
+        return res
+          .status(400)
+          .json({ error: "Selected client is not a valid, active client account" });
+      }
+      linkedClientId = clientRow.rows[0].id;
+      clientLabel = clientRow.rows[0].name;
     }
 
     if (phone && phone.length !== 10) {
@@ -79,7 +107,7 @@ exports.createProject = async (req, res) => {
       RETURNING *`,
       [
         name,
-        client,
+        clientLabel,
         start_date,
         end_date,
         budget,
@@ -87,7 +115,7 @@ exports.createProject = async (req, res) => {
         site_engineer_id,
         coordinator_id || null,
         architect_id || null,
-        client_user_id || null,
+        linkedClientId,
         location || null,
         description || null,
         building_type || null,
@@ -105,7 +133,13 @@ exports.createProject = async (req, res) => {
         s.name AS site_engineer_name,
         u.name AS coordinator_name,
         ua.name AS architect_name,
-        uc2.name AS client_user_name
+        uc2.name AS client_user_name,
+        uc2.email AS client_user_email,
+        NULLIF(TRIM(to_jsonb(uc2)->>'company_name'), '') AS client_company_name,
+        NULLIF(TRIM(to_jsonb(uc2)->>'contact_person'), '') AS client_contact_person,
+        COALESCE(NULLIF(TRIM(to_jsonb(uc2)->>'phone'), ''),
+                 NULLIF(TRIM(to_jsonb(uc2)->>'mobile'), ''),
+                 NULLIF(TRIM(to_jsonb(uc2)->>'phone_number'), '')) AS client_user_phone
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
        LEFT JOIN users s ON p.site_engineer_id = s.id
@@ -220,13 +254,21 @@ exports.getArchitects = async (req, res) => {
   }
 };
 
+// Client dropdown for the Add Project form. Real client accounts only:
+// users whose role code is exactly 'client' (the old `name LIKE '%client%'`
+// match could also catch unrelated roles) and that are not disabled.
+// company_name / contact_person come from to_jsonb() so this keeps working
+// before the optional profile migration has been applied (they are just null).
 exports.getClients = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.name
+      `SELECT u.id, u.name, u.email,
+              NULLIF(TRIM(to_jsonb(u)->>'company_name'), '')   AS company_name,
+              NULLIF(TRIM(to_jsonb(u)->>'contact_person'), '') AS contact_person
        FROM users u
        INNER JOIN roles r ON u.role_id = r.id
-       WHERE LOWER(r.name) LIKE '%client%'
+       WHERE LOWER(r.code) = 'client'
+         AND LOWER(COALESCE(u.status, 'active')) NOT IN ('inactive', 'disabled', 'blocked', 'suspended')
        ORDER BY u.name`,
     );
     res.json(result.rows);
@@ -255,7 +297,13 @@ exports.getAllProjects = async (req, res) => {
         s.name AS site_engineer_name,
         u.name AS coordinator_name,
         ua.name AS architect_name,
-        uc2.name AS client_user_name
+        uc2.name AS client_user_name,
+        uc2.email AS client_user_email,
+        NULLIF(TRIM(to_jsonb(uc2)->>'company_name'), '') AS client_company_name,
+        NULLIF(TRIM(to_jsonb(uc2)->>'contact_person'), '') AS client_contact_person,
+        COALESCE(NULLIF(TRIM(to_jsonb(uc2)->>'phone'), ''),
+                 NULLIF(TRIM(to_jsonb(uc2)->>'mobile'), ''),
+                 NULLIF(TRIM(to_jsonb(uc2)->>'phone_number'), '')) AS client_user_phone
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
        LEFT JOIN users s ON p.site_engineer_id = s.id
@@ -345,7 +393,13 @@ exports.getProjectById = async (req, res) => {
         s.name AS site_engineer_name,
         u.name AS coordinator_name,
         ua.name AS architect_name,
-        uc2.name AS client_user_name
+        uc2.name AS client_user_name,
+        uc2.email AS client_user_email,
+        NULLIF(TRIM(to_jsonb(uc2)->>'company_name'), '') AS client_company_name,
+        NULLIF(TRIM(to_jsonb(uc2)->>'contact_person'), '') AS client_contact_person,
+        COALESCE(NULLIF(TRIM(to_jsonb(uc2)->>'phone'), ''),
+                 NULLIF(TRIM(to_jsonb(uc2)->>'mobile'), ''),
+                 NULLIF(TRIM(to_jsonb(uc2)->>'phone_number'), '')) AS client_user_phone
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
        LEFT JOIN users s ON p.site_engineer_id = s.id

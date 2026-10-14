@@ -18,11 +18,14 @@ import {
   RefreshCw,
   Eye,
   Info,
+  UserPlus,
 } from "lucide-react";
 import {
   fetchClients,
   getApiErrorMessage,
 } from "../../services/ceoClientService";
+import Toast from "../../components/Toast";
+import CreateClientModal from "./CreateClientModal";
 import "./ClientManagement.css";
 
 /* ── helpers ─────────────────────────────────────────────── */
@@ -82,6 +85,12 @@ function ClientManagement() {
 
   const controllerRef = useRef(null);
 
+  /* Create Client */
+  const [showCreate, setShowCreate] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0); // bump to force a refetch (list + summary cards)
+  const pendingToastRef = useRef(null);
+
   /* debounce search so we don't query on every keystroke */
   useEffect(() => {
     const t = setTimeout(() => {
@@ -122,7 +131,7 @@ function ClientManagement() {
   useEffect(() => {
     load();
     return () => controllerRef.current?.abort();
-  }, [load]);
+  }, [load, reloadKey]); // reloadKey: forced refetch after a client is created
 
   const summary = data?.summary;
   const clients = data?.clients || [];
@@ -143,6 +152,35 @@ function ClientManagement() {
   };
 
   const openClient = (id) => navigate(`/ceo/clients/${id}`);
+
+  /* After a successful create: reset filters so the new client is visible,
+     refetch the list + summary cards (registered-client count), and notify. */
+  const handleCreated = (data) => {
+    setSearchInput("");
+    setSearch("");
+    setProjectFilter("all");
+    setPage(1);
+    setReloadKey((k) => k + 1);
+
+    const label = data?.client?.name || "Client";
+    if (data?.temporary_password) {
+      // The modal is still open showing the one-time password; announce when it closes.
+      pendingToastRef.current = { type: "success", text: `${label} created. Share the one-time password with the client.` };
+    } else {
+      setToast({
+        type: "success",
+        text: data?.email_sent ? `${label} created. Login details were emailed.` : `${label} created successfully.`,
+      });
+    }
+  };
+
+  const closeCreate = () => {
+    setShowCreate(false);
+    if (pendingToastRef.current) {
+      setToast(pendingToastRef.current);
+      pendingToastRef.current = null;
+    }
+  };
 
   const cards = [
     {
@@ -194,15 +232,25 @@ function ClientManagement() {
             position in one place.
           </p>
         </div>
-        <button
-          type="button"
-          className="cm-btn cm-btn--ghost"
-          onClick={load}
-          disabled={loading}
-        >
-          <RefreshCw size={15} className={loading ? "cm-spin" : ""} />
-          Refresh
-        </button>
+        <div className="cm-header__actions">
+          <button
+            type="button"
+            className="cm-btn cm-btn--primary"
+            onClick={() => setShowCreate(true)}
+          >
+            <UserPlus size={15} />
+            + Create Client
+          </button>
+          <button
+            type="button"
+            className="cm-btn cm-btn--ghost"
+            onClick={load}
+            disabled={loading}
+          >
+            <RefreshCw size={15} className={loading ? "cm-spin" : ""} />
+            Refresh
+          </button>
+        </div>
       </header>
 
       {/* ── Overview cards ── */}
@@ -368,8 +416,17 @@ function ClientManagement() {
             <p>
               {hasActiveFilters
                 ? "Try a different name, email or ID, or clear the filters."
-                : "Client accounts will appear here once they are created."}
+                : "No client accounts exist yet. Create one so projects can be linked to it."}
             </p>
+            {!hasActiveFilters && (
+              <button
+                type="button"
+                className="cm-btn cm-btn--primary"
+                onClick={() => setShowCreate(true)}
+              >
+                <UserPlus size={15} /> Create your first client
+              </button>
+            )}
             {hasActiveFilters && (
               <button type="button" className="cm-btn cm-btn--outline" onClick={clearFilters}>
                 Clear filters
@@ -404,6 +461,9 @@ function ClientManagement() {
                           <span className="cm-avatar">{initials(c.name)}</span>
                           <span className="cm-client__text">
                             <span className="cm-client__name">{c.name}</span>
+                            {c.company_name && c.company_name !== c.name && (
+                              <span className="cm-client__email">{c.company_name}</span>
+                            )}
                             <span className="cm-client__email">{c.email}</span>
                           </span>
                         </div>
@@ -477,6 +537,14 @@ function ClientManagement() {
           </>
         )}
       </section>
+
+      {showCreate && (
+        <CreateClientModal onClose={closeCreate} onCreated={handleCreated} />
+      )}
+      {/* wrapper scopes the position fix to this page: below the navbar, above everything */}
+      <div className="cm-toast-host">
+        <Toast toast={toast} onClose={() => setToast(null)} duration={4000} />
+      </div>
     </div>
   );
 }

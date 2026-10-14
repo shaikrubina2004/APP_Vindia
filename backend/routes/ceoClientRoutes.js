@@ -11,11 +11,14 @@ const {
   getClientProjects,
   getClientActivity,
 } = require("../controllers/ceoClientController");
+const { createClient } = require("../controllers/ceoClientCreateController");
 
 router.use(protect);
 router.use(requireRole("ceo"));
 
 router.get("/", getClients);
+// Create a client account (CEO only — enforced by requireRole("ceo") above).
+router.post("/", createClient);
 router.get("/:clientId", getClientById);
 router.get("/:clientId/projects", getClientProjects);
 router.get("/:clientId/activity", getClientActivity);

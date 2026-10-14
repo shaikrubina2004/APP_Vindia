@@ -79,6 +79,9 @@ const userFieldSql = async () => {
   return {
     userPhone: phoneCol ? `NULLIF(TRIM(u.${phoneCol}::text), '')` : `NULL::text`,
     userCreated: cols.has("created_at") ? `u.created_at` : `NULL::timestamptz`,
+    // Added by migrations/add_client_profile_columns_to_users.sql (null until then)
+    userCompany: cols.has("company_name") ? `NULLIF(TRIM(u.company_name::text), '')` : `NULL::text`,
+    userContact: cols.has("contact_person") ? `NULLIF(TRIM(u.contact_person::text), '')` : `NULL::text`,
     hasStatus: cols.has("status"),
   };
 };
@@ -89,6 +92,8 @@ const clientAggregateCte = (fields) => `
     SELECT u.id, u.name, u.email,
            ${fields.hasStatus ? "u.status" : "NULL::text"} AS status,
            ${fields.userPhone} AS user_phone,
+           ${fields.userCompany} AS company_name,
+           ${fields.userContact} AS contact_person,
            ${fields.userCreated} AS created_at
     FROM users u
     JOIN roles r ON r.id = u.role_id
@@ -137,6 +142,7 @@ exports.getClients = async (req, res) => {
       const idIdx = params.length;
       where.push(
         `(c.name ILIKE $${likeIdx} OR c.email ILIKE $${likeIdx}
+          OR c.company_name ILIKE $${likeIdx} OR c.contact_person ILIKE $${likeIdx}
           OR ('CL-' || LPAD(c.id::text, 4, '0')) ILIKE $${likeIdx}
           OR c.id::text = $${idIdx})`,
       );
@@ -168,6 +174,7 @@ exports.getClients = async (req, res) => {
       WITH ${cte},
       c AS (
         SELECT cl.id, cl.name, cl.email, cl.status, cl.created_at,
+               cl.company_name, cl.contact_person,
                COALESCE(cl.user_phone, pr.project_phone) AS phone,
                COALESCE(pr.total_projects, 0)     AS total_projects,
                COALESCE(pr.active_projects, 0)    AS active_projects,
@@ -216,6 +223,8 @@ exports.getClients = async (req, res) => {
           id: r.id,
           client_code: `CL-${String(r.id).padStart(4, "0")}`,
           name: r.name,
+          company_name: r.company_name || null,
+          contact_person: r.contact_person || null,
           email: r.email,
           phone: r.phone || null,
           status: r.status || null,

@@ -30,3 +30,12 @@ export const fetchClientProjects = (clientId, signal) =>
 
 export const fetchClientActivity = (clientId, signal) =>
   api.get(`/ceo/clients/${clientId}/activity`, { signal }).then(unwrap);
+
+/**
+ * Create a client account (CEO only — enforced by the backend).
+ * Resolves with { client, email_sent, temporary_password? }.
+ * On failure the axios error is re-thrown untouched so the form can read
+ * err.response.data.errors (per-field messages) and err.response.status.
+ */
+export const createClient = (payload) =>
+  api.post("/ceo/clients", payload).then(unwrap);
