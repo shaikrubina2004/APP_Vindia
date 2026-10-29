@@ -308,6 +308,10 @@ import CeoReports from "../pages/ceo/Reports";
 
 import RoleLayout from "../layouts/RoleLayout";
 
+const TIMESHEET_ROLES = Object.values(ROLES).filter(
+  (role) => role !== ROLES.CLIENT,
+);
+
 
 /* ═══════════════════════════════════════════════════════════
 
@@ -1923,22 +1927,13 @@ const AppRoutes = () => {
           element={
 
             <ProtectedRoute
-
-              allowedRoles={[
-                ROLES.CEO,
-                ROLES.HR_MANAGER,
-                ROLES.OPERATIONS_MANAGER,
-                ROLES.FINANCE_MANAGER,
-                ...PROJECT_ROLES,
-              ]}
+              allowedRoles={TIMESHEET_ROLES}
 
             >
 
-              <CEOLayout>
-
+              <RoleLayout>
                 <Timesheet />
-
-              </CEOLayout>
+              </RoleLayout>
 
             </ProtectedRoute>
 

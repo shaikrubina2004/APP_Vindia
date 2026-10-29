@@ -5,6 +5,17 @@ const auth = require("../middleware/authMiddleware");
 const router = express.Router();
 router.use(auth);
 
+function roleOf(req) {
+  return String(req.user?.role || "").trim().toLowerCase();
+}
+
+router.use((req, res, next) => {
+  if (roleOf(req) === "client") {
+    return res.status(403).json({ error: "Timesheet access is not available to client accounts." });
+  }
+  return next();
+});
+
 const MANAGER_ROLES = new Set([
   "project_manager",
   "operations_manager",
@@ -12,10 +23,6 @@ const MANAGER_ROLES = new Set([
   "finance_manager",
   "ceo",
 ]);
-
-function roleOf(req) {
-  return String(req.user?.role || "").trim().toLowerCase();
-}
 
 function isManager(req) {
   return MANAGER_ROLES.has(roleOf(req));
@@ -245,14 +252,7 @@ async function getAccessibleProjectIds(req) {
     return null;
   }
 
-  // params/conditions used to be built separately — params was always
-  // hardcoded to [employee.id, req.user.id] (2 values), but the
-  // project_manager branch below only ever referenced $1 in the SQL text.
-  // Postgres sizes a prepared statement by the highest placeholder it finds
-  // in the query, so for a project_manager this always threw "bind message
-  // supplies 2 parameters, but prepared statement requires 1" — built now so
-  // params only ever contains what's actually referenced.
-  const params = [employee.id];
+  const params = [employee.id, req.user.id];
   const conditions = [
     `EXISTS (
        SELECT 1
@@ -260,13 +260,20 @@ async function getAccessibleProjectIds(req) {
        JOIN timesheets t2 ON t2.id = te.timesheet_id
        WHERE t2.employee_id = $1 AND te.project_id = p.id
      )`,
+    `EXISTS (
+       SELECT 1
+       FROM team_members tm
+       WHERE tm.project_id = p.id
+         AND tm.employee_id = $1
+         AND tm.status IS DISTINCT FROM 'Inactive'
+     )`,
+    `p.site_engineer_id = $2`,
+    `p.coordinator_id = $2`,
+    `p.architect_id = $2`,
   ];
 
   if (role === "project_manager") {
     conditions.push(`p.manager_id = $1`);
-  } else if (role === "site_engineer") {
-    params.push(req.user.id);
-    conditions.push(`p.site_engineer_id = $${params.length}`);
   }
 
   const sql = `
