@@ -33,6 +33,8 @@ jobs:
           src/pages/siteEngineer/Snaglist.jsx
           src/pages/Architect/ArchitectSnagList.jsx
           src/routes/AppRoutes.jsx
+          src/routes/OperationsManagerRoutes.jsx
+          src/routes/OfficeAdministratorRoutes.jsx
       - run: npm run build
 
   backend-syntax:

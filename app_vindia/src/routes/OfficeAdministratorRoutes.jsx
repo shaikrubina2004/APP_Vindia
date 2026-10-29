@@ -2,12 +2,12 @@
 // Mounted in AppRoutes at  /operations/administrator/*  (role + layout applied there).
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import OfficeAdministratorDashboard from "../pages/Operations/administrator/OfficeAdministratorDashboard";
-import OfficeRequests from "../pages/Operations/administrator/OfficeRequests";
-import OfficeAdminModule from "../pages/Operations/administrator/OfficeAdminModule";
-import Visitors from "../pages/Operations/administrator/Visitors";
-import Assets from "../pages/Operations/administrator/Assets";
-import OfficeDailyUpdate from "../pages/Operations/administrator/OfficeDailyUpdate";
+import OfficeAdministratorDashboard from "../pages/operations/administrator/OfficeAdministratorDashboard";
+import OfficeRequests from "../pages/operations/administrator/OfficeRequests";
+import OfficeAdminModule from "../pages/operations/administrator/OfficeAdminModule";
+import Visitors from "../pages/operations/administrator/Visitors";
+import Assets from "../pages/operations/administrator/Assets";
+import OfficeDailyUpdate from "../pages/operations/administrator/OfficeDailyUpdate";
 import AppShell from "../components/incidents/AppShell";
 
 export default function OfficeAdministratorRoutes() {
