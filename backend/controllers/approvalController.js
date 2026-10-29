@@ -168,6 +168,7 @@ exports.createApproval = async (req, res) => {
 
 exports.getApprovals = async (req, res) => {
   try {
+    const siteEngineer = normalizeRole(req.user?.role) === "site_engineer";
     const result = await pool.query(
       `
       SELECT
@@ -176,8 +177,10 @@ exports.getApprovals = async (req, res) => {
       FROM approvals a
       LEFT JOIN users u
         ON u.id = a.submitted_by
+      ${siteEngineer ? "WHERE a.submitted_by = $1" : ""}
       ORDER BY a.created_at DESC
-      `
+      `,
+      siteEngineer ? [req.user.id] : []
     );
 
     return res.json({
@@ -308,7 +311,8 @@ exports.getApprovalById = async (req, res) => {
 
     if (
       approval.assign_to_role !== role &&
-      role !== "ceo"
+      role !== "ceo" &&
+      !(role === "site_engineer" && String(approval.submitted_by) === String(req.user.id))
     ) {
       return res.status(403).json({
         success: false,

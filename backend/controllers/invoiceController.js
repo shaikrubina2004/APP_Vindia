@@ -2,6 +2,7 @@
 const Invoice = require("../models/invoiceModel");
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
 const { validateFinanceWbs, assertWbsUnchanged } = require("../utils/financeWbsValidation");
+const { notifyProjectClient } = require("../utils/clientNotifications");
 
 // GET /api/finance/invoices
 // Optional query filters: ?project_id=&status=&search=
@@ -29,6 +30,13 @@ exports.createInvoice = asyncHandler(async (req, res) => {
   const invoice = await Invoice.create({
     ...req.body,
     invoice_number,
+  });
+  await notifyProjectClient(invoice.project_id, {
+    type: "invoice",
+    title: `New invoice: ${invoice.invoice_number}`,
+    description: "A new invoice is available in your client portal.",
+    link: "/client/invoices",
+    referenceId: invoice.id,
   });
   res.status(201).json({ success: true, data: invoice });
 });
@@ -79,6 +87,15 @@ exports.updateInvoiceStatus = asyncHandler(async (req, res) => {
   if (!existing) throw new AppError("Invoice not found", 404);
 
   const invoice = await Invoice.updateStatus(req.params.id, status);
+  if (String(existing.status).toLowerCase() !== String(invoice.status).toLowerCase()) {
+    await notifyProjectClient(invoice.project_id, {
+      type: "invoice",
+      title: `Invoice ${invoice.status}: ${invoice.invoice_number}`,
+      description: `The status of invoice ${invoice.invoice_number} was updated.`,
+      link: "/client/invoices",
+      referenceId: invoice.id,
+    });
+  }
   res.json({ success: true, data: invoice });
 });
 

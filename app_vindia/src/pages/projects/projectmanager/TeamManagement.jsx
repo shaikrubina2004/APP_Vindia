@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import "../../../styles/TeamManagement.css";
 import { useProject } from "../../../context/ProjectContext";
 import * as teamApi from "../../../api/teamApi";
+import api from "../../../services/api";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const todayLabel = () => { const d = new Date(); return `${MONTHS[d.getMonth()]} ${d.getDate()}`; };
@@ -48,6 +49,7 @@ export default function TeamManagement() {
   const [selectedId, setSelectedId] = useState(null);
   const [filter, setFilter]         = useState("All");
   const [projectFilter, setProjectFilter] = useState("All");
+  const [managedProjectIds, setManagedProjectIds] = useState(new Set());
   const [search, setSearch]         = useState("");
   const [modal, setModal]           = useState(null);
   const [form, setForm]             = useState({});
@@ -61,19 +63,22 @@ export default function TeamManagement() {
   const [staffRoles, setStaffRoles] = useState([]);
 
   const projectOptions = (PROJECTS || []).filter(p => p.id !== null);
+  const managedProjectOptions = projectOptions.filter(p => managedProjectIds.has(String(p.id)));
 
   useEffect(() => {
     if (projectsLoading) return;
     setLoading(true);
     setApiError(null);
     setSelectedId(null);
-    teamApi.fetchAllTeam()
-      .then((data) => {
+    Promise.all([teamApi.fetchAllTeam(), api.get("/projects/mine")])
+      .then(([data, projectsResponse]) => {
+        const assignedProjects = Array.isArray(projectsResponse.data) ? projectsResponse.data : [];
+        setManagedProjectIds(new Set(assignedProjects.map(project => String(project.id))));
         const enriched = data.map((m) => ({
           ...m,
           project_name:
             m.project_name ||
-            projectOptions.find((p) => String(p.id) === String(m.project_id))?.name ||
+            (PROJECTS || []).find((p) => String(p.id) === String(m.project_id))?.name ||
             "No Project",
           incidents: m.incidents || [],
         }));
@@ -83,10 +88,10 @@ export default function TeamManagement() {
       })
       .catch((err) => {
         console.error("Failed to load team:", err);
-        setApiError("Failed to load team members. Please check your connection.");
+        setApiError("Failed to load team members and assigned projects. Please check your connection.");
       })
       .finally(() => setLoading(false));
-  }, [projectsLoading]);
+  }, [projectsLoading, PROJECTS]);
 
   useEffect(() => {
     if (projectsLoading) return;
@@ -122,6 +127,7 @@ export default function TeamManagement() {
   }
 
   const totalIncidents = team.reduce((a, t) => a + (t.incidents?.length || 0), 0);
+  const canManageMember = (member) => managedProjectIds.has(String(member.project_id));
 
   useEffect(() => {
     if (!selectedId) { setMemberTasks([]); return; }
@@ -173,7 +179,10 @@ export default function TeamManagement() {
         hours:      member.hours       || "",
       });
     } else {
-      setForm({ type: "Staff", status: "Active", priority: "Normal", severity: "Low", projectId: String(projectId || "") });
+      const defaultProjectId = managedProjectIds.has(projectId)
+        ? projectId
+        : String(managedProjectOptions[0]?.id || "");
+      setForm({ type: "Staff", status: "Active", priority: "Normal", severity: "Low", projectId: defaultProjectId });
     }
     setModal({ type, memberId });
   }
@@ -335,7 +344,7 @@ export default function TeamManagement() {
       <label>Project *</label>
       <select className="fi" value={form.projectId || ""} onChange={e => setF("projectId", e.target.value)}>
         <option value="">-- Select Project --</option>
-        {projectOptions.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+        {managedProjectOptions.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
       </select>
     </div>
   );
@@ -378,7 +387,9 @@ export default function TeamManagement() {
           <h1 className="tm-title">Team Management</h1>
           <p className="tm-subtitle">Manage workforce, roles, incidents &amp; assignments</p>
         </div>
-        <button className="btn-add" onClick={() => openModal("add")}>＋ Add Member</button>
+        {managedProjectOptions.length > 0 && (
+          <button className="btn-add" onClick={() => openModal("add")}>＋ Add Member</button>
+        )}
       </div>
 
       {/* ── Stats ── */}
@@ -387,7 +398,7 @@ export default function TeamManagement() {
           { val: team.length,                                  label: "Total",     color: "#3b82f6", bg: "#eff6ff" },
           { val: team.filter(t => t.type === "Labour").length, label: "Labour",    color: "#f59e0b", bg: "#fffbeb" },
           { val: team.filter(t => t.type === "Staff").length,  label: "Staff",     color: "#8b5cf6", bg: "#f5f3ff" },
-          { val: totalIncidents,                               label: "Incidents", color: "#ef4444", bg: "#fef2f2" },
+          { val: totalIncidents,                               label: "Managed Incidents", color: "#ef4444", bg: "#fef2f2" },
         ].map(s => (
           <div className="stat-card" key={s.label} style={{"--sc": s.color, "--sb": s.bg}}>
             <div className="stat-num">{s.val}</div>
@@ -592,6 +603,29 @@ export default function TeamManagement() {
             </div>
           ) : (() => {
             const [bg, fg] = palette(selected.name);
+            if (!canManageMember(selected)) {
+              return (
+                <div className="panel-scroll">
+                  <div className="p-profile">
+                    <div className="p-av" style={{background: bg, color: fg}}>
+                      {(selected.name || "?").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase()}
+                    </div>
+                    <div className="p-info">
+                      <div className="p-name">{selected.name}</div>
+                      <div className="p-role">{selected.role}</div>
+                    </div>
+                  </div>
+                  <div className="p-divider"/>
+                  <div className="p-sec-label">Assignment</div>
+                  <div className="p-kv">
+                    <span>Project</span>
+                    <b>{selected.project_name || "—"}</b>
+                  </div>
+                  <div className="p-divider"/>
+                  <p className="pe-text">Read-only: you can manage team members only in projects assigned to you.</p>
+                </div>
+              );
+            }
             const incs = selected.incidents || [];
             const grpIdx = groups.findIndex(([n]) => n === (selected.project_name || "No Project"));
             const accent = projectAccent(grpIdx >= 0 ? grpIdx : 0);

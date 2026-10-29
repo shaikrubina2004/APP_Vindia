@@ -3,7 +3,7 @@
 // FINAL MERGED VERSION
 
 
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 
 
 /* ── AUTH ────────────────────────────────────────────────── */
@@ -136,7 +136,6 @@ import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
 
 import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
 
-import Qsmeasurement from "../pages/Quality Surveyor/Qsmeasurement";
 
 
 /* ── MEP ─────────────────────────────────────────────────── */
@@ -1010,6 +1009,13 @@ const AppRoutes = () => {
 
         {/* ══ QUANTITY SURVEYOR ═════════════════════════════ */}
 
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+              <Outlet />
+            </ProtectedRoute>
+          }
+        >
 
         <Route
 
@@ -1151,15 +1157,7 @@ const AppRoutes = () => {
 
           path="/quantity-surveyor/measurement"
 
-          element={
-
-            <QuantitySurveyorLayout>
-
-              <Qsmeasurement />
-
-            </QuantitySurveyorLayout>
-
-          }
+          element={<Navigate to="/quantity-surveyor/quantity-report" replace />}
 
         />
 
@@ -1184,6 +1182,7 @@ const AppRoutes = () => {
 
         />
 
+        </Route>
 
         {/* ══ MEP / CLIENT ══════════════════════════════════ */}
 
@@ -1304,7 +1303,13 @@ const AppRoutes = () => {
 
           element={
 
-            <ProtectedRoute allowedRoles={[ROLES.ACCOUNTANT]}>
+            <ProtectedRoute
+              allowedRoles={[
+                ROLES.ACCOUNTANT,
+                ROLES.FINANCE_MANAGER,
+                ROLES.CEO,
+              ]}
+            >
 
               <AccountantLayout>
 
@@ -1919,7 +1924,13 @@ const AppRoutes = () => {
 
             <ProtectedRoute
 
-              allowedRoles={[ROLES.CEO, ROLES.HR_MANAGER, ...PROJECT_ROLES]}
+              allowedRoles={[
+                ROLES.CEO,
+                ROLES.HR_MANAGER,
+                ROLES.OPERATIONS_MANAGER,
+                ROLES.FINANCE_MANAGER,
+                ...PROJECT_ROLES,
+              ]}
 
             >
 

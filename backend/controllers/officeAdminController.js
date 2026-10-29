@@ -110,21 +110,51 @@ exports.listSupplies = async (req, res) => {
   }
 };
 exports.createSupply = async (req, res) => {
+  if (!req.body?.item_name)
+    return res.status(400).json({ error: "Item name is required" });
+
+  const currentQty = Number(req.body.current_qty ?? 0);
+  const minimumQty = Number(req.body.minimum_qty ?? 0);
+  if (
+    !Number.isFinite(currentQty) ||
+    currentQty < 0 ||
+    !Number.isFinite(minimumQty) ||
+    minimumQty < 0
+  ) {
+    return res.status(400).json({
+      error: "Current and minimum quantities must be zero or greater",
+    });
+  }
+
   try {
-    if (!req.body.item_name)
-      return res.status(400).json({ error: "Item name is required" });
-    return ok(res, await OfficeAdmin.createSupply(req.body), 201);
+    return ok(
+      res,
+      await OfficeAdmin.createSupply({
+        ...req.body,
+        current_qty: currentQty,
+        minimum_qty: minimumQty,
+      }),
+      201,
+    );
   } catch (e) {
     return fail(res, e, "Failed to create office supply");
   }
 };
 exports.transactSupply = async (req, res) => {
+  if (!["restock", "issue", "adjustment"].includes(req.body?.transaction_type))
+    return res.status(400).json({ error: "Invalid supply transaction type" });
+
+  const quantity = Number(req.body.quantity);
+  if (!Number.isFinite(quantity) || quantity <= 0)
+    return res.status(400).json({ error: "Quantity must be greater than zero" });
+
   try {
-    if (!["restock", "issue", "adjustment"].includes(req.body.transaction_type))
-      return res.status(400).json({ error: "Invalid supply transaction type" });
     return ok(
       res,
-      await OfficeAdmin.transactSupply(req.params.id, req.user.id, req.body),
+      await OfficeAdmin.transactSupply(req.params.id, req.user.id, {
+        ...req.body,
+        quantity,
+      }),
     );
   } catch (e) {
     return fail(res, e, e.message || "Failed to update office supply");
@@ -608,7 +638,7 @@ exports.assignAssetV2 = async (req, res) => {
   try {
     const who = cleanOps(req.body?.assigned_to_name);
     const r = await opsPool.query(
-      `UPDATE administrative_assets SET assigned_to_name=$1,assigned_to_name=$1,assigned_at=CASE WHEN $1 IS NULL THEN NULL ELSE NOW() END,assigned_to=CASE WHEN $1 IS NULL THEN NULL ELSE assigned_to END,status=CASE WHEN $1 IS NULL THEN 'available' ELSE 'assigned' END,updated_at=NOW() WHERE id=$2 AND status IN ('available','assigned') RETURNING *`,
+      `UPDATE administrative_assets SET assigned_to_name=$1,assigned_at=CASE WHEN $1 IS NULL THEN NULL ELSE NOW() END,assigned_to=CASE WHEN $1 IS NULL THEN NULL ELSE assigned_to END,status=CASE WHEN $1 IS NULL THEN 'available' ELSE 'assigned' END,updated_at=NOW() WHERE id=$2 AND status IN ('available','assigned') RETURNING *`,
       [who, req.params.id],
     );
     if (!r.rows.length)
@@ -635,7 +665,7 @@ exports.updateAssetStatusV2 = async (req, res) => {
     )
       return res.status(400).json({ error: "Invalid asset status" });
     const r = await opsPool.query(
-      `UPDATE administrative_assets SET status=$1,notes=COALESCE($2,notes),assigned_to_name=CASE WHEN $1 IN ('available','retired','lost','maintenance') THEN NULL ELSE assigned_name END,assigned_to_name=CASE WHEN $1 IN ('available','retired','lost','maintenance') THEN NULL ELSE assigned_to_name END,assigned_at=CASE WHEN $1 IN ('available','retired','lost','maintenance') THEN NULL ELSE assigned_at END,updated_at=NOW() WHERE id=$3 RETURNING *`,
+      `UPDATE administrative_assets SET status=$1,notes=COALESCE($2,notes),assigned_to_name=CASE WHEN $1 IN ('available','retired','lost','maintenance') THEN NULL ELSE assigned_to_name END,assigned_to=CASE WHEN $1 IN ('available','retired','lost','maintenance') THEN NULL ELSE assigned_to END,assigned_at=CASE WHEN $1 IN ('available','retired','lost','maintenance') THEN NULL ELSE assigned_at END,updated_at=NOW() WHERE id=$3 RETURNING *`,
       [status, cleanOps(req.body.notes), req.params.id],
     );
     if (!r.rows.length)

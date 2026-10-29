@@ -1,4 +1,37 @@
 const pool = require("../config/db");
+const {
+  getAssignedProjectIds,
+  getManagedProjectIds,
+  isAssignedProject,
+  isManagedProject,
+} = require("../utils/siteEngineerAccess");
+
+const NCR_MANAGE_ROLES = new Set([
+  "project_manager",
+  "site_engineer",
+  "quality_manager",
+  "ceo",
+]);
+
+async function getProjectScope(req) {
+  if (req.user?.role === "site_engineer") {
+    return getAssignedProjectIds(req.user.id);
+  }
+  if (req.user?.role === "project_manager") {
+    return getManagedProjectIds(req.user.id);
+  }
+  return null;
+}
+
+async function canManageProject(req, projectId) {
+  if (req.user?.role === "site_engineer") {
+    return isAssignedProject(req.user.id, projectId);
+  }
+  if (req.user?.role === "project_manager") {
+    return isManagedProject(req.user.id, projectId);
+  }
+  return true;
+}
 
 /* =========================================================
    FORMAT NCR FOR FRONTEND
@@ -42,8 +75,12 @@ exports.createNCR = async (req, res) => {
         error: "User not authenticated",
       });
     }
+    if (!NCR_MANAGE_ROLES.has(req.user.role)) {
+      return res.status(403).json({ error: "Your role cannot create NCRs." });
+    }
 
     const {
+      project_id,
       title,
       description,
       severity,
@@ -53,11 +90,21 @@ exports.createNCR = async (req, res) => {
       holdPlaced,
     } = req.body;
 
-    if (!title || !description || !severity) {
+    const projectId = Number(project_id);
+    if (!Number.isInteger(projectId) || projectId <= 0 ||
+        typeof title !== "string" || !title.trim() ||
+        typeof description !== "string" || !description.trim() ||
+        !severity) {
       return res.status(400).json({
         error:
-          "title, description, and severity are required",
+          "project_id, title, description, and severity are required",
       });
+    }
+    if (assignedTo && (!Number.isInteger(Number(assignedTo)) || Number(assignedTo) <= 0)) {
+      return res.status(400).json({ error: "assignedTo must be a valid user ID." });
+    }
+    if (!(await canManageProject(req, projectId))) {
+      return res.status(403).json({ error: "You cannot create an NCR for this project." });
     }
 
     const allowedSeverity = [
@@ -85,6 +132,7 @@ exports.createNCR = async (req, res) => {
         INSERT INTO ncr
         (
           raised_by,
+          project_id,
           title,
           description,
           severity,
@@ -99,8 +147,8 @@ exports.createNCR = async (req, res) => {
         )
         VALUES
         (
-          $1,$2,$3,$4,$5,
-          $6,$7,$8,$9,
+          $1,$2,$3,$4,$5,$6,
+          $7,$8,$9,$10,
           'open',
           NOW(),
           NOW()
@@ -109,6 +157,7 @@ exports.createNCR = async (req, res) => {
       `,
       [
         raisedBy,
+        projectId,
         title.trim(),
         description.trim(),
         severity,
@@ -132,12 +181,33 @@ exports.createNCR = async (req, res) => {
   }
 };
 
+exports.getProjectOptions = async (req, res) => {
+  try {
+    const scope = await getProjectScope(req);
+    if (scope && !scope.length) return res.json([]);
+    const result = await pool.query(
+      `SELECT id, name
+         FROM projects
+        WHERE status IS DISTINCT FROM 'Archived'
+          AND ($1::INTEGER[] IS NULL OR id = ANY($1::INTEGER[]))
+        ORDER BY name`,
+      [scope]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("NCR project options error:", err);
+    res.status(500).json({ error: "Failed to load NCR projects." });
+  }
+};
+
 /* =========================================================
    GET ALL NCRs
 ========================================================= */
 
 exports.getNCR = async (req, res) => {
   try {
+    const scope = await getProjectScope(req);
+    if (scope && !scope.length) return res.json([]);
     const result = await pool.query(
       `
         SELECT
@@ -152,8 +222,10 @@ exports.getNCR = async (req, res) => {
         LEFT JOIN users assigned_user
           ON assigned_user.id = ncr.assigned_to
 
+        ${scope ? "WHERE ncr.project_id = ANY($1::INTEGER[])" : ""}
         ORDER BY ncr.created_at DESC
-      `
+      `,
+      scope ? [scope] : []
     );
 
     return res.json(
@@ -175,6 +247,10 @@ exports.getNCR = async (req, res) => {
 exports.getNCRById = async (req, res) => {
   try {
     const { id } = req.params;
+    const scope = await getProjectScope(req);
+    if (scope && !scope.length) {
+      return res.status(404).json({ error: "NCR not found" });
+    }
 
     const result = await pool.query(
       `
@@ -191,8 +267,9 @@ exports.getNCRById = async (req, res) => {
           ON assigned_user.id = ncr.assigned_to
 
         WHERE ncr.id = $1
+          ${scope ? "AND ncr.project_id = ANY($2::INTEGER[])" : ""}
       `,
-      [id]
+      scope ? [id, scope] : [id]
     );
 
     if (!result.rows.length) {
@@ -231,14 +308,7 @@ exports.updateNCR = async (req, res) => {
       });
     }
 
-    const allowedRoles = [
-      "project_manager",
-      "site_engineer",
-      "quality_manager",
-      "ceo",
-    ];
-
-    if (!allowedRoles.includes(role)) {
+    if (!NCR_MANAGE_ROLES.has(role)) {
       return res.status(403).json({
         error: "You are not authorized to update NCRs",
       });
@@ -281,16 +351,9 @@ exports.updateNCR = async (req, res) => {
       });
     }
 
-    const existing = await pool.query(
-      `
-        SELECT id
-        FROM ncr
-        WHERE id = $1
-      `,
-      [id]
-    );
+    const existing = await pool.query("SELECT project_id FROM ncr WHERE id = $1", [id]);
 
-    if (!existing.rows.length) {
+    if (!existing.rows.length || !(await canManageProject(req, existing.rows[0].project_id))) {
       return res.status(404).json({
         error: "NCR not found",
       });

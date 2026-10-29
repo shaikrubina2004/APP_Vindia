@@ -5,6 +5,10 @@ const multer = require("multer");
 const path = require("path");
 
 const authMiddleware = require("../middleware/authMiddleware");
+router.use(
+  authMiddleware,
+  authMiddleware.requireRole("site_engineer", "project_manager", "quantity_surveyor", "ceo")
+);
 
 const {
   createSiteProgress,
@@ -52,7 +56,6 @@ const upload = multer({
 /* CREATE */
 router.post(
   "/",
-  authMiddleware,
   upload.array("photos", 10),
   createSiteProgress
 );
@@ -60,21 +63,18 @@ router.post(
 /* GET ALL */
 router.get(
   "/",
-  authMiddleware,
   getSiteProgress
 );
 
 /* GET BY ID */
 router.get(
   "/:id",
-  authMiddleware,
   getSiteProgressById
 );
 
 /* DELETE */
 router.delete(
   "/:id",
-  authMiddleware,
   deleteSiteProgress
 );
 

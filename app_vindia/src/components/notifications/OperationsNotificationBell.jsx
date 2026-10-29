@@ -85,6 +85,7 @@ export default function OperationsNotificationBell({ userId, role, routes = {} }
   const [notifs, setNotifs] = useState([]);
   const [showRead, setShowRead] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   const filters = ROLE_FILTERS[role] ?? DEFAULT_FILTERS;
   const typeCfg = useMemo(
@@ -101,6 +102,7 @@ export default function OperationsNotificationBell({ userId, role, routes = {} }
     if (!userId) return;
     try {
       setLoading(true);
+      setLoadError("");
       const res = await fetch(`${API}/${userId}`, { headers: authHeaders() });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const data = await res.json();
@@ -111,7 +113,7 @@ export default function OperationsNotificationBell({ userId, role, routes = {} }
       );
     } catch (err) {
       console.error("Notification fetch error:", err);
-      setNotifs([]);
+      setLoadError("Notifications could not be loaded. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -230,7 +232,14 @@ export default function OperationsNotificationBell({ userId, role, routes = {} }
             </div>
 
             <div className="notif-list">
-              {unreadList.length === 0 ? (
+              {loadError ? (
+                <div className="notif-load-error">
+                  <p>{loadError}</p>
+                  <button onClick={fetchNotifs} disabled={loading}>
+                    {loading ? "Retrying…" : "Retry"}
+                  </button>
+                </div>
+              ) : unreadList.length === 0 ? (
                 <p className="notif-empty">
                   {loading
                     ? "Loading…"

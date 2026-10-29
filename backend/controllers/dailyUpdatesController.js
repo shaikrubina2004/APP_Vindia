@@ -1,14 +1,6 @@
 const pool = require("../config/db");
 const { notifyCEO } = require("./ceoNotificationsController");
 
-// /api/daily-reports (Project Manager) and /api/se-daily-reports (Structural
-// Engineer) both route through this same controller and the same
-// daily_reports table — but the table had no column distinguishing which
-// role a row belonged to, so both tabs would eventually show identical data.
-// source_role fixes that; it's added here (self-healing) so no manual
-// migration step is needed. Existing rows are left NULL and are treated as
-// "project_manager" below, matching createReport's old default of
-// submitted_by: "Project Manager".
 (async () => {
   try {
     await pool.query(`
@@ -19,6 +11,27 @@ const { notifyCEO } = require("./ceoNotificationsController");
     console.error("daily_reports.source_role setup failed:", err.message);
   }
 })();
+
+const requestReportRole = (req) => req.reportRole || req.user.role || "project_manager";
+const reportSourceAccess = (rolePlaceholder) => `
+  (source_role = ${rolePlaceholder}
+   OR (${rolePlaceholder} = 'project_manager' AND source_role IS NULL))
+`;
+
+const managedProjectNameAccess = (projectNameExpression, userPlaceholder) => `
+  EXISTS (
+    SELECT 1
+    FROM projects managed_project
+    JOIN employees manager ON manager.id = managed_project.manager_id
+    WHERE managed_project.name = ${projectNameExpression}
+      AND manager.user_id = ${userPlaceholder}
+  )
+`;
+
+const reportProjectAccess = (projectNameExpression, rolePlaceholder, userPlaceholder) => `
+  (${rolePlaceholder} <> 'project_manager'
+    OR ${managedProjectNameAccess(projectNameExpression, userPlaceholder)})
+`;
 
 /* =========================================================
    ➕ CREATE MANUAL REPORT (PM or others)
@@ -39,10 +52,19 @@ exports.createReport = async (req, res) => {
       return res.status(400).json({ error: "project_name and date are required" });
     }
 
-    // req.reportRole is set by the mounting route (dailyUpdatesRoutes.js ->
-    // "project_manager", seDailyupdatesRoutes.js -> "structural_engineer") so
-    // a single shared controller can still tell the two sources apart.
-    const sourceRole = req.reportRole || "project_manager";
+    const sourceRole = requestReportRole(req);
+    const project = await pool.query(
+      `SELECT p.id FROM projects p
+       WHERE p.name = $1
+         AND ($2 <> 'project_manager' OR EXISTS (
+           SELECT 1 FROM employees manager
+           WHERE manager.id = p.manager_id AND manager.user_id = $3
+         ))`,
+      [project_name, req.user.role, req.user.id]
+    );
+    if (!project.rows.length) {
+      return res.status(404).json({ error: "Project not found or not managed by you" });
+    }
 
     const result = await pool.query(
       `INSERT INTO daily_reports
@@ -57,7 +79,7 @@ exports.createReport = async (req, res) => {
         submitted_by || (sourceRole === "structural_engineer" ? "Structural Engineer" : "Project Manager"),
         submission_time || null,
         JSON.stringify(data || {}),
-        sourceRole,
+        sourceRole
       ]
     );
 
@@ -70,51 +92,22 @@ exports.createReport = async (req, res) => {
 };
 
 /* =========================================================
-   📋 GET ALL REPORTS
-   Scoped by req.reportRole (set by the mounting route) so
-   /api/daily-reports (Project Manager) and /api/se-daily-reports
-   (Structural Engineer) return their own reports instead of a shared
-   unfiltered table.
-
-   This used to also re-query site_engineer_daily_updates and merge
-   Site Engineer diary rows in here — that query selected a column
-   (labour_total) that doesn't exist on that table, so every call to
-   either endpoint failed with a 500. It was also the wrong place for
-   diary data in the first place: the Site Engineer's Daily Diary is
-   already served correctly by its own endpoint (GET /api/diary/review),
-   which the "Site Engineer" tab in the PM dashboard already uses — so
-   diary entries don't belong merged into the PM's or the Structural
-   Engineer's own report list, and the block has been removed rather
-   than patched.
+   📋 GET ALL MANUAL PROJECT REPORTS
 ========================================================= */
 exports.getAllReports = async (req, res) => {
   try {
-    const sourceRole = req.reportRole || "project_manager";
-
-    // Legacy rows created before source_role existed are NULL — treat those
-    // as Project Manager reports (createReport's old default), so nothing
-    // that was already saved disappears from that tab.
-    const result =
-      sourceRole === "project_manager"
-        ? await pool.query(
-            `SELECT * FROM daily_reports
-             WHERE source_role = $1 OR source_role IS NULL
-             ORDER BY date DESC`,
-            [sourceRole]
-          )
-        : await pool.query(
-            `SELECT * FROM daily_reports
-             WHERE source_role = $1
-             ORDER BY date DESC`,
-            [sourceRole]
-          );
-
-    const reports = result.rows.map(r => ({
-      ...r,
-      data: typeof r.data === "string" ? JSON.parse(r.data) : r.data,
-    }));
-
-    res.status(200).json(reports);
+    const sourceRole = requestReportRole(req);
+    const reports = await pool.query(
+      `SELECT * FROM daily_reports
+       WHERE ${reportSourceAccess("$1")}
+         AND ${reportProjectAccess("project_name", "$2", "$3")}
+       ORDER BY date DESC`,
+      [sourceRole, req.user.role, req.user.id]
+    );
+    res.status(200).json(reports.rows.map((report) => ({
+      ...report,
+      data: typeof report.data === "string" ? JSON.parse(report.data) : report.data,
+    })));
 
   } catch (error) {
     console.error("FETCH ERROR:", error);
@@ -129,9 +122,13 @@ exports.getReportById = async (req, res) => {
   const { id } = req.params;
 
   try {
+    const sourceRole = requestReportRole(req);
     const result = await pool.query(
-      `SELECT * FROM daily_reports WHERE id = $1`,
-      [id]
+      `SELECT * FROM daily_reports
+       WHERE id = $1
+         AND ${reportSourceAccess("$2")}
+         AND ${reportProjectAccess("project_name", "$3", "$4")}`,
+      [id, sourceRole, req.user.role, req.user.id]
     );
 
     if (!result.rows.length) {
@@ -160,14 +157,20 @@ exports.approveReport = async (req, res) => {
   const { id } = req.params;
 
   try {
+    const sourceRole = requestReportRole(req);
     const result = await pool.query(
       `UPDATE daily_reports
        SET approved = true
        WHERE id = $1
+         AND ${reportSourceAccess("$2")}
+         AND ${reportProjectAccess("project_name", "$3", "$4")}
        RETURNING *`,
-      [id]
+      [id, sourceRole, req.user.role, req.user.id]
     );
 
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Report not found or not in a project you manage" });
+    }
     res.status(200).json(result.rows[0]);
 
   } catch (error) {
@@ -193,6 +196,20 @@ exports.updateReport = async (req, res) => {
   } = req.body;
 
   try {
+    const sourceRole = requestReportRole(req);
+    const project = await pool.query(
+      `SELECT p.id FROM projects p
+       WHERE p.name = $1
+         AND ($2 <> 'project_manager' OR EXISTS (
+           SELECT 1 FROM employees manager
+           WHERE manager.id = p.manager_id AND manager.user_id = $3
+         ))`,
+      [project_name, req.user.role, req.user.id]
+    );
+    if (!project.rows.length) {
+      return res.status(404).json({ error: "Project not found or not managed by you" });
+    }
+
     const result = await pool.query(
       `UPDATE daily_reports
        SET project_name = $1,
@@ -203,6 +220,8 @@ exports.updateReport = async (req, res) => {
            submission_time = $6,
            data = $7
        WHERE id = $8
+         AND ${reportSourceAccess("$9")}
+         AND ${reportProjectAccess("project_name", "$10", "$11")}
        RETURNING *`,
       [
         project_name,
@@ -212,10 +231,16 @@ exports.updateReport = async (req, res) => {
         submitted_by,
         submission_time,
         JSON.stringify(data || {}),
-        id
+        id,
+        sourceRole,
+        req.user.role,
+        req.user.id
       ]
     );
 
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Report not found or not in a project you manage" });
+    }
     res.status(200).json(result.rows[0]);
 
   } catch (error) {
@@ -231,11 +256,19 @@ exports.deleteReport = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await pool.query(
-      `DELETE FROM daily_reports WHERE id = $1`,
-      [id]
+    const sourceRole = requestReportRole(req);
+    const result = await pool.query(
+      `DELETE FROM daily_reports
+       WHERE id = $1
+         AND ${reportSourceAccess("$2")}
+         AND ${reportProjectAccess("project_name", "$3", "$4")}
+       RETURNING id`,
+      [id, sourceRole, req.user.role, req.user.id]
     );
 
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Report not found or not in a project you manage" });
+    }
     res.status(200).json({ message: "Deleted successfully" });
 
   } catch (error) {
@@ -250,12 +283,15 @@ exports.deleteReport = async (req, res) => {
 ========================================================= */
 exports.sendToCeo = async (req, res) => {
   try {
+    const sourceRole = requestReportRole(req);
     const { rows } = await pool.query(
       `UPDATE daily_reports
        SET sent_to_ceo = TRUE, sent_to_ceo_at = NOW()
        WHERE id = $1
+         AND ${reportSourceAccess("$2")}
+         AND ${reportProjectAccess("project_name", "$3", "$4")}
        RETURNING id, project_name, phase, overall_status, submitted_by, sent_to_ceo, sent_to_ceo_at`,
-      [req.params.id]
+      [req.params.id, sourceRole, req.user.role, req.user.id]
     );
     if (!rows.length) return res.status(404).json({ error: "Report not found" });
 

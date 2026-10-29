@@ -22,6 +22,24 @@ router.get(
   controller.getDrawings
 );
 
+router.get(
+  "/:drawingId/revisions",
+  authMiddleware,
+  controller.getDrawingRevisions
+);
+
+router.patch(
+  "/:drawingId/revision",
+  authMiddleware,
+  controller.addDrawingRevision
+);
+
+router.delete(
+  "/:drawingId",
+  authMiddleware,
+  controller.deleteDrawing
+);
+
 /* SEND DRAWING */
 router.post(
   "/:drawingId/send",

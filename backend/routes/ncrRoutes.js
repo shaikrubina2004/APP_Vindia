@@ -9,6 +9,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 
 const {
   createNCR,
+  getProjectOptions,
   getNCR,
   getNCRById,
   updateNCR,
@@ -83,6 +84,12 @@ router.post(
 /* =========================================================
    GET
 ========================================================= */
+
+router.get(
+  "/options/projects",
+  authMiddleware,
+  getProjectOptions
+);
 
 router.get(
   "/",

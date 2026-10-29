@@ -1,5 +1,10 @@
 const pool = require("../config/db");
 const { notifyReviewers, notifyEngineer } = require("../utils/projectPeople");
+const {
+  isAssignedProject,
+  isWbsInProject,
+  isManagedProject,
+} = require("../utils/siteEngineerAccess");
 
 /* pg returns DATE columns as a JS Date at SERVER-LOCAL midnight. JSON-serialising that
    (toISOString) shifts it to the previous day for any server east of UTC (e.g. IST), so a
@@ -9,7 +14,10 @@ const ymd = (v) => {
   const p = (n) => String(n).padStart(2, "0");
   return `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`;
 };
-const withPlainDate = (row) => ({ ...row, report_date: ymd(row.report_date) });
+const withPlainDate = (row) => {
+  const date = ymd(row.report_date);
+  return { ...row, report_date: date, date };
+};
 
 // Roles that review Site Engineer diaries
 const DIARY_REVIEW_ROLES = ["project_manager", "project_coordinator", "ceo"];
@@ -59,14 +67,26 @@ exports.createDiary = async (req, res) => {
       });
     }
 
-    // An engineer can only file a diary for a project they are assigned to. (If the project has
-    // no engineer assigned yet, the old open behaviour is kept so nothing is blocked.)
-    if (req.user?.role === "site_engineer") {
-      const owner = await pool.query("SELECT site_engineer_id FROM projects WHERE id = $1", [project_id]);
-      if (!owner.rows.length) return res.status(404).json({ error: "Project not found" });
-      const assigned = owner.rows[0].site_engineer_id;
-      if (assigned && Number(assigned) !== Number(userId)) {
-        return res.status(403).json({ error: "You are not assigned to this project" });
+    if (req.user?.role === "site_engineer" && !(await isAssignedProject(userId, project_id))) {
+      return res.status(403).json({ error: "You are not assigned to this project" });
+    }
+    if (
+      milestone_id &&
+      !(await isWbsInProject(milestone_id, project_id))
+    ) {
+      return res.status(400).json({ error: "Milestone does not belong to the selected project" });
+    }
+    if (subtask_id) {
+      const subtask = await pool.query(
+        `SELECT 1 FROM wbs
+          WHERE id = $1
+            AND project_id = $2
+            AND parent_id = $3
+          LIMIT 1`,
+        [subtask_id, project_id, milestone_id]
+      );
+      if (!subtask.rows.length) {
+        return res.status(400).json({ error: "Task does not belong to the selected project milestone" });
       }
     }
 
@@ -227,7 +247,7 @@ exports.createDiary = async (req, res) => {
       refId: saved.id,
     });
 
-    return res.status(201).json(saved);
+    return res.status(201).json(withPlainDate(saved));
 
   } catch (err) {
     console.error("CREATE DIARY ERROR:", err);
@@ -245,6 +265,7 @@ exports.getDiary = async (req, res) => {
   try {
     const userId = req.user?.id;
     const role = req.user?.role;
+    const projectId = req.query.project_id ? Number(req.query.project_id) : null;
 
     if (!userId || !role) {
       return res.status(401).json({
@@ -255,14 +276,38 @@ exports.getDiary = async (req, res) => {
     let result;
 
     if (role === "site_engineer") {
+      if (projectId !== null && !(await isAssignedProject(userId, projectId))) {
+        return res.status(403).json({ error: "You are not assigned to this project" });
+      }
       result = await pool.query(
         `
           SELECT *
           FROM site_engineer_daily_updates
           WHERE submitted_by = $1
+            AND project_id IN (
+              SELECT id FROM projects WHERE site_engineer_id = $1
+            )
+            AND ($2::int IS NULL OR project_id = $2)
           ORDER BY report_date DESC, id DESC
         `,
-        [String(userId)]
+        [String(userId), projectId]
+      );
+    } else if (role === "project_manager") {
+      if (projectId !== null && !(await isManagedProject(userId, projectId))) {
+        return res.status(403).json({ error: "You do not manage this project" });
+      }
+      result = await pool.query(
+        `SELECT *
+           FROM site_engineer_daily_updates
+          WHERE project_id IN (
+            SELECT p.id
+              FROM projects p
+              JOIN employees e ON e.id = p.manager_id
+             WHERE e.user_id = $1
+          )
+            AND ($2::int IS NULL OR project_id = $2)
+          ORDER BY report_date DESC, id DESC`,
+        [userId, projectId]
       );
     } else {
       result = await pool.query(
@@ -329,10 +374,18 @@ exports.approveDiary = async (req, res) => {
     let result;
     try {
       result = await pool.query(
-        `UPDATE site_engineer_daily_updates
+        `UPDATE site_engineer_daily_updates AS diary
             SET approved = TRUE, approved_by = $2, approved_at = NOW()
-          WHERE id = $1 RETURNING *`,
-        [req.params.id, req.user.id]
+          WHERE diary.id = $1
+            AND ($3 <> 'project_manager' OR EXISTS (
+              SELECT 1
+              FROM projects managed_project
+              JOIN employees manager ON manager.id = managed_project.manager_id
+              WHERE managed_project.id = diary.project_id
+                AND manager.user_id = $4
+            ))
+          RETURNING diary.*`,
+        [req.params.id, req.user.id, req.user.role, req.user.id]
       );
     } catch (err) {
       if (err.code === "42703") {
@@ -340,7 +393,7 @@ exports.approveDiary = async (req, res) => {
       }
       throw err;
     }
-    if (!result.rows.length) return res.status(404).json({ error: "Diary not found" });
+    if (!result.rows.length) return res.status(404).json({ error: "Diary not found or not in a project you manage" });
     const d = result.rows[0];
     await notifyEngineer({
       userId: Number(d.submitted_by),
@@ -372,6 +425,13 @@ exports.getMilestones = async (req, res) => {
       return res.status(400).json({
         error: "project_id is required",
       });
+    }
+
+    if (req.user?.role === "site_engineer" && !(await isAssignedProject(req.user.id, project_id))) {
+      return res.status(403).json({ error: "You are not assigned to this project" });
+    }
+    if (req.user?.role === "project_manager" && !(await isManagedProject(req.user.id, project_id))) {
+      return res.status(403).json({ error: "You do not manage this project" });
     }
 
     const result = await pool.query(
@@ -414,6 +474,15 @@ exports.getWbs = async (req, res) => {
       });
     }
 
+    if (req.user?.role === "site_engineer") {
+      if (!project_id || !(await isAssignedProject(req.user.id, project_id))) {
+        return res.status(403).json({ error: "You are not assigned to this project" });
+      }
+    }
+    if (req.user?.role === "project_manager" && !(await isManagedProject(req.user.id, project_id))) {
+      return res.status(403).json({ error: "You do not manage this project" });
+    }
+
     let query = `
       SELECT
         id,
@@ -427,6 +496,15 @@ exports.getWbs = async (req, res) => {
     if (project_id) {
       query += ` AND project_id = $2`;
       params.push(project_id);
+    }
+
+    if (req.user?.role === "site_engineer") {
+      query += ` AND EXISTS (
+        SELECT 1 FROM wbs milestone
+        WHERE milestone.id = $1
+          AND milestone.project_id = $2
+          AND milestone.parent_id IS NULL
+      )`;
     }
 
     query += ` ORDER BY id`;

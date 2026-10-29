@@ -9,7 +9,8 @@ import React, {
 } from "react";
 
 import { useAuth } from "../../context/useAuth";
-import api from "../../services/api";
+import { useNotifications } from "../../context/Notificationcontext";
+import api, { API_ORIGIN } from "../../services/api";
 import "../../styles/Approvalworkflow.css";
 
 const QUEUE_KEY = "approvals:queue:v1";
@@ -139,7 +140,9 @@ const ls = {
   save: (key, value) => {
     try {
       localStorage.setItem(key, JSON.stringify(value));
-    } catch {}
+    } catch (error) {
+      console.error("Approval queue storage failed:", error);
+    }
   },
 };
 
@@ -319,23 +322,7 @@ function getAttachmentIcon(attachment) {
 
 export default function ApprovalWorkflow() {
   const { user } = useAuth();
-
-  /* -------------------------------------------------------
-     Notifications
-  ------------------------------------------------------- */
-
-  let push = () => {};
-
-  try {
-    const ctx = require("../../context/Notificationcontext");
-
-    if (ctx?.useNotifications) {
-      const notification = ctx.useNotifications();
-      push = notification?.push || (() => {});
-    }
-  } catch {
-    /* Notification provider not available */
-  }
+  const { push } = useNotifications();
 
   /* -------------------------------------------------------
      State
@@ -453,17 +440,15 @@ export default function ApprovalWorkflow() {
           )
         );
 
-        try {
-          push(
-            `Approval ${newStatus}: "${
-              approvals.find(
-                (a) =>
-                  String(a.id) === String(approvalId)
-              )?.title || ""
-            }"`,
-            "approval"
-          );
-        } catch {}
+        push(
+          `Approval ${newStatus}: "${
+            approvals.find(
+              (a) =>
+                String(a.id) === String(approvalId)
+            )?.title || ""
+          }"`,
+          "approval"
+        );
       } catch (error) {
         console.error(
           "UPDATE APPROVAL STATUS ERROR:",
@@ -691,7 +676,7 @@ export default function ApprovalWorkflow() {
           const token = localStorage.getItem("token");
 
           const uploadResponse = await fetch(
-            "http://localhost:5000/api/approvals",
+            `${API_ORIGIN}/api/approvals`,
             {
               method: "POST",
               headers: {
@@ -746,16 +731,14 @@ export default function ApprovalWorkflow() {
           );
         }
 
-        try {
-          push(
-            `Approval request submitted: "${form.title}"`,
-            "approval",
-            {
-              linked_ref:
-                form.linked_task || "",
-            }
-          );
-        } catch {}
+        push(
+          `Approval request submitted: "${form.title}"`,
+          "approval",
+          {
+            linked_ref:
+              form.linked_task || "",
+          }
+        );
 
         await loadList();
 

@@ -12,17 +12,18 @@ router.get("/", auth, ctrl.getAll);
 router.get(
   "/measurement/:id",
   auth,
+  auth.requireRole("site_engineer", "project_manager", "quantity_surveyor", "ceo"),
   ctrl.getMeasurementSource
 );
 
 // Get a single Labour Report
-router.get("/:id", auth, ctrl.getOne);
+router.get("/:id", auth, auth.requireRole("site_engineer", "project_manager", "quantity_surveyor", "ceo"), ctrl.getOne);
 
 // Create Labour Report
-router.post("/", auth, ctrl.create);
+router.post("/", auth, auth.requireRole("site_engineer"), ctrl.create);
 
 // Update Status
-router.patch("/:id", auth, ctrl.updateStatus);
+router.patch("/:id", auth, auth.requireRole("project_manager"), ctrl.updateStatus);
 
 // Delete
 router.delete("/:id", auth, ctrl.remove);

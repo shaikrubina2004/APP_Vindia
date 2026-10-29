@@ -13,18 +13,41 @@ export default function PettyCash() {
   const isFinanceManager = FM_ROLES.includes(user?.role);
   const [balance, setBalance] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [loadErrors, setLoadErrors] = useState([]);
 
   useEffect(() => {
     accountantService
       .getPettyCashBalance()
       .then((res) => setBalance(res.data?.data ?? null))
-      .catch(() => setBalance(null));
+      .catch((err) => {
+        setLoadErrors((current) => [
+          ...current,
+          err?.response?.data?.message ||
+            err?.response?.data?.error ||
+            "Unable to load the petty-cash balance summary.",
+        ]);
+      });
     getProjects()
       .then((res) => setProjects(res?.data?.projects || res?.data || []))
-      .catch(() => setProjects([]));
+      .catch((err) => {
+        setLoadErrors((current) => [
+          ...current,
+          err?.response?.data?.message ||
+            err?.response?.data?.error ||
+            "Unable to load projects. Project-related petty-cash records may not be available.",
+        ]);
+      });
   }, []);
 
   return (
+    <>
+      {loadErrors.length > 0 && (
+        <div className="acs-error-text" role="alert">
+          {loadErrors.map((message, index) => (
+            <p key={`${index}-${message}`}>{message}</p>
+          ))}
+        </div>
+      )}
     <AccountantResourcePage
       title="Petty Cash"
       subtitle="Small day-to-day cash transactions. Approval/rejection is a Finance Manager action."
@@ -104,5 +127,6 @@ export default function PettyCash() {
           : undefined
       }
     />
+    </>
   );
 }

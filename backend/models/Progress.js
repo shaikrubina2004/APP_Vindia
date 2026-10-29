@@ -98,7 +98,24 @@ class Progress {
      GET ALL
   ========================================================= */
 
-  static async getAll() {
+  static async getAll(filters = {}) {
+    const conditions = [];
+    const values = [];
+
+    for (const field of ["zone", "date", "activity"]) {
+      if (filters[field]) {
+        values.push(filters[field]);
+        conditions.push(`sp.${field} = $${values.length}`);
+      }
+    }
+
+    if (Array.isArray(filters.projectIds)) {
+      if (!filters.projectIds.length) return [];
+      values.push(filters.projectIds);
+      conditions.push(`sp.project_id = ANY($${values.length}::int[])`);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const result = await pool.query(`
       SELECT
         sp.*,
@@ -109,8 +126,9 @@ class Progress {
         ON sp.project_id = p.id
       LEFT JOIN wbs w
         ON sp.wbs_id = w.id
+      ${where}
       ORDER BY sp.created_at DESC
-    `);
+    `, values);
 
     return result.rows;
   }
@@ -144,10 +162,41 @@ class Progress {
   ========================================================= */
 
   static async delete(id) {
-    await pool.query(
-      "DELETE FROM site_progress WHERE id = $1",
+    const result = await pool.query(
+      "DELETE FROM site_progress WHERE id = $1 RETURNING *",
       [id]
     );
+    return result.rows[0] || null;
+  }
+
+  static async update(id, data) {
+    const allowed = [
+      "project_id", "wbs_id", "date", "zone", "work_type", "activity",
+      "morning_skilled", "morning_unskilled", "morning_supervisors",
+      "sqft_completed", "sqft_unit", "evening_description", "percent_complete",
+      "planned_percent", "delay_type", "linked_task", "linked_rfi",
+      "linked_incident", "remarks", "photos",
+    ];
+    const values = [];
+    const fields = [];
+
+    for (const field of allowed) {
+      if (data[field] !== undefined) {
+        values.push(data[field]);
+        fields.push(`${field} = $${values.length}`);
+      }
+    }
+
+    if (!fields.length) return this.getById(id);
+    values.push(id);
+    const result = await pool.query(
+      `UPDATE site_progress
+          SET ${fields.join(", ")}
+        WHERE id = $${values.length}
+        RETURNING *`,
+      values
+    );
+    return result.rows[0] || null;
   }
 
   /* =========================================================

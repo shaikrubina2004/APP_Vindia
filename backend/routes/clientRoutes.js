@@ -7,6 +7,10 @@ const c = require("../controllers/clientController");
 router.use(protect);
 router.use(protect.requireRole("client", "ceo"));
 // (clientFence in server.js additionally stops client tokens reaching any other /api route)
+const clientWriteOnly = (req, res, next) =>
+  req.user.role === "ceo"
+    ? res.status(403).json({ message: "CEO preview is read-only." })
+    : next();
 
 // Projects (switcher)
 router.get("/projects", c.getClientProjects);
@@ -35,14 +39,14 @@ router.get("/approvals", c.getClientApprovals);
 // Incidents (client's own tickets)
 router.get("/incidents", c.getClientIncidents);
 router.get("/incidents/:id", c.getClientIncidentById);
-router.post("/incidents", c.createClientIncident);
-router.post("/incidents/:id/comments", c.addClientIncidentComment);
+router.post("/incidents", clientWriteOnly, c.createClientIncident);
+router.post("/incidents/:id/comments", clientWriteOnly, c.addClientIncidentComment);
 
 // RFIs
 router.get("/rfi", c.getClientRfis);
 router.get("/rfi/:id", c.getClientRfiById);
-router.post("/rfi", c.createClientRfi);
-router.post("/rfi/:id/respond", c.respondClientRfi);
+router.post("/rfi", clientWriteOnly, c.createClientRfi);
+router.post("/rfi/:id/respond", clientWriteOnly, c.respondClientRfi);
 
 // Notifications (read-all BEFORE /:id/read)
 router.get("/notifications", c.getClientNotifications);

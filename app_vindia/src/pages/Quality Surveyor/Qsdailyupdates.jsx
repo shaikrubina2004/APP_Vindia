@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
-import axios from "axios";
+import { useState, useEffect, useRef, useCallback } from "react";
+import api from "../../services/api";
 import "./Qsdailyupdates.css";
 
 /* ─── API ─────────────────────────────────────── */
-const API = "http://localhost:5000/api/qs";
+const API = "/qs";
 
 /* ─── constants ───────────────────────────────── */
 const UNITS = ["m³","m²","m","kg","nos","ltr","ton","bag","rft","MT","Set","RMT"];
@@ -114,22 +114,31 @@ export default function QSDailyUpdates() {
   const week     = buildWeek();
 
   /* ── notify ── */
-  const notify = (msg, type="ok") => {
+  const notify = useCallback((msg, type="ok") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3200);
-  };
+  }, []);
 
   /* ── fetch on mount ── */
-  useEffect(() => { fetchProjects(); fetchUpdates(); }, []);
+  const fetchProjects = useCallback(async () => {
+    try {
+      const r = await api.get(`${API}/projects`);
+      setProjects(r.data.data || []);
+    } catch (err) {
+      notify(err.response?.data?.error || "Failed to load projects", "err");
+    }
+  }, [notify]);
 
-  const fetchProjects = async () => {
-    try { const r = await axios.get(`${API}/projects`); setProjects(r.data.data||[]); } catch {}
-  };
+  const fetchUpdates = useCallback(async () => {
+    try {
+      const r = await api.get(`${API}/daily-updates`);
+      setUpdates(r.data.data || []);
+    } catch (err) {
+      notify(err.response?.data?.error || "Failed to load updates", "err");
+    }
+  }, [notify]);
 
-  const fetchUpdates = async () => {
-    try { const r = await axios.get(`${API}/daily-updates`); setUpdates(r.data.data||[]); }
-    catch { notify("Failed to load updates","err"); }
-  };
+  useEffect(() => { fetchProjects(); fetchUpdates(); }, [fetchProjects, fetchUpdates]);
 
   /* ── project change → load WBS ── */
   const onProjectChange = async (pid) => {
@@ -139,16 +148,11 @@ export default function QSDailyUpdates() {
     sf("milestone",    "");
     if (!pid) { setPhases([]); return; }
     try {
-      const r = await axios.get(`${API}/boq/wbs/${pid}`);
-      setPhases((r.data.data||[]).filter(w => w.parent_id === null));
-    } catch {
-      setPhases([
-        {id:"1",name:"Site Preparation"},{id:"2",name:"Earthwork & Foundation"},
-        {id:"3",name:"Superstructure"},{id:"4",name:"Doors & Windows"},
-        {id:"5",name:"Plastering Works"},{id:"6",name:"MEP Works"},
-        {id:"7",name:"Tiling Works"},{id:"8",name:"Finishing Works"},
-        {id:"9",name:"Project Completion"},
-      ]);
+      const r = await api.get(`/boq/milestones/${pid}`);
+      setPhases(r.data);
+    } catch (err) {
+      setPhases([]);
+      notify(err.response?.data?.error || "Failed to load project milestones", "err");
     }
   };
 
@@ -208,7 +212,7 @@ export default function QSDailyUpdates() {
         cost_actual:   "",
         remarks:       remarkParts.join(" | ") || "",
       };
-      await axios.post(`${API}/daily-updates`, payload);
+      await api.post(`${API}/daily-updates`, payload);
       notify("Daily update submitted successfully! ✓");
       setForm({ ...EMPTY_FORM, items:[blankItem(),blankItem()], date:todayISO });
       setFiles([]);

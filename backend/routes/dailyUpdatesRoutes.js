@@ -9,9 +9,10 @@ const {
   deleteReport,
   sendToCeo
 } = require("../controllers/dailyUpdatesController");
-const { protect } = require("../middleware/authMiddleware");
+const { protect, requireRole } = require("../middleware/authMiddleware");
 
 const router = express.Router();
+router.use(protect, requireRole("project_manager", "ceo"));
 
 // Tags every request on this router as Project Manager's own reports, so the
 // shared controller can tell them apart from Structural Engineer's
@@ -29,7 +30,7 @@ router.get("/:id", getReportById);
 router.put("/:id", updateReport);
 
 /* ===== SEND TO CEO ===== */
-router.put("/send-to-ceo/:id", protect, sendToCeo);
+router.put("/send-to-ceo/:id", sendToCeo);
 
 /* ===== APPROVE ===== */
 router.put("/approve/:id", approveReport);

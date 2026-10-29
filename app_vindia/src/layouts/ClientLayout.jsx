@@ -16,7 +16,7 @@ import { ProjectProvider } from "../context/ProjectContext";
 // when no children are given keeps both call sites working.
 function ClientLayout({ children }) {
   return (
-    <div className="role-portal">
+    <div className="role-portal client-portal">
       <ProjectProvider>
         <AppLayout menuItems={ClientMenu}>
           {children ?? <Outlet />}

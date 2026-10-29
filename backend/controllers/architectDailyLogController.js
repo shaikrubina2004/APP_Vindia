@@ -197,8 +197,16 @@ async function getAllLogs(req, res) {
        FROM architect_daily_logs adl
        LEFT JOIN users    u ON u.id = adl.architect_id
        LEFT JOIN projects p ON p.id = adl.project_id
+       WHERE ($1 <> 'project_manager' OR EXISTS (
+         SELECT 1
+         FROM projects managed_project
+         JOIN employees manager ON manager.id = managed_project.manager_id
+         WHERE managed_project.id = adl.project_id
+           AND manager.user_id = $2
+       ))
        ORDER BY adl.date DESC, adl.created_at DESC
-       LIMIT 300`
+       LIMIT 300`,
+      [req.user.role, req.user.id]
     );
     const logs = await Promise.all(
       logResult.rows.map(async (log) => {

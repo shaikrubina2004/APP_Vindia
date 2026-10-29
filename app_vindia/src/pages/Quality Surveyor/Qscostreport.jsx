@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
+import api from "../../services/api";
 import "./Qscostreport.css";
 
-const BOQ_API = "/api/boq";
-const CR_API  = "/api/cost-report";
+const BOQ_API = "/boq";
+const CR_API  = "/cost-report";
 
 const STATUS = {
   pending_pm: { label: "Awaiting PM Approval", color: "amber", icon: "⏳" },
@@ -18,7 +19,7 @@ const safeArr = (val) => {
   if (Array.isArray(val)) return val;
   if (!val) return [];
   if (typeof val === "string") {
-    try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch (_) { return []; }
+    try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; }
   }
   return [];
 };
@@ -38,8 +39,6 @@ export default function Qscostreport() {
   });
   const [filterTo,      setFilterTo]      = useState(() => new Date().toISOString().split("T")[0]);
   const [viewingReport, setViewingReport] = useState(null);
-  const [rejectModal,   setRejectModal]   = useState(null);
-  const [rejectComment, setRejectComment] = useState("");
 
   const notify = (msg, type = "success") => {
     setToast({ msg, type });
@@ -49,12 +48,10 @@ export default function Qscostreport() {
   useEffect(() => {
     (async () => {
       try {
-        const res  = await fetch(`${BOQ_API}/projects`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed");
+        const { data } = await api.get(`${BOQ_API}/projects`);
         setProjects(data);
       } catch (err) {
-        setApiError("Could not load projects: " + err.message);
+        setApiError("Could not load projects: " + (err.response?.data?.error || err.message));
       }
     })();
   }, []);
@@ -64,13 +61,11 @@ export default function Qscostreport() {
     try {
       const params = new URLSearchParams();
       if (filterProject) params.append("projectId", filterProject);
-      if (filterStatus)  params.append("status",    filterStatus);
-      const res  = await fetch(`${CR_API}?${params.toString()}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
+      if (filterStatus)  params.append("status", filterStatus);
+      const { data } = await api.get(`${CR_API}?${params.toString()}`);
       setReports(data);
     } catch (err) {
-      notify("Could not load reports: " + err.message, "error");
+      notify("Could not load reports: " + (err.response?.data?.error || err.message), "error");
     } finally {
       setReportsLoading(false);
     }
@@ -78,52 +73,15 @@ export default function Qscostreport() {
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
 
-  const pmApprove = async (id) => {
-    try {
-      const res  = await fetch(`${CR_API}/approve/${id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      notify("PM approved ✅ — BOQ moved to SE approval stage");
-      fetchReports();
-      if (viewingReport?.id === id) {
-        const r = await fetch(`${CR_API}/${id}`);
-        setViewingReport(await r.json());
-      }
-    } catch (err) { notify(err.message, "error"); }
-  };
-
-  const openRejectModal = (id) => { setRejectComment(""); setRejectModal({ id }); };
-
-  const submitReject = async () => {
-    if (!rejectModal) return;
-    const id = rejectModal.id;
-    try {
-      const res  = await fetch(`${CR_API}/reject/${id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ comment: rejectComment.trim() || "Please review the cost figures." }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      notify("Changes requested ↩️ — BOQ rejected, QS must edit and resubmit");
-      setRejectModal(null); setRejectComment("");
-      fetchReports();
-      if (viewingReport?.id === id) {
-        const r = await fetch(`${CR_API}/${id}`);
-        setViewingReport(await r.json());
-      }
-    } catch (err) { notify(err.message, "error"); }
-  };
-
   const openDetail = async (report) => {
     setTab("detail");
     setViewingReport(report);
     try {
-      const res  = await fetch(`${CR_API}/${report.id}`);
-      const data = await res.json();
-      if (res.ok) setViewingReport(data);
-    } catch (_) {}
+      const { data } = await api.get(`${CR_API}/${report.id}`);
+      setViewingReport(data);
+    } catch (err) {
+      notify("Could not load report: " + (err.response?.data?.error || err.message), "error");
+    }
   };
 
   const exportCSV = (report) => {
@@ -383,12 +341,6 @@ export default function Qscostreport() {
 
                       <div className="cr__card-actions">
                         <button className="cr__view-btn" onClick={() => openDetail(r)}>👁 View Report</button>
-                        {r.status === "pending_pm" && (
-                          <>
-                            <button className="cr__approve-btn" onClick={() => pmApprove(r.id)}>✔ PM Approve</button>
-                            <button className="cr__reject-btn" onClick={() => openRejectModal(r.id)}>✘ PM Reject</button>
-                          </>
-                        )}
                         {r.status === "approved" && (
                           <button className="cr__export-btn" onClick={() => exportCSV(r)}>⬇ Export CSV</button>
                         )}
@@ -505,15 +457,6 @@ export default function Qscostreport() {
                   ))}
                 </div>
               </div>
-
-              {/* PM action buttons */}
-              {r.status === "pending_pm" && (
-                <div className="cr__pm-actions">
-                  <span className="cr__pm-actions-label">[ PM Actions ]</span>
-                  <button className="cr__approve-btn cr__approve-btn--lg" onClick={() => pmApprove(r.id)}>✔ Approve Cost Report</button>
-                  <button className="cr__reject-btn cr__reject-btn--lg" onClick={() => openRejectModal(r.id)}>✘ Request Changes</button>
-                </div>
-              )}
 
               {/* ── MATERIAL COST TABLE ── */}
               <div className="cr__block">
@@ -646,31 +589,6 @@ export default function Qscostreport() {
         })()}
       </div>
 
-      {/* REJECT MODAL */}
-      {rejectModal && (
-        <div className="cr__modal-overlay">
-          <div className="cr__modal">
-            <div className="cr__modal-header">
-              <span className="cr__modal-icon">↩️</span>
-              <div>
-                <div className="cr__modal-title">Request Changes</div>
-                <div className="cr__modal-sub">Add a suggestion for the Quantity Surveyor</div>
-              </div>
-            </div>
-            <textarea className="cr__modal-textarea"
-              placeholder="e.g. Please review the unit prices for steel and concrete…"
-              value={rejectComment} onChange={(e) => setRejectComment(e.target.value)}
-              rows={4} autoFocus />
-            <div className="cr__modal-actions">
-              <button className="cr__modal-cancel"
-                onClick={() => { setRejectModal(null); setRejectComment(""); }}>Cancel</button>
-              <button className="cr__modal-submit" onClick={submitReject}>
-                ✘ Send Rejection &amp; Suggestion
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

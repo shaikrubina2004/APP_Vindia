@@ -1,7 +1,7 @@
 // src/pages/siteEngineer/SiteEngineerDashboard.jsx
 // FULLY UPDATED — live data, all modules connected, notifications, planned vs actual,
 // pending approvals, snag count, SI count, material requests, auto-reminders
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import { useNotifications } from "../../context/Notificationcontext";
@@ -16,10 +16,6 @@ function makeKey(item) {
   if (!item) return "";
   if (item.id != null) return String(item.id);
   return `${item.refNo || ""}|${item.subject || item.description || ""}|${item.zone || ""}`;
-}
-function dedupe(arr = []) {
-  const seen = new Set();
-  return arr.filter(it => { const k = makeKey(it); if (seen.has(k)) return false; seen.add(k); return true; });
 }
 function fmtDate(d) {
   return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -108,11 +104,6 @@ const QUICK_ACTIONS = [
     route: "/site-engineer/photos",
   },
   {
-    label: "Site Instructions",
-    icon: "📝",
-    route: "/site-engineer/site-instructions",
-  },
-  {
     label: "Snag List",
     icon: "🔧",
     route: "/site-engineer/snag-list",
@@ -125,7 +116,7 @@ export default function SiteEngineerDashboard() {
   // ── hooks ─────────────────────────────────────────────────
   useAutoReminders(); // fires deadline/RFI/task reminders automatically
   const navigate = useNavigate();
-  const { notifications, unreadCount } = useNotifications();
+  const { unreadCount } = useNotifications();
 
   // ── Current user, for the check-in button and notification bell ──
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -143,13 +134,10 @@ export default function SiteEngineerDashboard() {
   const [progressEntries, setProg]  = useState([]);
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [openSnags, setOpenSnags]   = useState([]);
-  const [pendingSIs, setPendingSIs] = useState([]);
   const [pendingMaterials, setPendingMaterials] = useState([]);
   const [diaryToday, setDiaryToday] = useState(false);
   const [labourReports, setLabourReports] = useState([]);
 const [measurements, setMeasurements] = useState([]);
-
-  const loaded = useRef(false);
 
   // Real assigned project(s) — replaces the hard-coded "Al-Noor Residential Tower › Phase 2 › Block C".
   const { projects: myProjects, activeProject, setActiveProject, loading: projectsLoading } = useMyProjects();
@@ -164,101 +152,85 @@ const [measurements, setMeasurements] = useState([]);
 
   // ── data load ──────────────────────────────────────────────
   useEffect(() => {
-  if (loaded.current) return;
-  loaded.current = true;
+    if (projectsLoading) return undefined;
+    let cancelled = false;
+    const today = nowISO();
 
-  const today = nowISO();
+    const loadData = async () => {
+      if (!activeProject?.id) {
+        setLoading(false);
+        return;
+      }
 
-  const loadData = async () => {
-    try {
-      // 🔹 Dashboard summary (fast KPIs)
-      const dashRes = await api.get("/dashboard");
-      console.log("SITE ENGINEER DASHBOARD DATA:", dashRes.data);
-      // 🔹 Full module data (IMPORTANT)
+      setLoading(true);
+      const results = await Promise.allSettled([
+        api.get("/site-engineer-dashboard", { params: { project_id: activeProject.id } }),
+        api.get("/site-engineer/rfi", { params: { project_id: activeProject.id } }),
+        api.get("/incidents", { params: { project_id: activeProject.id } }),
+        api.get("/site-progress", { params: { project_id: activeProject.id } }),
+        api.get("/approvals"),
+        api.get("/snags"),
+        api.get("/material-request", { params: { project_id: activeProject.id } }),
+        api.get("/diary", { params: { project_id: activeProject.id } }),
+        api.get("/labour-report", { params: { project_id: activeProject.id } }),
+        api.get("/site-measurements", { params: { projectId: activeProject.id } }),
+      ]);
+
+      if (cancelled) return;
+      const rowsFrom = (result) => {
+        if (result.status !== "fulfilled") return [];
+        const body = result.value?.data;
+        if (Array.isArray(body)) return body;
+        return Array.isArray(body?.data) ? body.data : [];
+      };
       const [
-  rfiRes,
-  incRes,
-  progRes,
-  aprRes,
-  snagRes,
-  siRes,
-  matRes,
-  diaryRes,
-  labourRes,
-  measurementRes
-] = await Promise.allSettled([
-  api.get("/site-engineer/rfi"),
-  api.get("/incidents"),
-  api.get("/site-progress"),
-  api.get("/approvals"),
-  api.get("/snags"),
-  api.get("/site-instructions"),
-  api.get("/material-request"),
-  api.get("/diary"),
+        dashboardResult,
+        rfiResult,
+        incidentResult,
+        progressResult,
+        approvalResult,
+        snagResult,
+        materialResult,
+        diaryResult,
+        labourResult,
+        measurementResult,
+      ] = results;
 
-  // Construction workflow
-  api.get("/labour-report"),
-  api.get("/site-measurements"),
-]);
-
-      if (rfiRes.status === "fulfilled")
-        setRFIs(Array.isArray(rfiRes.value?.data) ? rfiRes.value.data : []);
-
-      if (incRes.status === "fulfilled")
-  setIncidents(Array.isArray(incRes.value?.data) ? incRes.value.data : []);
-
-      if (progRes.status === "fulfilled")
-        setProg(Array.isArray(progRes.value?.data?.data) ? progRes.value.data.data : []);
-
-      if (aprRes.status === "fulfilled") {
-        const all = aprRes.value?.data || [];
-        setPendingApprovals(all.filter(a => !a.status || a.status === "pending"));
+      if (dashboardResult.status === "rejected") {
+        console.error("Site Engineer project dashboard failed:", dashboardResult.reason);
       }
 
-      if (snagRes.status === "fulfilled") {
-        const all = snagRes.value?.data || [];
-        setOpenSnags(all.filter(s => s.status !== "closed"));
-      }
-
-      if (siRes.status === "fulfilled") {
-        const all = siRes.value?.data || [];
-        setPendingSIs(all.filter(s => s.status === "issued"));
-      }
-
-      if (matRes.status === "fulfilled") {
-        const all = matRes.value?.data || [];
-        setPendingMaterials(all.filter(m => m.status === "requested"));
-      }
-
-      if (diaryRes.status === "fulfilled") {
-        const all = diaryRes.value?.data || [];
-        setDiaryToday(all.some(d => (d.date || "").slice(0, 10) === today));
-      }
-      if (labourRes.status === "fulfilled") {
-  const all = Array.isArray(labourRes.value?.data)
-    ? labourRes.value.data
-    : [];
-
-  setLabourReports(all);
-}
-
-if (measurementRes.status === "fulfilled") {
-  const all = Array.isArray(measurementRes.value?.data)
-    ? measurementRes.value.data
-    : [];
-
-  setMeasurements(all);
-}
-
-    } catch (err) {
-      console.error("Dashboard error:", err);
-    } finally {
+      setRFIs(rowsFrom(rfiResult));
+      setIncidents(rowsFrom(incidentResult));
+      setProg(rowsFrom(progressResult));
+      setPendingApprovals(
+        rowsFrom(approvalResult).filter((approval) => !approval.status || approval.status === "pending")
+      );
+      setOpenSnags(rowsFrom(snagResult).filter((snag) => snag.status !== "closed"));
+      setPendingMaterials(
+        rowsFrom(materialResult).filter((request) => request.status === "requested")
+      );
+      setDiaryToday(
+        rowsFrom(diaryResult).some((diary) =>
+          String(diary.report_date || diary.date || "").slice(0, 10) === today
+        )
+      );
+      setLabourReports(rowsFrom(labourResult));
+      setMeasurements(rowsFrom(measurementResult));
       setLoading(false);
-    }
-  };
+    };
 
-  loadData();
-}, []);
+    loadData().catch((error) => {
+      if (!cancelled) {
+        console.error("Site Engineer dashboard error:", error);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProject?.id, projectsLoading]);
 
   // ── derived ────────────────────────────────────────────────
   const openRFIs  = useMemo(() => rfis.filter(r => !r?.status || r.status === "open"), [rfis]);
@@ -362,17 +334,6 @@ const pendingMeasurements = useMemo(
     });
   });
 
-  // Site Instructions
-  pendingSIs.slice(0, 1).forEach((s) => {
-    items.push({
-      label: `Site Instruction received: ${
-        s.title || s.si_number || ""
-      }`,
-      type: "si",
-      time: s.issued_date || s.createdAt,
-    });
-  });
-
   // Snags
   openSnags.slice(0, 1).forEach((s) => {
     items.push({
@@ -429,7 +390,6 @@ const pendingMeasurements = useMemo(
 }, [
   rfis,
   incidents,
-  pendingSIs,
   openSnags,
   pendingApprovals,
   diaryToday,
@@ -553,17 +513,8 @@ const pendingMeasurements = useMemo(
       <div className="dash-body">
 
         {/* ── ALERT STRIP — action items needing attention ── */}
-        {(pendingSIs.length > 0 || openSnags.length > 0 || pendingApprovals.length > 0) && (
+        {(openSnags.length > 0 || pendingApprovals.length > 0) && (
           <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-            {pendingSIs.length > 0 && (
-              <div onClick={() => navigate("/site-engineer/site-instructions")} style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: "#F3EDF8", border: "1px solid #C49FDC", borderRadius: 10, cursor: "pointer" }}>
-                <span style={{ fontSize: 20 }}>📝</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#4A1A6E" }}>{pendingSIs.length} Site Instruction{pendingSIs.length > 1 ? "s" : ""} need acknowledgement</div>
-                  <div style={{ fontSize: 11, color: "#7B4FA6" }}>Tap to acknowledge →</div>
-                </div>
-              </div>
-            )}
             {openSnags.length > 0 && (
               <div onClick={() => navigate("/site-engineer/snag-list")} style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: "#FAEEDA", border: "1px solid #EF9F27", borderRadius: 10, cursor: "pointer" }}>
                 <span style={{ fontSize: 20 }}>🔧</span>
@@ -805,7 +756,6 @@ const pendingMeasurements = useMemo(
   ok: openIncidents.length === 0, 
   route: "/site-engineer/incidents" 
 },
-                  { label: "Site Instructions", icon: "📝", value: pendingSIs.length > 0 ? `${pendingSIs.length} need acknowledgement` : "All acknowledged ✓", ok: pendingSIs.length === 0, route: "/site-engineer/site-instructions" },
                   { label: "Snag List",         icon: "🔧", value: `${openSnags.length} open`,                      ok: openSnags.length === 0, route: "/site-engineer/snag-list" },
                   { label: "Approvals",         icon: "✅", value: `${pendingApprovals.length} pending`,             ok: pendingApprovals.length === 0, route: "/site-engineer/approvals" },
                   { label: "Materials",         icon: "📦", value: `${pendingMaterials.length} awaiting procurement`, ok: pendingMaterials.length === 0, route: "/site-engineer/materials" },

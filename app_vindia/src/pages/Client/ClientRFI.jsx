@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { API } from "../../services/authService";
+import { useAuth } from "../../context/useAuth";
 import {
   useClientAPI,
   getClientProjectId,
@@ -102,7 +103,7 @@ function NewRfi({ onClose, onCreated }) {
   );
 }
 
-function RfiDetail({ id, onClose }) {
+function RfiDetail({ id, onClose, canWrite }) {
   const { data, loading, error, refetch } = useClientAPI(`/client/rfi/${id}`);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -151,13 +152,13 @@ function RfiDetail({ id, onClose }) {
             )) : <p className="cl-muted-note">No responses yet. You will be notified when the team replies.</p>}
           </div>
 
-          {String(r.status).toLowerCase() !== "closed" ? (
+          {canWrite && String(r.status).toLowerCase() !== "closed" ? (
             <div className="cl-reply">
               {err && <div className="cl-alert cl-alert--error">{err}</div>}
               <textarea className="cl-input" rows={2} value={text} onChange={(e) => setText(e.target.value)} maxLength={4000} placeholder="Reply to this RFI…" />
               <button className="cl-btn cl-btn--primary" disabled={busy || !text.trim()} onClick={send}>{busy ? "Sending…" : "Reply"}</button>
             </div>
-          ) : <p className="cl-muted-note">This RFI is closed.</p>}
+          ) : <p className="cl-muted-note">{canWrite ? "This RFI is closed." : "CEO preview is read-only."}</p>}
         </>
       )}
     </ClientModal>
@@ -165,6 +166,8 @@ function RfiDetail({ id, onClose }) {
 }
 
 export default function ClientRFI() {
+  const { user } = useAuth();
+  const canWrite = String(user?.role || "").toLowerCase() !== "ceo";
   const { id } = useParams();
   const navigate = useNavigate();
   const { data, loading, error, refetch } = useClientAPI("/client/rfi");
@@ -191,7 +194,7 @@ export default function ClientRFI() {
           <h1 className="cl-page-title">Requests for Information</h1>
           <p className="cl-page-sub">Questions you have raised, and questions the team has sent to you</p>
         </div>
-        <button className="cl-btn cl-btn--primary" onClick={() => setCreating(true)}>+ Raise RFI</button>
+        {canWrite && <button className="cl-btn cl-btn--primary" onClick={() => setCreating(true)}>+ Raise RFI</button>}
       </div>
 
       {notice && <div className="cl-alert cl-alert--success">{notice}</div>}
@@ -240,13 +243,13 @@ export default function ClientRFI() {
         </div>
       </div>
 
-      {creating && (
+      {creating && canWrite && (
         <NewRfi
           onClose={() => setCreating(false)}
           onCreated={() => { setCreating(false); setNotice("RFI submitted. The team has been notified."); refetch(); }}
         />
       )}
-      {id && <RfiDetail id={id} onClose={() => { navigate("/client/rfi"); refetch(); }} />}
+      {id && <RfiDetail id={id} canWrite={canWrite} onClose={() => { navigate("/client/rfi"); refetch(); }} />}
     </div>
   );
 }

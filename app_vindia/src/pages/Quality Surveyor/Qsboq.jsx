@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
+import api from "../../services/api";
 import "./Qsboq.css";
 
-const API    = "/api/boq";
-const CR_API = "/api/cost-report";
-const QR_API = "/api/quantity-report";
+const API    = "/boq";
+const CR_API = "/cost-report";
+const QR_API = "/quantity-report";
 
 const STATUS = {
   // Original statuses (kept for backward compatibility)
@@ -56,7 +57,7 @@ const safeArr = (val) => {
   if (!val) return [];
   if (Array.isArray(val)) return val;
   if (typeof val === "string") {
-    try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch (_) { return []; }
+    try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; }
   }
   return [];
 };
@@ -100,7 +101,6 @@ export default function Qsboq() {
   const [qrStatus,        setQrStatus]        = useState(null);
   const [crComment,       setCrComment]       = useState("");
   const [qrComment,       setQrComment]       = useState("");
-  const [reportsLoading,  setReportsLoading]  = useState(false);
 
   // FIX #3: split into two independent loading states
   const [creatingCostReport, setCreatingCostReport] = useState(false);
@@ -126,13 +126,9 @@ export default function Qsboq() {
 
   const loadMeasurementItems = async () => {
     try {
-      const res = await fetch(
-        `/api/site-measurements/${measurementId}/items`
+      const { data: items } = await api.get(
+        `/site-measurements/${measurementId}/items`
       );
-
-      const items = await res.json();
-
-      if (!res.ok) throw new Error(items.error);
 
       setRows(
         items.map(item => ({
@@ -196,12 +192,10 @@ const materialTotal = rows.reduce(
   useEffect(() => {
     (async () => {
       try {
-        const res  = await fetch(`${API}/projects`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed");
+        const { data } = await api.get(`${API}/projects`);
         setProjects(data);
       } catch (err) {
-        setApiError("Could not load projects: " + err.message);
+        setApiError("Could not load projects: " + (err.response?.data?.error || err.message));
       }
     })();
   }, []);
@@ -213,12 +207,10 @@ const materialTotal = rows.reduce(
       setMilestonesLoading(true);
       setMilestone("");
       try {
-        const res  = await fetch(`${API}/milestones/${project}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed");
+        const { data } = await api.get(`${API}/milestones/${project}`);
         setMilestones(data);
       } catch (err) {
-        notify("Could not load milestones: " + err.message, "error");
+        notify("Could not load milestones: " + (err.response?.data?.error || err.message), "error");
         setMilestones([]);
       } finally {
         setMilestonesLoading(false);
@@ -233,12 +225,10 @@ const materialTotal = rows.reduce(
       const params = new URLSearchParams();
       if (filterProject) params.append("projectId", filterProject);
       if (filterStatus)  params.append("status",    filterStatus);
-      const res  = await fetch(`${API}?${params.toString()}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
+      const { data } = await api.get(`${API}?${params.toString()}`);
       setBoqs(data);
     } catch (err) {
-      notify("Could not load BOQs: " + err.message, "error");
+      notify("Could not load BOQs: " + (err.response?.data?.error || err.message), "error");
     } finally {
       setBoqsLoading(false);
     }
@@ -248,20 +238,19 @@ const materialTotal = rows.reduce(
 
   // ── FETCH Linked report statuses for detail view ──
   const fetchReportStatuses = async (boqId) => {
-    setReportsLoading(true);
     setCrStatus(null); setQrStatus(null); setCrComment(""); setQrComment("");
     try {
       const [crRes, qrRes] = await Promise.all([
-        fetch(`${CR_API}?boqId=${boqId}`),
-        // FIX: cache busting so browser always fetches fresh QR data
-        fetch(`${QR_API}?boqId=${boqId}&_=${Date.now()}`),
+        api.get(`${CR_API}?boqId=${boqId}`),
+        api.get(`${QR_API}?boqId=${boqId}&_=${Date.now()}`),
       ]);
-      const crData = await crRes.json();
-      const qrData = await qrRes.json();
+      const crData = crRes.data;
+      const qrData = qrRes.data;
       if (Array.isArray(crData) && crData.length > 0) { setCrStatus(crData[0].status); setCrComment(crData[0].pmComment || ""); }
       if (Array.isArray(qrData) && qrData.length > 0) { setQrStatus(qrData[0].status); setQrComment(qrData[0].seComment || ""); }
-    } catch (_) {}
-    finally { setReportsLoading(false); }
+    } catch (err) {
+      notify("Could not load linked report statuses: " + (err.response?.data?.error || err.message), "error");
+    }
   };
 
   // ── SUBMIT BOQ ──
@@ -405,23 +394,12 @@ if (
 
     setLoading(true);
     try {
-      let res, data;
       if (editingId) {
-        res  = await fetch(`${API}/${editingId}`, {
-          method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to update BOQ");
+        await api.put(`${API}/${editingId}`, payload);
         notify("BOQ updated ✓");
         setEditingId(null);
       } else {
-        res  = await fetch(API, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to create BOQ");
+        await api.post(API, payload);
         notify("BOQ created ✓");
       }
       setRows([blank(), blank()]);
@@ -430,7 +408,7 @@ if (
       setMilestone("");
       setTab("list");
     } catch (err) {
-      notify(err.message, "error");
+      notify(err.response?.data?.error || err.message, "error");
     } finally {
       setLoading(false);
     }
@@ -467,19 +445,21 @@ if (
         totalCost:     parseFloat(boq.grandTotal),
       };
 
-      const crRes  = await fetch(CR_API, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(crPayload),
-      });
-      const crData = await crRes.json();
-      const crOk   = crRes.ok || crRes.status === 409;
-      if (!crOk) throw new Error("Cost Report: " + (crData.error || "Failed"));
+      let alreadyExists = false;
+      try {
+        await api.post(CR_API, crPayload);
+      } catch (err) {
+        if (err.response?.status !== 409) {
+          throw new Error("Cost Report: " + (err.response?.data?.error || err.message));
+        }
+        alreadyExists = true;
+      }
 
-      notify(crRes.status === 409 ? "Cost Report already exists ✓" : "Cost Report created & sent to PM ✓");
+      notify(alreadyExists ? "Cost Report already exists ✓" : "Cost Report created & sent to PM ✓");
       fetchBoqs();
       if (viewingBoq?.id === boq.id) { fetchReportStatuses(boq.id); refreshDetail(boq.id); }
     } catch (err) {
-      notify(err.message, "error");
+      notify(err.response?.data?.error || err.message, "error");
     } finally {
       setCreatingCostReport(false);
     }
@@ -501,20 +481,21 @@ if (
         boqId:       parseInt(boq.id),
       };
 
-      console.log("📐 Creating QR:", qrPayload); // temporary — remove after confirming
+      let alreadyExists = false;
+      try {
+        await api.post(QR_API, qrPayload);
+      } catch (err) {
+        if (err.response?.status !== 409) {
+          throw new Error("Qty Report: " + (err.response?.data?.error || err.message));
+        }
+        alreadyExists = true;
+      }
 
-      const qrRes  = await fetch(QR_API, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(qrPayload),
-      });
-      const qrData = await qrRes.json();
-      if (!qrRes.ok && qrRes.status !== 409) throw new Error("Qty Report: " + (qrData.error || "Failed"));
-
-      notify(qrRes.status === 409 ? "Qty Report already exists ✓" : "Qty Report created & sent to SE ✓");
+      notify(alreadyExists ? "Qty Report already exists ✓" : "Qty Report created & sent to SE ✓");
       fetchBoqs();
       if (viewingBoq?.id === boq.id) { fetchReportStatuses(boq.id); refreshDetail(boq.id); }
     } catch (err) {
-      notify(err.message, "error");
+      notify(err.response?.data?.error || err.message, "error");
     } finally {
       setCreatingQtyReport(false);
     }
@@ -564,17 +545,16 @@ setRows(
 
   const refreshDetail = async (id) => {
     try {
-      const res  = await fetch(`${API}/${id}`);
-      const data = await res.json();
-      if (res.ok) {
-        setViewingBoq({
-          ...data,
-          labourRows:    safeArr(data.labourRows),
-          labourTotal:   data.labourTotal   || 0,
-          materialTotal: data.materialTotal || data.grandTotal,
-        });
-      }
-    } catch (_) {}
+      const { data } = await api.get(`${API}/${id}`);
+      setViewingBoq({
+        ...data,
+        labourRows:    safeArr(data.labourRows),
+        labourTotal:   data.labourTotal   || 0,
+        materialTotal: data.materialTotal || data.grandTotal,
+      });
+    } catch (err) {
+      notify("Could not load BOQ: " + (err.response?.data?.error || err.message), "error");
+    }
   };
 
   const closeDetail = () => {
@@ -1004,7 +984,6 @@ const isPrefilled =
               <div className="boq__cards-list">
                 {filtered.map((boq) => {
                   const st          = STATUS[boq.status] || STATUS.pending_pm;
-                  const boqRows     = safeArr(boq.rows); // FIX #6: hoist
                   return (
                     <div key={boq.id} className={`boq__card boq__card--${st.color}`}>
                       <div className="boq__card-top">

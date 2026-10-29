@@ -8,7 +8,6 @@ import "../../styles/NCR.css";
 
 /* ── constants ───────────────────────────────────────────── */
 const DRAFT_KEY = "ncr:draft:v3";
-const QUEUE_KEY = "ncr:queue:v3";
 const PAGE_SIZE = 8;
 
 const SEVERITIES = ["low", "medium", "high", "critical"];
@@ -22,46 +21,37 @@ const SEV_COLOR = {
 };
 
 const BLANK = {
-  title: "", description: "", severity: "medium",
+  project_id: "", title: "", description: "", severity: "medium",
   zone: "", assignedTo: "", immediateAction: "",
   holdPlaced: false, attachments: [],
 };
 
-/* ── demo data ───────────────────────────────────────────── */
-const DEMO = [
-  { id: 1, title: "Concrete cylinder strength below spec — Level 2 Pour 14", description: "Lab tests show 7-day compressive strength of 18 MPa against specified 30 MPa C30. Work held pending engineering review and core testing.", severity: "critical", zone: "Level 2 / Pour 14", status: "open", holdPlaced: true, immediateAction: "Quarantine pour area. 3 cylinders sent for additional testing. QC Officer notified.", assignedToName: "QC Officer", createdAt: new Date(Date.now()-2*3600000).toISOString(), refNo: "NCR-031" },
-  { id: 2, title: "Column alignment — 50mm out of tolerance", description: "Column grid C3 found 50mm out of alignment in north-south direction during setout check. Exceeds 20mm tolerance.", severity: "high", zone: "Level 3 / Grid C3", status: "in_progress", holdPlaced: false, immediateAction: "Surveyor re-checked. Column marked. Structural engineer consulted.", assignedToName: "Ahmed Al-Rashid", createdAt: new Date(Date.now()-26*3600000).toISOString(), refNo: "NCR-030" },
-  { id: 3, title: "Rebar spacing non-conformance — Slab S7", description: "Rebar spacing in slab S7 measured at 250mm centres. Specification requires 200mm max centres.", severity: "medium", zone: "Level 1 / Slab S7", status: "closed", holdPlaced: false, immediateAction: "Additional bars inserted. ITP signed off by QC.", assignedToName: "Priya Sharma", createdAt: new Date(Date.now()-3*86400000).toISOString(), refNo: "NCR-029" },
-  { id: 4, title: "Waterproofing membrane applied in wet conditions", description: "Waterproofing applied to basement B1 slab during light rain contrary to manufacturer's spec which requires dry conditions.", severity: "high", zone: "Basement B1", status: "open", holdPlaced: true, immediateAction: "Application stopped. Area tarped. Re-application scheduled for dry weather.", assignedToName: "Khalid Noor", createdAt: new Date(Date.now()-4*86400000).toISOString(), refNo: "NCR-028" },
-  { id: 5, title: "MEP pipe penetration through main structural beam", description: "50mm diameter pipe run through main beam — structural drawings prohibit penetrations in main beams.", severity: "critical", zone: "Level 2 / Grid D4", status: "open", holdPlaced: true, immediateAction: "Pipe installation halted. RFI raised to structural engineer for remedial design.", assignedToName: "Mohammed Farhan", createdAt: new Date(Date.now()-5*86400000).toISOString(), refNo: "NCR-027" },
-];
-
 /* ── helpers ─────────────────────────────────────────────── */
 const ls = {
-  load: k => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch { return null; } },
-  save: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
-  del:  k => { try { localStorage.removeItem(k); } catch {} },
-};
-
-function enqueue(payload) {
-  const q = ls.load(QUEUE_KEY) || [];
-  q.push({ id: `q_${Date.now()}`, payload, createdAt: new Date().toISOString() });
-  ls.save(QUEUE_KEY, q);
-}
-
-async function flushQueue() {
-  const q = ls.load(QUEUE_KEY);
-  if (!Array.isArray(q) || !q.length) return;
-  const rem = [];
-  for (const item of q) {
+  load: k => {
     try {
-      if (item.payload?._fd) { rem.push(item); continue; }
-      const res = await api.post("/ncr", item.payload);
-      if (!res || (res.status && res.status >= 400)) throw new Error();
-    } catch { rem.push(item); }
-  }
-  ls.save(QUEUE_KEY, rem);
-}
+      const r = localStorage.getItem(k);
+      return r ? JSON.parse(r) : null;
+    } catch (err) {
+      console.error(`Could not read local NCR data "${k}":`, err);
+      return null;
+    }
+  },
+  save: (k, v) => {
+    try {
+      localStorage.setItem(k, JSON.stringify(v));
+    } catch (err) {
+      console.error(`Could not save local NCR data "${k}":`, err);
+    }
+  },
+  del: k => {
+    try {
+      localStorage.removeItem(k);
+    } catch (err) {
+      console.error(`Could not remove local NCR data "${k}":`, err);
+    }
+  },
+};
 
 function stableKey(it) {
   if (!it) return "";
@@ -71,6 +61,7 @@ function stableKey(it) {
 
 function validate(f) {
   const e = {};
+  if (!f.project_id) e.project_id = "Select a project";
   if (!f.title || f.title.trim().length < 3)        e.title       = "Title required (min 3 chars)";
   if (!f.description || f.description.trim().length < 8) e.description = "Description required (min 8 chars)";
   if (!f.severity)                                   e.severity    = "Select a severity";
@@ -102,6 +93,8 @@ export default function NCR() {
   const [ncrs, setNCRs]         = useState([]);
   const [listLoading, setLL]    = useState(true);
   const [users, setUsers]       = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [loadError, setLoadError] = useState("");
   const [search, setSearch]     = useState("");
   const [filterSev, setFSev]    = useState("all");
   const [filterStat, setFStat]  = useState("all");
@@ -119,19 +112,40 @@ export default function NCR() {
 
   async function loadAll() {
     setLL(true);
+    setLoadError("");
     try {
-      const [nr, ur] = await Promise.all([
-        api.get("/ncr"),
-        api.get("/users").catch(() => ({ data: [] })),
-      ]);
+      const nr = await api.get("/ncr");
       if (!alive.current) return;
       const raw  = Array.isArray(nr?.data) ? nr.data : [];
       const seen = new Set();
       const data = raw.filter(it => { const k = stableKey(it); if (seen.has(k)) return false; seen.add(k); return true; });
-      setNCRs(data.length ? data : DEMO);
+      setNCRs(data);
+    } catch (err) {
+      if (alive.current) {
+        setNCRs([]);
+        setLoadError(err.response?.data?.error || "Could not load NCRs. Check your connection and try again.");
+      }
+    }
+
+    try {
+      const ur = await api.get("/users");
+      if (!alive.current) return;
       setUsers(Array.isArray(ur?.data) ? ur.data : []);
-      flushQueue().catch(() => {});
-    } catch { if (alive.current) setNCRs(DEMO); }
+    } catch (err) {
+      if (alive.current) {
+        setLoadError(err.response?.data?.error || "Could not load assignee options.");
+      }
+    }
+
+    try {
+      const pr = await api.get("/ncr/options/projects");
+      if (!alive.current) return;
+      setProjects(Array.isArray(pr?.data) ? pr.data : []);
+    } catch (err) {
+      if (alive.current) {
+        setLoadError(err.response?.data?.error || "Could not load project options.");
+      }
+    }
     finally { if (alive.current) setLL(false); }
   }
 
@@ -171,14 +185,11 @@ export default function NCR() {
     if (Object.keys(errs).length) { setStatus("Fix errors above"); return; }
     setSub(true); setStatus("Submitting…");
 
-    const optimistic = { id: `local_${Date.now()}`, ...form, status: "open", createdAt: new Date().toISOString(), optimistic: true, attachments: form.attachments.map(f => ({ name: f.name })) };
-    setNCRs(s => [optimistic, ...s]);
-
     try {
       let res;
       if (form.attachments.length) {
         const fd = new FormData();
-        ["title","description","severity","zone","assignedTo","immediateAction"].forEach(k => fd.append(k, form[k] || ""));
+        ["project_id","title","description","severity","zone","assignedTo","immediateAction"].forEach(k => fd.append(k, form[k] || ""));
         fd.append("holdPlaced", String(form.holdPlaced));
         form.attachments.forEach(f => fd.append("attachments", f, f.name));
         res = await api.post("/ncr", fd, { headers: { "Content-Type": "multipart/form-data" } });
@@ -186,12 +197,10 @@ export default function NCR() {
         const { attachments: _, ...payload } = form;
         res = await api.post("/ncr", payload);
       }
-      if (!res || (res.status && res.status >= 400)) throw new Error();
+      if (!res || (res.status && res.status >= 400)) throw new Error("NCR creation failed.");
       await loadAll(); ls.del(DRAFT_KEY); setForm({ ...BLANK }); setStatus("NCR created ✓");
-    } catch {
-      enqueue(form.attachments.length ? { _fd: true, meta: { title: form.title } } : (({ attachments: _, ...p }) => p)(form));
-      setNCRs(s => s.map(it => it.id === optimistic.id ? { ...it, queued: true } : it));
-      setStatus("Offline — queued for retry");
+    } catch (err) {
+      setStatus(err.response?.data?.error || err.message || "NCR creation failed. Your form is still available to retry.");
     } finally { if (alive.current) setSub(false); }
   }, [form, submitting]);
 
@@ -214,7 +223,7 @@ export default function NCR() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages]);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
   /* ── stats (memoised) ─────────────────────────────────── */
   const stats = useMemo(() => ({
@@ -289,12 +298,24 @@ export default function NCR() {
             </div>
 
             <div className="ncr-panel-body">
+              {loadError && <div className="ncr-error" role="alert">{loadError}</div>}
               <form onSubmit={submit} noValidate>
 
                 {/* NCR Details */}
                 <div className="ncr-form-section">
                   <div className="ncr-section-title">NCR Details</div>
                   <div className="ncr-grid-2">
+
+                  <div className="ncr-field ncr-full">
+                    <label className="ncr-label">Project *</label>
+                    <select className="ncr-select" value={form.project_id} onChange={e => setF("project_id", e.target.value)}>
+                      <option value="">Select an assigned project</option>
+                      {projects.map(project => (
+                        <option key={project.id} value={project.id}>{project.name}</option>
+                      ))}
+                    </select>
+                    {errors.project_id && <div className="ncr-error">{errors.project_id}</div>}
+                  </div>
 
                     <div className="ncr-field ncr-full">
                       <label className="ncr-label">Title *</label>

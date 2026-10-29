@@ -13,6 +13,15 @@ const FinanceSettings = {
     };
   },
 
+  getBankAccountOptions: async () => {
+    const result = await pool.query(
+      `SELECT id, bank_name, RIGHT(account_number, 4) AS account_last4
+         FROM finance_bank_accounts
+        ORDER BY is_primary DESC, created_at ASC`
+    );
+    return result.rows;
+  },
+
   updateGeneral: async (data) => {
     const { company_name, gstin, pan, currency, fiscal_year_start, date_format } = data;
     const result = await pool.query(

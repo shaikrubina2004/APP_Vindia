@@ -1,6 +1,7 @@
 // controllers/labourReportController.js
 
 const pool = require("../config/db");
+const { isAssignedProject, getAssignedProjectIds } = require("../utils/siteEngineerAccess");
 
 /* =========================================================
    HELPERS
@@ -88,6 +89,13 @@ exports.create = async (req, res) => {
 
       return res.status(400).json({
         error: "date is required",
+      });
+    }
+
+    if (req.user?.role === "site_engineer" && !(await isAssignedProject(submittedBy, project_id))) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({
+        error: "Select a project assigned to you",
       });
     }
 
@@ -270,6 +278,10 @@ exports.getAll = async (req, res) => {
       can access reports allowed by their broader workflow.
     */
     if (userRole === "site_engineer") {
+      const assignedProjectIds = await getAssignedProjectIds(userId);
+      if (!assignedProjectIds.length) return res.json([]);
+      params.push(assignedProjectIds);
+      conditions.push(`lr.project_id = ANY($${params.length}::int[])`);
       params.push(userId);
       conditions.push(`lr.submitted_by = $${params.length}`);
     }
@@ -337,6 +349,14 @@ exports.getOne = async (req, res) => {
       return res.status(404).json({
         error: "Not found",
       });
+    }
+
+    if (
+      req.user?.role === "site_engineer" &&
+      (!(await isAssignedProject(req.user.id, report.project_id)) ||
+        String(report.submitted_by) !== String(req.user.id))
+    ) {
+      return res.status(404).json({ error: "Not found" });
     }
 
     return res.json(report);
@@ -474,6 +494,13 @@ exports.remove = async (req, res) => {
       });
     }
 
+    if (
+      req.user?.role === "site_engineer" &&
+      !(await isAssignedProject(userId, check.rows[0].project_id))
+    ) {
+      return res.status(403).json({ error: "Report is outside your assigned projects" });
+    }
+
     await pool.query(
       `
         DELETE FROM labour_report
@@ -539,6 +566,13 @@ exports.getMeasurementSource = async (req, res) => {
       return res.status(404).json({
         message: "Labour Report not found",
       });
+    }
+
+    if (
+      req.user?.role === "site_engineer" &&
+      !(await isAssignedProject(req.user.id, result.rows[0].project_id))
+    ) {
+      return res.status(404).json({ message: "Labour Report not found" });
     }
 
     return res.json(result.rows[0]);

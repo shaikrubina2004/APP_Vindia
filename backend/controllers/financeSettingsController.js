@@ -8,6 +8,11 @@ exports.getSettings = asyncHandler(async (req, res) => {
   res.json({ success: true, data: settings });
 });
 
+exports.getBankAccountOptions = asyncHandler(async (_req, res) => {
+  const accounts = await FinanceSettings.getBankAccountOptions();
+  res.json({ success: true, data: accounts });
+});
+
 // PUT /api/finance/settings/general
 exports.updateGeneral = asyncHandler(async (req, res) => {
   const settings = await FinanceSettings.updateGeneral(req.body);

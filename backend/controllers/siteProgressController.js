@@ -1,6 +1,13 @@
 // backend/controllers/siteProgressController.js
 
 const Progress = require("../models/Progress");
+const {
+  isAssignedProject,
+  getAssignedProjectIds,
+  isManagedProject,
+  getManagedProjectIds,
+  isWbsInProject,
+} = require("../utils/siteEngineerAccess");
 
 /* =========================================================
    CREATE SITE PROGRESS
@@ -56,6 +63,32 @@ const createSiteProgress = async (req, res) => {
 
     data.project_id = projectId;
     data.wbs_id = wbsId;
+
+    if (!(await isWbsInProject(wbsId, projectId))) {
+      return res.status(400).json({
+        success: false,
+        message: "WBS item does not belong to the selected project",
+      });
+    }
+
+    if (
+      req.user?.role === "site_engineer" &&
+      !(await isAssignedProject(userId, projectId))
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this project",
+      });
+    }
+    if (
+      req.user?.role === "project_manager" &&
+      !(await isManagedProject(userId, projectId))
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not manage this project",
+      });
+    }
 
     /* ---------- PARSE MEASUREMENTS ---------- */
 
@@ -138,7 +171,34 @@ const createSiteProgress = async (req, res) => {
 
 const getSiteProgress = async (req, res) => {
   try {
-    const list = await Progress.getAll();
+    const requestedProjectId = req.query.project_id ? Number(req.query.project_id) : null;
+    if (
+      requestedProjectId !== null &&
+      (!Number.isInteger(requestedProjectId) || requestedProjectId <= 0)
+    ) {
+      return res.status(400).json({ success: false, message: "Invalid project_id" });
+    }
+    if (
+      req.user?.role === "site_engineer" &&
+      requestedProjectId !== null &&
+      !(await isAssignedProject(req.user.id, requestedProjectId))
+    ) {
+      return res.status(403).json({ success: false, message: "You are not assigned to this project" });
+    }
+    if (
+      req.user?.role === "project_manager" &&
+      requestedProjectId !== null &&
+      !(await isManagedProject(req.user.id, requestedProjectId))
+    ) {
+      return res.status(403).json({ success: false, message: "You do not manage this project" });
+    }
+    let projectIds = req.user?.role === "site_engineer"
+      ? await getAssignedProjectIds(req.user.id)
+      : req.user?.role === "project_manager"
+        ? await getManagedProjectIds(req.user.id)
+        : null;
+    if (projectIds && requestedProjectId !== null) projectIds = [requestedProjectId];
+    const list = await Progress.getAll({ projectIds });
 
     const final = await Promise.all(
       list.map(async (item) => {
@@ -189,6 +249,24 @@ const getSiteProgressById = async (req, res) => {
         message: "Progress entry not found",
       });
     }
+    if (
+      req.user?.role === "site_engineer" &&
+      !(await isAssignedProject(req.user.id, data.project_id))
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: "Progress entry not found",
+      });
+    }
+    if (
+      req.user?.role === "project_manager" &&
+      !(await isManagedProject(req.user.id, data.project_id))
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: "Progress entry not found",
+      });
+    }
 
     const measurements =
       await Progress.getMeasurements(id);
@@ -228,6 +306,25 @@ const deleteSiteProgress = async (req, res) => {
     const existing = await Progress.getById(id);
 
     if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: "Progress entry not found",
+      });
+    }
+
+    if (
+      req.user?.role === "site_engineer" &&
+      !(await isAssignedProject(req.user.id, existing.project_id))
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: "Progress entry not found",
+      });
+    }
+    if (
+      req.user?.role === "project_manager" &&
+      !(await isManagedProject(req.user.id, existing.project_id))
+    ) {
       return res.status(404).json({
         success: false,
         message: "Progress entry not found",

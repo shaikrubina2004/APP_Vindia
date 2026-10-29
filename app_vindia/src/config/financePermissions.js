@@ -6,9 +6,9 @@ export const FINANCE_PERMISSIONS = {
 
     budget: ["view"],
 
-    expenses: ["view", "create", "edit", "verify"],
+    expenses: ["view", "create", "edit"],
 
-    invoices: ["view", "create", "edit"],
+    invoices: ["view", "create"],
 
     payments: ["view", "prepare"],
 

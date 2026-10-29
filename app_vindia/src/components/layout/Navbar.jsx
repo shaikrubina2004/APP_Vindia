@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 
@@ -43,7 +43,7 @@ const QUICK_ADD_ITEMS = {
     { label: "Incident", path: "/site-engineer/incidents" },
   ],
   quantity_surveyor: [
-    { label: "Measurement", path: "/quantity-surveyor/measurement" },
+    { label: "Pending Measurements", path: "/quantity-surveyor/quantity-report" },
     { label: "Quantity Report", path: "/quantity-surveyor/quantity-report" },
     { label: "RFI", path: "/quantity-surveyor/rfi" },
     { label: "Incident", path: "/quantity-surveyor/incident" },
@@ -106,7 +106,7 @@ const QUICK_ADD_ITEMS = {
   operations_manager: [
     { label: "Material Requests", path: "/operations/manager/material-requests" },
     { label: "Approvals", path: "/operations/manager/approvals" },
-    { label: "Purchase Orders", path: "/operations/procurement/purchase-orders" },
+    { label: "Purchase Orders", path: "/operations/manager/procurement" },
     { label: "Daily Updates", path: "/operations/manager/daily-updates" },
   ],
   office_administrator: [

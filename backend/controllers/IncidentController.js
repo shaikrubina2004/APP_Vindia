@@ -1,4 +1,6 @@
 const pool = require("../config/db");
+const { getAssignedProjectIds } = require("../utils/siteEngineerAccess");
+const { notifyProjectClient } = require("../utils/clientNotifications");
 const createSENotification = require("../utils/createSENotification");
 const { insertNotification } = require("./pcNotificationsController");
 const { insertMEPNotification } = require("./mepNotificationsController");
@@ -193,6 +195,7 @@ async function notifyByRole(
       } catch (err) {
         console.error("MEP Notification error:", err.message);
       }
+      exports.notifyByRole = notifyByRole;
     } else if (OPS_BELL_BASE[roleCode]) {
       // These roles read from operations_notifications, not pc_notifications.
       // Without this branch their incidents/tasks were written to the PC table
@@ -371,7 +374,12 @@ exports.getAllIncidents = async (req, res) => {
       params = [];
     let idx = 1;
 
-    if (userId !== null) {
+    if (req.user?.role === "site_engineer") {
+      const projectIds = await getAssignedProjectIds(userId);
+      if (!projectIds.length) return res.json({ success: true, data: [] });
+      conditions.push(`project_id = ANY($${idx++}::int[])`);
+      params.push(projectIds);
+    } else if (userId !== null) {
       conditions.push(
         `(created_by_id = $${idx} OR assigned_to_id = $${idx + 1})`,
       );
@@ -740,6 +748,16 @@ exports.updateIncident = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Incident not found" });
 
+    if (rows[0].source === "client" && rows[0].project_id) {
+      await notifyProjectClient(rows[0].project_id, {
+        type: "incident",
+        title: `Incident updated: ${rows[0].title}`,
+        description: "Your project team updated the incident.",
+        link: "/client/incidents",
+        referenceId: rows[0].id,
+      });
+    }
+
     // ✅ notifyByRole handles QS / MEP / PC automatically
     if (assigned_to_user_id) {
       await notifyByRole(
@@ -811,6 +829,15 @@ exports.updateIncidentStatus = async (req, res) => {
     }
 
     await client.query("COMMIT");
+    if (row.source === "client" && row.project_id) {
+      await notifyProjectClient(row.project_id, {
+        type: "incident",
+        title: `Incident ${status}: ${row.title}`,
+        description: `Your project team changed the incident status to ${status}.`,
+        link: "/client/incidents",
+        referenceId: row.id,
+      });
+    }
     await createSENotification({
       message: `Incident Status Updated`,
       description: `${row.title} → ${status}`,
@@ -878,11 +905,28 @@ exports.addIncidentComment = async (req, res) => {
       .json({ success: false, message: "Comment body is required" });
 
   try {
+    const incident = await pool.query(
+      `SELECT id, project_id, title, source
+         FROM incidents WHERE id = $1 AND is_deleted = FALSE`,
+      [id]
+    );
+    if (!incident.rows.length) {
+      return res.status(404).json({ success: false, message: "Incident not found" });
+    }
     const { rows } = await pool.query(
       `INSERT INTO incident_comments (incident_id, author_id, body)
        VALUES ($1, $2, $3) RETURNING id, body, created_at`,
       [id, author_id, body.trim()],
     );
+    if (incident.rows[0].source === "client" && incident.rows[0].project_id) {
+      await notifyProjectClient(incident.rows[0].project_id, {
+        type: "incident",
+        title: `New response on ${incident.rows[0].title}`,
+        description: "Your project team replied to your incident.",
+        link: "/client/incidents",
+        referenceId: incident.rows[0].id,
+      });
+    }
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
     console.error("addIncidentComment:", err);
@@ -946,7 +990,13 @@ exports.getAllTasks = async (req, res) => {
       params = [];
     let idx = 1;
 
-    if (userId !== null) {
+    if (req.user?.role === "site_engineer") {
+      const projectIds = await getAssignedProjectIds(userId);
+      if (!projectIds.length) return res.json({ success: true, data: [] });
+      conditions.push(`(project_id = ANY($${idx}::int[]) OR incident_project_id = ANY($${idx}::int[]))`);
+      params.push(projectIds);
+      idx += 1;
+    } else if (userId !== null) {
       conditions.push(`(assignee_id = $${idx} OR created_by_id = $${idx + 1})`);
       params.push(userId, userId);
       idx += 2;
@@ -1330,6 +1380,21 @@ exports.addTaskPhoto = async (req, res) => {
 
 exports.getStats = async (req, res) => {
   try {
+    const siteEngineer = req.user?.role === "site_engineer";
+    const projectIds = siteEngineer ? await getAssignedProjectIds(req.user.id) : null;
+    if (siteEngineer && !projectIds.length) {
+      return res.json({
+        success: true,
+        data: {
+          incidents: { total: 0, open: 0, resolved: 0, p1: 0, overdue: 0 },
+          tasks: { total: 0, pending: 0, in_progress: 0, done: 0, blocked: 0, p1_urgent: 0 },
+        },
+      });
+    }
+    const incidentScope = siteEngineer ? "AND project_id = ANY($1::int[])" : "";
+    const taskScope = siteEngineer
+      ? "AND (project_id = ANY($1::int[]) OR incident_id IN (SELECT id FROM incidents WHERE project_id = ANY($1::int[])))"
+      : "";
     const { rows } = await pool.query(`
       SELECT
         COUNT(*)                                                                            AS total,
@@ -1337,8 +1402,8 @@ exports.getStats = async (req, res) => {
         COUNT(*) FILTER (WHERE status IN ('Resolved','Closed'))                             AS resolved,
         COUNT(*) FILTER (WHERE priority = 'P1')                                             AS p1,
         COUNT(*) FILTER (WHERE status NOT IN ('Resolved','Closed') AND deadline_at < NOW()) AS overdue
-      FROM incidents WHERE is_deleted = FALSE
-    `);
+      FROM incidents WHERE is_deleted = FALSE ${incidentScope}
+    `, siteEngineer ? [projectIds] : []);
 
     const { rows: taskRows } = await pool.query(`
       SELECT
@@ -1348,8 +1413,8 @@ exports.getStats = async (req, res) => {
         COUNT(*) FILTER (WHERE status = 'Done')                         AS done,
         COUNT(*) FILTER (WHERE status = 'Blocked')                      AS blocked,
         COUNT(*) FILTER (WHERE priority = 'P1' AND status = 'Pending')  AS p1_urgent
-      FROM tasks WHERE is_deleted = FALSE
-    `);
+      FROM tasks WHERE is_deleted = FALSE ${taskScope}
+    `, siteEngineer ? [projectIds] : []);
 
     res.json({
       success: true,
