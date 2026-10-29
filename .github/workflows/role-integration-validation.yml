@@ -1,0 +1,54 @@
+name: Role integration validation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - agents/module-integration-review-and-optimization
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app_vindia
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app_vindia/package-lock.json
+      - run: npm ci
+      - name: Lint updated role workflows
+        run: >-
+          npx eslint
+          src/pages/timesheet/Timesheet.jsx
+          src/pages/siteEngineer/NCR.jsx
+          src/pages/siteEngineer/Snaglist.jsx
+          src/pages/Architect/ArchitectSnagList.jsx
+          src/routes/AppRoutes.jsx
+      - run: npm run build
+
+  backend-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check updated backend JavaScript syntax
+        run: >-
+          node --check backend/routes/timesheetRoutes.js &&
+          node --check backend/controllers/qsNotificationController.js &&
+          node --check backend/controllers/ncrController.js &&
+          node --check backend/routes/ncrRoutes.js &&
+          node --check backend/routes/snagRoutes.js &&
+          node --check backend/controllers/architectDesignController.js &&
+          node --check backend/routes/architectDesignRoutes.js &&
+          node --check backend/migrations/createRFINCRTables.js
