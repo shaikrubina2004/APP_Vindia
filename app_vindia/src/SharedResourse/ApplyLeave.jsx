@@ -145,7 +145,7 @@ function ApplyLeave({ onLeaveSubmitted }) {
               <p className="employee-meta">
                 <span className="meta-item">{user.designation || "Employee"}</span>
                 {user.department && <><span className="separator">•</span><span className="meta-item">{user.department}</span></>}
-                {user.id && <><span className="separator">•</span><span className="meta-item">User ID: {user.id}</span></>}
+                {user.employee_id && <><span className="separator">•</span><span className="meta-item">Employee ID: {user.employee_id}</span></>}
               </p>
             </div>
           </div>
