@@ -179,8 +179,7 @@ const getNotifications = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error("GET operations notifications failed:", err.message);
-    // Return an empty list rather than a 500 so the bell still renders.
-    res.json([]);
+    res.status(500).json({ error: "Failed to load notifications" });
   }
 };
 

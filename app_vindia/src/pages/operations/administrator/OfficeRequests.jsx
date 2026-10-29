@@ -103,7 +103,7 @@ export default function OfficeRequests({ defaultCategory = "all", title = "Offic
               <td><div className="hub-row-actions">
                 {r.status === "awaiting_approval" && managerMode && (<>
                   <button className="ops-btn ops-btn-outline ops-btn-sm" onClick={() => setReject(r)}>Reject</button>
-                  <button className="ops-btn ops-btn-primary ops-btn-sm" onClick={() => move(r, "in_progress")}>Approve</button></>)}
+                  <button className="ops-btn ops-btn-primary ops-btn-sm" onClick={() => move(r, "approved")}>Approve</button></>)}
                 {(NEXT[r.status] || []).map((to) => (
                   <button key={to} className="ops-btn ops-btn-outline ops-btn-sm" onClick={() => move(r, to)} style={{ textTransform: "capitalize" }}>{to === "open" ? "Reopen" : `Mark ${to.replace("_", " ")}`}</button>))}
               </div></td></tr>);

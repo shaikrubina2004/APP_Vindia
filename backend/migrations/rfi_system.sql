@@ -12,9 +12,13 @@ CREATE TABLE IF NOT EXISTS rfis (
   raised_by_id     INTEGER,
   assigned_to_role VARCHAR(60)   NOT NULL,
   project_name     VARCHAR(200),
+  project_id       INTEGER,
   created_at       TIMESTAMPTZ   DEFAULT NOW(),
   updated_at       TIMESTAMPTZ   DEFAULT NOW()
 );
+
+ALTER TABLE rfis ADD COLUMN IF NOT EXISTS project_id INTEGER;
+CREATE INDEX IF NOT EXISTS idx_rfis_project_id ON rfis (project_id);
 
 CREATE TABLE IF NOT EXISTS rfi_responses (
   id              SERIAL PRIMARY KEY,

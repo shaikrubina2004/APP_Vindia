@@ -6,6 +6,11 @@ const pool     = require("../config/db");
 const fs       = require("fs");
 const path     = require("path");
 const archiver = require("archiver");
+const {
+  isAssignedProject,
+  getAssignedProjectIds,
+  isWbsInProject,
+} = require("../utils/siteEngineerAccess");
 
 /* ─────────────────────────────────────────────────────────
    HELPER — safe integer
@@ -38,6 +43,16 @@ exports.uploadPhotos = async (req, res) => {
     } = req.body;
 
     const submitted_by = req.user?.id || null;
+
+    if (req.user?.role === "site_engineer" && !(await isAssignedProject(submitted_by, project_id))) {
+      return res.status(403).json({ error: "Select a project assigned to you" });
+    }
+    if (milestone_id && !(await isWbsInProject(milestone_id, project_id))) {
+      return res.status(400).json({ error: "Milestone does not belong to the selected project" });
+    }
+    if (task_id && !(await isWbsInProject(task_id, project_id))) {
+      return res.status(400).json({ error: "Task does not belong to the selected project" });
+    }
 
     const filePath = `/uploads/${file.filename}`;
 
@@ -96,12 +111,18 @@ exports.getPhotos = async (req, res) => {
     const conditions = [];
     const params     = [];
 
-    if (zone)       { params.push(zone);       conditions.push(`zone = $${params.length}`);       }
-    if (activity)   { params.push(activity);   conditions.push(`activity = $${params.length}`);   }
-    if (phase)      { params.push(phase);       conditions.push(`phase = $${params.length}`);      }
-    if (date)       { params.push(date);        conditions.push(`date = $${params.length}`);       }
-    if (visibility) { params.push(visibility);  conditions.push(`visibility = $${params.length}`); }
-    if (project_id) { params.push(toInt(project_id)); conditions.push(`project_id = $${params.length}`); }
+    if (zone)       { params.push(zone);       conditions.push(`pg.zone = $${params.length}`);       }
+    if (activity)   { params.push(activity);   conditions.push(`pg.activity = $${params.length}`);   }
+    if (phase)      { params.push(phase);      conditions.push(`pg.phase = $${params.length}`);      }
+    if (date)       { params.push(date);        conditions.push(`pg.date = $${params.length}`);       }
+    if (visibility) { params.push(visibility);  conditions.push(`pg.visibility = $${params.length}`); }
+    if (project_id) { params.push(toInt(project_id)); conditions.push(`pg.project_id = $${params.length}`); }
+    if (req.user?.role === "site_engineer") {
+      const assignedProjectIds = await getAssignedProjectIds(req.user.id);
+      if (!assignedProjectIds.length) return res.json([]);
+      params.push(assignedProjectIds);
+      conditions.push(`pg.project_id = ANY($${params.length}::int[])`);
+    }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
@@ -198,8 +219,13 @@ exports.sharePhoto = async (req, res) => {
 
     // Check photo exists
     const check = await pool.query(
-      "SELECT id FROM photo_gallery WHERE id = $1",
-      [toInt(photo_id)]
+      `SELECT id, project_id
+         FROM photo_gallery
+        WHERE id = $1
+          AND ($2 <> 'site_engineer' OR project_id IN (
+            SELECT id FROM projects WHERE site_engineer_id = $3
+          ))`,
+      [toInt(photo_id), req.user?.role, req.user?.id]
     );
     if (check.rows.length === 0) {
       return res.status(404).json({ error: "Photo not found" });
@@ -242,10 +268,15 @@ exports.downloadSet = async (req, res) => {
     const params = [date];
     let zoneClause = "";
     if (zone) { params.push(zone); zoneClause = `AND zone = $${params.length}`; }
+    let projectClause = "";
+    if (req.user?.role === "site_engineer") {
+      params.push(req.user.id);
+      projectClause = `AND project_id IN (SELECT id FROM projects WHERE site_engineer_id = $${params.length})`;
+    }
 
     const result = await pool.query(
       `SELECT * FROM photo_gallery
-       WHERE date = $1 ${zoneClause}
+       WHERE date = $1 ${zoneClause} ${projectClause}
        ORDER BY created_at ASC`,
       params
     );
@@ -315,8 +346,13 @@ exports.deletePhoto = async (req, res) => {
 const userRole = req.user?.role;
 
     const check = await pool.query(
-      "SELECT * FROM photo_gallery WHERE id = $1",
-      [toInt(id)]
+      `SELECT *
+         FROM photo_gallery
+        WHERE id = $1
+          AND ($2 <> 'site_engineer' OR project_id IN (
+            SELECT id FROM projects WHERE site_engineer_id = $3
+          ))`,
+      [toInt(id), userRole, userId]
     );
 
     if (check.rows.length === 0) {

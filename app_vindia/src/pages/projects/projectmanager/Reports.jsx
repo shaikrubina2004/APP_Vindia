@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import "../../../styles/Reports.css";
 import { useProject } from "../../../context/ProjectContext";
+import api from "../../../services/api";
 
 const BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE || "http://localhost:5000").replace(/\/+$/, "");
 const token = () => localStorage.getItem("token");
@@ -82,15 +83,36 @@ const TABS = [
 ];
 
 export default function Reports() {
-  const { activeProject, setActiveProject, PROJECTS, loading: projectsLoading } = useProject();
+  const { activeProject, setActiveProject, loading: projectsLoading } = useProject();
 
   const [tab, setTab]         = useState("project");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
   const [data, setData]       = useState(null);
+  const [projectError, setProjectError] = useState(null);
+  const [projectList, setProjectList] = useState([]);
+  const [assignedProjectsLoading, setAssignedProjectsLoading] = useState(true);
 
-  const projectList = (PROJECTS||[]).filter(p => p.id !== null);
   const projectId   = activeProject?.id ?? null;
+
+  useEffect(() => {
+    api.get("/projects/mine")
+      .then(({ data: projects }) => {
+        const assigned = Array.isArray(projects)
+          ? projects.map((project) => ({
+              id: String(project.id),
+              name: project.name,
+              code: project.code ?? `PRJ-${String(project.id).padStart(3, "0")}`,
+              location: project.location ?? "",
+            }))
+          : [];
+        setProjectList(assigned);
+      })
+      .catch((err) => {
+        setProjectError(err.response?.data?.error || err.message || "Failed to load assigned projects.");
+      })
+      .finally(() => setAssignedProjectsLoading(false));
+  }, []);
 
   // useCallback so the function reference is stable and useEffect dep works correctly
   const fetchTab = useCallback(async (t, pid) => {
@@ -115,10 +137,10 @@ export default function Reports() {
 
   // Re-fetch whenever tab OR project changes
   useEffect(() => {
-    if (projectsLoading) return;
+    if (projectsLoading || assignedProjectsLoading) return;
     if (!projectId) { setData(null); setError(null); setLoading(false); return; }
     fetchTab(tab, projectId);
-  }, [tab, projectId, projectsLoading, fetchTab]);
+  }, [tab, projectId, projectsLoading, assignedProjectsLoading, fetchTab]);
 
   // window.open() cannot send the Authorization header, so the export always came back
   // 401. Fetch with the token, then hand the file to the browser.
@@ -161,7 +183,7 @@ export default function Reports() {
   // What to show in the content area
   const showSpinner  = projectId && loading;
   const showError    = projectId && !loading && error;
-  const showEmpty    = !projectId && !projectsLoading;
+  const showEmpty    = !projectId && !projectsLoading && !assignedProjectsLoading && !projectError;
   const showContent  = projectId && !loading && !error && data;
 
   return (
@@ -177,8 +199,10 @@ export default function Reports() {
           <span className="rpt-selector-label">Select Project</span>
         </div>
         <div className="rpt-selector-right">
-          {projectsLoading ? (
+          {projectsLoading || assignedProjectsLoading ? (
             <span style={{fontSize:13,color:"#9ca3af"}}>Loading projects…</span>
+          ) : projectError ? (
+            <span style={{fontSize:13,color:"#ef4444"}}>{projectError}</span>
           ) : projectList.length === 0 ? (
             <span style={{fontSize:13,color:"#ef4444"}}>No projects found</span>
           ) : (

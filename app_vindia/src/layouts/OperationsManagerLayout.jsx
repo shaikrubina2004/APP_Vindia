@@ -6,7 +6,7 @@ import { ProjectProvider } from "../context/ProjectContext";
 
 function OperationsManagerLayout({ children }) {
   return (
-    <div className="role-portal">
+    <div className="role-portal operations-manager-portal">
       <ProjectProvider>
         <AppLayout menuItems={OperationsManagerMenu}>
           {children}

@@ -9,6 +9,7 @@ const protect = require("../middleware/authMiddleware");
 const createSENotification = require("../utils/createSENotification");
 const { insertThreeDNotification } = require("../controllers/threeDNotificationsController");
 const { insertNotification: insertDigitalMarketingNotification } = require("../controllers/digitalMarketingNotificationsController");
+const { notifyProjectClient } = require("../utils/clientNotifications");
 
 // ── Multer ────────────────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
@@ -252,6 +253,7 @@ router.post("/", protect, upload.single("file"), async (req, res) => {
       grid_ref,
       zone,
       response_required_by,
+      project_id,
     } = req.body;
 
     const userId = req.user?.id;
@@ -268,14 +270,39 @@ router.post("/", protect, upload.single("file"), async (req, res) => {
     const responseDate =
       response_required_by?.trim() ? response_required_by : null;
 
+    let linkedProjectId = null;
+    let linkedProjectName = project_name?.trim() || null;
+    if (project_id) {
+      const id = Number(project_id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ success: false, message: "Invalid project_id" });
+      }
+      const project = await pool.query(`SELECT id, name FROM projects WHERE id = $1`, [id]);
+      if (!project.rows.length) {
+        return res.status(400).json({ success: false, message: "Project not found" });
+      }
+      if (linkedProjectName && linkedProjectName.toLowerCase() !== project.rows[0].name.toLowerCase()) {
+        return res.status(400).json({ success: false, message: "project_id does not match project_name" });
+      }
+      linkedProjectId = project.rows[0].id;
+      linkedProjectName = project.rows[0].name;
+    } else if (linkedProjectName) {
+      const match = await pool.query(
+        `SELECT MIN(id) AS id, COUNT(*)::int AS count
+           FROM projects WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))`,
+        [linkedProjectName]
+      );
+      if (match.rows[0]?.count === 1) linkedProjectId = match.rows[0].id;
+    }
+
     const result = await pool.query(
       `INSERT INTO rfis
          (subject, description, priority, status,
           raised_by_role, raised_by_name, raised_by_id,
           assigned_to_role, assigned_to_user_id,
-          project_name, drawing_ref, grid_ref, zone,
+          project_name, project_id, drawing_ref, grid_ref, zone,
           response_required_by, created_at, updated_at)
-       VALUES ($1,$2,$3,'open',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
+       VALUES ($1,$2,$3,'open',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW())
        RETURNING *`,
       [
         subject,
@@ -286,7 +313,8 @@ router.post("/", protect, upload.single("file"), async (req, res) => {
         userId,
         assigned_to_role,       // comes from frontend selectedRole.code
         assigned_to_user_id || null,
-        project_name   || null,
+        linkedProjectName,
+        linkedProjectId,
         drawing_ref    || null,
         grid_ref       || null,
         zone           || null,
@@ -315,6 +343,19 @@ router.post("/", protect, upload.single("file"), async (req, res) => {
           severity: ["critical", "high"].includes(priority) ? "critical" : "warn",
         });
       } catch (e) { console.error("Notify err:", e.message); }
+    }
+
+    if (
+      linkedProjectId &&
+      (String(raisedByCode).toLowerCase() === "client" || String(assigned_to_role).toLowerCase() === "client")
+    ) {
+      await notifyProjectClient(linkedProjectId, {
+        type: "rfi",
+        title: `RFI update: ${subject}`,
+        description: "A new message was added to an RFI for your project.",
+        link: "/client/rfi",
+        referenceId: newRFI.id,
+      });
     }
 
     return res.status(201).json({ success: true, rfi: newRFI });
@@ -376,6 +417,19 @@ router.post("/:id/respond", protect, upload.single("file"), async (req, res) => 
         });
       } catch (e) { console.error("Notify err:", e.message); }
     }
+    if (
+      rfi.project_id &&
+      (String(rfi.raised_by_role).toLowerCase() === "client" ||
+        String(rfi.assigned_to_role).toLowerCase() === "client")
+    ) {
+      await notifyProjectClient(rfi.project_id, {
+        type: "rfi",
+        title: `RFI response: ${rfi.subject}`,
+        description: `${displayName} added a response to your RFI.`,
+        link: "/client/rfi",
+        referenceId: rfi.id,
+      });
+    }
 
     return res.json({ success: true, response: resp.rows[0] });
   } catch (err) {
@@ -410,6 +464,20 @@ router.patch("/:id/status", protect, async (req, res) => {
 
     if (!result.rowCount)
       return res.status(404).json({ success: false, message: "Not found or access denied" });
+
+    if (
+      result.rows[0].project_id &&
+      (String(result.rows[0].raised_by_role).toLowerCase() === "client" ||
+        String(result.rows[0].assigned_to_role).toLowerCase() === "client")
+    ) {
+      await notifyProjectClient(result.rows[0].project_id, {
+        type: "rfi",
+        title: `RFI status updated: ${result.rows[0].subject}`,
+        description: `Status changed to ${status}.`,
+        link: "/client/rfi",
+        referenceId: result.rows[0].id,
+      });
+    }
 
     return res.json({ success: true, rfi: result.rows[0] });
   } catch (err) {

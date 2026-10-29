@@ -4,6 +4,7 @@ const { notifyRole } = require("./operationsNotificationsController");
 const {
   insertNotification: notifySiteEngineer,
 } = require("./siteEngineerNotificationsController");
+const { isAssignedProject, getAssignedProjectIds } = require("../utils/siteEngineerAccess");
 
 const isPrivileged = (role) => ["operations_manager", "ceo"].includes(role);
 
@@ -53,6 +54,26 @@ exports.getRequests = async (req, res) => {
     if (!seeAll) {
       values.push(userId);
       where += ` AND mr.created_by = $${values.length}`;
+    }
+    if (req.user.role === "site_engineer") {
+      const assignedProjectIds = await getAssignedProjectIds(userId);
+      if (!assignedProjectIds.length) return res.status(200).json([]);
+      values.push(assignedProjectIds);
+      where += ` AND mr.project_id = ANY($${values.length}::int[])`;
+    }
+    if (req.query.project_id) {
+      const requestedProjectId = Number(req.query.project_id);
+      if (!Number.isInteger(requestedProjectId) || requestedProjectId <= 0) {
+        return res.status(400).json({ error: "Invalid project_id" });
+      }
+      if (
+        req.user.role === "site_engineer" &&
+        !(await isAssignedProject(userId, requestedProjectId))
+      ) {
+        return res.status(403).json({ error: "You are not assigned to this project" });
+      }
+      values.push(requestedProjectId);
+      where += ` AND mr.project_id = $${values.length}`;
     }
     if (req.query.status && req.query.status !== "all") {
       values.push(req.query.status);
@@ -131,6 +152,9 @@ if (!userId) {
     error: "User not authenticated",
   });
 }
+    if (req.user?.role === "site_engineer" && !(await isAssignedProject(userId, projectId))) {
+      return res.status(403).json({ error: "Select a project assigned to you" });
+    }
 
     const parsedItems =
       typeof items === "string" ? JSON.parse(items) : items;
@@ -356,12 +380,20 @@ exports.updateFullRequest = async (req, res) => {
     }
 
     const check = await pool.query(
-      "SELECT status, created_by FROM material_requests WHERE id=$1",
+      "SELECT status, created_by, project_id FROM material_requests WHERE id=$1",
       [id]
     );
 
     if (!check.rows.length) {
       return res.status(404).json({ error: "Request not found" });
+    }
+
+    if (
+      req.user?.role === "site_engineer" &&
+      (!(await isAssignedProject(req.user.id, check.rows[0].project_id)) ||
+        !(await isAssignedProject(req.user.id, projectId)))
+    ) {
+      return res.status(403).json({ error: "Request must remain within your assigned projects" });
     }
 
     if (
@@ -427,12 +459,19 @@ exports.deleteRequest = async (req, res) => {
     const { id } = req.params;
 
     const check = await pool.query(
-      "SELECT status, created_by FROM material_requests WHERE id=$1",
+      "SELECT status, created_by, project_id FROM material_requests WHERE id=$1",
       [id]
     );
 
     if (!check.rows.length) {
       return res.status(404).json({ error: "Not found" });
+    }
+
+    if (
+      req.user?.role === "site_engineer" &&
+      !(await isAssignedProject(req.user.id, check.rows[0].project_id))
+    ) {
+      return res.status(404).json({ error: "Request not found" });
     }
 
     if (
@@ -480,6 +519,7 @@ exports.addDelivery = async (req, res) => {
     const check = await pool.query(
       `SELECT
          id,
+         project_id,
          status,
          total_qty,
          delivered_qty,
@@ -496,6 +536,13 @@ exports.addDelivery = async (req, res) => {
     }
 
     const request = check.rows[0];
+
+    if (
+      req.user?.role === "site_engineer" &&
+      !(await isAssignedProject(req.user.id, request.project_id))
+    ) {
+      return res.status(404).json({ error: "Material request not found" });
+    }
 
     // Delivery can happen only after approval.
     if (request.status !== "approved") {
@@ -566,6 +613,7 @@ exports.receiveMaterial = async (req, res) => {
     const check = await pool.query(
       `SELECT
          id,
+         project_id,
          status,
          total_qty,
          delivered_qty,
@@ -582,6 +630,13 @@ exports.receiveMaterial = async (req, res) => {
     }
 
     const request = check.rows[0];
+
+    if (
+      req.user?.role === "site_engineer" &&
+      !(await isAssignedProject(req.user.id, request.project_id))
+    ) {
+      return res.status(404).json({ error: "Material request not found" });
+    }
 
     // Site Engineer can receive only after approval.
     if (request.status !== "approved") {

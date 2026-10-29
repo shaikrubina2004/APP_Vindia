@@ -75,10 +75,6 @@ const canView = (moduleName) =>
   Array.isArray(accountantPermissions[moduleName]) &&
   accountantPermissions[moduleName].includes("view");
 
-const hasVerifyPermission =
-  Array.isArray(accountantPermissions.expenses) &&
-  accountantPermissions.expenses.includes("verify");
-
 const EMPTY_DASHBOARD = {
   financialOverview: {
     pendingInvoices: { count: 0, amount: 0 },
@@ -535,13 +531,13 @@ const AccountantDashboard = () => {
                 />
               )}
 
-              {(canView("expenses") || hasVerifyPermission) && (
+              {canView("expenses") && (
                 <OverviewCard
                   icon={Receipt}
-                  label="Expenses to Verify"
+                  label="Pending Expenses"
                   count={data.financialOverview.expensesAwaitingVerification.count}
                   amount={data.financialOverview.expensesAwaitingVerification.amount}
-                  subtitle="Awaiting verification"
+                  subtitle="Awaiting Finance Manager review"
                   tone="amber"
                 />
               )}

@@ -2,22 +2,10 @@
 import "./QuantitySurveyorDashboard.css";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState, useCallback } from "react";
-import axios from "axios";
+import api from "../../services/api";
 import { Chart, registerables } from "chart.js";
 import CheckInButton from "../../SharedResourse/CheckInButton";
-// ^ This import assumes QuantitySurveyorDashboard.jsx is 2 folders under
-// src/ (e.g. src/pages/QuantitySurveyor/QuantitySurveyorDashboard.jsx),
-// matching the other dashboards at that depth. If Vite complains the
-// file doesn't exist, recount the folders to src/ and adjust the "../".
 Chart.register(...registerables);
-
-const API = "http://localhost:5000";
-
-// ── Auth header helper ──────────────────────────────────────
-const authHeaders = () => {
-  const token = localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
 
 const timeAgo = (date) => {
   const seconds = Math.floor((new Date() - new Date(date)) / 1000);
@@ -69,16 +57,15 @@ export default function QuantitySurveyorDashboard() {
   // ── Fetch all data ──────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const headers = authHeaders();
 
     try {
       const [dashRes, costRes, qtyRes, boqRes, taskRes, incRes] = await Promise.allSettled([
-        axios.get(`${API}/api/qs/dashboard`,    { headers }),
-        axios.get(`${API}/api/cost-report`,     { headers }),
-        axios.get(`${API}/api/quantity-report`, { headers }),
-        axios.get(`${API}/api/boq`,             { headers }),
-        axios.get(`${API}/api/incidents/tasks`, { headers }),
-        axios.get(`${API}/api/incidents`,       { headers }),
+        api.get("/qs/dashboard"),
+        api.get("/cost-report"),
+        api.get("/quantity-report"),
+        api.get("/boq"),
+        api.get("/incidents/tasks"),
+        api.get("/incidents"),
       ]);
 
       if (dashRes.status === "fulfilled") setDashboard(dashRes.value.data?.data);

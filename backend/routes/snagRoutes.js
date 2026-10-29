@@ -5,6 +5,24 @@ const path = require("path");
 
 const pool = require("../config/db");
 const authMiddleware = require("../middleware/authMiddleware");
+const {
+  getAssignedProjectIds,
+  getManagedProjectIds,
+  isAssignedProject,
+  isManagedProject,
+} = require("../utils/siteEngineerAccess");
+
+async function getProjectScope(req) {
+  if (req.user?.role === "site_engineer") return getAssignedProjectIds(req.user.id);
+  if (req.user?.role === "project_manager") return getManagedProjectIds(req.user.id);
+  return null;
+}
+
+async function canManageProject(req, projectId) {
+  if (req.user?.role === "site_engineer") return isAssignedProject(req.user.id, projectId);
+  if (req.user?.role === "project_manager") return isManagedProject(req.user.id, projectId);
+  return true;
+}
 
 /* =========================
    MULTER
@@ -43,8 +61,14 @@ const upload = multer({
 
 router.get("/", authMiddleware, async (req, res) => {
   try {
+    const scope = await getProjectScope(req);
+    if (scope && !scope.length) return res.json([]);
     const result = await pool.query(
-      "SELECT * FROM snags ORDER BY id DESC"
+      `SELECT *
+         FROM snags
+        ${scope ? "WHERE project_id = ANY($1::INTEGER[])" : ""}
+        ORDER BY id DESC`,
+      scope ? [scope] : []
     );
 
     res.json(result.rows);
@@ -70,9 +94,17 @@ router.post("/", authMiddleware, async (req, res) => {
     drawing_ref,
     grid_ref,
     due_date,
+    project_id,
   } = req.body;
 
   try {
+    const projectId = Number(project_id);
+    if (!Number.isInteger(projectId) || projectId <= 0) {
+      return res.status(400).json({ message: "A valid project_id is required." });
+    }
+    if (!(await canManageProject(req, projectId))) {
+      return res.status(403).json({ message: "You cannot create a snag for this project." });
+    }
     const result = await pool.query(
       `INSERT INTO snags
       (
@@ -83,10 +115,11 @@ router.post("/", authMiddleware, async (req, res) => {
         drawing_ref,
         grid_ref,
         due_date,
+        project_id,
         raised_by,
         raised_date
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
       RETURNING *`,
       [
         title,
@@ -96,7 +129,8 @@ router.post("/", authMiddleware, async (req, res) => {
         drawing_ref,
         grid_ref,
         due_date,
-        String(req.user?.id || ""),
+        projectId,
+        Number(req.user.id),
         new Date(),
       ]
     );
@@ -132,12 +166,10 @@ router.patch(
     } = req.body;
 
     try {
-      const existing = await pool.query(
-        "SELECT * FROM snags WHERE id = $1",
-        [id]
-      );
+      const existing = await pool.query("SELECT * FROM snags WHERE id = $1", [id]);
 
-      if (!existing.rows.length) {
+      if (!existing.rows.length ||
+          !(await canManageProject(req, existing.rows[0].project_id))) {
         return res.status(404).json({
           message: "Snag not found",
         });

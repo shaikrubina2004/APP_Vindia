@@ -33,8 +33,10 @@ export default function BankReconciliation() {
   const [search, setSearch] = useState("");
 
   const [loading, setLoading] = useState(true);
+  const [bankAccountsLoading, setBankAccountsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [bankAccountError, setBankAccountError] = useState("");
   const [formError, setFormError] = useState("");
 
   const [showCreate, setShowCreate] = useState(false);
@@ -59,18 +61,6 @@ export default function BankReconciliation() {
       const response = await accountantService.getBankReconciliations(filters);
       const rows = getList(response);
       setRecords(rows);
-
-      // Do not require an extra endpoint for the page to work.
-      // If the service exposes configured finance bank accounts, use it;
-      // otherwise the reconciliation register still remains fully usable.
-      if (typeof accountantService.getBankAccounts === "function") {
-        try {
-          const accountResponse = await accountantService.getBankAccounts();
-          setBankAccounts(getList(accountResponse));
-        } catch {
-          setBankAccounts([]);
-        }
-      }
     } catch (err) {
       setError(
         err?.response?.data?.message ||
@@ -83,9 +73,31 @@ export default function BankReconciliation() {
     }
   }, [statusFilter, accountFilter]);
 
+  const loadBankAccounts = useCallback(async () => {
+    setBankAccountsLoading(true);
+    setBankAccountError("");
+    try {
+      const response = await accountantService.getBankAccounts();
+      setBankAccounts(getList(response));
+    } catch (err) {
+      setBankAccountError(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message ||
+          "Failed to load configured bank accounts."
+      );
+    } finally {
+      setBankAccountsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    loadBankAccounts();
+  }, [loadBankAccounts]);
 
   const visibleRecords = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -244,6 +256,7 @@ export default function BankReconciliation() {
           <button
             type="button"
             className="br-primary-button"
+            disabled={bankAccountsLoading || bankAccounts.length === 0}
             onClick={() => {
               resetForm();
               setShowCreate(true);
@@ -253,6 +266,15 @@ export default function BankReconciliation() {
           </button>
         </div>
       </section>
+
+      {bankAccountError && (
+        <div className="br-alert" role="alert">{bankAccountError}</div>
+      )}
+      {!bankAccountError && !bankAccountsLoading && bankAccounts.length === 0 && (
+        <div className="br-alert" role="status">
+          No bank accounts are configured. Ask a Finance Manager to add one in Finance Settings before starting a reconciliation.
+        </div>
+      )}
 
       {error && <div className="br-alert">{error}</div>}
 
@@ -461,10 +483,8 @@ export default function BankReconciliation() {
             <form onSubmit={handleCreate}>
               <div className="br-form-grid">
                 <label>
-                  <span>Bank Account ID</span>
-                  <input
-                    type="number"
-                    min="1"
+                  <span>Bank Account</span>
+                  <select
                     value={form.bank_account_id}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -472,9 +492,18 @@ export default function BankReconciliation() {
                         bank_account_id: event.target.value,
                       }))
                     }
-                    placeholder="Configured finance bank account ID"
                     required
-                  />
+                    disabled={bankAccountsLoading || bankAccounts.length === 0}
+                  >
+                    <option value="">
+                      {bankAccountsLoading ? "Loading accounts…" : "Select a configured account"}
+                    </option>
+                    {bankAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.bank_name} ···· {account.account_last4}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label>

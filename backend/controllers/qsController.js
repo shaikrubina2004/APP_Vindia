@@ -83,7 +83,27 @@ exports.getNotifications = async (req, res) => {
 ═══════════════════════════════════════════════════════ */
 exports.getProjects = async (req, res) => {
   try {
-    const { rows } = await pool.query(`SELECT * FROM projects`);
+    const role = String(req.user?.role || "").trim().toLowerCase();
+    const values = [];
+    let where = "WHERE p.status IS DISTINCT FROM 'Archived'";
+
+    if (role === "site_engineer") {
+      values.push(req.user.id);
+      where += ` AND p.site_engineer_id = $${values.length}`;
+    } else if (role === "project_manager") {
+      const { rows: employees } = await pool.query(
+        `SELECT id FROM employees WHERE user_id = $1 LIMIT 1`,
+        [req.user.id]
+      );
+      if (!employees.length) return res.json({ success: true, data: [] });
+      values.push(employees[0].id);
+      where += ` AND p.manager_id = $${values.length}`;
+    }
+
+    const { rows } = await pool.query(
+      `SELECT p.id, p.name FROM projects p ${where} ORDER BY p.name`,
+      values
+    );
     res.json({ success: true, data: rows });
   } catch (err) {
     console.error("QS Projects Error:", err);
@@ -104,8 +124,19 @@ exports.getDailyUpdates = async (req, res) => {
       SELECT d.*, p.name AS project_name
       FROM qs_daily_updates d
       JOIN projects p ON d.project_id = p.id
+      WHERE (
+        $1 IN ('quantity_surveyor', 'ceo')
+        OR ($1 = 'site_engineer' AND p.site_engineer_id = $2)
+        OR ($1 = 'project_manager' AND EXISTS (
+          SELECT 1
+          FROM projects managed_project
+          JOIN employees manager ON manager.id = managed_project.manager_id
+          WHERE managed_project.id = d.project_id
+            AND manager.user_id = $2
+        ))
+      )
       ORDER BY d.created_at DESC
-    `);
+    `, [req.user.role, req.user.id]);
     res.json({ success: true, data: rows });
   } catch (err) {
     console.error("QS Daily Updates Error:", err);
@@ -118,7 +149,24 @@ exports.getDailyUpdateById = async (req, res) => {
   const { id } = req.params;
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM qs_daily_updates WHERE id=$1`, [id]
+      `SELECT d.* FROM qs_daily_updates d
+       WHERE d.id = $1
+         AND EXISTS (
+           SELECT 1
+           FROM projects p
+           WHERE p.id = d.project_id
+             AND (
+               $2 IN ('quantity_surveyor', 'ceo')
+               OR ($2 = 'site_engineer' AND p.site_engineer_id = $3)
+               OR ($2 = 'project_manager' AND EXISTS (
+                 SELECT 1
+                 FROM employees manager
+                 WHERE manager.id = p.manager_id
+                   AND manager.user_id = $3
+               ))
+             )
+         )`,
+      [id, req.user.role, req.user.id]
     );
     if (!rows.length) {
       return res.status(404).json({ success: false, message: "Not found" });

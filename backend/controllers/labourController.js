@@ -1,6 +1,7 @@
 // backend/controllers/labourController.js
 
 const pool = require("../config/db");
+const { isAssignedProject, getAssignedProjectIds } = require("../utils/siteEngineerAccess");
 
 /* =========================================================
    CREATE WORKER
@@ -27,6 +28,14 @@ exports.createWorker = async (req, res) => {
       return res.status(400).json({
         error: "Missing required fields",
       });
+    }
+
+    if (req.user?.role === "site_engineer") {
+      if (!(await isAssignedProject(createdBy, body.project_id))) {
+        return res.status(403).json({
+          error: "Select a project assigned to you",
+        });
+      }
     }
 
     /* Duplicate ID check */
@@ -148,6 +157,16 @@ exports.updateWorker = async (req, res) => {
     }
 
     const old = existing.rows[0];
+    if (req.user?.role === "site_engineer") {
+      if (
+        !(await isAssignedProject(req.user.id, old.project_id)) ||
+        !(await isAssignedProject(req.user.id, body.project_id))
+      ) {
+        return res.status(403).json({
+          error: "Workers can only be edited within your assigned projects",
+        });
+      }
+    }
 
     /* Files */
     const photo =
@@ -275,6 +294,16 @@ exports.getWorkers = async (req, res) => {
          ORDER BY w.created_at DESC`,
         [req.user.id, projectFilter]
       );
+    } else if (req.user?.role === "site_engineer") {
+      result = await pool.query(
+        `SELECT w.*
+         FROM workers w
+         WHERE w.is_deleted IS NOT TRUE
+           AND w.project_id = ANY($1::int[])
+           AND ($2::int IS NULL OR w.project_id = $2)
+         ORDER BY w.created_at DESC`,
+        [await getAssignedProjectIds(req.user.id), projectFilter]
+      );
     } else {
       result = await pool.query(
         `SELECT *
@@ -318,6 +347,7 @@ exports.updateStatus = async (req, res) => {
     }
 
     const isPM = req.user?.role === "project_manager";
+    const isSiteEngineer = req.user?.role === "site_engineer";
     const result = await pool.query(
       `UPDATE workers
        SET
@@ -326,8 +356,9 @@ exports.updateStatus = async (req, res) => {
        WHERE id = $2
        AND is_deleted IS NOT TRUE
        ${isPM ? `AND project_id IN (${PM_PROJECT_IDS.replace("$1", "$3")})` : ""}
+       ${isSiteEngineer ? "AND project_id IN (SELECT id FROM projects WHERE site_engineer_id = $3)" : ""}
        RETURNING *`,
-      isPM ? [status, id, req.user.id] : [status, id]
+      isPM || isSiteEngineer ? [status, id, req.user.id] : [status, id]
     );
 
     if (!result.rows.length) {
@@ -361,13 +392,14 @@ exports.deleteWorker = async (req, res) => {
         updated_at = NOW()
        WHERE id = $1
        AND is_deleted IS NOT TRUE
+       AND project_id IN (${PM_PROJECT_IDS.replace("$1", "$2")})
        RETURNING id`,
-      [id]
+      [id, req.user.id]
     );
 
     if (!result.rows.length) {
       return res.status(404).json({
-        error: "Worker not found",
+        error: "Worker not found or not in a project you manage",
       });
     }
 

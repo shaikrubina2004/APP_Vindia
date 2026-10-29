@@ -28,6 +28,7 @@ const bankReconciliationController = require("../controllers/bankReconciliationC
 const taxRegisterController = require("../controllers/taxRegisterController");
 const pettyCashController = require("../controllers/pettyCashController");
 const financeWbsController = require("../controllers/financeWbsController");
+const financeSettingsController = require("../controllers/financeSettingsController");
 
 // Accountant + Finance Manager + CEO can enter these APIs
 router.use(
@@ -43,6 +44,7 @@ router.use(
    every finance create/edit form.
    ============================================================ */
 router.get("/wbs", financeWbsController.getFinanceWbsOptions);
+router.get("/bank-accounts", financeSettingsController.getBankAccountOptions);
 
 /* Dashboard
    Phase 4A: dedicated Accountant dashboard (task-oriented view),

@@ -1,6 +1,21 @@
 const pool = require("../config/db");
 const { notifyCEO } = require("./ceoNotificationsController");
 
+const managedProjectNameAccess = (projectNameExpression, userPlaceholder) => `
+  EXISTS (
+    SELECT 1
+    FROM projects managed_project
+    JOIN employees manager ON manager.id = managed_project.manager_id
+    WHERE managed_project.name = ${projectNameExpression}
+      AND manager.user_id = ${userPlaceholder}
+  )
+`;
+
+const reportProjectAccess = (projectNameExpression, rolePlaceholder, userPlaceholder) => `
+  (${rolePlaceholder} <> 'project_manager'
+    OR ${managedProjectNameAccess(projectNameExpression, userPlaceholder)})
+`;
+
 /* =========================================================
    ➕ CREATE MANUAL REPORT (PM or others)
 ========================================================= */
@@ -18,6 +33,19 @@ exports.createReport = async (req, res) => {
 
     if (!project_name || !date) {
       return res.status(400).json({ error: "project_name and date are required" });
+    }
+
+    const project = await pool.query(
+      `SELECT p.id FROM projects p
+       WHERE p.name = $1
+         AND ($2 <> 'project_manager' OR EXISTS (
+           SELECT 1 FROM employees manager
+           WHERE manager.id = p.manager_id AND manager.user_id = $3
+         ))`,
+      [project_name, req.user.role, req.user.id]
+    );
+    if (!project.rows.length) {
+      return res.status(404).json({ error: "Project not found or not managed by you" });
     }
 
     const result = await pool.query(
@@ -45,90 +73,20 @@ exports.createReport = async (req, res) => {
 };
 
 /* =========================================================
-   📋 GET ALL REPORTS (MAIN FIX — COMBINED DATA)
+   📋 GET ALL MANUAL PROJECT REPORTS
 ========================================================= */
 exports.getAllReports = async (req, res) => {
   try {
-    // 🔹 1. SITE ENGINEER DIARY DATA
-    const diary = await pool.query(`
-      SELECT
-        d.id,
-        d.report_date AS date,
-        d.zone AS phase,
-        d.work_done,
-        d.issues,
-        d.delay_type,
-        d.delay_description,
-        d.labour_total,
-        d.materials,
-
-        u.name AS submitted_by,
-        p.name AS project_name,
-
-        d.created_at
-
-      FROM site_engineer_daily_updates d
-      JOIN users u ON u.id = d.submitted_by
-      JOIN projects p ON p.id = d.project_id
-    `);
-
-    // 🔹 2. MANUAL REPORTS (PM / others)
-    const reports = await pool.query(`
-      SELECT *
-      FROM daily_reports
-    `);
-
-    // 🔥 MERGE BOTH
-    const combined = [
-
-      // 🟢 Convert diary → PM format
-      ...diary.rows.map(r => ({
-        id: `diary-${r.id}`,
-        project_name: r.project_name,
-        date: r.date,
-        phase: r.phase,
-        overall_status: r.delay_type ? "delayed" : "on-track",
-        submitted_by: r.submitted_by,
-        submission_time: r.created_at,
-        approved: false,
-
-        data: {
-          workItems: [
-            {
-              activity: r.work_done,
-              location: r.phase,
-              status: "done"
-            }
-          ],
-
-          issues: r.issues
-            ? [{ issue: r.issues }]
-            : [],
-
-          materials: r.materials || [],
-
-          progress: {
-            overall: r.labour_total || 0
-          },
-
-          delay: r.delay_type,
-          delay_description: r.delay_description
-        }
-      })),
-
-      // 🔵 Manual reports (existing)
-      ...reports.rows.map(r => ({
-        ...r,
-        data: typeof r.data === "string"
-          ? JSON.parse(r.data)
-          : r.data
-      }))
-    ];
-
-    // 🔥 SORT BY DATE (latest first)
-    combined.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    res.status(200).json(combined);
+    const reports = await pool.query(
+      `SELECT * FROM daily_reports
+       WHERE ${reportProjectAccess("project_name", "$1", "$2")}
+       ORDER BY date DESC`,
+      [req.user.role, req.user.id]
+    );
+    res.status(200).json(reports.rows.map((report) => ({
+      ...report,
+      data: typeof report.data === "string" ? JSON.parse(report.data) : report.data,
+    })));
 
   } catch (error) {
     console.error("FETCH ERROR:", error);
@@ -144,8 +102,9 @@ exports.getReportById = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT * FROM daily_reports WHERE id = $1`,
-      [id]
+      `SELECT * FROM daily_reports
+       WHERE id = $1 AND ${reportProjectAccess("project_name", "$2", "$3")}`,
+      [id, req.user.role, req.user.id]
     );
 
     if (!result.rows.length) {
@@ -178,10 +137,14 @@ exports.approveReport = async (req, res) => {
       `UPDATE daily_reports
        SET approved = true
        WHERE id = $1
+         AND ${reportProjectAccess("project_name", "$2", "$3")}
        RETURNING *`,
-      [id]
+      [id, req.user.role, req.user.id]
     );
 
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Report not found or not in a project you manage" });
+    }
     res.status(200).json(result.rows[0]);
 
   } catch (error) {
@@ -207,6 +170,19 @@ exports.updateReport = async (req, res) => {
   } = req.body;
 
   try {
+    const project = await pool.query(
+      `SELECT p.id FROM projects p
+       WHERE p.name = $1
+         AND ($2 <> 'project_manager' OR EXISTS (
+           SELECT 1 FROM employees manager
+           WHERE manager.id = p.manager_id AND manager.user_id = $3
+         ))`,
+      [project_name, req.user.role, req.user.id]
+    );
+    if (!project.rows.length) {
+      return res.status(404).json({ error: "Project not found or not managed by you" });
+    }
+
     const result = await pool.query(
       `UPDATE daily_reports
        SET project_name = $1,
@@ -217,6 +193,7 @@ exports.updateReport = async (req, res) => {
            submission_time = $6,
            data = $7
        WHERE id = $8
+         AND ${reportProjectAccess("project_name", "$9", "$10")}
        RETURNING *`,
       [
         project_name,
@@ -226,10 +203,15 @@ exports.updateReport = async (req, res) => {
         submitted_by,
         submission_time,
         JSON.stringify(data || {}),
-        id
+        id,
+        req.user.role,
+        req.user.id
       ]
     );
 
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Report not found or not in a project you manage" });
+    }
     res.status(200).json(result.rows[0]);
 
   } catch (error) {
@@ -245,11 +227,17 @@ exports.deleteReport = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await pool.query(
-      `DELETE FROM daily_reports WHERE id = $1`,
-      [id]
+    const result = await pool.query(
+      `DELETE FROM daily_reports
+       WHERE id = $1
+         AND ${reportProjectAccess("project_name", "$2", "$3")}
+       RETURNING id`,
+      [id, req.user.role, req.user.id]
     );
 
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Report not found or not in a project you manage" });
+    }
     res.status(200).json({ message: "Deleted successfully" });
 
   } catch (error) {
@@ -268,8 +256,9 @@ exports.sendToCeo = async (req, res) => {
       `UPDATE daily_reports
        SET sent_to_ceo = TRUE, sent_to_ceo_at = NOW()
        WHERE id = $1
+         AND ${reportProjectAccess("project_name", "$2", "$3")}
        RETURNING id, project_name, phase, overall_status, submitted_by, sent_to_ceo, sent_to_ceo_at`,
-      [req.params.id]
+      [req.params.id, req.user.role, req.user.id]
     );
     if (!rows.length) return res.status(404).json({ error: "Report not found" });
 

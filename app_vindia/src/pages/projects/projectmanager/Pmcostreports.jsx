@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import api from "../../../services/api";
 
 /* ── All styles embedded — no external CSS file needed ────── */
 const STYLES = `
@@ -152,9 +153,6 @@ const STYLES = `
 .pmcr__cal-leg-dot{width:10px;height:10px;border-radius:2px;}
 `;
 
-const CR_API  = "/api/cost-report";
-const BOQ_API = "/api/boq";
-
 const STATUS = {
   pending_pm: { label: "Awaiting Review",  color: "amber", icon: "⏳" },
   approved:   { label: "Approved",          color: "green", icon: "✅" },
@@ -301,10 +299,11 @@ export default function PMCostReports() {
   };
 
   useEffect(() => {
-    fetch(`${BOQ_API}/projects`)
-      .then(r => r.json())
-      .then(setProjects)
-      .catch(() => {});
+    api.get("/boq/projects")
+      .then(({ data }) => setProjects(data))
+      .catch((err) => {
+        notify(`Could not load projects: ${err.response?.data?.error || err.message}`, "error");
+      });
   }, []);
 
   const fetchReports = useCallback(async () => {
@@ -313,12 +312,10 @@ export default function PMCostReports() {
       const params = new URLSearchParams();
       if (filterProject) params.append("projectId", filterProject);
       if (filterStatus)  params.append("status",    filterStatus);
-      const res  = await fetch(`${CR_API}?${params}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
+      const { data } = await api.get("/cost-report", { params });
       setReports(data);
     } catch (err) {
-      notify("Could not load reports: " + err.message, "error");
+      notify("Could not load reports: " + (err.response?.data?.error || err.message), "error");
     } finally {
       setLoading(false);
     }
@@ -331,36 +328,35 @@ export default function PMCostReports() {
   useEffect(() => {
     const params = new URLSearchParams();
     if (filterProject) params.append("projectId", filterProject);
-    fetch(`${CR_API}?${params}`)
-      .then(r => r.json())
-      .then(data => Array.isArray(data) ? setAllReports(data) : setAllReports([]))
-      .catch(() => setAllReports([]));
+    api.get("/cost-report", { params })
+      .then(({ data }) => setAllReports(Array.isArray(data) ? data : []))
+      .catch((err) => {
+        setAllReports([]);
+        notify(`Could not load report calendar: ${err.response?.data?.error || err.message}`, "error");
+      });
   }, [filterProject]);
 
   const openDetail = async (report) => {
     setViewingReport(report);
     try {
-      const res  = await fetch(`${CR_API}/${report.id}`);
-      const data = await res.json();
-      if (res.ok) setViewingReport(data);
-    } catch (_) {}
+      const { data } = await api.get(`/cost-report/${report.id}`);
+      setViewingReport(data);
+    } catch (err) {
+      notify(`Could not load report details: ${err.response?.data?.error || err.message}`, "error");
+    }
   };
 
   const handleApprove = async (id) => {
     setSubmitting(true);
     try {
-      const res  = await fetch(`${CR_API}/approve/${id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
+      await api.put(`/cost-report/approve/${id}`, {});
       notify("✅ Cost Report approved — BOQ moved to SE stage");
       fetchReports();
       if (viewingReport?.id === id) {
-        const r = await fetch(`${CR_API}/${id}`);
-        setViewingReport(await r.json());
+        const { data } = await api.get(`/cost-report/${id}`);
+        setViewingReport(data);
       }
-    } catch (err) { notify(err.message, "error"); }
+    } catch (err) { notify(err.response?.data?.error || err.message, "error"); }
     finally { setSubmitting(false); }
   };
 
@@ -372,21 +368,16 @@ export default function PMCostReports() {
     const id = rejectModal.id;
     setSubmitting(true);
     try {
-      const res  = await fetch(`${CR_API}/reject/${id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ comment: rejectComment.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
+      await api.put(`/cost-report/reject/${id}`, { comment: rejectComment.trim() });
       notify("↩️ Report rejected — message sent to Quantity Surveyor");
       setRejectModal(null);
       setRejectComment("");
       fetchReports();
       if (viewingReport?.id === id) {
-        const r = await fetch(`${CR_API}/${id}`);
-        setViewingReport(await r.json());
+        const { data } = await api.get(`/cost-report/${id}`);
+        setViewingReport(data);
       }
-    } catch (err) { notify(err.message, "error"); }
+    } catch (err) { notify(err.response?.data?.error || err.message, "error"); }
     finally { setSubmitting(false); }
   };
 

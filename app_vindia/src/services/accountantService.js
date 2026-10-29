@@ -122,6 +122,7 @@ const accountantService = {
   // ============================================================
   getFinanceWbs: (projectId) =>
     api.get(`${ACCOUNTANT_BASE_URL}/wbs`, { params: { project_id: projectId } }),
+  getBankAccounts: () => api.get(`${ACCOUNTANT_BASE_URL}/bank-accounts`),
 
   // ============================================================
   // GENERAL LEDGER (derived, read-only — Decision 2)

@@ -1,9 +1,10 @@
 // QSNotificationBell.jsx
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "../../services/api";
 import "./QSNotificationBell.css";
 
-const API = "http://localhost:5000/api/qs/notifications";
+const API = "/qs/notifications";
 
 /* ── Type config ─────────────────────────────────────────────── */
 const TYPE_CONFIG = {
@@ -85,8 +86,8 @@ export default function QSNotificationBell() {
     setLoading(true);
     setError(null);
     try {
-      const res  = await fetch(API);
-      const data = await res.json();
+      const res = await api.get(API);
+      const data = res.data;
       if (data.success && Array.isArray(data.data)) {
         // Only keep unread ones — read notifications never appear in the bell
         setNotifications(
@@ -106,8 +107,8 @@ export default function QSNotificationBell() {
       } else {
         setError("Failed to load");
       }
-    } catch {
-      setError("Network error");
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to load notifications");
     } finally {
       setLoading(false);
     }
@@ -133,25 +134,25 @@ export default function QSNotificationBell() {
   /* ── Actions ──────────────────────────────────────────────── */
   const markAllRead = async () => {
     try {
-      await fetch(`${API}/mark-all-read`, { method: "PUT" });
+      await api.put(`${API}/mark-all-read`);
       // Remove ALL from local state — list becomes empty
       setNotifications([]);
-    } catch { /* silent */ }
+    } catch {
+      setError("Failed to mark notifications as read");
+    }
   };
 
   const handleNotificationClick = async (n) => {
-    // 1. Remove from local list immediately — it disappears from the bell right away
-    setNotifications((prev) => prev.filter((x) => x.id !== n.id));
-
-    // 2. Mark as read in DB (awaited so re-fetch won't bring it back)
     try {
-      await fetch(`${API}/${n.id}/read`, { method: "PUT" });
-    } catch { /* silent */ }
+      await api.put(`${API}/${n.id}/read`);
+      setNotifications((prev) => prev.filter((x) => x.id !== n.id));
+    } catch {
+      setError("Failed to mark notification as read");
+      return;
+    }
 
-    // 3. Close panel
     setOpen(false);
 
-    // 4. Navigate to the relevant page
     const cfg   = TYPE_CONFIG[n.type];
     const route = cfg ? cfg.route(n) : "/quantity-surveyor/incident";
     navigate(route);

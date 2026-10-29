@@ -4,6 +4,21 @@
 const pool = require("../config/db");
 const { createNotificationDirect } = require("./qsNotificationController");
 
+const managedProjectAccess = (projectExpression, userPlaceholder) => `
+  EXISTS (
+    SELECT 1
+    FROM projects managed_project
+    JOIN employees manager ON manager.id = managed_project.manager_id
+    WHERE managed_project.id = ${projectExpression}
+      AND manager.user_id = ${userPlaceholder}
+  )
+`;
+
+const pmProjectFilter = (projectExpression, rolePlaceholder, userPlaceholder) => `
+  (${rolePlaceholder} <> 'project_manager'
+    OR ${managedProjectAccess(projectExpression, userPlaceholder)})
+`;
+
 // ── Auto-create / migrate table ───────────────────────────────────────────────
 (async () => {
   try {
@@ -117,15 +132,17 @@ exports.getAllReports = async (req, res) => {
   try {
     const { projectId, status, boqId } = req.query;
     const conditions = [];
-    const values     = [];
+    const values     = [req.user.role, req.user.id];
 
-    if (projectId) { values.push(projectId); conditions.push(`project_id = $${values.length}`); }
-    if (status)    { values.push(status);    conditions.push(`status = $${values.length}`);     }
-    if (boqId)     { values.push(boqId);     conditions.push(`boq_id = $${values.length}`);    }
+    conditions.push(pmProjectFilter("cr.project_id", "$1", "$2"));
+
+    if (projectId) { values.push(projectId); conditions.push(`cr.project_id = $${values.length}`); }
+    if (status)    { values.push(status);    conditions.push(`cr.status = $${values.length}`); }
+    if (boqId)     { values.push(boqId);     conditions.push(`cr.boq_id = $${values.length}`); }
 
     const where  = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const result = await pool.query(
-      `SELECT * FROM cost_reports ${where} ORDER BY created_at DESC`, values
+      `SELECT cr.* FROM cost_reports cr ${where} ORDER BY cr.created_at DESC`, values
     );
     res.json(result.rows.map(formatReport));
   } catch (err) {
@@ -140,7 +157,9 @@ exports.getAllReports = async (req, res) => {
 exports.getReportById = async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM cost_reports WHERE id = $1", [req.params.id]
+      `SELECT cr.* FROM cost_reports cr
+       WHERE cr.id = $1 AND ${pmProjectFilter("cr.project_id", "$2", "$3")}`,
+      [req.params.id, req.user.role, req.user.id]
     );
     if (!result.rows.length) {
       return res.status(404).json({ error: "Cost report not found" });
@@ -163,16 +182,36 @@ exports.createReport = async (req, res) => {
       materialTotal, labourTotal, totalCost,
     } = req.body;
 
-    if (!projectId || !milestoneId || !boqId) {
+    const numericProjectId = Number(projectId);
+    if (
+      !Number.isInteger(numericProjectId) || numericProjectId <= 0 ||
+      !Number.isInteger(Number(milestoneId)) || Number(milestoneId) <= 0 ||
+      !Number.isInteger(Number(boqId)) || Number(boqId) <= 0
+    ) {
       return res.status(400).json({ error: "projectId, milestoneId and boqId are required" });
     }
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "items must be a non-empty array" });
     }
 
-    const boqCheck = await pool.query("SELECT id, status FROM boqs WHERE id = $1", [boqId]);
+    const projectCheck = await pool.query(
+      `SELECT p.id FROM projects p
+       WHERE p.id = $1 AND ${pmProjectFilter("p.id", "$2", "$3")}`,
+      [numericProjectId, req.user.role, req.user.id]
+    );
+    if (!projectCheck.rows.length) {
+      return res.status(404).json({ error: "Project not found or not managed by you" });
+    }
+
+    const boqCheck = await pool.query(
+      "SELECT id, status, project_id FROM boqs WHERE id = $1",
+      [boqId]
+    );
     if (!boqCheck.rows.length) {
       return res.status(404).json({ error: "Linked BOQ not found" });
+    }
+    if (Number(boqCheck.rows[0].project_id) !== numericProjectId) {
+      return res.status(400).json({ error: "Linked BOQ must belong to the selected project" });
     }
     if (boqCheck.rows[0].status !== "pending_pm") {
       return res.status(400).json({
@@ -206,7 +245,7 @@ exports.createReport = async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending_pm')
        RETURNING id`,
       [
-        projectId, projectName, milestoneId, milestoneName,
+        numericProjectId, projectName, milestoneId, milestoneName,
         boqId,
         JSON.stringify(items),
         JSON.stringify(safeLabourItems),
@@ -239,8 +278,24 @@ exports.updateReport = async (req, res) => {
       materialTotal, labourTotal, totalCost,
     } = req.body;
 
-    const check = await pool.query("SELECT status FROM cost_reports WHERE id = $1", [id]);
+    const check = await pool.query(
+      `SELECT cr.project_id, cr.status FROM cost_reports cr
+       WHERE cr.id = $1 AND ${pmProjectFilter("cr.project_id", "$2", "$3")}`,
+      [id, req.user.role, req.user.id]
+    );
     if (!check.rows.length) return res.status(404).json({ error: "Cost report not found" });
+    const newProjectId = projectId == null ? Number(check.rows[0].project_id) : Number(projectId);
+    if (!Number.isInteger(newProjectId) || newProjectId <= 0) {
+      return res.status(400).json({ error: "Invalid projectId" });
+    }
+    const projectCheck = await pool.query(
+      `SELECT p.id FROM projects p
+       WHERE p.id = $1 AND ${pmProjectFilter("p.id", "$2", "$3")}`,
+      [newProjectId, req.user.role, req.user.id]
+    );
+    if (!projectCheck.rows.length) {
+      return res.status(404).json({ error: "Project not found or not managed by you" });
+    }
     if (check.rows[0].status === "approved") {
       return res.status(403).json({ error: "Cannot edit an approved cost report" });
     }
@@ -248,7 +303,7 @@ exports.updateReport = async (req, res) => {
     const safeLabourItems = Array.isArray(labourItems) ? labourItems : [];
 
     const result = await pool.query(
-      `UPDATE cost_reports
+      `UPDATE cost_reports AS cr
        SET project_id     = COALESCE($1,  project_id),
            project_name   = COALESCE($2,  project_name),
            milestone_id   = COALESCE($3,  milestone_id),
@@ -263,7 +318,8 @@ exports.updateReport = async (req, res) => {
            pm_comment     = '',
            updated_date   = CURRENT_DATE,
            updated_at     = NOW()
-       WHERE id = $11
+       WHERE cr.id = $11
+         AND ${pmProjectFilter("cr.project_id", "$12", "$13")}
        RETURNING id, status`,
       [
         projectId, projectName, milestoneId, milestoneName, boqId,
@@ -273,6 +329,8 @@ exports.updateReport = async (req, res) => {
         labourTotal   || null,
         totalCost     || null,
         id,
+        req.user.role,
+        req.user.id,
       ]
     );
 
@@ -293,11 +351,12 @@ exports.updateReport = async (req, res) => {
 exports.approveReport = async (req, res) => {
   try {
     const result = await pool.query(
-      `UPDATE cost_reports
+      `UPDATE cost_reports AS cr
        SET status = 'approved', pm_comment = '', updated_at = NOW()
-       WHERE id = $1 AND status = 'pending_pm'
+       WHERE cr.id = $1 AND cr.status = 'pending_pm'
+         AND ${pmProjectFilter("cr.project_id", "$2", "$3")}
        RETURNING id, status, boq_id, project_name, milestone_name`,
-      [req.params.id]
+      [req.params.id, req.user.role, req.user.id]
     );
     if (!result.rows.length) {
       return res.status(404).json({ error: "Cost report not found or not awaiting PM approval" });
@@ -341,11 +400,12 @@ exports.rejectReport = async (req, res) => {
     const note = comment || "Please review the cost figures.";
 
     const result = await pool.query(
-      `UPDATE cost_reports
+      `UPDATE cost_reports AS cr
        SET status = 'rejected', pm_comment = $1, updated_at = NOW()
-       WHERE id = $2 AND status = 'pending_pm'
+       WHERE cr.id = $2 AND cr.status = 'pending_pm'
+         AND ${pmProjectFilter("cr.project_id", "$3", "$4")}
        RETURNING id, status, boq_id, project_name, milestone_name`,
-      [note, req.params.id]
+      [note, req.params.id, req.user.role, req.user.id]
     );
     if (!result.rows.length) {
       return res.status(404).json({ error: "Cost report not found or not awaiting PM approval" });
@@ -385,12 +445,20 @@ exports.rejectReport = async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 exports.deleteReport = async (req, res) => {
   try {
-    const check = await pool.query("SELECT status FROM cost_reports WHERE id = $1", [req.params.id]);
+    const check = await pool.query(
+      `SELECT cr.status FROM cost_reports cr
+       WHERE cr.id = $1 AND ${pmProjectFilter("cr.project_id", "$2", "$3")}`,
+      [req.params.id, req.user.role, req.user.id]
+    );
     if (!check.rows.length) return res.status(404).json({ error: "Cost report not found" });
     if (check.rows[0].status === "approved") {
       return res.status(403).json({ error: "Cannot delete an approved cost report" });
     }
-    await pool.query("DELETE FROM cost_reports WHERE id = $1", [req.params.id]);
+    await pool.query(
+      `DELETE FROM cost_reports AS cr
+       WHERE cr.id = $1 AND ${pmProjectFilter("cr.project_id", "$2", "$3")}`,
+      [req.params.id, req.user.role, req.user.id]
+    );
     res.json({ message: "Cost report deleted", id: parseInt(req.params.id) });
   } catch (err) {
     console.error("deleteReport:", err.message);

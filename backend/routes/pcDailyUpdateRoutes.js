@@ -9,6 +9,7 @@ router.use(protect);
 
 // Only coordinators (and the CEO) may create / edit / delete updates.
 const writeAccess = requireRole("project_coordinator", "ceo");
+const reviewAccess = requireRole("project_manager", "ceo");
 
 // Coordinators may only touch their own updates; the CEO may touch any.
 const assertOwner = async (req, res, id) => {
@@ -120,13 +121,19 @@ router.post("/", writeAccess, async (req, res) => {
 /* =========================================================
    GET ALL UPDATES — ALL PROJECTS (for Project Manager)
 ========================================================= */
-router.get("/project/all", async (req, res) => {
+router.get("/project/all", reviewAccess, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT u.*, p.name AS project_name
        FROM pc_daily_updates u
        LEFT JOIN projects p ON u.project_id = p.id
-       ORDER BY u.date DESC, u.created_at DESC`
+       WHERE ($1 <> 'project_manager' OR EXISTS (
+         SELECT 1
+         FROM employees manager
+         WHERE manager.id = p.manager_id AND manager.user_id = $2
+       ))
+       ORDER BY u.date DESC, u.created_at DESC`,
+      [req.user.role, req.user.id]
     );
     res.json(result.rows);
   } catch (err) {

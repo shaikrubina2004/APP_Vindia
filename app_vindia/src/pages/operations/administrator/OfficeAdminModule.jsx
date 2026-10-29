@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Plus, RefreshCw, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import officeAdminService from "../../../services/officeAdminService";
@@ -33,19 +33,35 @@ export default function OfficeAdminModule({ module }) {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm[module] || {});
+  const [transaction, setTransaction] = useState(null);
+  const [transactionForm, setTransactionForm] = useState({
+    transaction_type: "restock",
+    quantity: "",
+    reason: "",
+  });
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true); setError("");
     try { const r = await cfg.get(); setRows(r.data?.data || []); }
     catch (e) { setError(e.response?.data?.error || "Unable to load this module."); }
     finally { setLoading(false); }
-  };
+  }, [cfg]);
 
-  useEffect(() => { setForm(emptyForm[module] || {}); setShowForm(false); load(); }, [module]);
+  useEffect(() => { setForm(emptyForm[module] || {}); setShowForm(false); load(); }, [module, load]);
 
   const save = async (e) => {
-    e.preventDefault(); setSaving(true); setError("");
+    e.preventDefault();
+    if (module === "supplies") {
+      const currentQty = Number(form.current_qty);
+      const minimumQty = Number(form.minimum_qty);
+      if (!Number.isFinite(currentQty) || currentQty < 0 || !Number.isFinite(minimumQty) || minimumQty < 0) {
+        setError("Current and minimum quantities must be zero or greater.");
+        return;
+      }
+    }
+
+    setSaving(true); setError("");
     try { await cfg.create(form); setShowForm(false); setForm(emptyForm[module] || {}); await load(); }
     catch (e) { setError(e.response?.data?.error || "Unable to save the record."); }
     finally { setSaving(false); }
@@ -60,33 +76,59 @@ export default function OfficeAdminModule({ module }) {
     } catch (e) { setError(e.response?.data?.error || "Unable to update status."); }
   };
 
+  const saveTransaction = async (e) => {
+    e.preventDefault();
+    const quantity = Number(transactionForm.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setError("Enter a quantity greater than zero.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      await officeAdminService.transactSupply(transaction.id, {
+        ...transactionForm,
+        quantity,
+      });
+      setTransaction(null);
+      setTransactionForm({ transaction_type: "restock", quantity: "", reason: "" });
+      await load();
+    } catch (e) {
+      setError(e.response?.data?.error || "Unable to record the supply transaction.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="oam-page">
       <header className="oam-header">
         <div><span>Office Administration</span><h1>{cfg.title}</h1><p>{cfg.subtitle}</p></div>
-        <div className="oam-actions"><Link to="/office-administrator/dashboard"><ArrowLeft size={15}/> Dashboard</Link><button onClick={load}><RefreshCw size={15}/> Refresh</button></div>
+        <div className="oam-actions"><Link to="/operations/administrator/dashboard"><ArrowLeft size={15}/> Dashboard</Link><button onClick={load}><RefreshCw size={15}/> Refresh</button></div>
       </header>
 
       <section className="oam-card">
         <div className="oam-card-head"><h2>{rows.length} record{rows.length === 1 ? "" : "s"}</h2><button className="oam-primary" onClick={() => setShowForm(true)}><Plus size={15}/> New {cfg.title.replace(/s$/i, "")}</button></div>
         {error && <div className="oam-inline-error">{error}</div>}
         {loading ? <div className="oam-state">Loading…</div> : rows.length === 0 ? <div className="oam-empty">No records have been created yet.</div> : (
-          <div className="oam-table-wrap"><table className="oam-table"><thead><tr>{cfg.columns.map(c => <th key={c}>{c.replaceAll("_", " ")}</th>)}{["requests","facilities","visitors"].includes(module) && <th>Action</th>}</tr></thead><tbody>
-            {rows.map((row, i) => <tr key={row.id ?? i}>{cfg.columns.map(c => <td key={c}>{fmt(row[c], c)}</td>)}{["requests","facilities","visitors"].includes(module) && <td><StatusAction module={module} row={row} onChange={updateStatus}/></td>}</tr>)}
+          <div className="oam-table-wrap"><table className="oam-table"><thead><tr>{cfg.columns.map(c => <th key={c}>{c.replaceAll("_", " ")}</th>)}{["requests","facilities","visitors","supplies"].includes(module) && <th>Action</th>}</tr></thead><tbody>
+            {rows.map((row, i) => <tr key={row.id ?? i}>{cfg.columns.map(c => <td key={c}>{fmt(row[c], c)}</td>)}{["requests","facilities","visitors"].includes(module) && <td><StatusAction module={module} row={row} onChange={updateStatus}/></td>}{module === "supplies" && <td><div className="oam-actions"><button type="button" onClick={() => { setTransaction(row); setTransactionForm({ transaction_type: "restock", quantity: "", reason: "" }); }}>Restock</button><button type="button" disabled={Number(row.current_qty) <= 0} onClick={() => { setTransaction(row); setTransactionForm({ transaction_type: "issue", quantity: "", reason: "" }); }}>Issue</button></div></td>}</tr>)}
           </tbody></table></div>
         )}
       </section>
 
       {showForm && <div className="oam-modal-backdrop" onMouseDown={() => setShowForm(false)}><div className="oam-modal" onMouseDown={e => e.stopPropagation()}><div className="oam-modal-head"><div><h2>Create {cfg.title.replace(/s$/i, "")}</h2><p>Enter the minimum information required to create the record.</p></div><button onClick={() => setShowForm(false)}><X size={18}/></button></div><form onSubmit={save}><Fields module={module} form={form} setForm={setForm}/><div className="oam-form-actions"><button type="button" onClick={() => setShowForm(false)}>Cancel</button><button className="oam-primary" disabled={saving}>{saving ? "Saving…" : "Create"}</button></div></form></div></div>}
+      {transaction && <div className="oam-modal-backdrop" onMouseDown={() => !saving && setTransaction(null)}><div className="oam-modal" onMouseDown={e => e.stopPropagation()}><div className="oam-modal-head"><div><h2>{transactionForm.transaction_type === "issue" ? "Issue" : "Restock"} {transaction.item_name}</h2><p>Available now: {transaction.current_qty} {transaction.unit}</p></div><button type="button" onClick={() => !saving && setTransaction(null)}><X size={18}/></button></div><form onSubmit={saveTransaction}>      <div className="oam-form-grid"><Field label="Transaction" name="transaction_type" value={transactionForm.transaction_type} onChange={v => setTransactionForm(f => ({ ...f, transaction_type: v }))}><select value={transactionForm.transaction_type} onChange={e => setTransactionForm(f => ({ ...f, transaction_type: e.target.value }))}><option value="restock">Restock</option><option value="issue">Issue</option></select></Field><Field label={`Quantity (${transaction.unit || "units"})`} name="quantity" type="number" min="0.01" step="any" value={transactionForm.quantity} onChange={v => setTransactionForm(f => ({ ...f, quantity: v }))} required/><Field label="Reason" name="reason" value={transactionForm.reason} onChange={v => setTransactionForm(f => ({ ...f, reason: v }))}/></div>{error && <div className="oam-inline-error">{error}</div>}<div className="oam-form-actions"><button type="button" onClick={() => setTransaction(null)} disabled={saving}>Cancel</button><button className="oam-primary" disabled={saving}>{saving ? "Saving…" : "Record transaction"}</button></div></form></div></div>}
     </div>
   );
 }
 
-function Field({ label, name, value, onChange, type = "text", required = false, children }) { return <label className="oam-field"><span>{label}</span>{children || <input type={type} value={value ?? ""} required={required} onChange={e => onChange(e.target.value)} />}</label>; }
+function Field({ label, name, value, onChange, type = "text", required = false, min, step, children }) { return <label className="oam-field"><span>{label}</span>{children || <input name={name} type={type} min={min} step={step} value={value ?? ""} required={required} onChange={e => onChange(e.target.value)} />}</label>; }
 function Fields({ module, form, setForm }) { const set = (name, value) => setForm(v => ({ ...v, [name]: value }));
   if (module === "requests") return <div className="oam-form-grid"><Field label="Request Type" name="request_type" value={form.request_type} onChange={v=>set("request_type",v)} required/><Field label="Title" name="title" value={form.title} onChange={v=>set("title",v)} required/><Field label="Priority" name="priority" value={form.priority} onChange={v=>set("priority",v)}><select value={form.priority} onChange={e=>set("priority",e.target.value)}><option>low</option><option>normal</option><option>high</option><option>urgent</option></select></Field><Field label="Due Date" name="due_date" type="date" value={form.due_date} onChange={v=>set("due_date",v)}/><Field label="Description" name="description" value={form.description} onChange={v=>set("description",v)}><textarea value={form.description} onChange={e=>set("description",e.target.value)} rows="4"/></Field></div>;
   if (module === "facilities") return <div className="oam-form-grid"><Field label="Location" name="location" value={form.location} onChange={v=>set("location",v)} required/><Field label="Issue Type" name="issue_type" value={form.issue_type} onChange={v=>set("issue_type",v)} required/><Field label="Priority" name="priority" value={form.priority} onChange={v=>set("priority",v)}><select value={form.priority} onChange={e=>set("priority",e.target.value)}><option>low</option><option>normal</option><option>high</option><option>urgent</option></select></Field><Field label="Due Date" name="due_date" type="date" value={form.due_date} onChange={v=>set("due_date",v)}/><Field label="Description" name="description" value={form.description} onChange={v=>set("description",v)} required><textarea value={form.description} onChange={e=>set("description",e.target.value)} rows="4"/></Field></div>;
-  if (module === "supplies") return <div className="oam-form-grid"><Field label="Item Name" name="item_name" value={form.item_name} onChange={v=>set("item_name",v)} required/><Field label="Item Code" name="item_code" value={form.item_code} onChange={v=>set("item_code",v)}/><Field label="Category" name="category" value={form.category} onChange={v=>set("category",v)}/><Field label="Unit" name="unit" value={form.unit} onChange={v=>set("unit",v)} required/><Field label="Current Qty" name="current_qty" type="number" value={form.current_qty} onChange={v=>set("current_qty",v)}/><Field label="Minimum Qty" name="minimum_qty" type="number" value={form.minimum_qty} onChange={v=>set("minimum_qty",v)}/><Field label="Location" name="location" value={form.location} onChange={v=>set("location",v)}/></div>;
+  if (module === "supplies") return <div className="oam-form-grid"><Field label="Item Name" name="item_name" value={form.item_name} onChange={v=>set("item_name",v)} required/><Field label="Item Code" name="item_code" value={form.item_code} onChange={v=>set("item_code",v)}/><Field label="Category" name="category" value={form.category} onChange={v=>set("category",v)}/><Field label="Unit" name="unit" value={form.unit} onChange={v=>set("unit",v)} required/><Field label="Current Qty" name="current_qty" type="number" min="0" step="any" value={form.current_qty} onChange={v=>set("current_qty",v)}/><Field label="Minimum Qty" name="minimum_qty" type="number" min="0" step="any" value={form.minimum_qty} onChange={v=>set("minimum_qty",v)}/><Field label="Location" name="location" value={form.location} onChange={v=>set("location",v)}/></div>;
   if (module === "visitors") return <div className="oam-form-grid"><Field label="Visitor Name" name="visitor_name" value={form.visitor_name} onChange={v=>set("visitor_name",v)} required/><Field label="Company" name="company" value={form.company} onChange={v=>set("company",v)}/><Field label="Contact" name="contact" value={form.contact} onChange={v=>set("contact",v)}/><Field label="Purpose" name="purpose" value={form.purpose} onChange={v=>set("purpose",v)}/><Field label="Expected At" name="expected_at" type="datetime-local" value={form.expected_at} onChange={v=>set("expected_at",v)}/><Field label="Notes" name="notes" value={form.notes} onChange={v=>set("notes",v)}><textarea value={form.notes} onChange={e=>set("notes",e.target.value)} rows="3"/></Field></div>;
   return <div className="oam-form-grid"><Field label="Asset Name" name="asset_name" value={form.asset_name} onChange={v=>set("asset_name",v)} required/><Field label="Asset Code" name="asset_code" value={form.asset_code} onChange={v=>set("asset_code",v)}/><Field label="Category" name="category" value={form.category} onChange={v=>set("category",v)}/><Field label="Serial Number" name="serial_number" value={form.serial_number} onChange={v=>set("serial_number",v)}/><Field label="Location" name="location" value={form.location} onChange={v=>set("location",v)}/><Field label="Purchase Date" name="purchase_date" type="date" value={form.purchase_date} onChange={v=>set("purchase_date",v)}/><Field label="Condition" name="condition" value={form.condition} onChange={v=>set("condition",v)}><select value={form.condition} onChange={e=>set("condition",e.target.value)}><option>new</option><option>good</option><option>fair</option><option>damaged</option><option>retired</option></select></Field></div>;
 }

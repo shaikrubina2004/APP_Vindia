@@ -45,6 +45,7 @@ function ensureClientTables() {
         );
         CREATE INDEX IF NOT EXISTS idx_project_approvals_project
           ON project_approvals (project_id);
+
       `)
       .catch((err) => {
         ready = null; // retry next time

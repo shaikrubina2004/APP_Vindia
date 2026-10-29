@@ -49,7 +49,7 @@ export default function OperationsManagerModule({ module }) {
   }
 
   if (module === "administration") {
-    return <div className="omm-page"><Header title={cfg.title} subtitle={cfg.subtitle} /><div className="omm-admin-callout"><div><h2>Office Administration</h2><p>Administrative transactions are managed by the Office Administrator. Use the dedicated workspace for requests, facilities, supplies, visitors and assets.</p></div><Link to="/office-administrator/dashboard">Open Office Administration <ArrowRight size={16}/></Link></div></div>;
+    return <div className="omm-page"><Header title={cfg.title} subtitle={cfg.subtitle} /><div className="omm-admin-callout"><div><h2>Office Administration</h2><p>Administrative transactions are managed by the Office Administrator. Use the dedicated workspace for requests, facilities, supplies, visitors and assets.</p></div><Link to="/operations/administrator/dashboard">Open Office Administration <ArrowRight size={16}/></Link></div></div>;
   }
 
   return <div className="omm-page"><Header title={cfg.title} subtitle={cfg.subtitle} /><section className="omm-card"><div className="omm-card-head"><h2>{rows.length} record{rows.length===1?"":"s"}</h2><button className="omm-refresh" onClick={load}><RefreshCw size={15}/> Refresh</button></div>{rows.length===0?<p className="omm-empty">No records are currently available.</p>:<Table rows={rows.slice(0,100)} columns={cfg.columns}/>}</section></div>;

@@ -26,18 +26,116 @@ function isCeo(req) {
 }
 
 function startOfWeek(value) {
-  const d = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
+  if (!isDateOnly(value)) return null;
+  const d = new Date(`${value}T00:00:00.000Z`);
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
+  d.setUTCDate(d.getUTCDate() + diff);
   return d.toISOString().slice(0, 10);
 }
 
 function endOfWeek(weekStart) {
-  const d = new Date(`${weekStart}T00:00:00`);
-  d.setDate(d.getDate() + 6);
+  const d = new Date(`${weekStart}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + 6);
   return d.toISOString().slice(0, 10);
+}
+
+function isDateOnly(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function validationError(status, message) {
+  return Object.assign(new Error(message), { status });
+}
+
+async function validateEntries(client, payload, weekStart, accessibleProjectIds, allowEmpty, employeeId) {
+  const entries = [];
+  const hoursByDate = new Map();
+  const weekEnd = endOfWeek(weekStart);
+
+  for (const [index, item] of payload.entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw validationError(400, `Entry ${index + 1} is invalid.`);
+    }
+
+    const hasHours = item.hours !== null && item.hours !== undefined &&
+      String(item.hours).trim() !== "";
+    const hours = hasHours ? Number(item.hours) : 0;
+    if (hasHours && (!Number.isFinite(hours) || hours < 0)) {
+      throw validationError(400, `Entry ${index + 1} must have valid positive hours.`);
+    }
+    if (!hasHours || hours === 0) continue;
+
+    if (!isDateOnly(item.work_date)) {
+      throw validationError(400, `Entry ${index + 1} must have a valid work date.`);
+    }
+    if (item.work_date < weekStart || item.work_date > weekEnd) {
+      throw validationError(400, "All entries must be within the same Monday–Sunday week.");
+    }
+
+    const projectId = Number(item.project_id);
+    const taskId = Number(item.task_id);
+    if (!Number.isInteger(projectId) || projectId <= 0 ||
+        !Number.isInteger(taskId) || taskId <= 0) {
+      throw validationError(400, `Entry ${index + 1} must include a project and task.`);
+    }
+    if (!Number.isFinite(hours) || hours <= 0 || hours > 12) {
+      throw validationError(400, "Each timesheet entry must be greater than 0 and no more than 12 hours.");
+    }
+    if (accessibleProjectIds !== null && !accessibleProjectIds.includes(projectId)) {
+      throw validationError(403, "You are not assigned to one of the selected projects.");
+    }
+
+    const task = await client.query(
+      `SELECT id FROM tasks WHERE id = $1 AND project_id = $2 LIMIT 1`,
+      [taskId, projectId]
+    );
+    if (!task.rows.length) {
+      throw validationError(400, "Selected task does not belong to the selected project.");
+    }
+
+    const dailyHours = (hoursByDate.get(item.work_date) || 0) + hours;
+    if (dailyHours > 24) {
+      throw validationError(400, `Total hours for ${item.work_date} cannot exceed 24.`);
+    }
+    hoursByDate.set(item.work_date, dailyHours);
+    entries.push({
+      work_date: item.work_date,
+      project_id: projectId,
+      task_id: taskId,
+      hours,
+      description: item.description || null,
+    });
+  }
+
+  if (!allowEmpty && !entries.length) {
+    throw validationError(400, "At least one valid project/task/time entry is required.");
+  }
+
+  if (entries.length) {
+    const leaveResult = await client.query(
+      `SELECT from_date, to_date
+         FROM leaves
+        WHERE employee_id = $1
+          AND LOWER(status) = 'approved'
+          AND from_date <= $3::date
+          AND to_date >= $2::date`,
+      [employeeId, weekStart, weekEnd]
+    );
+    const approvedLeaves = leaveResult.rows.map((leave) => ({
+      from: String(leave.from_date).slice(0, 10),
+      to: String(leave.to_date).slice(0, 10),
+    }));
+    if (entries.some((entry) =>
+      approvedLeaves.some((leave) => entry.work_date >= leave.from && entry.work_date <= leave.to)
+    )) {
+      throw validationError(400, "Timesheet hours cannot be entered on an approved leave day.");
+    }
+  }
+
+  return entries;
 }
 
 function normalizeStatus(status) {
@@ -251,75 +349,109 @@ async function requireOwnSheet(req, res, sheet) {
 }
 
 async function transitionTimesheet(req, res, sheetId, action, comment = "") {
-  const sheet = await fetchSheet(sheetId);
-  if (!sheet) return res.status(404).json({ error: "Timesheet not found" });
+  let client;
+  try {
+    client = await pool.connect();
+    await client.query("BEGIN");
+    const sheetResult = await client.query(
+      `SELECT * FROM timesheets WHERE id = $1 FOR UPDATE`,
+      [sheetId]
+    );
+    const sheet = sheetResult.rows[0];
+    if (!sheet) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Timesheet not found" });
+    }
 
-  const requester = await getEmployeeForUser(req.user.id);
-  if (!requester) return res.status(404).json({ error: "Employee profile not found" });
+    const requester = await getEmployeeForUser(req.user.id);
+    if (!requester) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Employee profile not found" });
+    }
 
-  const employeeOwns = Number(sheet.employee_id) === Number(requester.id);
-  const managerCanAct = await canManagerAccessEmployee(req, sheet.employee_id);
+    const employeeOwns = Number(sheet.employee_id) === Number(requester.id);
+    const managerCanAct = await canManagerAccessEmployee(req, sheet.employee_id);
 
-  const employeeActions = new Set(["submitted", "resubmitted"]);
-  const managerActions = new Set(["under_review", "approved", "changes_requested", "rejected", "reopened"]);
+    const employeeActions = new Set(["submitted", "resubmitted"]);
+    const managerActions = new Set(["under_review", "approved", "changes_requested", "rejected", "reopened"]);
+    if (employeeActions.has(action) && !employeeOwns) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "Only the employee can submit their own timesheet." });
+    }
+    if (managerActions.has(action) && !managerCanAct) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ error: "Only the employee's reporting manager can review this timesheet." });
+    }
 
-  if (employeeActions.has(action) && !employeeOwns) {
-    return res.status(403).json({ error: "Only the employee can submit their own timesheet." });
-  }
-  if (managerActions.has(action) && !managerCanAct) {
-    return res.status(403).json({ error: "Only the employee's reporting manager can review this timesheet." });
-  }
+    const allowedTransitions = {
+      submitted: new Set(["draft", "changes_requested", "reopened", "rejected"]),
+      resubmitted: new Set(["changes_requested"]),
+      under_review: new Set(["submitted", "resubmitted"]),
+      approved: new Set(["submitted", "resubmitted", "under_review", "reopened"]),
+      changes_requested: new Set(["submitted", "resubmitted", "under_review"]),
+      rejected: new Set(["submitted", "resubmitted", "under_review"]),
+      reopened: new Set(["approved", "rejected"]),
+    };
+    if (!allowedTransitions[action]?.has(sheet.status)) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: `Cannot ${action.replaceAll("_", " ")} a timesheet in ${displayStatus(sheet.status)} status.`,
+      });
+    }
 
-  const allowedTransitions = {
-    submitted: new Set(["draft", "changes_requested", "reopened"]),
-    resubmitted: new Set(["changes_requested"]),
-    under_review: new Set(["submitted", "resubmitted"]),
-    approved: new Set(["submitted", "resubmitted", "under_review", "reopened"]),
-    changes_requested: new Set(["submitted", "resubmitted", "under_review"]),
-    rejected: new Set(["submitted", "resubmitted", "under_review"]),
-    reopened: new Set(["approved", "rejected"]),
-  };
+    const submittedAt = ["submitted", "resubmitted"].includes(action) ? "NOW()" : "submitted_at";
+    let approvalSql = "";
+    const updateParams = [action, sheetId];
+    if (action === "approved") {
+      updateParams.push(requester.id);
+      approvalSql = `approved_by = $3, approved_at = NOW(),`;
+    } else if (action === "reopened") {
+      approvalSql = `approved_by = NULL, approved_at = NULL,`;
+    }
+    updateParams.push(sheet.status);
+    const expectedStatusParam = action === "approved" ? "$4" : "$3";
 
-  if (!allowedTransitions[action]?.has(sheet.status)) {
-    return res.status(409).json({
-      error: `Cannot ${action.replaceAll("_", " ")} a timesheet in ${displayStatus(sheet.status)} status.`,
+    const result = await client.query(
+      `UPDATE timesheets
+          SET status = $1,
+              ${approvalSql}
+              submitted_at = ${submittedAt},
+              updated_at = NOW()
+        WHERE id = $2 AND status = ${expectedStatusParam}
+        RETURNING *`,
+      updateParams
+    );
+    if (!result.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "Timesheet status changed; reload and try again." });
+    }
+
+    await client.query(
+      `INSERT INTO timesheet_approval_history (timesheet_id, action, action_by, comment)
+       VALUES ($1, $2, $3, $4)`,
+      [sheetId, action, requester.id, comment || null]
+    );
+    await client.query("COMMIT");
+
+    return res.json({
+      data: {
+        ...result.rows[0],
+        display_status: displayStatus(result.rows[0].status),
+      },
     });
+  } catch (err) {
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("timesheet transition rollback:", rollbackError);
+      }
+    }
+    console.error("timesheet transition:", err);
+    return res.status(500).json({ error: "Failed to update timesheet status" });
+  } finally {
+    client?.release();
   }
-
-  const submittedAt = ["submitted", "resubmitted"].includes(action) ? "NOW()" : "submitted_at";
-  // Parameters are built together with the SQL. Previously $2 (approver id) was always sent but only
-  // referenced when approving — PostgreSQL rejects an unreferenced parameter ("could not determine
-  // data type of parameter $2"), so submit / review / reject / request-changes / reopen all failed.
-  const updateParams = [action, sheetId];
-  let approvedFields = "";
-  if (action === "approved") {
-    updateParams.push(requester.id);
-    approvedFields = `approved_by = $3, approved_at = NOW(),`;
-  }
-
-  const result = await pool.query(
-    `UPDATE timesheets
-        SET status = $1,
-            ${approvedFields}
-            submitted_at = ${submittedAt},
-            updated_at = NOW()
-      WHERE id = $2
-      RETURNING *`,
-    updateParams
-  );
-
-  await pool.query(
-    `INSERT INTO timesheet_approval_history (timesheet_id, action, action_by, comment)
-     VALUES ($1, $2, $3, $4)`,
-    [sheetId, action, requester.id, comment || null]
-  );
-
-  return res.json({
-    data: {
-      ...result.rows[0],
-      display_status: displayStatus(result.rows[0].status),
-    },
-  });
 }
 
 // ---- Static routes FIRST -------------------------------------------------
@@ -555,67 +687,88 @@ router.get("/:id/history", async (req, res) => {
 });
 
 router.post("/draft", async (req, res) => {
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     const employee = await getEmployeeForUser(req.user.id);
     if (!assertEmployee(res, employee)) return;
 
     const payload = Array.isArray(req.body?.entries) ? req.body.entries : Array.isArray(req.body) ? req.body : [];
-    const firstDate = payload.map((x) => x.work_date).filter(Boolean).sort()[0] || req.body?.week_start;
+    const firstDate = payload.map((x) => x?.work_date).filter(Boolean).sort()[0] || req.body?.week_start;
     const weekStart = startOfWeek(firstDate || new Date().toISOString().slice(0, 10));
     if (!weekStart) return res.status(400).json({ error: "Invalid week date." });
     const weekEnd = endOfWeek(weekStart);
 
     const accessibleProjectIds = await getAccessibleProjectIds(req);
-
     await client.query("BEGIN");
-    const sheetResult = await client.query(
-      `INSERT INTO timesheets (employee_id, week_start, week_end, status, updated_at)
-       VALUES ($1,$2,$3,'draft',NOW())
-       ON CONFLICT (employee_id, week_start)
-       DO UPDATE SET status = 'draft', updated_at = NOW()
-       RETURNING *`,
-      [employee.id, weekStart, weekEnd]
+    const entries = await validateEntries(client, payload, weekStart, accessibleProjectIds, true, employee.id);
+    const existingResult = await client.query(
+      `SELECT * FROM timesheets
+        WHERE employee_id = $1 AND week_start = $2
+        FOR UPDATE`,
+      [employee.id, weekStart]
     );
-    const sheet = sheetResult.rows[0];
-    await client.query("DELETE FROM timesheet_entries WHERE timesheet_id = $1", [sheet.id]);
+    let sheet = existingResult.rows[0];
+    if (sheet && !["draft", "changes_requested", "rejected", "reopened"].includes(sheet.status)) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: `A timesheet in ${displayStatus(sheet.status)} status cannot be edited.`,
+      });
+    }
+    if (sheet) {
+      const updated = await client.query(
+        `UPDATE timesheets SET updated_at = NOW() WHERE id = $1 RETURNING *`,
+        [sheet.id]
+      );
+      sheet = updated.rows[0];
+    } else {
+      const created = await client.query(
+        `INSERT INTO timesheets (employee_id, week_start, week_end, status, updated_at)
+         VALUES ($1,$2,$3,'draft',NOW())
+         RETURNING *`,
+        [employee.id, weekStart, weekEnd]
+      );
+      sheet = created.rows[0];
+    }
 
-    for (const item of payload) {
-      const hours = Number(item.hours || 0);
-      if (!item.work_date || !item.project_id || !item.task_id || hours <= 0) continue;
-      if (hours > 12) throw new Error("Cannot log more than 12 hours in a single entry.");
-      if (accessibleProjectIds !== null && !accessibleProjectIds.includes(Number(item.project_id))) {
-        throw new Error("You are not assigned to one of the selected projects.");
-      }
+    await client.query("DELETE FROM timesheet_entries WHERE timesheet_id = $1", [sheet.id]);
+    for (const item of entries) {
       await client.query(
         `INSERT INTO timesheet_entries
           (timesheet_id, work_date, project_id, task_id, regular_hours, description)
          VALUES ($1,$2,$3,$4,$5,$6)`,
-        [sheet.id, item.work_date, Number(item.project_id), Number(item.task_id), hours, item.description || null]
+        [sheet.id, item.work_date, item.project_id, item.task_id, item.hours, item.description]
       );
     }
 
     await client.query("COMMIT");
     res.status(201).json({ data: { id: sheet.id, status: displayStatus(sheet.status), week_start: weekStart, week_end: weekEnd } });
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("timesheets/draft rollback:", rollbackError);
+      }
+    }
     console.error("timesheets/draft:", err);
-    res.status(500).json({ error: err.message || "Failed to save draft" });
+    res.status(err.status || 500).json({ error: err.message || "Failed to save draft" });
   } finally {
-    client.release();
+    client?.release();
   }
 });
 
 router.post("/bulk", async (req, res) => {
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     const employee = await getEmployeeForUser(req.user.id);
     if (!assertEmployee(res, employee)) return;
 
     const payload = Array.isArray(req.body) ? req.body : [];
     if (!payload.length) return res.status(400).json({ error: "No timesheet entries supplied." });
 
-    const dates = payload.map((x) => x.work_date).filter(Boolean).sort();
+    const dates = payload.map((x) => x?.work_date).filter(Boolean).sort();
     const weekStart = startOfWeek(dates[0]);
     if (!weekStart) return res.status(400).json({ error: "Invalid work date." });
     const weekEnd = endOfWeek(weekStart);
@@ -623,57 +776,70 @@ router.post("/bulk", async (req, res) => {
     const accessibleProjectIds = await getAccessibleProjectIds(req);
 
     await client.query("BEGIN");
-    const sheetResult = await client.query(
-      `INSERT INTO timesheets (employee_id, week_start, week_end, status, submitted_at, updated_at)
-       VALUES ($1,$2,$3,'submitted',NOW(),NOW())
-       ON CONFLICT (employee_id, week_start)
-       DO UPDATE SET status = 'submitted', submitted_at = NOW(), updated_at = NOW()
-       RETURNING *`,
-      [employee.id, weekStart, weekEnd]
+    const entries = await validateEntries(client, payload, weekStart, accessibleProjectIds, false, employee.id);
+    const existingResult = await client.query(
+      `SELECT * FROM timesheets
+        WHERE employee_id = $1 AND week_start = $2
+        FOR UPDATE`,
+      [employee.id, weekStart]
     );
-    const sheet = sheetResult.rows[0];
-    await client.query("DELETE FROM timesheet_entries WHERE timesheet_id = $1", [sheet.id]);
-
-    let inserted = 0;
-    for (const item of payload) {
-      const hours = Number(item.hours || 0);
-      if (!item.work_date || !item.project_id || !item.task_id || hours <= 0) continue;
-      if (hours > 12) throw new Error("Cannot log more than 12 hours in a single entry.");
-      if (accessibleProjectIds !== null && !accessibleProjectIds.includes(Number(item.project_id))) {
-        throw new Error("You are not assigned to one of the selected projects.");
-      }
-
-      const task = await client.query(
-        `SELECT id FROM tasks WHERE id = $1 AND project_id = $2 LIMIT 1`,
-        [Number(item.task_id), Number(item.project_id)]
+    let sheet = existingResult.rows[0];
+    if (sheet && !["draft", "changes_requested", "rejected", "reopened"].includes(sheet.status)) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: `A timesheet in ${displayStatus(sheet.status)} status cannot be submitted again.`,
+      });
+    }
+    const action = sheet?.status === "changes_requested" ? "resubmitted" : "submitted";
+    if (sheet) {
+      const updated = await client.query(
+        `UPDATE timesheets
+            SET status = $1, submitted_at = NOW(), updated_at = NOW()
+          WHERE id = $2
+          RETURNING *`,
+        [action, sheet.id]
       );
-      if (!task.rows.length) throw new Error("Selected task does not belong to the selected project.");
+      sheet = updated.rows[0];
+    } else {
+      const created = await client.query(
+        `INSERT INTO timesheets (employee_id, week_start, week_end, status, submitted_at, updated_at)
+         VALUES ($1,$2,$3,'submitted',NOW(),NOW())
+         RETURNING *`,
+        [employee.id, weekStart, weekEnd]
+      );
+      sheet = created.rows[0];
+    }
 
+    await client.query("DELETE FROM timesheet_entries WHERE timesheet_id = $1", [sheet.id]);
+    for (const item of entries) {
       await client.query(
         `INSERT INTO timesheet_entries
           (timesheet_id, work_date, project_id, task_id, regular_hours, description)
          VALUES ($1,$2,$3,$4,$5,$6)`,
-        [sheet.id, item.work_date, Number(item.project_id), Number(item.task_id), hours, item.description || null]
+        [sheet.id, item.work_date, item.project_id, item.task_id, item.hours, item.description]
       );
-      inserted += 1;
     }
-
-    if (!inserted) throw new Error("At least one valid project/task/time entry is required.");
 
     await client.query(
       `INSERT INTO timesheet_approval_history (timesheet_id, action, action_by, comment)
-       VALUES ($1, 'submitted', $2, $3)`,
-      [sheet.id, employee.id, req.body?.comment || null]
+       VALUES ($1, $2, $3, $4)`,
+      [sheet.id, action, employee.id, req.body?.comment || null]
     );
 
     await client.query("COMMIT");
     res.status(201).json({ id: sheet.id, status: displayStatus(sheet.status), week_start: weekStart, week_end: weekEnd });
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("timesheets/bulk rollback:", rollbackError);
+      }
+    }
     console.error("timesheets/bulk:", err);
-    res.status(500).json({ error: err.message || "Failed to submit timesheet" });
+    res.status(err.status || 500).json({ error: err.message || "Failed to submit timesheet" });
   } finally {
-    client.release();
+    client?.release();
   }
 });
 

@@ -102,7 +102,7 @@ export default function OperationsDailyUpdatesReview() {
       <div className="du-header">
         <div>
           <h1 className="du-title">Team Daily Updates</h1>
-          <p className="du-subtitle">Inventory &amp; Logistics</p>
+          <p className="du-subtitle">Inventory, Logistics &amp; Office Administration</p>
         </div>
       </div>
 
