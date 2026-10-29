@@ -252,7 +252,7 @@ async function getAccessibleProjectIds(req) {
     return null;
   }
 
-  const params = [employee.id, req.user.id];
+  const params = [employee.id];
   const conditions = [
     `EXISTS (
        SELECT 1
@@ -262,14 +262,21 @@ async function getAccessibleProjectIds(req) {
      )`,
     `EXISTS (
        SELECT 1
+       FROM employees assigned_employee
+       WHERE assigned_employee.id = $1
+         AND (
+           assigned_employee.user_id = p.site_engineer_id
+           OR assigned_employee.user_id = p.coordinator_id
+           OR assigned_employee.user_id = p.architect_id
+         )
+     )`,
+    `EXISTS (
+       SELECT 1
        FROM team_members tm
        WHERE tm.project_id = p.id
          AND tm.employee_id = $1
          AND tm.status IS DISTINCT FROM 'Inactive'
      )`,
-    `p.site_engineer_id = $2`,
-    `p.coordinator_id = $2`,
-    `p.architect_id = $2`,
   ];
 
   if (role === "project_manager") {
