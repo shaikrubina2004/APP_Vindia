@@ -114,7 +114,11 @@ const withProject = (tag, fn) => async (req, res) => {
     return await fn(req, res, project);
   } catch (err) {
     console.error(`${tag}:`, err);
-    return fail(res, 500, "Internal server error.");
+    // Temporarily including err.message here (same as the earlier timesheet
+    // fix) so the real Postgres error is visible on the Site Photos page
+    // itself without digging through backend logs. Safe to remove once
+    // confirmed fixed.
+    return res.status(500).json({ message: "Internal server error.", detail: err.message });
   }
 };
 
@@ -222,12 +226,21 @@ const getClientMilestoneById = withProject("getClientMilestoneById", async (req,
 // ═══════════════════════════════════════════════════════════════════════════
 //  DAILY LOGS  (site engineer reports; internal notes/issues/links are NOT shared)
 // ═══════════════════════════════════════════════════════════════════════════
+// s.labour_total was referenced here but site_engineer_daily_updates has no
+// such column (createDiary in siteDiaryController.js never captures a crew
+// count) — selecting it threw "column s.labour_total does not exist" on
+// every call, which silently broke the Client Dashboard's "Daily site logs"
+// card (the dashboard doesn't surface this secondary fetch's error, so it
+// just showed "No logs yet." instead of the real failure). Also,
+// s.submitted_by stores a user id (see createDiary), not an email, so the
+// subquery matching it against users.email never actually matched anything
+// — switched to matching by id.
 const LOG_COLS = `
   s.id, ${D("s.report_date")}, s.shift, s.weather_am, s.weather_pm, s.temp_c,
-  s.work_done, s.labour_total, s.next_day, s.delay_type, s.delay_description, s.attachments,
+  s.work_done, s.next_day, s.delay_type, s.delay_description, s.attachments,
   w.name  AS milestone_name,
   st.name AS subtask_name,
-  (SELECT u.name FROM users u WHERE u.email = s.submitted_by LIMIT 1) AS submitted_by_name`;
+  (SELECT u.name FROM users u WHERE u.id::text = s.submitted_by::text LIMIT 1) AS submitted_by_name`;
 
 const getClientDailyLogs = withProject("getClientDailyLogs", async (req, res, project) => {
   const limit = clampInt(req.query.limit, 20, 1, 100);
@@ -270,20 +283,38 @@ const getClientSitePhotos = withProject("getClientSitePhotos", async (req, res, 
   const limit = clampInt(req.query.limit, 24, 1, 60);
   const offset = clampInt(req.query.offset, 0, 0, 1000000);
 
+  // Site Engineers upload general progress photos through the dedicated
+  // Photo Gallery module (photo_gallery table), not through a task or an
+  // incident — and that module already has a working "visibility" field
+  // (internal / client / shared) with its own toggle and filter on the SE
+  // side. None of that ever reached the client: this UNION only pulled from
+  // task_photos and incident_photos, so a gallery photo marked "client" or
+  // "shared" was still invisible on the Client Portal no matter what the SE
+  // did. Added as a third branch below.
+  // photo_gallery.id is a uuid, while task_photos.id / incident_photos.id are
+  // integers — a UNION requires every branch's column to share one type, so
+  // the id column is cast to text everywhere below (nothing downstream uses
+  // it as a number; the frontend keys off photo_key instead).
   const union = `
-    SELECT 'task-' || tp.id AS photo_key, tp.id, tp.url, tp.uploaded_at,
+    SELECT 'task-' || tp.id AS photo_key, tp.id::text AS id, tp.url, tp.uploaded_at,
            u.name AS uploaded_by, t.title AS source_title, 'task' AS source_type
       FROM task_photos tp
       JOIN tasks t ON t.id = tp.task_id
       LEFT JOIN users u ON u.id = tp.uploaded_by
      WHERE t.project_id = $1 AND t.is_deleted = false
     UNION ALL
-    SELECT 'incident-' || ip.id, ip.id, ip.url, ip.uploaded_at,
+    SELECT 'incident-' || ip.id, ip.id::text, ip.url, ip.uploaded_at,
            u.name, i.title, 'incident'
       FROM incident_photos ip
       JOIN incidents i ON i.id = ip.incident_id
       LEFT JOIN users u ON u.id = ip.uploaded_by
-     WHERE i.project_id = $1 AND i.is_deleted = false AND i.source = 'client'`;
+     WHERE i.project_id = $1 AND i.is_deleted = false AND i.source = 'client'
+    UNION ALL
+    SELECT 'gallery-' || pg.id, pg.id::text, pg.file_url, pg.created_at,
+           u.name, COALESCE(NULLIF(pg.activity, ''), NULLIF(pg.phase, ''), NULLIF(pg.zone, ''), 'Site photo'), 'gallery'
+      FROM photo_gallery pg
+      LEFT JOIN users u ON u.id = pg.submitted_by
+     WHERE pg.project_id = $1 AND pg.visibility IN ('client', 'shared')`;
 
   const [rows, count] = await Promise.all([
     pool.query(`SELECT * FROM (${union}) x ORDER BY uploaded_at DESC NULLS LAST LIMIT $2 OFFSET $3`, [project.id, limit, offset]),

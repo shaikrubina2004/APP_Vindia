@@ -1,6 +1,25 @@
 const pool = require("../config/db");
 const { notifyCEO } = require("./ceoNotificationsController");
 
+// /api/daily-reports (Project Manager) and /api/se-daily-reports (Structural
+// Engineer) both route through this same controller and the same
+// daily_reports table — but the table had no column distinguishing which
+// role a row belonged to, so both tabs would eventually show identical data.
+// source_role fixes that; it's added here (self-healing) so no manual
+// migration step is needed. Existing rows are left NULL and are treated as
+// "project_manager" below, matching createReport's old default of
+// submitted_by: "Project Manager".
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE daily_reports
+        ADD COLUMN IF NOT EXISTS source_role VARCHAR(50) DEFAULT NULL;
+    `);
+  } catch (err) {
+    console.error("daily_reports.source_role setup failed:", err.message);
+  }
+})();
+
 /* =========================================================
    ➕ CREATE MANUAL REPORT (PM or others)
 ========================================================= */
@@ -20,19 +39,25 @@ exports.createReport = async (req, res) => {
       return res.status(400).json({ error: "project_name and date are required" });
     }
 
+    // req.reportRole is set by the mounting route (dailyUpdatesRoutes.js ->
+    // "project_manager", seDailyupdatesRoutes.js -> "structural_engineer") so
+    // a single shared controller can still tell the two sources apart.
+    const sourceRole = req.reportRole || "project_manager";
+
     const result = await pool.query(
       `INSERT INTO daily_reports
-      (project_name, date, phase, overall_status, submitted_by, submission_time, data, approved)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,false)
+      (project_name, date, phase, overall_status, submitted_by, submission_time, data, approved, source_role)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,false,$8)
       RETURNING *`,
       [
         project_name,
         date,
         phase || null,
         overall_status || "on-track",
-        submitted_by || "Project Manager",
+        submitted_by || (sourceRole === "structural_engineer" ? "Structural Engineer" : "Project Manager"),
         submission_time || null,
-        JSON.stringify(data || {})
+        JSON.stringify(data || {}),
+        sourceRole,
       ]
     );
 
@@ -45,90 +70,51 @@ exports.createReport = async (req, res) => {
 };
 
 /* =========================================================
-   📋 GET ALL REPORTS (MAIN FIX — COMBINED DATA)
+   📋 GET ALL REPORTS
+   Scoped by req.reportRole (set by the mounting route) so
+   /api/daily-reports (Project Manager) and /api/se-daily-reports
+   (Structural Engineer) return their own reports instead of a shared
+   unfiltered table.
+
+   This used to also re-query site_engineer_daily_updates and merge
+   Site Engineer diary rows in here — that query selected a column
+   (labour_total) that doesn't exist on that table, so every call to
+   either endpoint failed with a 500. It was also the wrong place for
+   diary data in the first place: the Site Engineer's Daily Diary is
+   already served correctly by its own endpoint (GET /api/diary/review),
+   which the "Site Engineer" tab in the PM dashboard already uses — so
+   diary entries don't belong merged into the PM's or the Structural
+   Engineer's own report list, and the block has been removed rather
+   than patched.
 ========================================================= */
 exports.getAllReports = async (req, res) => {
   try {
-    // 🔹 1. SITE ENGINEER DIARY DATA
-    const diary = await pool.query(`
-      SELECT
-        d.id,
-        d.report_date AS date,
-        d.zone AS phase,
-        d.work_done,
-        d.issues,
-        d.delay_type,
-        d.delay_description,
-        d.labour_total,
-        d.materials,
+    const sourceRole = req.reportRole || "project_manager";
 
-        u.name AS submitted_by,
-        p.name AS project_name,
+    // Legacy rows created before source_role existed are NULL — treat those
+    // as Project Manager reports (createReport's old default), so nothing
+    // that was already saved disappears from that tab.
+    const result =
+      sourceRole === "project_manager"
+        ? await pool.query(
+            `SELECT * FROM daily_reports
+             WHERE source_role = $1 OR source_role IS NULL
+             ORDER BY date DESC`,
+            [sourceRole]
+          )
+        : await pool.query(
+            `SELECT * FROM daily_reports
+             WHERE source_role = $1
+             ORDER BY date DESC`,
+            [sourceRole]
+          );
 
-        d.created_at
+    const reports = result.rows.map(r => ({
+      ...r,
+      data: typeof r.data === "string" ? JSON.parse(r.data) : r.data,
+    }));
 
-      FROM site_engineer_daily_updates d
-      JOIN users u ON u.id = d.submitted_by
-      JOIN projects p ON p.id = d.project_id
-    `);
-
-    // 🔹 2. MANUAL REPORTS (PM / others)
-    const reports = await pool.query(`
-      SELECT *
-      FROM daily_reports
-    `);
-
-    // 🔥 MERGE BOTH
-    const combined = [
-
-      // 🟢 Convert diary → PM format
-      ...diary.rows.map(r => ({
-        id: `diary-${r.id}`,
-        project_name: r.project_name,
-        date: r.date,
-        phase: r.phase,
-        overall_status: r.delay_type ? "delayed" : "on-track",
-        submitted_by: r.submitted_by,
-        submission_time: r.created_at,
-        approved: false,
-
-        data: {
-          workItems: [
-            {
-              activity: r.work_done,
-              location: r.phase,
-              status: "done"
-            }
-          ],
-
-          issues: r.issues
-            ? [{ issue: r.issues }]
-            : [],
-
-          materials: r.materials || [],
-
-          progress: {
-            overall: r.labour_total || 0
-          },
-
-          delay: r.delay_type,
-          delay_description: r.delay_description
-        }
-      })),
-
-      // 🔵 Manual reports (existing)
-      ...reports.rows.map(r => ({
-        ...r,
-        data: typeof r.data === "string"
-          ? JSON.parse(r.data)
-          : r.data
-      }))
-    ];
-
-    // 🔥 SORT BY DATE (latest first)
-    combined.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    res.status(200).json(combined);
+    res.status(200).json(reports);
 
   } catch (error) {
     console.error("FETCH ERROR:", error);

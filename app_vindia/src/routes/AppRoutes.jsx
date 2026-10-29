@@ -297,6 +297,7 @@ import LogisticsDailyUpdate from "../pages/operations/logistics/LogisticsDailyUp
 import ManagerReports from "../SharedResourse/ManagerReports";
 
 import Settings from "../SharedResourse/Settings";
+import Profile from "../SharedResourse/Profile";
 
 import ReportsInbox from "../pages/ceo/ReportsInbox";
 
@@ -2852,6 +2853,28 @@ const AppRoutes = () => {
               <RoleLayout>
 
                 <Settings />
+
+              </RoleLayout>
+
+            </ProtectedRoute>
+
+          }
+
+        />
+
+        {/* ══ PROFILE ═══════════════════════════════════════ */}
+
+        <Route
+
+          path="/profile"
+
+          element={
+
+            <ProtectedRoute allowedRoles={Object.values(ROLES)}>
+
+              <RoleLayout>
+
+                <Profile />
 
               </RoleLayout>
 

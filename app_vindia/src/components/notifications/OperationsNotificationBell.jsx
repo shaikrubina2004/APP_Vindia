@@ -23,6 +23,7 @@ const TYPE_CFG = {
   approval:  { label: "Approval",  color: "#b45309", bg: "#fffbeb" },
   request:   { label: "Request",   color: "#4338ca", bg: "#eef2ff" },
   diary:     { label: "Site Diary", color: "#0f766e", bg: "#f0fdfa" },
+  project:   { label: "Project", color: "#1d4ed8", bg: "#eff6ff" },
 };
 
 const SEV_COLOR = {

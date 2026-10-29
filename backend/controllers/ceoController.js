@@ -259,7 +259,11 @@ async function buildTodayStatus() {
     }, new Map()),
     section("today.pm", async () => {
       const { rows } = await pool.query(
-        `SELECT MAX(sent_to_ceo_at) AS at, COUNT(*) AS c FROM daily_reports WHERE date::date = CURRENT_DATE AND sent_to_ceo = TRUE`);
+        `SELECT MAX(sent_to_ceo_at) AS at, COUNT(*) AS c
+         FROM daily_reports
+         WHERE sent_to_ceo = TRUE
+           AND sent_to_ceo_at >= CURRENT_DATE
+           AND sent_to_ceo_at < CURRENT_DATE + INTERVAL '1 day'`);
       return num(rows[0].c) > 0 ? rows[0].at || true : null;
     }, null),
   ]);
@@ -335,7 +339,9 @@ exports.getManagerUpdates = async (req, res) => {
     section("feed.pm", async () => {
       const { rows } = await pool.query(
         `SELECT * FROM daily_reports
-         WHERE sent_to_ceo = TRUE AND date::date >= CURRENT_DATE - ($1 || ' day')::interval`,
+         WHERE sent_to_ceo = TRUE
+           AND sent_to_ceo_at IS NOT NULL
+           AND sent_to_ceo_at >= NOW() - ($1 || ' day')::interval`,
         [String(days)]
       );
       return rows.map((r) => {

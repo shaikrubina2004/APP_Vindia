@@ -26,6 +26,12 @@ export const getTasksByProject = (projectId) =>
 export const getTeamTimesheets = (params = {}) =>
   API.get("/timesheets/team", { params }).then(unwrap);
 
+// Hours actually logged against one project (used by the PM dashboard's
+// per-project Timesheet tab) — distinct from getTeamTimesheets above, which
+// only returns whole-timesheet totals with no project breakdown.
+export const getProjectTimesheets = (projectId) =>
+  API.get(`/timesheets/project/${projectId}`).then(unwrap);
+
 export const getTeamSummary = () =>
   API.get("/timesheets/team/summary").then(unwrap);
 

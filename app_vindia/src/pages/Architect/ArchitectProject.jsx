@@ -7,6 +7,7 @@ import { getArchitectProjects } from "../../services/architectprojectService.js"
 import { getProjectLogs } from "../../services/architectDailyLogService.js";
 import { getDrawings } from "../../services/architectDesignService.js";
 import { API } from "../../services/authService";
+import ProjectPhotosGrid from "../../components/photos/ProjectPhotosGrid";
 /* ══════════════════════════════════════════════════════════════
    HELPERS
 ══════════════════════════════════════════════════════════════ */
@@ -23,6 +24,7 @@ const MODULE_DEFS = [
   { key: "dailyLogs", label: "Daily Logs", icon: "📋", urgentClass: () => "" },
   { key: "designs",   label: "Designs",    icon: "📐", urgentClass: m => m.urgent > 0 ? "amber" : "" },
   { key: "incidents", label: "Incidents",  icon: "🚨", urgentClass: m => m.urgent > 0 ? "red"   : "" },
+  { key: "photos",    label: "Site Photos", icon: "📷", urgentClass: () => "" },
 ];
 
 const STATUS_FILTERS = ["All", "Active", "On Hold", "Draft", "Completed"];
@@ -243,7 +245,7 @@ function ProjectDetail({ project, onClose, onToast, onModuleClick }) {
             {MODULE_DEFS.map((def) => {
               const mod = project.modules?.[def.key] || { count: 0, urgent: 0, label: "" };
               const cc = def.urgentClass(mod);
-              const isClickable = def.key === "dailyLogs" || def.key === "designs" || def.key === "tasks" || def.key === "incidents";
+              const isClickable = def.key === "dailyLogs" || def.key === "designs" || def.key === "tasks" || def.key === "incidents" || def.key === "photos";
               return (
                 <div
                   key={def.key}
@@ -759,6 +761,27 @@ function ProjectIncidentsModal({ project, onClose }) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   SITE PHOTOS MODAL
+   Site Engineers upload progress photos through their own Photo
+   Gallery (GET /api/photos has no role restriction) — this was never
+   surfaced to the Architect at all; this reuses the same read-only
+   grid built for the PM/CEO dashboard's own Site Photos tab.
+══════════════════════════════════════════════════════════════ */
+function ProjectPhotosModal({ project, onClose }) {
+  return (
+    <SubModal
+      title={project.name}
+      subtitle="Site Photos"
+      icon="📷"
+      footerLeft="From the Site Engineer's Photo Gallery"
+      onClose={onClose}
+    >
+      <ProjectPhotosGrid projectId={project.id} />
+    </SubModal>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
    DESIGNS MODAL
 ══════════════════════════════════════════════════════════════ */
 function ProjectDesignsModal({ project, userId, onClose }) {
@@ -1128,6 +1151,7 @@ export default function ArchitectProjects() {
             if (key === "designs")   setSubModal({ type: "designs", project: proj });
             if (key === "tasks")      setSubModal({ type: "tasks",     project: proj }); // ✅ add
   if (key === "incidents")  setSubModal({ type: "incidents", project: proj }); 
+  if (key === "photos")     setSubModal({ type: "photos",    project: proj });
           }}
         />
       )}
@@ -1161,6 +1185,14 @@ export default function ArchitectProjects() {
 {/* ── Incidents sub-modal ── */}
 {subModal?.type === "incidents" && (
   <ProjectIncidentsModal
+    project={subModal.project}
+    onClose={() => setSubModal(null)}
+  />
+)}
+
+{/* ── Site Photos sub-modal ── */}
+{subModal?.type === "photos" && (
+  <ProjectPhotosModal
     project={subModal.project}
     onClose={() => setSubModal(null)}
   />

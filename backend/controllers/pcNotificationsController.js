@@ -29,14 +29,21 @@ const insertNotification = async (
   }
 };
 
-// Notify every project coordinator (role_id 33, same as projects/coordinators list).
+// Notify every project coordinator.
 // extraUserId = the coordinator explicitly assigned on the project, if any, so they
 // are always included even if their role id differs.
+// Was: WHERE role_id = 33 — same hardcoded-id bug already found and fixed in
+// projectController.js's getCoordinators/getSiteEngineers and
+// ArchitectAssignController.js's getArchitects — matched by role name instead.
 const notifyAllCoordinators = async (
   type, title, description, link, severity = "info", projectId = null, extraUserId = null
 ) => {
   try {
-    const { rows } = await pool.query(`SELECT id FROM users WHERE role_id = 33`);
+    const { rows } = await pool.query(
+      `SELECT u.id FROM users u
+       INNER JOIN roles r ON u.role_id = r.id
+       WHERE LOWER(r.name) LIKE '%coordinator%'`
+    );
     const ids = new Set(rows.map((r) => Number(r.id)));
     if (extraUserId) ids.add(Number(extraUserId));
     for (const id of ids) {

@@ -24,6 +24,11 @@ const {
 // enforced inside the controller using the role from the login token.
 router.use(auth);
 
+// Tags every request on this router as Structural Engineer's own reports, so
+// the controller (shared with dailyUpdatesRoutes.js / Project Manager) can
+// tell the two apart instead of returning the same unfiltered table to both.
+router.use((req, _res, next) => { req.reportRole = "structural_engineer"; next(); });
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  ⚠️  ORDER MATTERS:
 //  /approve/:id  MUST come before  /:id

@@ -195,6 +195,7 @@ const PROJECT_MANAGER_ROUTES = {
   daily_update: "/pm/daily-updates",
   incident:     "/pm/incidents",
   task:         "/pm/incidents?page=tasks",
+  project:      "/project-manager/dashboard",
 };
 
 const ProjectManagerBell = ({ userId }) => (
@@ -490,8 +491,14 @@ function Navbar() {
                 <small className="dropdown-email">{user?.email || user?.employee_email}</small>
               </div>
             </div>
-            <button className="dropdown-item" onClick={() => { setIsProfileOpen(false); navigate("/settings"); }}>Profile</button>
-            <button className="dropdown-item" onClick={() => { setIsProfileOpen(false); navigate("/timesheet"); }}>My Timesheet</button>
+            <button className="dropdown-item" onClick={() => { setIsProfileOpen(false); navigate("/profile"); }}>Profile</button>
+            {/* /timesheet's allowedRoles never included "client" — clicking this
+                as a client hit a blocked/redirect dead end, for a concept
+                (submitting your own timesheet) that doesn't apply to a client
+                account anyway. */}
+            {user?.role !== "client" && (
+              <button className="dropdown-item" onClick={() => { setIsProfileOpen(false); navigate("/timesheet"); }}>My Timesheet</button>
+            )}
             <button className="dropdown-item" onClick={() => { setIsProfileOpen(false); navigate("/settings"); }}>Settings</button>
             <div className="dropdown-divider"></div>
             <button className="dropdown-item logout" onClick={handleLogout}>

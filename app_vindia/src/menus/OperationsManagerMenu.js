@@ -10,6 +10,7 @@ const OperationsManagerMenu = [
   { name: "Project Control (WBS)", path: "/operations/manager/wbs", icon: "layers" },
   { name: "Office Admin", path: "/operations/manager/administration", icon: "briefcase" },
   { name: "Team Updates", path: "/operations/manager/daily-updates", icon: "clipboard" },
+  { name: "Site Teams", path: "/operations/manager/team", icon: "users" },
   { name: "Reports", path: "/operations/manager/reports", icon: "bar-chart-2" },
   { name: "Issues & Tasks", path: "/operations/manager/incidents", icon: "alert-triangle" },
   { name: "Report to CEO", path: "/my-reports", icon: "send" },

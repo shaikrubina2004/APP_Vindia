@@ -3,6 +3,9 @@ import "./ProjectManagement.css";
 import ProjectCard from "../../components/project/ProjectCard";
 import CostTracking from "../../pages/projects/CostTracking";
 import WbsPage from "../../pages/wbs/WbsPage";
+import { getProjectTimesheets } from "../../services/timesheetService";
+import { useAuth } from "../../context/useAuth";
+import ProjectPhotosGrid from "../../components/photos/ProjectPhotosGrid";
 import {
   LineChart,
   Line,
@@ -29,15 +32,6 @@ const authFetch = (url, options = {}) =>
   });
 
 const fmt = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
-
-/* Client dropdown label: "Name (Company) — email" */
-const clientLabel = (c) => {
-  const base =
-    c.company_name && c.company_name !== c.name
-      ? `${c.name} (${c.company_name})`
-      : c.name;
-  return c.email ? `${base} — ${c.email}` : base;
-};
 
 const fmtDate = (d) =>
   d
@@ -250,9 +244,17 @@ function ProjectManagement() {
 
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-    authFetch("http://localhost:5000/api/projects")
+    // This page is shared between the CEO (who should see every project)
+    // and the Project Manager (who was also seeing every project — the
+    // same gap already fixed for the Project Coordinator's own dashboard).
+    // A CEO legitimately needs the full company view; a PM only ever works
+    // with their own assigned projects, so /mine scopes that server-side
+    // the same way it already does for Coordinator, Site Engineer, etc.
+    const endpoint = user?.role === "project_manager" ? "/api/projects/mine" : "/api/projects";
+    authFetch(`http://localhost:5000${endpoint}`)
       .then((res) => res.json())
       .then((data) => {
         setProjects(data);
@@ -263,7 +265,7 @@ function ProjectManagement() {
         console.error("Fetch error:", err);
         setLoading(false);
       });
-  }, []);
+  }, [user?.role]);
 
   const [siteEngineers, setSiteEngineers] = useState([]);
   useEffect(() => {
@@ -284,7 +286,6 @@ function ProjectManagement() {
   const [coordinators, setCoordinators] = useState([]);
   const [architects, setArchitects] = useState([]);
   const [clients, setClients] = useState([]);
-  const [clientsStatus, setClientsStatus] = useState("loading"); // loading | ready | error
   useEffect(() => {
     authFetch("http://localhost:5000/api/projects/coordinators")
       .then((res) => res.json())
@@ -294,6 +295,11 @@ function ProjectManagement() {
     authFetch("http://localhost:5000/api/projects/architects")
       .then((res) => res.json())
       .then((data) => setArchitects(Array.isArray(data) ? data : []))
+      .catch(console.error);
+
+    authFetch("http://localhost:5000/api/projects/clients")
+      .then((res) => res.json())
+      .then((data) => setClients(Array.isArray(data) ? data : []))
       .catch(console.error);
   }, []);
 
@@ -308,44 +314,47 @@ function ProjectManagement() {
       .catch(console.error);
   }, [selectedProject]);
 
-  const [timesheets, setTimesheets] = useState([
-    {
-      id: 1,
-      employee: "Ravi Kumar",
-      task: "Foundation Excavation",
-      hours: 8,
-      date: "2024-03-15",
-      rate: 600,
-      status: "Approved",
-    },
-    {
-      id: 2,
-      employee: "Meena Sharma",
-      task: "Column Casting",
-      hours: 8,
-      date: "2024-03-15",
-      rate: 650,
-      status: "Pending",
-    },
-    {
-      id: 3,
-      employee: "Arjun Patel",
-      task: "Column Casting",
-      hours: 8,
-      date: "2024-03-15",
-      rate: 650,
-      status: "Approved",
-    },
-    {
-      id: 4,
-      employee: "Priya Singh",
-      task: "Beam Installation",
-      hours: 6,
-      date: "2024-03-16",
-      rate: 700,
-      status: "Approved",
-    },
-  ]);
+  // Previously hardcoded mock rows (same problem as Payments above) — the
+  // "Timesheet" tab showed 4 fake employees/hours that never changed no
+  // matter which project was selected. Pulled from a new endpoint,
+  // GET /api/timesheets/project/:projectId, which returns the actual
+  // timesheet_entries logged against this project (who, how many hours,
+  // on which task, this week's status) — the existing /timesheets/team
+  // endpoint couldn't be reused here since it only returns whole-timesheet
+  // totals per employee with no per-project breakdown at all.
+  const [timesheets, setTimesheets] = useState([]);
+  const [timesheetSummary, setTimesheetSummary] = useState(null);
+  const [timesheetsLoading, setTimesheetsLoading] = useState(false);
+  const [timesheetsError, setTimesheetsError] = useState(null);
+
+  useEffect(() => {
+    if (!selectedProject?.id) { setTimesheets([]); setTimesheetSummary(null); return; }
+    setTimesheetsLoading(true);
+    setTimesheetsError(null);
+    getProjectTimesheets(selectedProject.id)
+      .then((body) => {
+        const rows = Array.isArray(body?.data) ? body.data : [];
+        // Normalized to the field names the "Timesheet Submissions" widget on
+        // the Overview tab already uses (ts.employee / ts.task / ts.hours /
+        // ts.date / ts.status), while keeping the raw fields too for the
+        // fuller table on the Timesheet tab itself.
+        setTimesheets(rows.map((r) => ({
+          ...r,
+          employee: r.employee_name,
+          task: r.task_title || "—",
+          hours: r.regular_hours + r.overtime_hours,
+          date: r.work_date,
+        })));
+        setTimesheetSummary(body?.summary || null);
+      })
+      .catch((err) => {
+        const data = err?.response?.data;
+        setTimesheetsError(data?.detail || data?.error || err.message);
+        setTimesheets([]);
+        setTimesheetSummary(null);
+      })
+      .finally(() => setTimesheetsLoading(false));
+  }, [selectedProject]);
 
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [newProject, setNewProject] = useState({
@@ -367,54 +376,29 @@ function ProjectManagement() {
     phone: "",
   });
 
-  /* Registered client accounts (real users with the Client role) for the Client
-     dropdown. Re-fetched each time the Add Project modal opens so a client the
-     CEO has just created shows up without reloading the page. */
+  // Previously hardcoded mock rows that were never even rendered — the
+  // "Payments" tab just showed a literal "Payments content" placeholder.
+  // A real payments backend already exists (GET /api/finance/payments),
+  // it just wasn't wired to this page (and didn't allow project_manager
+  // to read it at all — see financeRoutes.js). Pulled from there now,
+  // scoped to the selected project, same pattern as costSummary above.
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState(null);
+
   useEffect(() => {
-    if (!showProjectModal) return undefined;
-    let cancelled = false;
-    authFetch("http://localhost:5000/api/projects/clients")
+    if (!selectedProject?.id) { setPayments([]); return; }
+    setPaymentsLoading(true);
+    setPaymentsError(null);
+    authFetch(`http://localhost:5000/api/finance/payments?project_id=${selectedProject.id}`)
       .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error(`Request failed with status code ${res.status}`);
         return res.json();
       })
-      .then((data) => {
-        if (cancelled) return;
-        setClients(Array.isArray(data) ? data : []);
-        setClientsStatus("ready");
-      })
-      .catch((err) => {
-        console.error("Load clients error:", err);
-        if (!cancelled) setClientsStatus("error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showProjectModal]);
-
-  const [payments, setPayments] = useState([
-    {
-      id: 1,
-      date: "2024-02-15",
-      amount: 10000000,
-      status: "Completed",
-      reference: "INV-001",
-    },
-    {
-      id: 2,
-      date: "2024-05-10",
-      amount: 15000000,
-      status: "Completed",
-      reference: "INV-002",
-    },
-    {
-      id: 3,
-      date: "2024-08-20",
-      amount: 10000000,
-      status: "Completed",
-      reference: "INV-003",
-    },
-  ]);
+      .then((body) => setPayments(Array.isArray(body?.data) ? body.data : []))
+      .catch((err) => { setPaymentsError(err.message); setPayments([]); })
+      .finally(() => setPaymentsLoading(false));
+  }, [selectedProject]);
 
   /* ── Derived ── */
   const filteredProjects =
@@ -453,10 +437,6 @@ function ProjectManagement() {
         alert("Please fill required fields");
         return;
       }
-      if (!newProject.client_user_id) {
-        alert("Please select a registered client for this project.");
-        return;
-      }
       const res = await authFetch("http://localhost:5000/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -480,12 +460,7 @@ function ProjectManagement() {
           phone: newProject.phone,
         }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        // keep the modal open so nothing the user typed is lost
-        alert(data?.error || data?.message || "Could not create the project.");
-        return;
-      }
+      const data = await res.json();
       if (data?.id) {
         setProjects((prev) => [data, ...prev]);
         setSelectedProject(data);
@@ -493,7 +468,6 @@ function ProjectManagement() {
       setNewProject({
         name: "",
         client: "",
-        client_user_id: "",
         phone: "",
         startDate: "",
         endDate: "",
@@ -607,6 +581,7 @@ function ProjectManagement() {
               { key: "timesheet", label: "🗂 Timesheet" },
               { key: "cost", label: "📊 Cost Tracking" },
               { key: "payments", label: "✳ Payments" },
+              { key: "photos", label: "📷 Site Photos" },
             ].map(({ key, label }) => (
               <button
                 key={key}
@@ -797,17 +772,8 @@ function ProjectManagement() {
                     label="End Date"
                     value={fmtDate(sp.end_date)}
                   />
-                  <DetailRow icon="👤" label="Client" value={sp.client_user_name || sp.client} />
-                  {sp.client_company_name && sp.client_company_name !== (sp.client_user_name || sp.client) && (
-                    <DetailRow icon="🏢" label="Client Company" value={sp.client_company_name} />
-                  )}
-                  {sp.client_contact_person && (
-                    <DetailRow icon="🧑‍💼" label="Contact Person" value={sp.client_contact_person} />
-                  )}
-                  {sp.client_user_email && (
-                    <DetailRow icon="✉️" label="Client Email" value={sp.client_user_email} />
-                  )}
-                  <DetailRow icon="📞" label="Phone" value={sp.phone || sp.client_user_phone} />
+                  <DetailRow icon="👤" label="Client" value={sp.client} />
+                  <DetailRow icon="📞" label="Phone" value={sp.phone} />
                 </div>
               </div>
 
@@ -1111,9 +1077,16 @@ function ProjectManagement() {
                   >
                     Timesheet Submissions
                   </h4>
+                  {timesheets.length === 0 && (
+                    <p style={{ fontSize: 12, color: "#94a3b8" }}>
+                      {timesheetsLoading ? "Loading…" : "No timesheet entries logged for this project yet."}
+                    </p>
+                  )}
                   {timesheets
-                    .slice(-3)
-                    .reverse()
+                    // Real data comes back newest-first already (unlike the
+                    // old mock array, which was oldest-first and needed
+                    // slice(-3).reverse() to show the latest 3).
+                    .slice(0, 3)
                     .map((ts) => (
                       <div
                         key={ts.id}
@@ -1186,7 +1159,62 @@ function ProjectManagement() {
           {activeTab === "wbs" && <WbsPage selectedProject={selectedProject} />}
 
           {activeTab === "timesheet" && (
-            <div className="timesheet-section">Timesheet content</div>
+            <div className="timesheet-section" style={{ padding: 24 }}>
+              {!sp ? (
+                <p style={{ color: "#94a3b8" }}>Select a project to see its timesheets.</p>
+              ) : timesheetsLoading ? (
+                <p style={{ color: "#94a3b8" }}>Loading timesheets…</p>
+              ) : timesheetsError ? (
+                <p style={{ color: "#dc2626" }}>Couldn't load timesheets: {timesheetsError}</p>
+              ) : timesheets.length === 0 ? (
+                <p style={{ color: "#94a3b8" }}>No hours logged against this project yet.</p>
+              ) : (
+                <>
+                  {timesheetSummary && (
+                    <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+                      <div style={{ padding: "10px 16px", background: "#eff6ff", borderRadius: 8 }}>
+                        <div style={{ fontSize: 11, color: "#64748b" }}>TOTAL HOURS</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#1e293b" }}>{timesheetSummary.total_hours}h</div>
+                      </div>
+                      <div style={{ padding: "10px 16px", background: "#f0fdf4", borderRadius: 8 }}>
+                        <div style={{ fontSize: 11, color: "#64748b" }}>STAFF LOGGED</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#1e293b" }}>{timesheetSummary.staff_count}</div>
+                      </div>
+                      <div style={{ padding: "10px 16px", background: "#fefce8", borderRadius: 8 }}>
+                        <div style={{ fontSize: 11, color: "#64748b" }}>ENTRIES</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#1e293b" }}>{timesheetSummary.entry_count}</div>
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0" }}>
+                          <th style={{ padding: "8px 10px" }}>Date</th>
+                          <th style={{ padding: "8px 10px" }}>Staff</th>
+                          <th style={{ padding: "8px 10px" }}>Task / WBS</th>
+                          <th style={{ padding: "8px 10px", textAlign: "right" }}>Hours</th>
+                          <th style={{ padding: "8px 10px" }}>Timesheet status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {timesheets.map((ts) => (
+                          <tr key={ts.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "8px 10px" }}>{fmtDate(ts.date)}</td>
+                            <td style={{ padding: "8px 10px", fontWeight: 600 }}>{ts.employee}</td>
+                            <td style={{ padding: "8px 10px" }}>{ts.task}</td>
+                            <td style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700 }}>
+                              {ts.hours}h{ts.leave_hours > 0 ? ` (+${ts.leave_hours}h leave)` : ""}
+                            </td>
+                            <td style={{ padding: "8px 10px" }}>{ts.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           {activeTab === "cost" && (
@@ -1204,7 +1232,64 @@ function ProjectManagement() {
           )}
 
           {activeTab === "payments" && (
-            <div className="payments-section">Payments content</div>
+            <div className="payments-section" style={{ padding: 24 }}>
+              {!sp ? (
+                <p style={{ color: "#94a3b8" }}>Select a project to see its payments.</p>
+              ) : paymentsLoading ? (
+                <p style={{ color: "#94a3b8" }}>Loading payments…</p>
+              ) : paymentsError ? (
+                <p style={{ color: "#dc2626" }}>Couldn't load payments: {paymentsError}</p>
+              ) : payments.length === 0 ? (
+                <p style={{ color: "#94a3b8" }}>No payments recorded for this project yet.</p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0" }}>
+                        <th style={{ padding: "8px 10px" }}>Date</th>
+                        <th style={{ padding: "8px 10px" }}>Type</th>
+                        <th style={{ padding: "8px 10px" }}>Reference</th>
+                        <th style={{ padding: "8px 10px" }}>Vendor / Invoice</th>
+                        <th style={{ padding: "8px 10px", textAlign: "right" }}>Amount</th>
+                        <th style={{ padding: "8px 10px" }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payments.map((p) => (
+                        <tr key={p.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "8px 10px" }}>{fmtDate(p.payment_date)}</td>
+                          <td style={{ padding: "8px 10px", textTransform: "capitalize" }}>{p.payment_type || "—"}</td>
+                          <td style={{ padding: "8px 10px" }}>{p.reference_number || "—"}</td>
+                          <td style={{ padding: "8px 10px" }}>{p.vendor_name || p.invoice_number || "—"}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700 }}>{fmt(p.amount)}</td>
+                          <td style={{ padding: "8px 10px" }}>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                textTransform: "capitalize",
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                                background: p.status === "completed" ? "#dcfce7" : p.status === "pending" ? "#fef9c3" : "#fee2e2",
+                                color: p.status === "completed" ? "#166534" : p.status === "pending" ? "#854d0e" : "#991b1b",
+                              }}
+                            >
+                              {p.status || "—"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "photos" && (
+            <div className="photos-section" style={{ padding: 24 }}>
+              <ProjectPhotosGrid projectId={sp?.id} />
+            </div>
           )}
         </div>
 
@@ -1239,7 +1324,6 @@ function ProjectManagement() {
                 <div className="form-group">
                   <label>Client *</label>
                   <select
-                    disabled={clientsStatus === "ready" && clients.length === 0}
                     value={newProject.client_user_id || ""}
                     onChange={(e) => {
                       const selected = clients.find(
@@ -1252,29 +1336,13 @@ function ProjectManagement() {
                       });
                     }}
                   >
-                    <option value="">
-                      {clientsStatus === "loading" && clients.length === 0
-                        ? "Loading clients…"
-                        : "Select Client"}
-                    </option>
+                    <option value="">Select Client</option>
                     {clients.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {clientLabel(c)}
+                        {c.name}
                       </option>
                     ))}
                   </select>
-                  {clientsStatus === "ready" && clients.length === 0 && (
-                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#b45309" }}>
-                      No clients are registered yet. A CEO must register a client
-                      (CEO → Client Management → Create Client) before a project
-                      can be linked to them.
-                    </p>
-                  )}
-                  {clientsStatus === "error" && (
-                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#dc2626" }}>
-                      Could not load the client list. Close this form and try again.
-                    </p>
-                  )}
                 </div>
                 <div className="form-group">
                   <label>Phone Number</label>

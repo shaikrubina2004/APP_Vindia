@@ -13,6 +13,11 @@ const { protect } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
+// Tags every request on this router as Project Manager's own reports, so the
+// shared controller can tell them apart from Structural Engineer's
+// (seDailyupdatesRoutes.js sets this to "structural_engineer").
+router.use((req, _res, next) => { req.reportRole = "project_manager"; next(); });
+
 /* ===== CREATE ===== */
 router.post("/", createReport);
 

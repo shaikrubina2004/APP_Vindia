@@ -12,6 +12,7 @@ import InventoryOverview from "../pages/operations/manager/InventoryOverview";
 import OperationsReports from "../pages/operations/manager/OperationsReports";
 import OperationsWbsControl from "../pages/operations/manager/OperationsWbsControl";
 import OperationsDailyUpdatesReview from "../pages/operations/manager/OperationsDailyUpdatesReview";
+import TeamOverview from "../pages/operations/manager/TeamOverview";
 import VendorsView from "../pages/operations/procurement/VendorsView";
 import OfficeRequests from "../pages/operations/administrator/OfficeRequests";
 import AppShell from "../components/incidents/AppShell";
@@ -29,6 +30,7 @@ export default function OperationsManagerRoutes() {
       <Route path="vendors" element={<VendorsView />} />
       <Route path="administration" element={<OfficeRequests title="Office Administration" managerMode />} />
       <Route path="daily-updates" element={<OperationsDailyUpdatesReview />} />
+      <Route path="team" element={<TeamOverview />} />
       <Route path="reports" element={<OperationsReports />} />
       <Route path="wbs" element={<OperationsWbsControl />} />
       <Route path="incidents" element={<AppShell key="opsmgr-incidents" />} />

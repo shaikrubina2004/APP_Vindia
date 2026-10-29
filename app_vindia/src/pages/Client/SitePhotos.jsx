@@ -4,7 +4,8 @@ import { withClientProject, assetUrl, PageLoader, PageError, fmtDate } from "../
 import "../../styles/Client.css";
 
 const PAGE = 24;
-const SOURCE_PILL = { incident: "pill--warning", task: "pill--info" };
+const SOURCE_PILL = { incident: "pill--warning", task: "pill--info", gallery: "pill--success" };
+const SOURCE_LABEL = { incident: "⚠ My incident", task: "✅ Site progress", gallery: "📷 Site photo" };
 
 export default function SitePhotos() {
   const [photos, setPhotos] = useState([]);
@@ -23,7 +24,8 @@ export default function SitePhotos() {
       setPhotos((prev) => (offset === 0 ? res.data.photos : [...prev, ...res.data.photos]));
       setTotal(res.data.total);
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to load photos.");
+      const data = err?.response?.data;
+      setError(data?.detail || data?.message || "Failed to load photos.");
     } finally {
       setLoading(false);
       setBusy(false);
@@ -51,7 +53,7 @@ export default function SitePhotos() {
           <div className="cl-eyebrow">Progress</div>
           <h1 className="cl-page-title">Site Photos</h1>
           <p className="cl-page-sub">
-            {total} photo{total !== 1 ? "s" : ""} from site progress and your own incident reports
+            {total} photo{total !== 1 ? "s" : ""} from site progress, the site gallery, and your own incident reports
           </p>
         </div>
       </div>
@@ -61,6 +63,7 @@ export default function SitePhotos() {
         <select className="cl-select" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
           <option value="all">All sources</option>
           <option value="task">Site progress</option>
+          <option value="gallery">Site gallery</option>
           <option value="incident">My incidents</option>
         </select>
         <span style={{ fontSize: 13, color: "var(--text-muted)", marginLeft: "auto" }}>
@@ -96,7 +99,7 @@ export default function SitePhotos() {
                 <div className="sp-card__meta">{fmtDate(p.uploaded_at)} · {p.uploaded_by || "—"}</div>
                 <div className="sp-card__tag" style={{ marginTop: 6 }}>
                   <span className={`pill ${SOURCE_PILL[p.source_type] || "pill--neutral"}`}>
-                    {p.source_type === "incident" ? "⚠ My incident" : "✅ Site progress"}
+                    {SOURCE_LABEL[p.source_type] || "Site photo"}
                   </span>
                 </div>
               </div>

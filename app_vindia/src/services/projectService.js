@@ -22,3 +22,10 @@ API.interceptors.request.use(
 export const getProjects = () => {
   return API.get("/projects");
 };
+
+// GET MY ASSIGNED PROJECTS — scoped server-side by role
+// (site_engineer/coordinator/architect/client/manager), unlike getProjects()
+// above which returns every project in the company.
+export const getMyProjects = () => {
+  return API.get("/projects/mine");
+};

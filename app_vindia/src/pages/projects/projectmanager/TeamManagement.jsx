@@ -41,6 +41,8 @@ export default function TeamManagement() {
   const projectId = activeProject?.id ? String(activeProject.id) : null;
 
   const [team, setTeam]             = useState([]);
+  const [memberTasks, setMemberTasks] = useState([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
   const [loading, setLoading]       = useState(true);
   const [apiError, setApiError]     = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -52,6 +54,11 @@ export default function TeamManagement() {
   const [saving, setSaving]         = useState(false);
   const [toast, setToast]           = useState(null);
   const [openGroups, setOpenGroups] = useState(new Set());
+  // People on the PM's projects who are not in the team yet (labour registry + HR records).
+  const [roster, setRoster]         = useState([]);
+  const [addingKey, setAddingKey]   = useState(null);
+  // Role names for Staff (same list HR uses for designations). Labour roles stay free text (trades).
+  const [staffRoles, setStaffRoles] = useState([]);
 
   const projectOptions = (PROJECTS || []).filter(p => p.id !== null);
 
@@ -81,12 +88,62 @@ export default function TeamManagement() {
       .finally(() => setLoading(false));
   }, [projectsLoading]);
 
+  useEffect(() => {
+    if (projectsLoading) return;
+    teamApi.fetchRoster()
+      .then((data) => setRoster(Array.isArray(data) ? data : []))
+      .catch((err) => { console.error("Failed to load project roster:", err); setRoster([]); });
+  }, [projectsLoading]);
+
+  useEffect(() => {
+    teamApi.fetchRoles()
+      .then((rows) => {
+        const names = rows
+          .filter((r) => r.is_active !== false && r.name && r.name.toLowerCase() !== "client")
+          .map((r) => r.name);
+        setStaffRoles([...new Set(names)].sort((a, b) => a.localeCompare(b)));
+      })
+      .catch((err) => { console.error("Failed to load roles:", err); setStaffRoles([]); });
+  }, []);
+
+  // A dropdown for Staff. The member's current role is always kept as an option, so an older or
+  // HR-imported role is never lost. If the list could not load, fall back to plain text.
+  function renderRoleField(isStaff, placeholder) {
+    if (!isStaff || staffRoles.length === 0) {
+      return <input className="fi" placeholder={placeholder} value={form.role || ""} onChange={e => setF("role", e.target.value)}/>;
+    }
+    const options = form.role && !staffRoles.includes(form.role) ? [form.role, ...staffRoles] : staffRoles;
+    return (
+      <select className="fi" value={form.role || ""} onChange={e => setF("role", e.target.value)}>
+        <option value="">Select role…</option>
+        {options.map(r => <option key={r} value={r}>{r}</option>)}
+      </select>
+    );
+  }
+
   const totalIncidents = team.reduce((a, t) => a + (t.incidents?.length || 0), 0);
+
+  useEffect(() => {
+    if (!selectedId) { setMemberTasks([]); return; }
+    let cancelled = false;
+    setTasksLoading(true);
+    teamApi.fetchMemberTasks(selectedId)
+      .then((items) => { if (!cancelled) setMemberTasks(Array.isArray(items) ? items : []); })
+      .catch((err) => { console.error("Failed to load member tasks:", err); if (!cancelled) setMemberTasks([]); })
+      .finally(() => { if (!cancelled) setTasksLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedId]);
 
   const visible = team.filter(t =>
     (filter === "All" || t.type === filter) &&
     (projectFilter === "All" || String(t.project_id) === projectFilter) &&
     (t.name || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const rosterVisible = roster.filter(p =>
+    (filter === "All" || p.type === filter) &&
+    (projectFilter === "All" || String(p.project_id) === projectFilter) &&
+    (p.name || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const groups = groupByProject(visible);
@@ -113,7 +170,7 @@ export default function TeamManagement() {
         projectId:  String(member.project_id || projectId || ""),
         wage:       member.wage        || "",
         daysWorked: member.days_worked || "",
-        tasks:      member.tasks_count || "",
+        hours:      member.hours       || "",
       });
     } else {
       setForm({ type: "Staff", status: "Active", priority: "Normal", severity: "Low", projectId: String(projectId || "") });
@@ -135,8 +192,9 @@ export default function TeamManagement() {
         type:        form.type     || "Staff",
         status:      form.status   || "Active",
         project_id:  form.projectId,
-        wage:        form.type === "Labour" ? parseInt(form.wage)       || 0 : null,
+        wage:        form.type === "Labour" ? parseFloat(form.wage)     || 0 : null,
         days_worked: form.type === "Labour" ? parseInt(form.daysWorked) || 0 : 0,
+        hours:       parseFloat(form.hours) || 0,
       });
       const matchedProject = projectOptions.find(p => String(p.id) === String(form.projectId));
       const memberWithProject = {
@@ -164,9 +222,9 @@ export default function TeamManagement() {
         role:        form.role?.trim()  || member.role,
         status:      form.status        || member.status,
         project_id:  form.projectId,
-        wage:        member.type === "Labour" ? parseInt(form.wage)       || 0 : null,
+        wage:        member.type === "Labour" ? parseFloat(form.wage)     || 0 : null,
         days_worked: member.type === "Labour" ? parseInt(form.daysWorked) || 0 : 0,
-        tasks_count: member.type !== "Labour" ? parseInt(form.tasks)      || 0 : 0,
+        hours:       parseFloat(form.hours) || 0,
       });
       const matchedProject = projectOptions.find(p => String(p.id) === String(form.projectId));
       const updatedWithProject = {
@@ -204,6 +262,7 @@ export default function TeamManagement() {
         priority:    form.priority || "Normal",
         due_date:    form.due      || null,
       });
+      setMemberTasks(p => [res, ...p]);
       setTeam(p => p.map(t => t.id === id
         ? { ...t, tasks_count: res.tasks_count ?? (t.tasks_count || 0) + 1 } : t));
       closeModal();
@@ -217,14 +276,58 @@ export default function TeamManagement() {
     if (!form.incident?.trim()) { showToast("Please describe the incident"); return; }
     setSaving(true);
     try {
-      await teamApi.logIncident(id, { text: form.incident.trim(), severity: form.severity || "Low" });
+      const incident = await teamApi.logIncident(id, { text: form.incident.trim(), severity: form.severity || "Low", due_date: form.incidentDue || null });
       setTeam(p => p.map(t => t.id === id
-        ? { ...t, incidents: [{ text: form.incident.trim(), date: todayLabel() }, ...(t.incidents || [])] } : t));
+        ? { ...t, incidents: [incident, ...(t.incidents || [])] } : t));
       closeModal();
       showToast("Incident logged");
     } catch (err) {
       showToast(err?.response?.data?.error || "Failed to log incident");
     } finally { setSaving(false); }
+  }
+
+  const rosterKey = (p) => `${p.source}-${p.source_id}-${p.project_id}`;
+
+  async function addFromRoster(person) {
+    const key = rosterKey(person);
+    setAddingKey(key);
+    try {
+      const created = await teamApi.importToTeam({
+        project_id: person.project_id, source: person.source, source_id: person.source_id,
+      });
+      setTeam(prev => [...prev, { ...created, project_name: person.project_name, incidents: [] }]);
+      setRoster(prev => prev.filter(p => rosterKey(p) !== key));
+      setOpenGroups(prev => new Set(prev).add(person.project_name));
+      showToast(`${person.name} added to the team`);
+    } catch (err) {
+      showToast(err?.response?.data?.error || "Could not add to team");
+    } finally {
+      setAddingKey(null);
+    }
+  }
+
+  // Status changes. tasks_count always comes back from the server, so the badge never drifts.
+  async function changeIncidentStatus(memberId, incidentId, status, message) {
+    try {
+      const updated = await teamApi.updateIncident(incidentId, { status });
+      setTeam(prev => prev.map(m => m.id === memberId
+        ? { ...m, incidents: m.incidents.map(x => x.id === incidentId ? { ...x, ...updated } : x) } : m));
+      showToast(message);
+    } catch (err) {
+      showToast(err?.response?.data?.error || "Could not update incident");
+    }
+  }
+
+  async function changeTaskStatus(memberId, taskId, status, message) {
+    try {
+      const updated = await teamApi.updateTask(taskId, { status });
+      setMemberTasks(prev => prev.map(t => t.id === taskId ? updated : t));
+      if (updated.tasks_count != null)
+        setTeam(prev => prev.map(m => m.id === memberId ? { ...m, tasks_count: updated.tasks_count } : m));
+      showToast(message);
+    } catch (err) {
+      showToast(err?.response?.data?.error || "Could not update task");
+    }
   }
 
   const ProjectDropdown = () => (
@@ -446,6 +549,38 @@ export default function TeamManagement() {
           })}
 
           <div className="table-foot">{visible.length} of {team.length} members shown</div>
+
+          {rosterVisible.length > 0 && (
+            <div style={{ marginTop: 16, border: "1px solid #e2e8f0", borderRadius: 12, background: "#fff" }}>
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid #e2e8f0" }}>
+                <div style={{ fontWeight: 700 }}>Also working on your projects ({rosterVisible.length})</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                  From the Site Engineer's labour registry and HR records. Add someone to track their tasks and incidents here.
+                </div>
+              </div>
+              {rosterVisible.map(p => {
+                const key = rosterKey(p);
+                return (
+                  <div key={key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderBottom: "1px solid #f1f5f9" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600 }}>
+                        {p.name} <span className={`pill pill-${(p.type || "").toLowerCase()}`}>{p.type}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>
+                        {p.role} · {p.project_name}{p.detail ? ` · ${p.detail}` : ""}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 11, color: "#64748b", whiteSpace: "nowrap" }}>
+                      {p.source === "labour_registry" ? "Labour registry" : "Staff record"}
+                    </span>
+                    <button className="ftab" disabled={addingKey === key} onClick={() => addFromRoster(p)}>
+                      {addingKey === key ? "Adding…" : "Add to team"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* ── Detail Panel ── */}
@@ -495,6 +630,7 @@ export default function TeamManagement() {
                     <div className="p-sec-label">Wage Details</div>
                     <div className="p-kv"><span>Daily Wage</span><b>₹{selected.wage || 0}</b></div>
                     <div className="p-kv"><span>Days Worked</span><b>{selected.days_worked || 0}</b></div>
+                    <div className="p-kv"><span>Hours Logged</span><b>{selected.hours || 0}</b></div>
                     <div className="wage-box">
                       <span>Total Earned</span>
                       <span className="wage-val">₹{((selected.wage || 0) * (selected.days_worked || 0)).toLocaleString()}</span>
@@ -511,21 +647,45 @@ export default function TeamManagement() {
                   </>
                 )}
 
-                {incs.length > 0 && (
-                  <>
-                    <div className="p-divider"/>
-                    <div className="p-sec-label">Incident Log</div>
-                    {incs.map((inc, i) => (
-                      <div className="inc-row" key={i}>
-                        <span className="inc-pip"/>
-                        <div>
-                          <div className="inc-txt">{inc.text}</div>
-                          <div className="inc-date">{inc.date}</div>
+                <div className="p-divider"/>
+                <div className="p-sec-label">Incident Log ({incs.length})</div>
+                {incs.length === 0 ? <div className="inc-date">No incidents recorded.</div> : incs.map((inc, i) => (
+                  <div className="inc-row" key={inc.id || i}>
+                    <span className="inc-pip"/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div className="inc-txt">{inc.text}</div>
+                      <div className="inc-date">{inc.date} · {inc.severity || "Low"} · {inc.status || "Open"}{inc.due_date ? ` · Due ${String(inc.due_date).slice(0,10)}` : ""}</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:5}}>
+                        {(inc.status || "Open") === "Open" && <button className="ftab" onClick={(e) => { e.stopPropagation(); changeIncidentStatus(selected.id, inc.id, "In Progress", "Incident in progress"); }}>Start</button>}
+                        {!['Resolved','Closed'].includes(inc.status) && <button className="ftab" onClick={(e) => { e.stopPropagation(); changeIncidentStatus(selected.id, inc.id, "Resolved", "Incident marked resolved"); }}>Mark resolved</button>}
+                        {inc.status === "Resolved" && <button className="ftab" onClick={(e) => { e.stopPropagation(); changeIncidentStatus(selected.id, inc.id, "Closed", "Incident closed"); }}>Close</button>}
+                        {['Resolved','Closed'].includes(inc.status) && <button className="ftab" onClick={(e) => { e.stopPropagation(); changeIncidentStatus(selected.id, inc.id, "Open", "Incident reopened"); }}>Reopen</button>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {selected.type !== "Labour" && <>
+                  <div className="p-divider"/>
+                  <div className="p-sec-label">Tasks ({memberTasks.length})</div>
+                  {tasksLoading ? <div className="inc-date">Loading tasks…</div> : memberTasks.length === 0 ? <div className="inc-date">No tasks assigned.</div> : memberTasks.map(task => (
+                    <div className="inc-row" key={task.id}>
+                      <span className="inc-pip"/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div className="inc-txt">{task.description}</div>
+                        <div className="inc-date">{task.priority || "Normal"} · {task.status || "Pending"}{task.due_date ? ` · Due ${String(task.due_date).slice(0,10)}` : ""}{task.due_date && new Date(`${String(task.due_date).slice(0,10)}T23:59:59`) < new Date() && !['Completed','Cancelled'].includes(task.status) ? " · OVERDUE" : ""}</div>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:5}}>
+                          {!['Completed','Cancelled'].includes(task.status) && <>
+                            {task.status !== "In Progress" && <button className="ftab" onClick={() => changeTaskStatus(selected.id, task.id, "In Progress", "Task started")}>Start</button>}
+                            <button className="ftab" onClick={() => changeTaskStatus(selected.id, task.id, "Completed", "Task completed")}>Complete</button>
+                            <button className="ftab" onClick={() => changeTaskStatus(selected.id, task.id, "Cancelled", "Task cancelled")}>Cancel</button>
+                          </>}
+                          {['Completed','Cancelled'].includes(task.status) && <button className="ftab" onClick={() => changeTaskStatus(selected.id, task.id, "Pending", "Task reopened")}>Reopen</button>}
                         </div>
                       </div>
-                    ))}
-                  </>
-                )}
+                    </div>
+                  ))}
+                </>}
 
                 <div className="p-divider"/>
                 <div className="p-sec-label">Actions</div>
@@ -578,13 +738,13 @@ export default function TeamManagement() {
                     </div>
                     <div className="fg">
                       <label>Role *</label>
-                      <input className="fi" placeholder="e.g. Electrician" value={form.role || ""} onChange={e => setF("role", e.target.value)}/>
+                      {renderRoleField((form.type || "Staff") === "Staff", "e.g. Electrician")}
                     </div>
                   </div>
                   <div className="frow">
                     <div className="fg">
                       <label>Type</label>
-                      <select className="fi" value={form.type || "Staff"} onChange={e => setF("type", e.target.value)}>
+                      <select className="fi" value={form.type || "Staff"} onChange={e => setForm(f => ({ ...f, type: e.target.value, role: "" }))}>
                         <option>Staff</option><option>Labour</option>
                       </select>
                     </div>
@@ -596,11 +756,15 @@ export default function TeamManagement() {
                     </div>
                   </div>
                   <ProjectDropdown />
+                  <div className="fg">
+                    <label>Hours Worked</label>
+                    <input className="fi" type="number" min="0" step="0.5" value={form.hours || ""} onChange={e => setF("hours", e.target.value)}/>
+                  </div>
                   {form.type === "Labour" && (
                     <div className="frow">
                       <div className="fg">
                         <label>Daily Wage (₹)</label>
-                        <input className="fi" type="number" min="0" value={form.wage || ""} onChange={e => setF("wage", e.target.value)}/>
+                        <input className="fi" type="number" min="0" step="0.01" value={form.wage || ""} onChange={e => setF("wage", e.target.value)}/>
                       </div>
                       <div className="fg">
                         <label>Days Worked</label>
@@ -622,7 +786,7 @@ export default function TeamManagement() {
                       </div>
                       <div className="fg">
                         <label>Role</label>
-                        <input className="fi" value={form.role || ""} onChange={e => setF("role", e.target.value)}/>
+                        {renderRoleField(t?.type === "Staff", "")}
                       </div>
                     </div>
                     <div className="fg">
@@ -636,19 +800,18 @@ export default function TeamManagement() {
                       <div className="frow">
                         <div className="fg">
                           <label>Daily Wage (₹)</label>
-                          <input className="fi" type="number" min="0" value={form.wage || ""} onChange={e => setF("wage", e.target.value)}/>
+                          <input className="fi" type="number" min="0" step="0.01" value={form.wage || ""} onChange={e => setF("wage", e.target.value)}/>
                         </div>
                         <div className="fg">
                           <label>Days Worked</label>
                           <input className="fi" type="number" min="0" value={form.daysWorked || ""} onChange={e => setF("daysWorked", e.target.value)}/>
                         </div>
                       </div>
-                    ) : (
-                      <div className="fg">
-                        <label>Tasks Assigned</label>
-                        <input className="fi" type="number" min="0" value={form.tasks || ""} onChange={e => setF("tasks", e.target.value)}/>
-                      </div>
-                    )}
+                    ) : null}
+                    <div className="fg">
+                      <label>Hours Worked</label>
+                      <input className="fi" type="number" min="0" step="0.5" value={form.hours || ""} onChange={e => setF("hours", e.target.value)}/>
+                    </div>
                   </>
                 );
               })()}
@@ -688,11 +851,17 @@ export default function TeamManagement() {
                     <label>Incident Description</label>
                     <input className="fi" placeholder="e.g. PPE not worn at site" value={form.incident || ""} onChange={e => setF("incident", e.target.value)}/>
                   </div>
-                  <div className="fg">
-                    <label>Severity</label>
-                    <select className="fi" value={form.severity || "Low"} onChange={e => setF("severity", e.target.value)}>
-                      <option>Low</option><option>Medium</option><option>High</option>
-                    </select>
+                  <div className="frow">
+                    <div className="fg">
+                      <label>Severity</label>
+                      <select className="fi" value={form.severity || "Low"} onChange={e => setF("severity", e.target.value)}>
+                        <option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
+                      </select>
+                    </div>
+                    <div className="fg">
+                      <label>Due Date</label>
+                      <input className="fi" type="date" value={form.incidentDue || ""} onChange={e => setF("incidentDue", e.target.value)}/>
+                    </div>
                   </div>
                 </>
               )}

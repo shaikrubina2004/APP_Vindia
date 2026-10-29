@@ -40,6 +40,7 @@ const ROLE_TYPES = {
   project_manager: [
     "approval",  // a Site Engineer asked for an approval assigned to the PM
     "diary",     // a Site Engineer submitted the daily diary
+    "project",   // a new project was created and assigned to this PM
     "incident", "task", "daily_update",
   ],
 

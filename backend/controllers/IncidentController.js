@@ -319,6 +319,9 @@ async function notifyByRole(
    ROLES + USERS
 ══════════════════════════════════════════════════════════════ */
 
+// Shared with Team Management so its alerts reach the right bell for every role.
+exports.notifyByRole = notifyByRole;
+
 exports.getRoles = async (req, res) => {
   try {
     const { rows } = await pool.query(`

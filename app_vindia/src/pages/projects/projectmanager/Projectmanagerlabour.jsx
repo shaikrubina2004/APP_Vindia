@@ -83,6 +83,23 @@ export default function ProjectManagerLabour() {
     }
   }
 
+  // The backend restricts DELETE /labour-registry/:id to project_manager only —
+  // but this page never called it, so the one role allowed to remove a worker
+  // record had no way to do so.
+  async function removeWorker(id) {
+    if (updating) return;
+    if (!window.confirm("Remove this worker from the registry? This can't be undone.")) return;
+    setUpdating(id);
+    try {
+      await api.delete(`/labour-registry/${id}`);
+      setWorkers(prev => prev.filter(w => w.id !== id));
+    } catch {
+      alert("Delete failed — check connection");
+    } finally {
+      if (alive.current) setUpdating(null);
+    }
+  }
+
   async function updateStatus(id, status) {
     if (updating) return;
     setUpdating(id);
@@ -466,6 +483,14 @@ export default function ProjectManagerLabour() {
                           ⚠ Suspend
                         </button>
                       )}
+                      <button
+                        className="lr-btn lr-btn--danger lr-btn--sm lr-btn--outline"
+                        onClick={() => removeWorker(w.id)}
+                        disabled={updating === w.id}
+                        title="Remove this worker from the registry"
+                      >
+                        🗑 Remove
+                      </button>
                       {updating === w.id && <span className="lr-updating">Updating…</span>}
                     </div>
                   </div>

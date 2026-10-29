@@ -111,6 +111,17 @@ const managerAccess = requireRole(
   "ceo"
 );
 
+// Read-only payments access for a Project Manager viewing their own project's
+// Payments tab. They should see what's been paid against their project, but
+// creating/editing/deleting a payment is still Finance's job only — that
+// stays on accountantAccess / managerAccess below.
+const paymentsReadAccess = requireRole(
+  "accountant",
+  "finance_manager",
+  "ceo",
+  "project_manager"
+);
+
 // ============================================================
 // DASHBOARD
 // ============================================================
@@ -319,21 +330,21 @@ router.delete(
 // Get all payments
 router.get(
   "/payments",
-  accountantAccess,
+  paymentsReadAccess,
   paymentController.getAllPayments
 );
 
 // Get payment summary
 router.get(
   "/payments/summary",
-  accountantAccess,
+  paymentsReadAccess,
   paymentController.getPaymentSummary
 );
 
 // Get payment by ID
 router.get(
   "/payments/:id",
-  accountantAccess,
+  paymentsReadAccess,
   paymentController.getPaymentById
 );
 

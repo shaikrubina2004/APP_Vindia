@@ -1,5 +1,9 @@
 const pool = require("../config/db");
 const { insertNotification } = require("./pcNotificationsController");
+const { insertNotification: insertSiteEngineerNotification } = require("./siteEngineerNotificationsController");
+const { insertArchitectNotification } = require("./architectNotificationsController");
+const { insertNotification: insertOperationsNotification } = require("./operationsNotificationsController");
+const { notifyClientUser } = require("../utils/clientNotifications");
 
 // ✅ Helper to parse floor string into rows
 function parseFloors(floorsString) {
@@ -54,38 +58,10 @@ exports.createProject = async (req, res) => {
     } = req.body;
 
     // ✅ Validation
-    if (!name || (!client && !client_user_id) || !budget) {
+    if (!name || !client || !budget) {
       return res.status(400).json({
         error: "Name, Client and Budget are required",
       });
-    }
-
-    // ✅ Client link: when a client account is chosen it must be a real, active
-    // CLIENT-role user. The stored `client` label is taken from that account so
-    // it can never drift from (or be spoofed against) the linked user.
-    let linkedClientId = null;
-    let clientLabel = client;
-    if (client_user_id !== undefined && client_user_id !== null && client_user_id !== "") {
-      const cid = Number(client_user_id);
-      if (!Number.isInteger(cid) || cid <= 0) {
-        return res.status(400).json({ error: "Invalid client selected" });
-      }
-      const clientRow = await pool.query(
-        `SELECT u.id, u.name
-           FROM users u
-           JOIN roles r ON r.id = u.role_id
-          WHERE u.id = $1
-            AND LOWER(r.code) = 'client'
-            AND LOWER(COALESCE(u.status, 'active')) NOT IN ('inactive', 'disabled', 'blocked', 'suspended')`,
-        [cid],
-      );
-      if (!clientRow.rows.length) {
-        return res
-          .status(400)
-          .json({ error: "Selected client is not a valid, active client account" });
-      }
-      linkedClientId = clientRow.rows[0].id;
-      clientLabel = clientRow.rows[0].name;
     }
 
     if (phone && phone.length !== 10) {
@@ -107,7 +83,7 @@ exports.createProject = async (req, res) => {
       RETURNING *`,
       [
         name,
-        clientLabel,
+        client,
         start_date,
         end_date,
         budget,
@@ -115,7 +91,7 @@ exports.createProject = async (req, res) => {
         site_engineer_id,
         coordinator_id || null,
         architect_id || null,
-        linkedClientId,
+        client_user_id || null,
         location || null,
         description || null,
         building_type || null,
@@ -133,13 +109,7 @@ exports.createProject = async (req, res) => {
         s.name AS site_engineer_name,
         u.name AS coordinator_name,
         ua.name AS architect_name,
-        uc2.name AS client_user_name,
-        uc2.email AS client_user_email,
-        NULLIF(TRIM(to_jsonb(uc2)->>'company_name'), '') AS client_company_name,
-        NULLIF(TRIM(to_jsonb(uc2)->>'contact_person'), '') AS client_contact_person,
-        COALESCE(NULLIF(TRIM(to_jsonb(uc2)->>'phone'), ''),
-                 NULLIF(TRIM(to_jsonb(uc2)->>'mobile'), ''),
-                 NULLIF(TRIM(to_jsonb(uc2)->>'phone_number'), '')) AS client_user_phone
+        uc2.name AS client_user_name
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
        LEFT JOIN users s ON p.site_engineer_id = s.id
@@ -164,18 +134,79 @@ exports.createProject = async (req, res) => {
       }
     }
 
-    // ✅ Send notification to coordinator
+    // ✅ Let everyone who was just assigned to this project know.
+    // Previously only the coordinator was notified here — the Site Engineer,
+    // Project Manager, Architect and Client all got nothing when a new
+    // project was created and assigned to them, with no way to find out
+    // short of someone telling them or stumbling across it in a project list.
     try {
       if (coordinator_id) {
         await insertNotification(
           coordinator_id,
           "project",
-          "New Project Created",
-          `Project "${name}" is created`,
+          "New project assigned to you",
+          `You've been assigned as coordinator on "${name}".`,
           "/project-coordinator/dashboard",
           "info",
           newProject.id,
         );
+      }
+
+      // site_engineer_id and architect_id reference users.id directly.
+      if (site_engineer_id) {
+        await insertSiteEngineerNotification(
+          site_engineer_id,
+          "project",
+          "New project assigned to you",
+          `You've been assigned as site engineer on "${name}".`,
+          "/site-engineer/dashboard",
+          "info",
+          newProject.id,
+        );
+      }
+      if (architect_id) {
+        await insertArchitectNotification(
+          architect_id,
+          "project",
+          "New project assigned to you",
+          `You've been assigned as architect on "${name}".`,
+          "/architect/dashboard",
+          "info",
+          newProject.id,
+        );
+      }
+
+      // manager_id references employees.id, not users.id — resolve the
+      // actual login account before notifying.
+      if (manager_id) {
+        const mgr = await pool.query(
+          `SELECT user_id FROM employees WHERE id = $1`,
+          [manager_id]
+        );
+        const managerUserId = mgr.rows[0]?.user_id;
+        if (managerUserId) {
+          await insertOperationsNotification(
+            managerUserId,
+            "project",
+            "New project assigned to you",
+            `You've been assigned as project manager on "${name}".`,
+            "/project-manager/dashboard",
+            "info",
+            newProject.id,
+            "project_manager",
+          );
+        }
+      }
+
+      if (client_user_id) {
+        await notifyClientUser(client_user_id, {
+          type: "project",
+          title: "Your project is set up",
+          description: `"${name}" has been created and is now active.`,
+          link: "/client/dashboard",
+          severity: "info",
+          projectId: newProject.id,
+        });
       }
     } catch (notifErr) {
       console.warn("⚠️ Notification failed (non-critical):", notifErr.message);
@@ -194,10 +225,18 @@ exports.createProject = async (req, res) => {
  */
 exports.getCoordinators = async (req, res) => {
   try {
+    // Was: WHERE role_id = 33 — a hardcoded role id that only happened to
+    // mean "Project Coordinator" in whichever database this was written
+    // against. role_id values come from whatever order roles were seeded
+    // in, so this could silently return the wrong people (or nobody) on
+    // any other environment. Matched by role name instead, same pattern
+    // as getArchitects/getClients below.
     const result = await pool.query(
-      `SELECT id, name 
-       FROM users
-       WHERE role_id = 33`,
+      `SELECT u.id, u.name
+       FROM users u
+       INNER JOIN roles r ON u.role_id = r.id
+       WHERE LOWER(r.name) LIKE '%coordinator%'
+       ORDER BY u.name`,
     );
     res.json(result.rows);
   } catch (err) {
@@ -228,10 +267,14 @@ exports.getManagers = async (req, res) => {
  */
 exports.getSiteEngineers = async (req, res) => {
   try {
+    // Was: WHERE role_id = 23 — same hardcoded-id problem as getCoordinators
+    // above. Matched by role name instead.
     const result = await pool.query(
-      `SELECT id, name 
-       FROM users
-       WHERE role_id = 23`,
+      `SELECT u.id, u.name
+       FROM users u
+       INNER JOIN roles r ON u.role_id = r.id
+       WHERE LOWER(r.name) LIKE '%site engineer%' OR LOWER(r.name) LIKE '%site_engineer%'
+       ORDER BY u.name`,
     );
     res.json(result.rows);
   } catch (err) {
@@ -254,21 +297,13 @@ exports.getArchitects = async (req, res) => {
   }
 };
 
-// Client dropdown for the Add Project form. Real client accounts only:
-// users whose role code is exactly 'client' (the old `name LIKE '%client%'`
-// match could also catch unrelated roles) and that are not disabled.
-// company_name / contact_person come from to_jsonb() so this keeps working
-// before the optional profile migration has been applied (they are just null).
 exports.getClients = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.name, u.email,
-              NULLIF(TRIM(to_jsonb(u)->>'company_name'), '')   AS company_name,
-              NULLIF(TRIM(to_jsonb(u)->>'contact_person'), '') AS contact_person
+      `SELECT u.id, u.name
        FROM users u
        INNER JOIN roles r ON u.role_id = r.id
-       WHERE LOWER(r.code) = 'client'
-         AND LOWER(COALESCE(u.status, 'active')) NOT IN ('inactive', 'disabled', 'blocked', 'suspended')
+       WHERE LOWER(r.name) LIKE '%client%'
        ORDER BY u.name`,
     );
     res.json(result.rows);
@@ -297,13 +332,7 @@ exports.getAllProjects = async (req, res) => {
         s.name AS site_engineer_name,
         u.name AS coordinator_name,
         ua.name AS architect_name,
-        uc2.name AS client_user_name,
-        uc2.email AS client_user_email,
-        NULLIF(TRIM(to_jsonb(uc2)->>'company_name'), '') AS client_company_name,
-        NULLIF(TRIM(to_jsonb(uc2)->>'contact_person'), '') AS client_contact_person,
-        COALESCE(NULLIF(TRIM(to_jsonb(uc2)->>'phone'), ''),
-                 NULLIF(TRIM(to_jsonb(uc2)->>'mobile'), ''),
-                 NULLIF(TRIM(to_jsonb(uc2)->>'phone_number'), '')) AS client_user_phone
+        uc2.name AS client_user_name
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
        LEFT JOIN users s ON p.site_engineer_id = s.id
@@ -345,7 +374,7 @@ exports.getMyProjects = async (req, res) => {
     const where = filters[role] || "";
     const result = await pool.query(
       `SELECT p.id, p.name, p.location, p.status, p.client, p.building_type, p.floors,
-              p.start_date, p.end_date,
+              p.start_date, p.end_date, p.description, p.phone, p.plot_size, p.budget, p.progress,
               m.name AS manager_name, s.name AS site_engineer_name
          FROM projects p
          LEFT JOIN employees m ON p.manager_id = m.id
@@ -393,13 +422,7 @@ exports.getProjectById = async (req, res) => {
         s.name AS site_engineer_name,
         u.name AS coordinator_name,
         ua.name AS architect_name,
-        uc2.name AS client_user_name,
-        uc2.email AS client_user_email,
-        NULLIF(TRIM(to_jsonb(uc2)->>'company_name'), '') AS client_company_name,
-        NULLIF(TRIM(to_jsonb(uc2)->>'contact_person'), '') AS client_contact_person,
-        COALESCE(NULLIF(TRIM(to_jsonb(uc2)->>'phone'), ''),
-                 NULLIF(TRIM(to_jsonb(uc2)->>'mobile'), ''),
-                 NULLIF(TRIM(to_jsonb(uc2)->>'phone_number'), '')) AS client_user_phone
+        uc2.name AS client_user_name
        FROM projects p
        LEFT JOIN employees m ON p.manager_id = m.id
        LEFT JOIN users s ON p.site_engineer_id = s.id
@@ -435,6 +458,7 @@ exports.updateProject = async (req, res) => {
       manager_id,
       site_engineer_id,
       coordinator_id,
+      client_user_id,
       status,
       progress,
       location,
@@ -444,10 +468,23 @@ exports.updateProject = async (req, res) => {
       plot_size,
       phone,
     } = req.body;
+    // architect_id is deliberately NOT accepted here — ArchitectAssignController's
+    // assignArchitect endpoint already owns that field and enforces a safety rule
+    // (can't silently reassign an architect already on the project without a 409).
+    // Accepting it here too would let this endpoint bypass that rule.
 
     if (phone && phone.length !== 10) {
       return res.status(400).json({ error: "Phone must be 10 digits" });
     }
+
+    // Read the current assignment before overwriting it, so we only notify
+    // the people who are actually NEWLY assigned by this update — not
+    // everyone already on the project, every time any field is edited.
+    const before = await pool.query(
+      `SELECT manager_id, site_engineer_id, coordinator_id, client_user_id FROM projects WHERE id = $1`,
+      [id]
+    );
+    const prev = before.rows[0] || {};
 
     const result = await pool.query(
       `UPDATE projects SET
@@ -459,16 +496,17 @@ exports.updateProject = async (req, res) => {
         manager_id = COALESCE($6, manager_id),
         site_engineer_id = COALESCE($7, site_engineer_id),
         coordinator_id = COALESCE($8, coordinator_id),
-        status = COALESCE($9, status),
-        progress = COALESCE($10, progress),
-        location = COALESCE($11, location),
-        description = COALESCE($12, description),
-        building_type = COALESCE($13, building_type),
-        floors = COALESCE($14, floors),
-        plot_size = COALESCE($15, plot_size),
-        phone = COALESCE($16, phone),
+        client_user_id = COALESCE($9, client_user_id),
+        status = COALESCE($10, status),
+        progress = COALESCE($11, progress),
+        location = COALESCE($12, location),
+        description = COALESCE($13, description),
+        building_type = COALESCE($14, building_type),
+        floors = COALESCE($15, floors),
+        plot_size = COALESCE($16, plot_size),
+        phone = COALESCE($17, phone),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $17
+       WHERE id = $18
        RETURNING *`,
       [
         name,
@@ -479,6 +517,7 @@ exports.updateProject = async (req, res) => {
         manager_id,
         site_engineer_id,
         coordinator_id,
+        client_user_id,
         status,
         progress,
         location,
@@ -494,7 +533,66 @@ exports.updateProject = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Project not found" });
     }
-    return res.status(200).json(result.rows[0]);
+
+    const updated = result.rows[0];
+
+    // Notify only the roles whose assignment actually changed, same
+    // reasoning as createProject — previously nobody was ever told about a
+    // reassignment, new or existing project alike.
+    try {
+      if (site_engineer_id && String(site_engineer_id) !== String(prev.site_engineer_id)) {
+        await insertSiteEngineerNotification(
+          site_engineer_id,
+          "project",
+          "New project assigned to you",
+          `You've been assigned as site engineer on "${updated.name}".`,
+          "/site-engineer/dashboard",
+          "info",
+          updated.id,
+        );
+      }
+      if (coordinator_id && String(coordinator_id) !== String(prev.coordinator_id)) {
+        await insertNotification(
+          coordinator_id,
+          "project",
+          "New project assigned to you",
+          `You've been assigned as coordinator on "${updated.name}".`,
+          "/project-coordinator/dashboard",
+          "info",
+          updated.id,
+        );
+      }
+      if (manager_id && String(manager_id) !== String(prev.manager_id)) {
+        const mgr = await pool.query(`SELECT user_id FROM employees WHERE id = $1`, [manager_id]);
+        const managerUserId = mgr.rows[0]?.user_id;
+        if (managerUserId) {
+          await insertOperationsNotification(
+            managerUserId,
+            "project",
+            "New project assigned to you",
+            `You've been assigned as project manager on "${updated.name}".`,
+            "/project-manager/dashboard",
+            "info",
+            updated.id,
+            "project_manager",
+          );
+        }
+      }
+      if (client_user_id && String(client_user_id) !== String(prev.client_user_id)) {
+        await notifyClientUser(client_user_id, {
+          type: "project",
+          title: "You've been linked to a project",
+          description: `You now have access to "${updated.name}" in your client portal.`,
+          link: "/client/dashboard",
+          severity: "info",
+          projectId: updated.id,
+        });
+      }
+    } catch (notifErr) {
+      console.warn("⚠️ Reassignment notification failed (non-critical):", notifErr.message);
+    }
+
+    return res.status(200).json(updated);
   } catch (err) {
     console.error("🔥 UPDATE ERROR:", err.message);
     return res.status(500).json({ error: "Failed to update project" });

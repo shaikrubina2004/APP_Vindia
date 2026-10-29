@@ -52,6 +52,36 @@ function WBSSection({ selectedProject }) {
   const toggleWBSExpand = (id) =>
     setExpandedWBS((prev) => ({ ...prev, [id]: !prev[id] }));
 
+  // ── share / unshare a milestone with the client ────────────────────────────
+  // Every milestone is created with visible_to_client = false (both here and
+  // in the auto-plan endpoint) so nothing is exposed to the client by
+  // default — but there was no control anywhere to ever flip it back on, so
+  // the Client Portal's Milestones page was permanently empty for every
+  // project. The backend already supports this via PATCH /api/wbs/:id
+  // (visible_to_client is in its allowed-fields list); this was just never
+  // wired up on the PM side.
+  const toggleVisibleToClient = async (wbs) => {
+    const next = !wbs.visible_to_client;
+    setWbsTree((prev) =>
+      prev.map((w) => (w.id === wbs.id ? { ...w, visible_to_client: next } : w))
+    );
+    try {
+      const res = await authFetch(`${API}/wbs/${wbs.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visible_to_client: next }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+    } catch (err) {
+      console.error("Failed to update client visibility:", err);
+      // roll back on failure
+      setWbsTree((prev) =>
+        prev.map((w) => (w.id === wbs.id ? { ...w, visible_to_client: !next } : w))
+      );
+      alert("Couldn't update client visibility — please try again.");
+    }
+  };
+
   // ── open modals ───────────────────────────────────────────────────────────
   const handleAddMainTask = () => {
     setNewTask({ wbsId: null, name: "", type: "task" });
@@ -366,6 +396,17 @@ function WBSSection({ selectedProject }) {
                     {wbs.status}
                   </span>
                 </div>
+                <button
+                  className={`btn-client-visibility ${wbs.visible_to_client ? "is-shared" : "is-private"}`}
+                  onClick={(e) => { e.stopPropagation(); toggleVisibleToClient(wbs); }}
+                  title={
+                    wbs.visible_to_client
+                      ? "Visible to the client — click to hide"
+                      : "Not visible to the client yet — click to share"
+                  }
+                >
+                  {wbs.visible_to_client ? "👁 Shared with client" : "🔒 Private"}
+                </button>
                 <button
                   className="btn-add-subtask-header"
                   onClick={() => handleAddSubTask(wbs.id)}

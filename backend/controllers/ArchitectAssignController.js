@@ -1,16 +1,22 @@
 const pool = require("../config/db");
+const { insertArchitectNotification } = require("./architectNotificationsController");
 
 /**
  * GET /api/architect-assign/architects
- * Fetch all active users with role_id = 29 (Architect)
+ * Fetch all active architects.
+ * Was: WHERE role_id = 29 — a hardcoded role id that only means "Architect"
+ * by coincidence of however roles were seeded in one particular database.
+ * Same bug class already found and fixed in projectController.js's
+ * getCoordinators/getSiteEngineers — matched by role name instead.
  */
 const getArchitects = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, name, email, status
-       FROM users
-       WHERE role_id = 29
-       ORDER BY name ASC`
+      `SELECT u.id, u.name, u.email, u.status
+       FROM users u
+       INNER JOIN roles r ON u.role_id = r.id
+       WHERE LOWER(r.name) LIKE '%architect%'
+       ORDER BY u.name ASC`
     );
 
     res.json({
@@ -61,9 +67,12 @@ const assignArchitect = async (req, res) => {
       });
     }
 
-    // Check architect exists with role_id = 29
+    // Check architect exists — same role-name match as getArchitects above.
     const archCheck = await pool.query(
-      "SELECT id, name FROM users WHERE id = $1 AND role_id = 29",
+      `SELECT u.id, u.name
+       FROM users u
+       INNER JOIN roles r ON u.role_id = r.id
+       WHERE u.id = $1 AND LOWER(r.name) LIKE '%architect%'`,
       [architect_id]
     );
 
@@ -86,6 +95,23 @@ const assignArchitect = async (req, res) => {
     );
 
     const isUpdate = !!existingArchitectId;
+
+    // Let the architect know they've been assigned — same gap as
+    // createProject/updateProject had before (nobody was ever notified of
+    // an assignment made through this endpoint).
+    try {
+      await insertArchitectNotification(
+        architect_id,
+        "project",
+        isUpdate ? "Project assignment updated" : "New project assigned to you",
+        `You've been assigned as architect on "${updateResult.rows[0].name}".`,
+        "/architect/dashboard",
+        "info",
+        updateResult.rows[0].id,
+      );
+    } catch (notifErr) {
+      console.warn("⚠️ Architect assignment notification failed (non-critical):", notifErr.message);
+    }
 
     res.json({
       success: true,

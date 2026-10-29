@@ -141,7 +141,20 @@ async function getAccessibleProjectIds(req) {
   const role = roleOf(req);
   if (isCeo(req)) return null; // null = all projects
 
-  const params = [employee.id, req.user.id];
+  // QS has no dedicated project-assignment FK in the current schema, so keep
+  // existing project access for QS while still requiring authentication.
+  if (role === "quantity_surveyor") {
+    return null;
+  }
+
+  // params/conditions used to be built separately — params was always
+  // hardcoded to [employee.id, req.user.id] (2 values), but the
+  // project_manager branch below only ever referenced $1 in the SQL text.
+  // Postgres sizes a prepared statement by the highest placeholder it finds
+  // in the query, so for a project_manager this always threw "bind message
+  // supplies 2 parameters, but prepared statement requires 1" — built now so
+  // params only ever contains what's actually referenced.
+  const params = [employee.id];
   const conditions = [
     `EXISTS (
        SELECT 1
@@ -154,13 +167,8 @@ async function getAccessibleProjectIds(req) {
   if (role === "project_manager") {
     conditions.push(`p.manager_id = $1`);
   } else if (role === "site_engineer") {
-    conditions.push(`p.site_engineer_id = $2`);
-  }
-
-  // QS has no dedicated project-assignment FK in the current schema, so keep
-  // existing project access for QS while still requiring authentication.
-  if (role === "quantity_surveyor") {
-    return null;
+    params.push(req.user.id);
+    conditions.push(`p.site_engineer_id = $${params.length}`);
   }
 
   const sql = `
@@ -491,6 +499,66 @@ async function getTeamTimesheets(req, res) {
 
 router.get("/team", getTeamTimesheets);
 router.get("/", getTeamTimesheets);
+
+// GET /timesheets/project/:projectId
+// Hours actually recorded against one project/WBS — this is what the PM
+// dashboard's per-project "Timesheet" tab needs (who logged hours, how many,
+// on which task, this week vs overall), which /team and /team/summary above
+// can't answer since they only return whole-timesheet totals with no
+// project breakdown at all.
+router.get("/project/:projectId", async (req, res) => {
+  try {
+    const projectId = Number(req.params.projectId);
+    if (!Number.isInteger(projectId) || projectId <= 0) {
+      return res.status(400).json({ error: "Invalid project ID" });
+    }
+    if (!(await canUserAccessProject(req, projectId))) {
+      return res.status(403).json({ error: "You are not assigned to this project." });
+    }
+
+    const result = await pool.query(
+      `SELECT te.id, te.work_date, te.project_id, te.task_id,
+              te.regular_hours, te.overtime_hours, te.leave_hours, te.description,
+              t.id AS timesheet_id, t.status AS timesheet_status, t.week_start, t.week_end,
+              e.id AS employee_id, e.name AS employee_name, e.designation,
+              tk.title AS task_title
+         FROM timesheet_entries te
+         JOIN timesheets t ON t.id = te.timesheet_id
+         JOIN employees e ON e.id = t.employee_id
+         LEFT JOIN tasks tk ON tk.id = te.task_id
+        WHERE te.project_id = $1
+        ORDER BY te.work_date DESC, e.name ASC`,
+      [projectId]
+    );
+
+    const entries = result.rows.map((r) => ({
+      ...r,
+      status: displayStatus(r.timesheet_status),
+      regular_hours: Number(r.regular_hours || 0),
+      overtime_hours: Number(r.overtime_hours || 0),
+      leave_hours: Number(r.leave_hours || 0),
+    }));
+
+    const totalHours = entries.reduce((s, e) => s + e.regular_hours + e.overtime_hours, 0);
+    const uniqueStaff = new Set(entries.map((e) => e.employee_id)).size;
+
+    res.json({
+      data: entries,
+      summary: {
+        total_hours: totalHours,
+        staff_count: uniqueStaff,
+        entry_count: entries.length,
+      },
+    });
+  } catch (err) {
+    console.error("timesheets/project/:projectId:", err);
+    // Temporarily echoing err.message here (instead of just the generic
+    // string) so the real Postgres error is visible without digging through
+    // server logs. This is an authenticated, internal endpoint, so it's safe
+    // to leave in — but fine to remove once this is confirmed working.
+    res.status(500).json({ error: "Failed to fetch project timesheets", detail: err.message });
+  }
+});
 
 router.get("/options/projects", async (req, res) => {
   try {

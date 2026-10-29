@@ -1,5 +1,6 @@
 import Navbar from "../components/layout/Navbar";
 import Sidebar from "../components/layout/Sidebar";
+import TeamFloatingWidget from "../components/TeamFloatingWidget";
 import "../styles/Layout.css";
 
 function AppLayout({
@@ -20,6 +21,9 @@ function AppLayout({
           </div>
         </div>
       </div>
+
+      {/* Floating "My Project Team" button + pop-outs. Hides itself when you are not on a project. */}
+      <TeamFloatingWidget />
     </>
   );
 }
