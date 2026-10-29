@@ -44,6 +44,15 @@ const isSE = (req) => roleOf(req) === "structural_engineer";
 const isCeo = (req) => roleOf(req) === "ceo";
 const canReview = (req) => ["project_manager", "ceo"].includes(roleOf(req));
 const sameUser = (a, b) => String(a) === String(b);
+const managedProjectNameAccess = (projectNameExpression, userPlaceholder) => `
+  EXISTS (
+    SELECT 1
+    FROM projects managed_project
+    JOIN employees manager ON manager.id = managed_project.manager_id
+    WHERE managed_project.name = ${projectNameExpression}
+      AND manager.user_id = ${userPlaceholder}
+  )
+`;
 
 // A log belongs to the SE who filed it. Older logs saved before this change
 // have no owner (user_id is NULL); the first SE to open one claims it.
@@ -98,7 +107,9 @@ exports.getAllReports = async (req, res) => {
       result = await pool.query(
         `SELECT id, project_name, date, overall_status, submitted_by, data, approved, user_id
          FROM se_daily_reports
-         ORDER BY date DESC`
+         WHERE ($1 <> 'project_manager' OR ${managedProjectNameAccess("project_name", "$2")})
+         ORDER BY date DESC`,
+        [req.user.role, req.user.id]
       );
     } else {
       return res.status(403).json({ error: "You are not allowed to view these reports" });
@@ -116,8 +127,10 @@ exports.getAllReports = async (req, res) => {
 exports.getReportById = async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM se_daily_reports WHERE id = $1",
-      [req.params.id]
+      `SELECT * FROM se_daily_reports
+       WHERE id = $1
+         AND ($2 <> 'project_manager' OR ${managedProjectNameAccess("project_name", "$3")})`,
+      [req.params.id, req.user.role, req.user.id]
     );
     if (!result.rows.length) {
       return res.status(404).json({ error: "Report not found" });
@@ -299,8 +312,9 @@ exports.approveReport = async (req, res) => {
       `UPDATE se_daily_reports
        SET approved = TRUE, approved_by = $2, approved_at = NOW(), updated_at = NOW()
        WHERE id = $1
+         AND ($3 <> 'project_manager' OR ${managedProjectNameAccess("project_name", "$4")})
        RETURNING id, approved`,
-      [req.params.id, req.user.id]
+      [req.params.id, req.user.id, req.user.role, req.user.id]
     );
     if (!result.rows.length) {
       return res.status(404).json({ error: "Report not found" });

@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { isAssignedProject, getAssignedProjectIds } = require("../utils/siteEngineerAccess");
 
 /**
  * Create Activity Log Entry
@@ -36,16 +37,20 @@ exports.getAllActivityLogs = async (req, res) => {
                  FROM activity_log al
                  LEFT JOIN employees u ON al.user_id = u.id`;
     const params = [];
-
+    const conditions = [];
     if (project_id) {
-      query += ` WHERE al.project_id = $1`;
       params.push(project_id);
-      query += ` ORDER BY al.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-      params.push(limit, offset);
-    } else {
-      query += ` ORDER BY al.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-      params.push(limit, offset);
+      conditions.push(`al.project_id = $${params.length}`);
     }
+    if (req.user?.role === "site_engineer") {
+      const assignedProjectIds = await getAssignedProjectIds(req.user.id);
+      if (!assignedProjectIds.length) return res.json([]);
+      params.push(assignedProjectIds);
+      conditions.push(`al.project_id = ANY($${params.length}::int[])`);
+    }
+    if (conditions.length) query += ` WHERE ${conditions.join(" AND ")}`;
+    query += ` ORDER BY al.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
 
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -62,6 +67,13 @@ exports.getActivityLogsByProject = async (req, res) => {
   try {
     const { projectId } = req.params;
     const { limit = 100 } = req.query;
+
+    if (
+      req.user?.role === "site_engineer" &&
+      !(await isAssignedProject(req.user.id, projectId))
+    ) {
+      return res.status(404).json({ error: "Project not found" });
+    }
 
     const result = await pool.query(
       `SELECT al.*, u.name as user_name

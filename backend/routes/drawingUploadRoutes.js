@@ -113,8 +113,7 @@ router.get("/floors/:project_id", getFloorsByProject);
 // ── Daily Logs ────────────────────────
 router.post("/daily-logs", upsertDailyLog);
 router.get("/daily-logs/check", checkTodayLog);
-router.get("/daily-logs/all", async (req, res) => {
-  /* PM-only: fetch all MEP daily logs across all projects */
+router.get("/daily-logs/all", authMiddleware.requireRole("project_manager", "ceo"), async (req, res) => {
   try {
     const pool = require("../config/db");
     const result = await pool.query(
@@ -125,8 +124,16 @@ router.get("/daily-logs/all", async (req, res) => {
        LEFT JOIN project_floors pf ON pf.id = dl.floor_id
        LEFT JOIN users u ON u.id = dl.submitted_by
        LEFT JOIN projects p ON p.id = dl.project_id
+       WHERE ($1 <> 'project_manager' OR EXISTS (
+         SELECT 1
+         FROM projects managed_project
+         JOIN employees manager ON manager.id = managed_project.manager_id
+         WHERE managed_project.id = dl.project_id
+           AND manager.user_id = $2
+       ))
        ORDER BY dl.log_date DESC, dl.created_at DESC
        LIMIT 200`,
+      [req.user.role, req.user.id]
     );
     res.json(result.rows);
   } catch (err) {

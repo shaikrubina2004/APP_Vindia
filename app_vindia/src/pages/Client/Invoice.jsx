@@ -16,7 +16,7 @@ const PAY = {
   due: ["Due", "pill--danger"],
 };
 
-function Breakdown({ id }) {
+function InvoiceDetails({ id }) {
   const [st, setSt] = useState({ loading: true, error: "", inv: null });
 
   useEffect(() => {
@@ -32,52 +32,20 @@ function Breakdown({ id }) {
     };
   }, [id]);
 
-  if (st.loading) return <p className="cl-muted-note">Loading breakdown…</p>;
+  if (st.loading) return <p className="cl-muted-note">Loading invoice details…</p>;
   if (st.error) return <p className="cl-muted-note" style={{ color: "var(--red)" }}>{st.error}</p>;
-  const { material_lines = [], labour_lines = [] } = st.inv;
+  const invoice = st.inv;
 
   return (
     <div className="cl-breakdown">
       <div className="cl-breakdown__block">
-        <div className="cl-breakdown__title">Materials</div>
-        {material_lines.length ? (
-          <table className="cl-table cl-table--compact">
-            <thead>
-              <tr><th>Description</th><th>Unit</th><th style={{ textAlign: "right" }}>Qty</th><th style={{ textAlign: "right" }}>Rate</th><th style={{ textAlign: "right" }}>Amount</th></tr>
-            </thead>
-            <tbody>
-              {material_lines.map((l, i) => (
-                <tr key={i}>
-                  <td>{l.description}</td>
-                  <td>{l.unit}</td>
-                  <td style={{ textAlign: "right" }}>{l.quantity.toLocaleString("en-IN")}</td>
-                  <td style={{ textAlign: "right" }}>{fmtINR(l.rate)}</td>
-                  <td style={{ textAlign: "right" }}>{fmtINR(l.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : <p className="cl-muted-note">No material lines.</p>}
-      </div>
-      <div className="cl-breakdown__block">
-        <div className="cl-breakdown__title">Labour</div>
-        {labour_lines.length ? (
-          <table className="cl-table cl-table--compact">
-            <thead>
-              <tr><th>Trade</th><th style={{ textAlign: "right" }}>Workers</th><th style={{ textAlign: "right" }}>Days</th><th style={{ textAlign: "right" }}>Amount</th></tr>
-            </thead>
-            <tbody>
-              {labour_lines.map((l, i) => (
-                <tr key={i}>
-                  <td>{l.type}</td>
-                  <td style={{ textAlign: "right" }}>{l.workers}</td>
-                  <td style={{ textAlign: "right" }}>{l.days}</td>
-                  <td style={{ textAlign: "right" }}>{fmtINR(l.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : <p className="cl-muted-note">No labour lines.</p>}
+        <div className="cl-breakdown__title">{invoice.invoice_number || `Invoice #${invoice.id}`}</div>
+        <p className="cl-muted-note">
+          {invoice.milestone_name || "Project invoice"}
+          {invoice.due_date ? ` · Due ${fmtDate(invoice.due_date)}` : ""}
+          {invoice.tax_amount > 0 ? ` · Tax ${fmtINR(invoice.tax_amount)}` : ""}
+        </p>
+        <p className="cl-muted-note">Invoice details and payment status are recorded by the project finance team.</p>
       </div>
     </div>
   );
@@ -108,7 +76,7 @@ export default function Invoice() {
           <div className="cl-eyebrow">Finance</div>
           <h1 className="cl-page-title">Invoices</h1>
           <p className="cl-page-sub">
-            {invoices.length} finalised invoice{invoices.length !== 1 ? "s" : ""}. Estimates still under review are not billed.
+            {invoices.length} invoice{invoices.length !== 1 ? "s" : ""} issued by the project finance team.
           </p>
         </div>
       </div>
@@ -163,12 +131,11 @@ export default function Invoice() {
               <tr>
                 <th>Invoice</th>
                 <th>Milestone</th>
-                <th style={{ textAlign: "right" }}>Material</th>
-                <th style={{ textAlign: "right" }}>Labour</th>
                 <th style={{ textAlign: "right" }}>Total</th>
                 <th style={{ textAlign: "right" }}>Paid</th>
                 <th style={{ textAlign: "right" }}>Balance</th>
-                <th>Finalised on</th>
+                <th>Issued on</th>
+                <th>Due date</th>
                 <th>Status</th>
                 <th />
               </tr>
@@ -181,24 +148,23 @@ export default function Invoice() {
                   return (
                     <Fragment key={inv.id}>
                       <tr>
-                        <td><span className="cl-mono">INV-{String(inv.id).padStart(4, "0")}</span></td>
-                        <td>{inv.milestone_name || "—"}</td>
-                        <td style={{ textAlign: "right" }}>{fmtINR(inv.material_total)}</td>
-                        <td style={{ textAlign: "right" }}>{fmtINR(inv.labour_total)}</td>
+                        <td><span className="cl-mono">{inv.invoice_number || `INV-${String(inv.id).padStart(4, "0")}`}</span></td>
+                        <td>{inv.milestone_name || "Project invoice"}</td>
                         <td style={{ textAlign: "right", fontWeight: 700 }}>{fmtINR(inv.amount)}</td>
                         <td style={{ textAlign: "right", color: "var(--green)" }}>{fmtINR(inv.paid_amount)}</td>
                         <td style={{ textAlign: "right", color: inv.balance > 0 ? "var(--red)" : "var(--text-muted)" }}>{fmtINR(inv.balance)}</td>
                         <td style={{ color: "var(--text-muted)" }}>{fmtDate(inv.invoice_date)}</td>
+                        <td style={{ color: "var(--text-muted)" }}>{fmtDate(inv.due_date)}</td>
                         <td><span className={`pill ${cls}`}>{label}</span></td>
                         <td>
                           <button className="cl-btn cl-btn--ghost" style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => setOpenId(isOpen ? null : inv.id)}>
-                            {isOpen ? "Hide" : "Breakdown"}
+                            {isOpen ? "Hide" : "Details"}
                           </button>
                         </td>
                       </tr>
                       {isOpen && (
                         <tr className="cl-breakdown-row">
-                          <td colSpan={10}><Breakdown id={inv.id} /></td>
+                          <td colSpan={9}><InvoiceDetails id={inv.id} /></td>
                         </tr>
                       )}
                     </Fragment>
@@ -206,10 +172,10 @@ export default function Invoice() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={10}>
+                  <td colSpan={9}>
                     <div className="cl-empty">
                       <div className="cl-empty__icon">🧾</div>
-                      <p>{invoices.length ? "No invoices match this filter." : "No invoices yet. An invoice appears once a milestone's BOQ is finalised."}</p>
+                      <p>{invoices.length ? "No invoices match this filter." : "No project invoices have been issued yet."}</p>
                     </div>
                   </td>
                 </tr>
@@ -218,7 +184,7 @@ export default function Invoice() {
           </table>
         </div>
         <p className="cl-muted-note" style={{ padding: "10px 16px 14px" }}>
-          Payments received are applied to the oldest invoice first.
+          Payments are matched to the invoice they were recorded against. Unallocated advances are shown in Payments.
         </p>
       </div>
     </div>

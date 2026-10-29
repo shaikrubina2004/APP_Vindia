@@ -2,11 +2,12 @@
 // Mounted in AppRoutes at  /operations/administrator/*  (role + layout applied there).
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import OfficeAdministratorDashboard from "../pages/operations/administrator/OfficeAdministratorDashboard";
-import OfficeRequests from "../pages/operations/administrator/OfficeRequests";
-import Visitors from "../pages/operations/administrator/Visitors";
-import Assets from "../pages/operations/administrator/Assets";
-import OfficeDailyUpdate from "../pages/operations/administrator/OfficeDailyUpdate";
+import OfficeAdministratorDashboard from "../pages/Operations/administrator/OfficeAdministratorDashboard";
+import OfficeRequests from "../pages/Operations/administrator/OfficeRequests";
+import OfficeAdminModule from "../pages/Operations/administrator/OfficeAdminModule";
+import Visitors from "../pages/Operations/administrator/Visitors";
+import Assets from "../pages/Operations/administrator/Assets";
+import OfficeDailyUpdate from "../pages/Operations/administrator/OfficeDailyUpdate";
 import AppShell from "../components/incidents/AppShell";
 
 export default function OfficeAdministratorRoutes() {
@@ -15,9 +16,8 @@ export default function OfficeAdministratorRoutes() {
       <Route index element={<Navigate to="dashboard" replace />} />
       <Route path="dashboard" element={<OfficeAdministratorDashboard />} />
       <Route path="requests" element={<OfficeRequests title="Office Requests" />} />
-      {/* Same screen, pre-filtered — keeps one backend table and one UI */}
-      <Route path="supplies" element={<OfficeRequests title="Office Supplies" defaultCategory="supplies" />} />
-      <Route path="facilities" element={<OfficeRequests title="Facilities & Maintenance" defaultCategory="maintenance" />} />
+      <Route path="supplies" element={<OfficeAdminModule module="supplies" />} />
+      <Route path="facilities" element={<OfficeAdminModule module="facilities" />} />
       <Route path="visitors" element={<Visitors />} />
       <Route path="assets" element={<Assets />} />
       <Route path="daily-update" element={<OfficeDailyUpdate />} />

@@ -556,3 +556,146 @@ a.hub-tile:hover {
     transition: none !important;
   }
 }
+
+/* ── Role accents: preserve one shared system, give each workspace a clear identity ── */
+.operations-manager-portal .ops-page {
+  --ops-primary: #2356a8;
+  --ops-primary-2: #3974c6;
+  --ops-primary-dark: #163d79;
+  --ops-primary-soft: #edf3fc;
+  --ops-shadow-hover: 0 12px 28px rgba(27, 68, 127, 0.13);
+}
+
+.operations-manager-portal .ops-hero {
+  background:
+    radial-gradient(circle at 82% 18%, rgba(116, 164, 232, 0.24), transparent 28%),
+    linear-gradient(118deg, #152e4e 0%, #234b79 58%, #2b6295 100%);
+  box-shadow: 0 14px 34px rgba(24, 57, 97, 0.2);
+}
+
+.operations-manager-portal .ops-hero-actions .ops-btn-primary {
+  color: #173c70;
+}
+
+.operations-manager-portal .ops-hero-actions .ops-btn-primary:hover:not(:disabled) {
+  color: #102f5a;
+  background: #edf4ff;
+}
+
+.operations-manager-portal .ops-card {
+  border-color: #e2e9f1;
+}
+
+.operations-manager-portal .hub-pipeline {
+  padding: 22px 18px 24px;
+}
+
+.operations-manager-portal .hub-stage {
+  min-height: 158px;
+  justify-content: flex-start;
+  padding: 10px 12px;
+}
+
+.operations-manager-portal .hub-stage-dot {
+  width: 46px;
+  height: 46px;
+  margin-bottom: 11px;
+  box-shadow: 0 5px 13px rgba(35, 86, 168, 0.18);
+}
+
+.operations-manager-portal .hub-stage-name {
+  margin-top: 5px;
+  font-weight: 700;
+}
+
+.operations-manager-portal .hub-attention a {
+  padding: 12px 14px;
+}
+
+.operations-manager-portal .hub-feed li {
+  padding: 12px 0;
+}
+
+.office-administrator-portal .ops-page {
+  --ops-primary: #147d78;
+  --ops-primary-2: #249b8e;
+  --ops-primary-dark: #105e5a;
+  --ops-primary-soft: #e8f5f2;
+  --ops-shadow-hover: 0 12px 28px rgba(20, 105, 99, 0.12);
+}
+
+.office-administrator-portal .ops-hero {
+  background:
+    radial-gradient(circle at 82% 18%, rgba(74, 205, 176, 0.2), transparent 28%),
+    linear-gradient(118deg, #12343d 0%, #17565a 60%, #167a73 100%);
+  box-shadow: 0 14px 34px rgba(18, 68, 68, 0.17);
+}
+
+.office-administrator-portal .ops-hero-actions .ops-btn-primary {
+  color: #125c56;
+}
+
+.office-administrator-portal .ops-hero-actions .ops-btn-primary:hover:not(:disabled) {
+  color: #104943;
+  background: #e9f7f3;
+}
+
+.office-administrator-portal .ops-card {
+  border-color: #e2ece9;
+}
+
+.office-administrator-portal .ops-kpi-card::before {
+  background: var(--ops-primary);
+}
+
+.office-administrator-portal .ops-kpi-card:has(.ops-tone-amber)::before {
+  background: #d89022;
+}
+
+.office-administrator-portal .ops-kpi-card:has(.ops-tone-emerald)::before {
+  background: #15936f;
+}
+
+.office-administrator-portal .ops-kpi-card:has(.ops-tone-sky)::before {
+  background: #428aa0;
+}
+
+.office-administrator-portal .ops-table th {
+  background: #f5faf9;
+}
+
+.office-administrator-portal .ops-table tbody tr:hover {
+  background: #f3faf8;
+}
+
+.office-administrator-portal .hub-feed-ico {
+  color: #147d78;
+  background: #e8f5f2;
+}
+
+.office-administrator-portal .hub-stat-tiles .hub-tile {
+  background: #f5faf9;
+  border-color: #e3efec;
+}
+
+.office-administrator-portal a.hub-tile:hover {
+  box-shadow: var(--ops-shadow-hover);
+}
+
+@media (max-width: 720px) {
+  .operations-manager-portal .hub-pipeline {
+    padding: 14px;
+  }
+
+  .operations-manager-portal .hub-stage {
+    min-height: 0;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .office-administrator-portal .ops-hero {
+    background:
+      radial-gradient(circle at 100% 0, rgba(74, 205, 176, 0.18), transparent 34%),
+      linear-gradient(118deg, #12343d 0%, #17565a 60%, #167a73 100%);
+  }
+}

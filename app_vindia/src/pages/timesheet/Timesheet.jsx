@@ -1,63 +1,26 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import "../../styles/timesheet.css";
 import ApplyLeave from "../../SharedResourse/ApplyLeave";
 import ManagerTimesheet from "./ManagerTimesheet";
 import API from "../../services/authService";
 import { useAuth } from "../../context/useAuth";
 
-function buildMonthWeeks(year, month) {
-  const lastDate = new Date(year, month + 1, 0).getDate();
-  const weeks = [];
-  let d = 1;
-
-  while (d <= lastDate) {
-    const startDate = new Date(year, month, d);
-    const startDow = startDate.getDay();
-    const daysUntilNextSunday = startDow === 0 ? 7 : 7 - startDow;
-    const endD = Math.min(d + daysUntilNextSunday, lastDate);
-
-    const weekDays = [];
-    for (let i = d; i <= endD; i++) {
-      const date = new Date(year, month, i);
-      weekDays.push({
-        label: date.toLocaleDateString("en-IN", {
-          weekday: "short",
-          day: "numeric",
-        }),
-        full: new Date(date),
-        dayOfWeek: date.getDay(),
-        isSunday: date.getDay() === 0,
-      });
-    }
-    weeks.push(weekDays);
-    d = endD + 1;
-  }
-
-  while (weeks.length >= 2 && weeks[weeks.length - 1].length < 7) {
-    weeks[weeks.length - 2] = [
-      ...weeks[weeks.length - 2],
-      ...weeks[weeks.length - 1],
-    ];
-    weeks.pop();
-  }
-
-  return weeks;
-}
-
 function getWeekDates(anchorDate) {
   const anchor = new Date(anchorDate);
   anchor.setHours(0, 0, 0, 0);
-  const year = anchor.getFullYear();
-  const month = anchor.getMonth();
-  const date = anchor.getDate();
-  const weeks = buildMonthWeeks(year, month);
+  const mondayOffset = (anchor.getDay() + 6) % 7;
+  anchor.setDate(anchor.getDate() - mondayOffset);
 
-  for (const week of weeks) {
-    const from = week[0].full.getDate();
-    const to = week[week.length - 1].full.getDate();
-    if (date >= from && date <= to) return week;
-  }
-  return weeks[weeks.length - 1] || [];
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(anchor);
+    date.setDate(anchor.getDate() + index);
+    return {
+      label: date.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" }),
+      full: date,
+      dayOfWeek: date.getDay(),
+      isSunday: date.getDay() === 0,
+    };
+  });
 }
 
 function isUploadAllowed(weekDates) {
@@ -103,6 +66,14 @@ const MANAGER_ROLES = [
   "CEO",
 ];
 
+const EDITABLE_TIMESHEET_STATUSES = new Set([
+  "not submitted",
+  "draft",
+  "changes requested",
+  "rejected",
+  "reopened",
+]);
+
 export default function Timesheet() {
   const { user } = useAuth();
 
@@ -110,7 +81,7 @@ export default function Timesheet() {
 const normalizedRole = String(user?.role || "").trim().toLowerCase();
   const isManager = MANAGER_ROLES.map((role) => role.toLowerCase()).includes(normalizedRole);
   const [view, setView] = useState("MY");
-  const currentDate = new Date();
+  const [currentDate] = useState(() => new Date());
   const [rows, setRows] = useState([
     {
       id: 1,
@@ -122,12 +93,20 @@ const normalizedRole = String(user?.role || "").trim().toLowerCase();
     },
   ]);
   const [submissionStatus, setSubmissionStatus] = useState("NOT SUBMITTED");
+  const [timesheetLoaded, setTimesheetLoaded] = useState(false);
+  const [timesheetError, setTimesheetError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [appliedLeaves, setAppliedLeaves] = useState([]);
   const [projects, setProjects] = useState([]);
   const [tasksByProject, setTasksByProject] = useState({});
 
-  const weekDates = getWeekDates(currentDate);
+  const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
   const canSubmit = isUploadAllowed(weekDates);
+  const canEditTimesheet =
+    timesheetLoaded &&
+    EDITABLE_TIMESHEET_STATUSES.has(
+      String(submissionStatus).trim().toLowerCase().replace(/_/g, " "),
+    );
 
   const leaveDayFlags = weekDates.map((day) =>
     isDateOnLeave(day.full, appliedLeaves),
@@ -157,6 +136,7 @@ const normalizedRole = String(user?.role || "").trim().toLowerCase();
   };
 
   const handleHours = (id, idx, val) => {
+    if (!canEditTimesheet) return;
     if (leaveDayFlags[idx]) return;
     const dateKey = toDateStr(weekDates[idx].full);
     setRows(
@@ -206,6 +186,54 @@ const normalizedRole = String(user?.role || "").trim().toLowerCase();
       0,
     );
 
+  const collectEntries = (allowEmpty = false) => {
+    const payload = [];
+    const dailyTotals = new Map();
+    const approvedLeaveDates = new Set(
+      weekDates
+        .filter((_, index) => leaveDayFlags[index])
+        .map((day) => toDateStr(day.full)),
+    );
+
+    for (const row of rows) {
+      for (const [date, value] of Object.entries(row.hours || {})) {
+        const hrs = Number(value);
+        if (!Number.isFinite(hrs) || hrs < 0 || hrs > 12) {
+          alert("Enter between 0 and 12 hours per task per day.");
+          return null;
+        }
+        if (hrs <= 0) continue;
+        if (approvedLeaveDates.has(date)) {
+          alert(`Remove time entries for ${date}, which is an approved leave day.`);
+          return null;
+        }
+        if (!row.projectCode || !row.taskCode) {
+          alert("Select a project and task for every row with hours.");
+          return null;
+        }
+        const nextDailyTotal = (dailyTotals.get(date) || 0) + hrs;
+        if (nextDailyTotal > 24) {
+          alert(`Total timesheet hours for ${date} cannot exceed 24.`);
+          return null;
+        }
+        dailyTotals.set(date, nextDailyTotal);
+        payload.push({
+          project_id: row.projectCode,
+          task_id: row.taskCode,
+          work_date: date,
+          hours: hrs,
+          description: row.employeeType,
+        });
+      }
+    }
+
+    if (!allowEmpty && !payload.length) {
+      alert("Add at least one valid project, task, and hours entry before submitting.");
+      return null;
+    }
+    return payload;
+  };
+
   const timeOffDayValue = (idx) => (leaveDayFlags[idx] ? 9 : "");
   const timeOffTotal = () =>
     weekDates.reduce((s, _, idx) => s + (leaveDayFlags[idx] ? 9 : 0), 0);
@@ -249,9 +277,9 @@ const normalizedRole = String(user?.role || "").trim().toLowerCase();
 
     loadInitialData();
     return () => { cancelled = true; };
-  }, [user?.id]);
+  }, [user?.id, user?.name]);
 
-  const loadTasks = async (projectId) => {
+  const loadTasks = useCallback(async (projectId) => {
     if (!projectId || tasksByProject[projectId]) return;
     try {
       const res = await API.get(`/timesheets/options/projects/${projectId}/tasks`);
@@ -259,9 +287,10 @@ const normalizedRole = String(user?.role || "").trim().toLowerCase();
     } catch (err) {
       console.error("Failed to load timesheet tasks:", err);
     }
-  };
+  }, [tasksByProject]);
 
   const handleProjectSelect = (id, projectCode) => {
+    if (!canEditTimesheet) return;
     loadTasks(projectCode);
     setRows(
       rows.map((r) => (r.id === id ? { ...r, projectCode, taskCode: "" } : r)),
@@ -269,14 +298,17 @@ const normalizedRole = String(user?.role || "").trim().toLowerCase();
   };
 
   const handleTaskSelect = (id, taskCode) => {
+    if (!canEditTimesheet) return;
     setRows(rows.map((r) => (r.id === id ? { ...r, taskCode } : r)));
   };
 
   const handleEmpType = (id, val) => {
+    if (!canEditTimesheet) return;
     setRows(rows.map((r) => (r.id === id ? { ...r, employeeType: val } : r)));
   };
 
   const addTaskToGroup = (groupId) => {
+    if (!canEditTimesheet) return;
     const lastGroupRow = rows.filter((r) => r.groupId === groupId).pop();
     if (!lastGroupRow || !lastGroupRow.projectCode) {
       alert("Please select a project first");
@@ -299,6 +331,7 @@ const normalizedRole = String(user?.role || "").trim().toLowerCase();
   };
 
   const addRow = () => {
+    if (!canEditTimesheet) return;
     const newGroupId = Math.max(...rows.map((r) => r.groupId), 0) + 1;
     setRows([
       ...rows,
@@ -314,12 +347,14 @@ const normalizedRole = String(user?.role || "").trim().toLowerCase();
   };
 
   const deleteRow = (id) => {
+    if (!canEditTimesheet) return;
     if (id === 1) return;
     setRows(rows.filter((r) => r.id !== id));
   };
 
   // ── FIX 2: Quick fill now skips Sunday AND leave days ──────────────────────
   const handleQuickFill = () => {
+    if (!canEditTimesheet) return;
     const h = prompt("Enter hours for all working days:", "8");
     if (h && !isNaN(h) && Number(h) > 0) {
       setRows(
@@ -340,6 +375,7 @@ const normalizedRole = String(user?.role || "").trim().toLowerCase();
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleClearAll = () => {
+    if (!canEditTimesheet) return;
     if (confirm("Clear all time entries for this week?")) {
       setRows(
         rows.map((r) => {
@@ -354,76 +390,120 @@ const normalizedRole = String(user?.role || "").trim().toLowerCase();
   };
 
   const handleSubmit = async () => {
-  if (!canSubmit) {
-    alert(`This week's timesheet can be submitted on or after ${getDueDate()}.`);
-    return;
-  }
-
-  try {
-    const payload = [];
-
-    rows.forEach((row) => {
-      Object.entries(row.hours || {}).forEach(([date, hrs]) => {
-        if (hrs > 0) {
-          payload.push({
-            project_id: row.projectCode,
-            task_id: row.taskCode,
-            work_date: date,
-            hours: hrs,
-            description: row.employeeType,
-          });
-        }
-      });
-    });
-
-    await API.post("/timesheets/bulk", payload);
-
-    setSubmissionStatus("SUBMITTED");
-    alert("Timesheet submitted successfully");
-
-  } catch (err) {
-    console.error(err);
-    alert("Submission failed");
-  }
-};
-const fetchMyTimesheet = async () => {
-  try {
-    const weekStart = toDateStr(weekDates[0]?.full || new Date());
-    const res = await API.get("/timesheets/me", { params: { week_start: weekStart } });
-    const sheet = res.data?.data;
-
-    if (!sheet) {
-      setSubmissionStatus("NOT SUBMITTED");
+    if (!canEditTimesheet) {
+      alert("This timesheet is not loaded or is locked. Only a draft, returned, rejected, or reopened timesheet can be edited.");
+      return;
+    }
+    if (!canSubmit) {
+      alert(`This week's timesheet can be submitted on or after ${getDueDate()}.`);
       return;
     }
 
-    const grouped = new Map();
-    (sheet.entries || []).forEach((entry) => {
-      const key = `${entry.project_id || ""}:${entry.task_id || ""}`;
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          id: entry.id,
-          projectCode: entry.project_id == null ? "" : String(entry.project_id),
-          taskCode: entry.task_id == null ? "" : String(entry.task_id),
-          employeeType: entry.description || "Employee",
-          hours: {},
-          groupId: entry.project_id || entry.id,
-        });
-      }
-      const row = grouped.get(key);
-      const dateKey = String(entry.work_date).slice(0, 10);
-      row.hours[dateKey] = Number(entry.regular_hours || 0) + Number(entry.overtime_hours || 0);
-    });
+    try {
+      const payload = collectEntries();
+      if (!payload) return;
 
-    if (grouped.size) setRows(Array.from(grouped.values()));
-    setSubmissionStatus(sheet.display_status || sheet.status || "NOT SUBMITTED");
-  } catch (err) {
-    console.error("Fetch error:", err);
-  }
-};
-useEffect(() => {
-  fetchMyTimesheet();
-}, []);
+      setIsSubmitting(true);
+      await API.post("/timesheets/bulk", payload);
+
+      const refreshed = await fetchMyTimesheet();
+      alert(
+        refreshed
+          ? "Timesheet submitted successfully."
+          : "Timesheet submitted, but its latest status could not be loaded. Refresh the page before editing.",
+      );
+
+    } catch (err) {
+      console.error("Timesheet submission failed:", err);
+      alert(err.response?.data?.error || "Timesheet submission failed. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!canEditTimesheet) {
+      alert("This timesheet is not loaded or is locked.");
+      return;
+    }
+
+    const entries = collectEntries(true);
+    if (!entries) return;
+    setIsSubmitting(true);
+    try {
+      await API.post("/timesheets/draft", {
+        week_start: toDateStr(weekDates[0].full),
+        entries,
+      });
+      const refreshed = await fetchMyTimesheet();
+      alert(
+        refreshed
+          ? "Timesheet draft saved."
+          : "Draft saved, but its latest status could not be loaded. Refresh before editing.",
+      );
+    } catch (err) {
+      console.error("Timesheet draft save failed:", err);
+      alert(err.response?.data?.error || "Timesheet draft could not be saved.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  const fetchMyTimesheet = useCallback(async () => {
+    setTimesheetError("");
+    setTimesheetLoaded(false);
+    try {
+      const weekStart = toDateStr(weekDates[0]?.full || new Date());
+      const res = await API.get("/timesheets/me", { params: { week_start: weekStart } });
+      const sheet = res.data?.data;
+
+      if (!sheet) {
+        setSubmissionStatus("NOT SUBMITTED");
+        setRows([{
+          id: 1,
+          projectCode: "",
+          taskCode: "",
+          employeeType: "Labour",
+          hours: {},
+          groupId: 1,
+        }]);
+        setTimesheetLoaded(true);
+        return true;
+      }
+
+      const grouped = new Map();
+      (sheet.entries || []).forEach((entry) => {
+        const key = `${entry.project_id || ""}:${entry.task_id || ""}`;
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            id: entry.id,
+            projectCode: entry.project_id == null ? "" : String(entry.project_id),
+            taskCode: entry.task_id == null ? "" : String(entry.task_id),
+            employeeType: entry.description || "Employee",
+            hours: {},
+            groupId: entry.project_id || entry.id,
+          });
+        }
+        const row = grouped.get(key);
+        const dateKey = String(entry.work_date).slice(0, 10);
+        row.hours[dateKey] = Number(entry.regular_hours || 0) + Number(entry.overtime_hours || 0);
+      });
+
+      if (grouped.size) setRows(Array.from(grouped.values()));
+      setSubmissionStatus(sheet.display_status || sheet.status || "NOT SUBMITTED");
+      setTimesheetLoaded(true);
+      grouped.forEach((row) => {
+        if (row.projectCode) loadTasks(row.projectCode);
+      });
+      return true;
+    } catch (err) {
+      console.error("Failed to load timesheet:", err);
+      setTimesheetError(err.response?.data?.error || "Failed to load this week's timesheet.");
+      return false;
+    }
+  }, [weekDates, loadTasks]);
+  useEffect(() => {
+    fetchMyTimesheet();
+  }, [fetchMyTimesheet]);
   const handleLeaveSubmitted = async (leaveData) => {
     const res = await API.post("/leaves", {
       leaveType: leaveData.leaveType,
@@ -504,7 +584,9 @@ useEffect(() => {
             </div>
             <div className="ts-info-row">
               <span
-                className={`ts-status-badge ${submissionStatus === "SUBMITTED" ? "submitted" : "not-submitted"}`}
+                className={`ts-status-badge ${["pending", "under review", "approved"].includes(
+                  String(submissionStatus).trim().toLowerCase().replace(/_/g, " "),
+                ) ? "submitted" : "not-submitted"}`}
               >
                 {submissionStatus}
               </span>
@@ -523,24 +605,38 @@ useEffect(() => {
             </div>
           )}
 
+          {timesheetError && (
+            <div className="ts-lock-banner" role="alert">
+              {timesheetError}
+            </div>
+          )}
+
           <div className="ts-action-bar">
             <button className="ts-btn-count">
               {entryCount()} TIME ENTRY(IES)
             </button>
             <button
+              className="ts-btn-secondary"
+              onClick={handleSaveDraft}
+              disabled={!canEditTimesheet || isSubmitting}
+            >
+              SAVE DRAFT
+            </button>
+            <button
               className="ts-btn-submit"
               onClick={handleSubmit}
+              disabled={!canSubmit || !canEditTimesheet || isSubmitting}
               style={{
-                opacity: !canSubmit ? 0.5 : 1,
-                cursor: !canSubmit ? "not-allowed" : "pointer",
+                opacity: !canSubmit || !canEditTimesheet || isSubmitting ? 0.5 : 1,
+                cursor: !canSubmit || !canEditTimesheet || isSubmitting ? "not-allowed" : "pointer",
               }}
             >
               ✓ SUBMIT TIMESHEET
             </button>
-            <button className="ts-btn-secondary" onClick={handleQuickFill}>
+            <button className="ts-btn-secondary" onClick={handleQuickFill} disabled={!canEditTimesheet}>
               QUICK FILL
             </button>
-            <button className="ts-btn-secondary" onClick={handleClearAll}>
+            <button className="ts-btn-secondary" onClick={handleClearAll} disabled={!canEditTimesheet}>
               CLEAR ALL
             </button>
             <button
@@ -637,6 +733,7 @@ useEffect(() => {
                             <select
                               className="ts-select"
                               value={row.projectCode}
+                              disabled={!canEditTimesheet}
                               onChange={(e) =>
                                 handleProjectSelect(row.id, e.target.value)
                               }
@@ -665,10 +762,10 @@ useEffect(() => {
                             <select
                               className="ts-select"
                               value={row.taskCode}
+                              disabled={!row.projectCode || !canEditTimesheet}
                               onChange={(e) =>
                                 handleTaskSelect(row.id, e.target.value)
                               }
-                              disabled={!row.projectCode}
                               style={{ opacity: !row.projectCode ? 0.5 : 1 }}
                             >
                               <option value="">Select Task</option>
@@ -682,6 +779,7 @@ useEffect(() => {
                               <button
                                 className="ts-btn-add-task"
                                 onClick={() => addTaskToGroup(row.groupId)}
+                                disabled={!canEditTimesheet}
                                 title="Add another task for this project"
                               >
                                 +
@@ -694,6 +792,7 @@ useEffect(() => {
                           <select
                             className="ts-select"
                             value={row.employeeType}
+                            disabled={!canEditTimesheet}
                             onChange={(e) =>
                               handleEmpType(row.id, e.target.value)
                             }
@@ -732,8 +831,9 @@ useEffect(() => {
                                   className={`ts-input ${day.isSunday ? "ts-sunday-input" : ""}`}
                                   placeholder="0"
                                   min="0"
-                                  max="24"
+                                  max="12"
                                   value={getHourVal(row, di)}
+                                  disabled={!canEditTimesheet}
                                   onChange={(e) =>
                                     handleHours(row.id, di, e.target.value)
                                   }
@@ -751,6 +851,7 @@ useEffect(() => {
                             <button
                               className="ts-btn-delete"
                               onClick={() => deleteRow(row.id)}
+                              disabled={!canEditTimesheet}
                               title="Delete row"
                             >
                               ✕

@@ -25,6 +25,7 @@
 // - getAllReports, getReportById, updateReport
 
 const pool = require("../config/db");
+const { notifyProjectClient } = require("../utils/clientNotifications");
 
 // Reuse the helper from siteMeasurementController — no SQL duplication
 const { updateMeasurementStatus } = require("./siteMeasurementcontroller");
@@ -410,6 +411,14 @@ exports.approveReport = async (req, res) => {
     await updateMeasurementStatus(client, sourceMeasurementId, "approved");
 
     await client.query("COMMIT");
+
+    await notifyProjectClient(project_id, {
+      type: "invoice",
+      title: `Estimate finalised: ${milestone_name}`,
+      description: "A finalised bill of quantities is now available in your client portal.",
+      link: "/client/boq",
+      referenceId: boq_id,
+    });
 
     try {
       const { createNotificationDirect } = require("./qsNotificationController");

@@ -3,17 +3,17 @@
 // Owner: Developer 3. Adding a manager screen = one line here + one menu entry.
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import OperationsManagerDashboard from "../pages/operations/manager/OperationsManagerDashboard";
-import ApprovalsCenter from "../pages/operations/manager/ApprovalsCenter";
-import MaterialRequestsOverview from "../pages/operations/manager/MaterialRequestsOverview";
-import ProcurementOverview from "../pages/operations/manager/ProcurementOverview";
-import LogisticsOverview from "../pages/operations/manager/LogisticsOverview";
-import InventoryOverview from "../pages/operations/manager/InventoryOverview";
-import OperationsReports from "../pages/operations/manager/OperationsReports";
-import OperationsWbsControl from "../pages/operations/manager/OperationsWbsControl";
-import OperationsDailyUpdatesReview from "../pages/operations/manager/OperationsDailyUpdatesReview";
-import VendorsView from "../pages/operations/procurement/VendorsView";
-import OfficeRequests from "../pages/operations/administrator/OfficeRequests";
+import OperationsManagerDashboard from "../pages/Operations/manager/OperationsManagerDashboard";
+import ApprovalsCenter from "../pages/Operations/manager/ApprovalsCenter";
+import MaterialRequestsOverview from "../pages/Operations/manager/MaterialRequestsOverview";
+import ProcurementOverview from "../pages/Operations/manager/ProcurementOverview";
+import LogisticsOverview from "../pages/Operations/manager/LogisticsOverview";
+import InventoryOverview from "../pages/Operations/manager/InventoryOverview";
+import OperationsReports from "../pages/Operations/manager/OperationsReports";
+import OperationsWbsControl from "../pages/Operations/manager/OperationsWbsControl";
+import OperationsDailyUpdatesReview from "../pages/Operations/manager/OperationsDailyUpdatesReview";
+import VendorsView from "../pages/Operations/procurement/VendorsView";
+import OfficeRequests from "../pages/Operations/administrator/OfficeRequests";
 import AppShell from "../components/incidents/AppShell";
 
 export default function OperationsManagerRoutes() {

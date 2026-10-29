@@ -42,6 +42,7 @@ const upload = multer({
 router.post(
   "/",
   auth,
+  auth.requireRole("site_engineer"),
   upload.array("attachments"),
   c.createDiary
 );
@@ -50,6 +51,7 @@ router.post(
 router.get(
   "/",
   auth,
+  auth.requireRole("site_engineer", "project_manager", "project_coordinator", "ceo"),
   c.getDiary
 );
 
@@ -62,6 +64,7 @@ router.put("/approve/:id", auth, auth.requireRole(...c.DIARY_REVIEW_ROLES), c.ap
 router.get(
   "/milestones",
   auth,
+  auth.requireRole("site_engineer", "project_manager", "project_coordinator", "ceo"),
   c.getMilestones
 );
 
@@ -69,6 +72,7 @@ router.get(
 router.get(
   "/wbs",
   auth,
+  auth.requireRole("site_engineer", "project_manager", "project_coordinator", "ceo"),
   c.getWbs
 );
 

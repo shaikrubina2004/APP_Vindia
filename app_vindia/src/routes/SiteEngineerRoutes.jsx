@@ -22,14 +22,12 @@
     import Progress              from "../pages/siteEngineer/Progress";
     import RFI                   from "../pages/StructuralEngineer/RFI";
     import NCR                   from "../pages/siteEngineer/NCR";
-    import Checklist             from "../pages/siteEngineer/Checklist";
     import ActivityLog           from "../pages/siteEngineer/ActivityLog";
 
     // ── New pages ──────────────────────────────────────────────
     import SnagList         from "../pages/siteEngineer/Snaglist";
     import ApprovalWorkflow from "../pages/siteEngineer/Approvalworkflow";
     import PhotoGallery     from "../pages/siteEngineer/Photogallery";
-    import SiteInstruction  from "../pages/siteEngineer/Siteinstruction";
     import MaterialRequest  from "../pages/siteEngineer/Materialrequest";
     import LabourReport from "../pages/siteEngineer/Labourreport";
 
@@ -95,16 +93,6 @@ import LabourRegistry from "../pages/siteEngineer/Labourregistry";
         element={
         <ProtectedRoute allowedRoles={[...SE_ROLES, ROLES.QC_ENGINEER]}>
             <SiteEngineerLayout><NCR /></SiteEngineerLayout>
-        </ProtectedRoute>
-        }
-    />,
-
-    <Route
-        key="se-checklist"
-        path="/site-engineer/checklist"
-        element={
-        <ProtectedRoute allowedRoles={SE_ROLES}>
-            <SiteEngineerLayout><Checklist /></SiteEngineerLayout>
         </ProtectedRoute>
         }
     />,

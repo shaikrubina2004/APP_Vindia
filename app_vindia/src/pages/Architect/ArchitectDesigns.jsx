@@ -9,6 +9,7 @@ import {
   sendDrawing,
   requestDrawing,
   getRequests,
+  markRequestSeen as markDrawingRequestSeen,
   submit3DRender,
   get3DSubmissions,
   review3DSubmission,
@@ -129,15 +130,17 @@ function normaliseDrawing(row) {
 }
 
 function normaliseRequest(row) {
+  const requesterRole = row.requester_role || row.role || "—";
+  const requesterRoleKey = String(requesterRole).toLowerCase().replace(/[\s-]/g, "_");
   return {
     id:          row.id,
-    from:        row.requester_name || row.role || "—",
-    fromRole:    row.requester_role || row.role || "—",
+    from:        row.requester_name || requesterRole,
+    fromRole:    ROLE_MAP[requesterRoleKey] || requesterRole,
     projectId:   String(row.project_id),
     projectName: row.project_name || "—",
     note:        row.description   || "",
     sentAt:      row.created_at,
-    seen:        row.status !== "pending",
+    seen:        Boolean(row.seen),
     drawingId:   row.drawing_id || null,
   };
 }
@@ -658,7 +661,7 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
   useEffect(() => {
     (async () => {
       try {
-        const res  = await fetch(`/api/architect-designs/${d.id}/revisions`);
+        const res  = await authFetch(`/api/architect-designs/${d.id}/revisions`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         const list = (json?.data || json || []).map(normaliseRevision);
@@ -709,18 +712,20 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
     }
     setAddRevBusy(true);
     try {
-      let fileUrl = "";
-      try {
-        const formData = new FormData();
-        formData.append("file", addRevFile);
-        const uploadRes  = await fetch("/api/architect-drawings/upload", { method: "POST", body: formData });
-        const uploadData = await uploadRes.json();
-        fileUrl = uploadData.url || uploadData.file_url || uploadData.path || `uploads/${addRevFile.name}`;
-      } catch {
-        fileUrl = `uploads/${addRevFile.name}`;
+      const formData = new FormData();
+      formData.append("file", addRevFile);
+      const uploadRes = await authFetch("/api/architect-drawings/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!uploadRes.ok) throw new Error(`File upload failed with HTTP ${uploadRes.status}`);
+      const uploadData = await uploadRes.json();
+      const fileUrl = uploadData.url;
+      if (!uploadData.success || !fileUrl) {
+        throw new Error(uploadData.error || "File upload did not return a file URL.");
       }
 
-      await fetch(`/api/architect-designs/${d.id}/revision`, {
+      const revisionRes = await authFetch(`/api/architect-designs/${d.id}/revision`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -730,6 +735,10 @@ function PlanningDrawingDetailModal({ d, currentUserId, sendTo, onRevisionIncrem
           file_name:  addRevFile.name,
         }),
       });
+      if (!revisionRes.ok) {
+        const response = await revisionRes.json().catch(() => ({}));
+        throw new Error(response.error || `Revision save failed with HTTP ${revisionRes.status}`);
+      }
 
       await onRevisionIncrement(d.id, newRevLabel, fileUrl, addRevFile.name);
 
@@ -1372,7 +1381,7 @@ function SendToArchitectModal({ projects, currentUserId, mySubmissions, onSubmit
 }
 
 // ─── Visualizer Request Modal ────────────────────────────────────────────────
-function VisualizerRequestModal({ projects, currentUserId, onSent, onClose }) {
+function VisualizerRequestModal({ projects, onSent, onClose }) {
   const [projectId, setProjectId] = useState("");
   const [note, setNote]           = useState(DEFAULT_REQUEST_NOTE);
   const [busy, setBusy]           = useState(false);
@@ -1383,8 +1392,6 @@ function VisualizerRequestModal({ projects, currentUserId, onSent, onClose }) {
     try {
       await requestDrawing({
         project_id:   parseInt(projectId, 10),
-        requested_by: currentUserId,
-        role:         "3d_visualizer",
         description:  note.trim(),
         due_date:     new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
       });
@@ -1420,6 +1427,76 @@ function VisualizerRequestModal({ projects, currentUserId, onSent, onClose }) {
         <textarea className="dms-input" style={{ minHeight: 120 }}
           placeholder="e.g. Requesting the latest revision of the planning drawing for this project…"
           value={note} onChange={(e) => setNote(e.target.value)} />
+      </div>
+    </Modal>
+  );
+}
+
+function DrawingRequestModal({ projects, onSent, onClose }) {
+  const [projectId, setProjectId] = useState("");
+  const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const handleSend = async () => {
+    if (!projectId) return alert("Please select a project.");
+    setBusy(true);
+    try {
+      await requestDrawing({
+        project_id: Number(projectId),
+        description: description.trim(),
+      });
+      onSent();
+      onClose();
+    } catch (error) {
+      console.error("Drawing request failed:", error);
+      alert(error?.response?.data?.error || "Failed to send drawing request.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Request Detail Drawing"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="dms-btn dms-btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="dms-btn dms-btn-primary" onClick={handleSend} disabled={busy || !projectId}>
+            {busy ? "Sending…" : "Send Request"}
+          </button>
+        </>
+      }
+    >
+      <div className="dms-form-field">
+        <label className="dms-label" htmlFor="drawing-request-project">Project *</label>
+        <select
+          id="drawing-request-project"
+          className="dms-input"
+          value={projectId}
+          onChange={(event) => setProjectId(event.target.value)}
+        >
+          <option value="">Select a project…</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>{project.name}</option>
+          ))}
+        </select>
+        {projects.length === 0 && (
+          <div className="dms-info-box dms-info-box-red" style={{ marginTop: 10, fontSize: 12 }}>
+            No assigned projects are available for a drawing request.
+          </div>
+        )}
+      </div>
+      <div className="dms-form-field">
+        <label className="dms-label" htmlFor="drawing-request-description">What drawing do you need?</label>
+        <textarea
+          id="drawing-request-description"
+          className="dms-input"
+          style={{ minHeight: 100 }}
+          placeholder="Describe the detail drawing or information required…"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+        />
       </div>
     </Modal>
   );
@@ -1666,20 +1743,16 @@ export default function DrawingManagementSystem() {
 
   // ── Mark a drawing request as seen (persisted) ────────────────────────────
   const markRequestSeen = useCallback(async (reqId) => {
-    // Optimistic update so the UI feels instant…
+    const previousRequests = requests;
     setRequests((prev) => prev.map((r) => (r.id === reqId ? { ...r, seen: true } : r)));
     try {
-      const res = await fetch(`/api/architect-designs/requests/${reqId}/seen`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seen_by: currentUser.id }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await markDrawingRequestSeen(reqId);
     } catch (err) {
       console.error("Failed to persist seen status:", err);
-      showToast("error", "Marked seen locally, but the server didn't confirm it — it may reappear as unseen.");
+      setRequests(previousRequests);
+      showToast("error", "Could not mark the request as seen. Please try again.");
     }
-  }, [currentUser.id, showToast]);
+  }, [requests, showToast]);
 
   // ── Delete a drawing (persisted) ──────────────────────────────────────────
   const requestDeleteDrawing = useCallback((drawing) => {
@@ -1690,7 +1763,7 @@ export default function DrawingManagementSystem() {
     if (!deleteTarget) return;
     setDeleteBusy(true);
     try {
-      const res = await fetch(`/api/architect-designs/${deleteTarget.id}`, { method: "DELETE" });
+      const res = await authFetch(`/api/architect-designs/${deleteTarget.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setDrawings((prev) => prev.filter((d) => String(d.id) !== String(deleteTarget.id)));
       setSelectedDrawing((prev) => (prev && String(prev.id) === String(deleteTarget.id) ? null : prev));
@@ -1730,11 +1803,22 @@ export default function DrawingManagementSystem() {
     try {
       const formData = new FormData();
       formData.append("file", uf.file);
-      const uploadRes  = await fetch("/api/architect-drawings/upload", { method: "POST", body: formData });
+      const uploadRes = await authFetch("/api/architect-drawings/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!uploadRes.ok) {
+        throw new Error(`File upload failed with HTTP ${uploadRes.status}`);
+      }
       const uploadData = await uploadRes.json();
-      fileUrl = uploadData.url || uploadData.file_url || uploadData.path || "";
-    } catch {
-      fileUrl = `uploads/${uf.fileName}`;
+      fileUrl = uploadData.url || "";
+      if (!uploadData.success || !fileUrl) {
+        throw new Error(uploadData.error || "File upload did not return a file URL");
+      }
+    } catch (error) {
+      console.error("Drawing file upload failed:", error);
+      showToast("error", error.message || "Could not upload drawing file.");
+      return;
     }
 
     const trimmedName = uf.drawingName.trim();
@@ -1750,11 +1834,15 @@ export default function DrawingManagementSystem() {
       if (existingPlanning) {
         const newRev = nextRevision(existingPlanning.revision);
         try {
-          await fetch(`/api/architect-designs/${existingPlanning.id}/revision`, {
+          const revisionRes = await authFetch(`/api/architect-designs/${existingPlanning.id}/revision`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ revision: newRev, updated_by: currentUser.id, file_url: fileUrl, file_name: uf.fileName }),
           });
+          if (!revisionRes.ok) {
+            const response = await revisionRes.json().catch(() => ({}));
+            throw new Error(response.error || `Revision save failed with HTTP ${revisionRes.status}`);
+          }
           showToast("success", `"${trimmedName}" updated to revision ${newRev}.`);
           setUf({ projectId: "", drawingName: "", drawingType: "Working Drawing", revision: "R1", file: null, fileName: "", blobKey: null });
           closeModal();
@@ -1768,7 +1856,6 @@ export default function DrawingManagementSystem() {
     }
 
     const payload = {
-      id:           uid(),
       project_id:   parseInt(uf.projectId, 10),
       name:         trimmedName,
       drawing_type: uf.drawingType,
@@ -2423,7 +2510,7 @@ export default function DrawingManagementSystem() {
       )}
 
       {modal === "visualizerRequest" && (
-        <VisualizerRequestModal projects={projects} currentUserId={currentUser.id}
+        <VisualizerRequestModal projects={projects}
           onSent={(payload) => {
             showToast("success", "Request sent to Architect.");
             setMyRequestsSent((prev) => [
@@ -2448,6 +2535,14 @@ export default function DrawingManagementSystem() {
 
       {modal === "requestDetail" && selectedRequest && (
         <RequestDetailModal req={selectedRequest} onMarkSeen={markRequestSeen} onClose={closeModal} />
+      )}
+
+      {modal === "request" && (
+        <DrawingRequestModal
+          projects={projects}
+          onSent={() => showToast("success", "Drawing request sent to the Architect.")}
+          onClose={closeModal}
+        />
       )}
 
       {modal === "planningDetail" && selectedDrawing && (

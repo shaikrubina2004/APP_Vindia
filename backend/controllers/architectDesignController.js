@@ -1,5 +1,39 @@
 const pool = require("../config/db");
 const { insertThreeDNotification } = require("./threeDNotificationsController");
+const { isAssignedProject } = require("../utils/siteEngineerAccess");
+const DRAWING_EDIT_ROLES = new Set(["architect", "draftsman"]);
+
+function drawingRecipientRole(role) {
+  return {
+    site_engineer: "Site Engineer",
+    quantity_surveyor: "Quantity Surveyor",
+    project_coordinator: "Program Coordinator",
+    client: "Client",
+    "3d_visualizer": "3D Visualizer",
+    "3dvisualizer": "3D Visualizer",
+  }[role] || null;
+}
+
+async function canViewDrawing(userId, role, drawingId) {
+  if (DRAWING_EDIT_ROLES.has(role)) return true;
+  const recipientRole = drawingRecipientRole(role);
+  const result = await pool.query(
+    `SELECT 1
+       FROM architect_drawings d
+      WHERE d.id = $1
+        AND (
+          d.created_by = $2
+          OR EXISTS (
+            SELECT 1 FROM architect_drawing_recipients r
+             WHERE r.drawing_id = d.id
+               AND (r.user_id = $2 OR ($3::text IS NOT NULL AND r.role = $3))
+          )
+        )
+      LIMIT 1`,
+    [drawingId, userId, recipientRole]
+  );
+  return result.rows.length > 0;
+}
 
 /* ─────────────────────────────────────────────
    DB HELPER — wraps pool.query with timeout
@@ -42,8 +76,10 @@ async function withDb(res, fn) {
 ───────────────────────────────────────────── */
 exports.createDrawing = async (req, res) => {
   await withDb(res, async () => {
+    if (!DRAWING_EDIT_ROLES.has(req.user?.role)) {
+      return res.status(403).json({ error: "Only an architect can create drawings." });
+    }
     const {
-      id,
       project_id,
       name,
       drawing_type,
@@ -59,21 +95,45 @@ exports.createDrawing = async (req, res) => {
         error: "User not authenticated",
       });
     }
-    await pool.query(
-      `INSERT INTO architect_drawings
-       (id, project_id, name, drawing_type, current_revision, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
-      [id, project_id, name, drawing_type, revision, createdBy]
-    );
+    const projectId = Number(project_id);
+    if (!Number.isInteger(projectId) || projectId <= 0 ||
+        !String(name || "").trim() ||
+        !String(revision || "").trim() ||
+        !String(file_url || "").trim()) {
+      return res.status(400).json({
+        error: "A valid project, drawing name, revision, and uploaded file URL are required.",
+      });
+    }
 
-    await pool.query(
-      `INSERT INTO architect_drawing_revisions
-       (drawing_id, revision, file_url, file_name, created_by)
-       VALUES ($1,$2,$3,$4,$5)`,
-      [id, revision, file_url, file_name || null, createdBy]
-    );
-
-    res.json({ success: true });
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const drawing = await client.query(
+        `INSERT INTO architect_drawings
+           (project_id, name, drawing_type, current_revision, created_by)
+         VALUES ($1,$2,$3,$4,$5)
+         RETURNING id`,
+        [projectId, String(name).trim(), drawing_type || null, String(revision).trim(), createdBy]
+      );
+      const drawingId = drawing.rows[0].id;
+      await client.query(
+        `INSERT INTO architect_drawing_revisions
+           (drawing_id, revision, file_url, file_name, created_by)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [drawingId, String(revision).trim(), String(file_url).trim(), file_name || null, createdBy]
+      );
+      await client.query("COMMIT");
+      res.status(201).json({ success: true, data: { id: drawingId } });
+    } catch (err) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("createDrawing rollback:", rollbackError.message);
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
   });
 };
 
@@ -236,6 +296,9 @@ if (!userId || !role) {
 ───────────────────────────────────────────── */
 exports.sendDrawing = async (req, res) => {
   await withDb(res, async () => {
+    if (!DRAWING_EDIT_ROLES.has(req.user?.role)) {
+      return res.status(403).json({ error: "Only an architect can share drawings." });
+    }
     const { drawingId } = req.params;
     const { user_id, role } = req.body;
 
@@ -319,30 +382,174 @@ exports.sendDrawing = async (req, res) => {
   });
 };
 
+exports.getDrawingRevisions = async (req, res) => {
+  await withDb(res, async () => {
+    const userId = req.user?.id;
+    const role = req.user?.role;
+    const { drawingId } = req.params;
+    if (!userId || !role) return res.status(401).json({ error: "User not authenticated" });
+    if (!(await canViewDrawing(userId, role, drawingId))) {
+      return res.status(404).json({ error: "Drawing not found" });
+    }
+
+    const result = await pool.query(
+      `SELECT id, drawing_id, revision, file_url, file_name, created_by, created_at
+         FROM architect_drawing_revisions
+        WHERE drawing_id = $1
+        ORDER BY created_at DESC, id DESC`,
+      [drawingId]
+    );
+    res.json({ data: result.rows });
+  });
+};
+
+exports.addDrawingRevision = async (req, res) => {
+  if (!DRAWING_EDIT_ROLES.has(req.user?.role)) {
+    return res.status(403).json({ error: "Only an architect can add drawing revisions." });
+  }
+
+  let client;
+  try {
+    client = await pool.connect();
+    const { drawingId } = req.params;
+    const revision = String(req.body?.revision || "").trim();
+    const fileUrl = String(req.body?.file_url || "").trim();
+    const fileName = String(req.body?.file_name || "").trim();
+    if (!revision || revision.length > 50 || !fileUrl) {
+      return res.status(400).json({ error: "A valid revision and uploaded file URL are required." });
+    }
+
+    await client.query("BEGIN");
+    const drawing = await client.query(
+      "SELECT id, current_revision FROM architect_drawings WHERE id = $1 FOR UPDATE",
+      [drawingId]
+    );
+    if (!drawing.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Drawing not found." });
+    }
+    if (drawing.rows[0].current_revision === revision) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "That revision is already current." });
+    }
+
+    const saved = await client.query(
+      `INSERT INTO architect_drawing_revisions
+         (drawing_id, revision, file_url, file_name, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, drawing_id, revision, file_url, file_name, created_by, created_at`,
+      [drawingId, revision, fileUrl, fileName || null, req.user.id]
+    );
+    await client.query(
+      "UPDATE architect_drawings SET current_revision = $1 WHERE id = $2",
+      [revision, drawingId]
+    );
+    await client.query(
+      `INSERT INTO architect_drawing_logs (drawing_id, action, stage, performed_by)
+       VALUES ($1, 'REVISION_ADDED', $2, $3)`,
+      [drawingId, revision, req.user.id]
+    );
+    await client.query("COMMIT");
+    res.status(201).json({ data: saved.rows[0] });
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error("addDrawingRevision rollback:", rollbackError.message);
+    }
+    console.error("addDrawingRevision:", err.message);
+    res.status(500).json({ error: "Failed to save drawing revision." });
+  } finally {
+    client?.release();
+  }
+};
+
+exports.deleteDrawing = async (req, res) => {
+  if (!DRAWING_EDIT_ROLES.has(req.user?.role)) {
+    return res.status(403).json({ error: "Only an architect can delete drawings." });
+  }
+
+  let client;
+  try {
+    client = await pool.connect();
+    const { drawingId } = req.params;
+    await client.query("BEGIN");
+    const drawing = await client.query(
+      "SELECT id FROM architect_drawings WHERE id = $1 FOR UPDATE",
+      [drawingId]
+    );
+    if (!drawing.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Drawing not found." });
+    }
+
+    await client.query("UPDATE three_d_models SET drawing_id = NULL WHERE drawing_id = $1", [drawingId]);
+    await client.query("DELETE FROM architect_drawing_recipients WHERE drawing_id = $1", [drawingId]);
+    await client.query("DELETE FROM architect_drawing_revisions WHERE drawing_id = $1", [drawingId]);
+    await client.query("DELETE FROM architect_drawing_logs WHERE drawing_id = $1", [drawingId]);
+    await client.query("DELETE FROM architect_drawings WHERE id = $1", [drawingId]);
+    await client.query("COMMIT");
+    res.json({ success: true });
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error("deleteDrawing rollback:", rollbackError.message);
+    }
+    console.error("deleteDrawing:", err.message);
+    res.status(500).json({ error: "Failed to delete drawing." });
+  } finally {
+    client?.release();
+  }
+};
+
 /* ─────────────────────────────────────────────
    REQUEST DRAWING
 ───────────────────────────────────────────── */
 exports.requestDrawing = async (req, res) => {
   await withDb(res, async () => {
-    const {
-      project_id,
-      role,
-      description,
-      due_date,
-    } = req.body;
-
+    const projectId = Number(req.body?.project_id);
+    const description = String(req.body?.description || "").trim();
+    const dueDate = req.body?.due_date || null;
     const requestedBy = req.user?.id;
+    const requesterRole = req.user?.role;
 
     if (!requestedBy) {
       return res.status(401).json({
         error: "User not authenticated",
       });
     }
-
-    if (!project_id || !role) {
+    if (!Number.isInteger(projectId) || projectId <= 0) {
       return res.status(400).json({
-        error: "project_id and role are required",
+        error: "A valid project_id is required",
       });
+    }
+    if (!["site_engineer", "client", "3d_visualizer", "3dvisualizer"].includes(requesterRole)) {
+      return res.status(403).json({ error: "Your role cannot request drawings" });
+    }
+    if (description.length > 2000) {
+      return res.status(400).json({ error: "Request description must be 2000 characters or fewer" });
+    }
+    if (requesterRole === "site_engineer" && !(await isAssignedProject(requestedBy, projectId))) {
+      return res.status(403).json({ error: "You are not assigned to this project" });
+    }
+    if (requesterRole === "client") {
+      const project = await pool.query(
+        "SELECT 1 FROM projects WHERE id = $1 AND client_user_id = $2 LIMIT 1",
+        [projectId, requestedBy]
+      );
+      if (!project.rows.length) {
+        return res.status(403).json({ error: "You are not linked to this project" });
+      }
+    }
+    if (requesterRole === "3d_visualizer" || requesterRole === "3dvisualizer") {
+      const project = await pool.query(
+        "SELECT 1 FROM projects WHERE id = $1 AND architect_id IS NOT NULL LIMIT 1",
+        [projectId]
+      );
+      if (!project.rows.length) {
+        return res.status(400).json({ error: "The selected project has no assigned architect" });
+      }
     }
 
     await pool.query(
@@ -350,11 +557,11 @@ exports.requestDrawing = async (req, res) => {
        (project_id, requested_by, role, description, due_date)
        VALUES ($1,$2,$3,$4,$5)`,
       [
-        project_id,
+        projectId,
         requestedBy,
-        role,
+        requesterRole,
         description || null,
-        due_date || null,
+        dueDate,
       ]
     );
 
@@ -376,7 +583,7 @@ exports.getRequests = async (req, res) => {
       });
     }
 
-    if (role !== "architect") {
+    if (role !== "architect" && role !== "draftsman") {
       return res.status(403).json({
         error: "Only architects can view drawing requests",
       });
@@ -402,6 +609,9 @@ exports.getRequests = async (req, res) => {
 exports.markRequestSeen = async (req, res) => {
   try {
     const { id } = req.params;
+    if (req.user?.role !== "architect" && req.user?.role !== "draftsman") {
+      return res.status(403).json({ error: "Only architects can update drawing requests" });
+    }
 
     const result = await pool.query(
       `

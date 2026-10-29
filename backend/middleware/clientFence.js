@@ -9,10 +9,9 @@
 const jwt = require("jsonwebtoken");
 
 const ALLOW = [
-  { method: "*",    re: /^\/api\/client(\/|$)/ },                       // the client portal API
-  { method: "*",    re: /^\/api\/auth(\/|$)/ },                         // login / session
-  { method: "GET",  re: /^\/api\/projects\/?$/ },                       // client ProjectProvider uses this; project controller scopes clients to their own projects
-  { method: "POST", re: /^\/api\/settings\/change-password\/?$/ },      // change own password
+  { method: "*",    re: /^\/api\/client(\/|$)/ },                  // the client portal API
+  { method: "*",    re: /^\/api\/auth(\/|$)/ },                    // login / session
+  { method: "POST", re: /^\/api\/settings\/change-password\/?$/ }, // change own password
 ];
 
 const normaliseRole = (role) =>

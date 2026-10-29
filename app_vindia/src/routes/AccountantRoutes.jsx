@@ -37,6 +37,10 @@ import { ROLES } from "../roles";
 // gates its own FM-only buttons internally. Accountant's other pages
 // stay Accountant-only, unchanged from before.
 const ACCOUNTANT_AND_FM = [ROLES.ACCOUNTANT, ROLES.FINANCE_MANAGER, ROLES.CEO];
+const ACCOUNTANT_AND_FINANCE_MANAGER = [
+  ROLES.ACCOUNTANT,
+  ROLES.FINANCE_MANAGER,
+];
 
 const AccountantRoutes = () => (
   <Routes>
@@ -122,7 +126,7 @@ const AccountantRoutes = () => (
       path="/receivables-payables"
       element={
         <ProtectedRoute
-          allowedRoles={[ROLES.ACCOUNTANT]}
+          allowedRoles={ACCOUNTANT_AND_FM}
         >
           <ReceivablesPayables />
         </ProtectedRoute>
@@ -133,7 +137,7 @@ const AccountantRoutes = () => (
       path="/daily-update"
       element={
         <ProtectedRoute
-          allowedRoles={[ROLES.ACCOUNTANT]}
+          allowedRoles={ACCOUNTANT_AND_FINANCE_MANAGER}
         >
           <FinanceDailyUpdate />
         </ProtectedRoute>

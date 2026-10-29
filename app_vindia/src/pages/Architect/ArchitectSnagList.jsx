@@ -25,7 +25,7 @@ const STATUS_CFG = {
 };
 
 const BLANK_FORM = {
-  title: "", description: "", zone: "",
+  project_id: "", title: "", description: "", zone: "",
   priority: "medium", due_date: "",
   drawing_ref: "", grid_ref: "",
 };
@@ -51,6 +51,7 @@ function Badge({ cfg, label }) {
 ══════════════════════════════════════════════════════════ */
 export default function ArchitectSnagList() {
   const [snags, setSnags]         = useState([]);
+  const [projects, setProjects]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [form, setForm]           = useState({ ...BLANK_FORM });
   const [errors, setErrors]       = useState({});
@@ -68,6 +69,15 @@ export default function ArchitectSnagList() {
   useEffect(() => {
     alive.current = true;
     loadSnags();
+    api.get("/projects")
+      .then(res => {
+        const rows = Array.isArray(res?.data) ? res.data : res?.data?.data || [];
+        if (alive.current) setProjects(rows);
+      })
+      .catch(err => {
+        console.error("Error loading snag projects:", err);
+        if (alive.current) setStatus("Could not load projects. Refresh before creating a snag.");
+      });
     return () => { alive.current = false; };
   }, []);
 
@@ -75,8 +85,6 @@ export default function ArchitectSnagList() {
     setLoading(true);
     try {
       const res = await api.get("/snags");
-      console.log(res.data); // 👈 check status here
-
       if (!alive.current) return;
       const raw = Array.isArray(res?.data) ? res.data : (res?.data?.snags || []);
       setSnags(raw.slice().reverse());
@@ -97,6 +105,7 @@ export default function ArchitectSnagList() {
   /* ── validate ──────────────────────────────────────────── */
   function validate(f) {
     const e = {};
+    if (!f.project_id) e.project_id = "Select a project";
     if (!f.title || f.title.trim().length < 3) e.title = "Title required (min 3 chars)";
     if (!f.priority) e.priority = "Select priority";
     return e;
@@ -112,10 +121,12 @@ export default function ArchitectSnagList() {
     try {
       const res = await api.post("/snags", {
         ...form,
+        project_id: Number(form.project_id),
         raised_by: "architect",
         raised_date: new Date().toISOString().slice(0, 10),
       });
-      const newSnag = res?.data?.snag || res?.data || { id: Date.now(), ...form, status: "open" };
+      const newSnag = res?.data?.snag || res?.data;
+      if (!newSnag?.id) throw new Error("The server did not return the saved snag.");
       setSnags(prev => [newSnag, ...prev]);
       setForm({ ...BLANK_FORM });
       setStatus("Snag created ✓");
@@ -161,7 +172,7 @@ export default function ArchitectSnagList() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages]);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
   const stats = useMemo(() => ({
     total:        snags.length,
@@ -233,6 +244,16 @@ export default function ArchitectSnagList() {
               <div className="asl-form-section">
                 <div className="asl-section-title">Snag Details</div>
                 <div className="asl-grid-2">
+                  <div className="asl-field asl-full">
+                    <label className="asl-label">Project *</label>
+                    <select className="asl-select" value={form.project_id} onChange={e => setF("project_id", e.target.value)}>
+                      <option value="">Select a project</option>
+                      {projects.map(project => (
+                        <option key={project.id} value={project.id}>{project.name}</option>
+                      ))}
+                    </select>
+                    {errors.project_id && <div className="asl-error">{errors.project_id}</div>}
+                  </div>
                   <div className="asl-field asl-full">
                     <label className="asl-label">Title *</label>
                     <input className="asl-input" value={form.title} onChange={e => setF("title", e.target.value)} placeholder="e.g. Honeycombing on Column C3, Level 2" autoFocus />

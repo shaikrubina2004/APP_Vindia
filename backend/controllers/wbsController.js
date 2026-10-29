@@ -1,5 +1,9 @@
 const pool = require("../config/db");
 const { insertNotification } = require("./pcNotificationsController");
+const {
+  getAssignedProjectIds,
+  getManagedProjectIds,
+} = require("../utils/siteEngineerAccess");
 
 /* ─────────────────────────────────────────────
    GET /api/wbs/:projectId  — nested tree
@@ -57,7 +61,50 @@ exports.getWBSByProject = async (req, res) => {
 ──────────────────────────────────────────────*/
 exports.getAllWBS = async (req, res) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM wbs ORDER BY project_id, created_at ASC");
+    const requestedProjectId = req.query.project_id ? Number(req.query.project_id) : null;
+    if (
+      requestedProjectId !== null &&
+      (!Number.isInteger(requestedProjectId) || requestedProjectId <= 0)
+    ) {
+      return res.status(400).json({ error: "Invalid project_id" });
+    }
+
+    let rows;
+    if (["site_engineer", "project_manager"].includes(req.user?.role)) {
+      const projectIds = req.user.role === "site_engineer"
+        ? await getAssignedProjectIds(req.user.id)
+        : await getManagedProjectIds(req.user.id);
+      if (!projectIds.length) return res.json([]);
+      if (
+        requestedProjectId !== null &&
+        !projectIds.includes(requestedProjectId)
+      ) {
+        return res.status(403).json({
+          error: req.user.role === "site_engineer"
+            ? "You are not assigned to this project"
+            : "You do not manage this project",
+        });
+      }
+      const result = requestedProjectId === null
+        ? await pool.query(
+          "SELECT * FROM wbs WHERE project_id = ANY($1::int[]) ORDER BY project_id, created_at ASC",
+          [projectIds]
+        )
+        : await pool.query(
+          "SELECT * FROM wbs WHERE project_id = $1 ORDER BY created_at ASC",
+          [requestedProjectId]
+        );
+      rows = result.rows;
+    } else if (requestedProjectId !== null) {
+      const result = await pool.query(
+        "SELECT * FROM wbs WHERE project_id = $1 ORDER BY created_at ASC",
+        [requestedProjectId]
+      );
+      rows = result.rows;
+    } else {
+      const result = await pool.query("SELECT * FROM wbs ORDER BY project_id, created_at ASC");
+      rows = result.rows;
+    }
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: "Server error" });

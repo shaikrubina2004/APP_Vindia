@@ -3,6 +3,7 @@ const multer = require("multer");
 const path = require("path");
 const pool = require("../config/db");
 const auth = require("../middleware/authMiddleware");
+const { notifyProjectClient } = require("../utils/clientNotifications");
 
 const router = express.Router();
 router.use(auth);
@@ -78,16 +79,16 @@ async function resolveProject(req, value) {
 
 async function getScopedRfi(req, id) {
   const projects = await getAccessibleProjects(req);
-  const projectNames = projects.map((p) => p.name);
-  if (!projectNames.length) return null;
+  const projectIds = projects.map((p) => p.id);
+  if (!projectIds.length) return null;
 
   const result = await pool.query(
     `SELECT *
        FROM rfis
       WHERE id = $1
-        AND project_name = ANY($2::text[])
+        AND project_id = ANY($2::int[])
       LIMIT 1`,
-    [id, projectNames]
+    [id, projectIds]
   );
   return result.rows[0] || null;
 }
@@ -130,15 +131,24 @@ async function resolveAssignee(req, project, assignedTo) {
 router.get("/", async (req, res) => {
   try {
     const projects = await getAccessibleProjects(req);
-    if (!projects.length) return res.json([]);
+    let accessibleProjects = projects;
+    if (req.query.project_id) {
+      accessibleProjects = projects.filter((project) =>
+        String(project.id) === String(req.query.project_id)
+      );
+      if (!accessibleProjects.length) {
+        return res.status(403).json({ error: "You are not assigned to this project" });
+      }
+    }
+    if (!accessibleProjects.length) return res.json([]);
     const result = await pool.query(
       `SELECT
          r.*, r.subject AS title,
          r.created_at AS "createdAt"
        FROM rfis r
-      WHERE r.project_name = ANY($1::text[])
+      WHERE r.project_id = ANY($1::int[])
       ORDER BY r.created_at DESC`,
-      [projects.map((p) => p.name)]
+      [accessibleProjects.map((p) => p.id)]
     );
     return res.json(result.rows);
   } catch (err) {
@@ -182,8 +192,8 @@ router.post("/", upload.array("attachments", 10), async (req, res) => {
     }
 
     const countResult = await pool.query(
-      `SELECT COUNT(*) AS count FROM rfis WHERE project_name = $1`,
-      [project.name]
+      `SELECT COUNT(*) AS count FROM rfis WHERE project_id = $1`,
+      [project.id]
     );
     const seq = Number.parseInt(countResult.rows[0]?.count || "0", 10) + 1;
     const rfiCode = `RFI-${String(seq).padStart(3, "0")}`;
@@ -194,14 +204,14 @@ router.post("/", upload.array("attachments", 10), async (req, res) => {
         (rfi_code, subject, description, priority, status,
          raised_by_role, raised_by_name, raised_by_id,
          assigned_to_role, assigned_to_user_id,
-         project_name, drawing_ref, grid_ref, zone,
+         project_name, project_id, drawing_ref, grid_ref, zone,
          response_required_by, created_at, updated_at)
        VALUES
         ($1,$2,$3,$4,'open',
          $5,$6,$7,
          $8,$9,
-         $10,$11,$12,$13,
-         $14,NOW(),NOW())
+         $10,$11,$12,$13,$14,
+         $15,NOW(),NOW())
        RETURNING *`,
       [
         rfiCode,
@@ -214,6 +224,7 @@ router.post("/", upload.array("attachments", 10), async (req, res) => {
         assignee.role,
         assignee.userId,
         project.name,
+        project.id,
         req.body?.drawing_ref || null,
         req.body?.grid_ref || null,
         req.body?.zone || null,
@@ -255,6 +266,19 @@ router.put("/:id/status", async (req, res) => {
       `UPDATE rfis SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
       [status, req.params.id]
     );
+    if (
+      result.rows[0].project_id &&
+      (String(result.rows[0].raised_by_role).toLowerCase() === "client" ||
+        String(result.rows[0].assigned_to_role).toLowerCase() === "client")
+    ) {
+      await notifyProjectClient(result.rows[0].project_id, {
+        type: "rfi",
+        title: `RFI status updated: ${result.rows[0].subject}`,
+        description: `Status changed to ${status}.`,
+        link: "/client/rfi",
+        referenceId: result.rows[0].id,
+      });
+    }
     return res.json({ ...result.rows[0], title: result.rows[0].subject, createdAt: result.rows[0].created_at });
   } catch (err) {
     console.error("SE RFI status:", err);
@@ -280,6 +304,19 @@ router.put("/:id/answer", async (req, res) => {
       `UPDATE rfis SET status = 'responded', updated_at = NOW() WHERE id = $1 RETURNING *`,
       [req.params.id]
     );
+    if (
+      result.rows[0].project_id &&
+      (String(result.rows[0].raised_by_role).toLowerCase() === "client" ||
+        String(result.rows[0].assigned_to_role).toLowerCase() === "client")
+    ) {
+      await notifyProjectClient(result.rows[0].project_id, {
+        type: "rfi",
+        title: `RFI response: ${result.rows[0].subject}`,
+        description: `${req.user?.name || "Your project team"} added a response to your RFI.`,
+        link: "/client/rfi",
+        referenceId: result.rows[0].id,
+      });
+    }
     return res.json({ ...result.rows[0], title: result.rows[0].subject, createdAt: result.rows[0].created_at });
   } catch (err) {
     console.error("SE RFI answer:", err);

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { API } from "../../services/authService";
 import {
   useClientAPI,
   PageLoader,
@@ -8,6 +7,7 @@ import {
   fmtINR,
 } from "../../hooks/Useclientapi.jsx";
 import { Link } from "react-router-dom";
+import { Activity, AlertTriangle, Layers, Receipt } from "lucide-react";
 import ProjectSwitcher from "./ProjectSwitcher";
 import "../../styles/Client.css";
 
@@ -35,7 +35,7 @@ function StatusPill({ status }) {
 function StatCard({ icon, label, value, sub, subType = "info" }) {
   return (
     <div className="stat-card">
-      <div className="stat-card__icon">{icon}</div>
+      <div className="stat-card__icon" aria-hidden="true">{icon}</div>
       <div className="stat-card__body">
         <span className="stat-card__label">{label}</span>
         <span className="stat-card__value">{value ?? "—"}</span>
@@ -53,7 +53,6 @@ function StatCard({ icon, label, value, sub, subType = "info" }) {
 function MilestoneCard({ m }) {
   const [open, setOpen] = useState(false);
   const status = m.display_status || "pending";
-  const done = m.subtask_done ?? 0;
   const total = m.subtask_count ?? 0;
 
   return (
@@ -165,7 +164,7 @@ function InvoiceRow({ inv }) {
   return (
     <div className="invoice-row">
       <div className="invoice-row__left">
-        <span className="invoice-row__id">INV-{String(inv.id).padStart(4, "0")}</span>
+        <span className="invoice-row__id">{inv.invoice_number || `INV-${String(inv.id).padStart(4, "0")}`}</span>
         <span className="invoice-row__desc">{inv.milestone_name}</span>
       </div>
       <div className="invoice-row__right">
@@ -206,19 +205,30 @@ function IncidentRow({ inc }) {
 function ProgressRing({ pct = 0 }) {
   const circumference = 188.5;
   return (
-    <div className="cd-header__progress-ring">
-      <svg viewBox="0 0 72 72" width="72" height="72">
-        <circle cx="36" cy="36" r="30" className="ring-bg" />
-        <circle
-          cx="36"
-          cy="36"
-          r="30"
-          className="ring-fill"
-          strokeDasharray={`${(pct / 100) * circumference} ${circumference}`}
-          strokeDashoffset="47"
-        />
-      </svg>
-      <span className="ring-label">{pct}%</span>
+    <div className="cd-progress">
+      <div className="cd-progress__copy">
+        <span className="cd-progress__eyebrow">Project progress</span>
+        <strong>{pct}% complete</strong>
+        <span>Overall construction progress</span>
+      </div>
+      <div
+        className="cd-header__progress-ring"
+        role="img"
+        aria-label={`${pct}% project progress`}
+      >
+        <svg viewBox="0 0 72 72" width="72" height="72" aria-hidden="true">
+          <circle cx="36" cy="36" r="30" className="ring-bg" />
+          <circle
+            cx="36"
+            cy="36"
+            r="30"
+            className="ring-fill"
+            strokeDasharray={`${(pct / 100) * circumference} ${circumference}`}
+            strokeDashoffset="47"
+          />
+        </svg>
+        <span className="ring-label">{pct}%</span>
+      </div>
     </div>
   );
 }
@@ -249,8 +259,14 @@ export default function ClientDashboard() {
       {/* Header */}
       <header className="cd-header">
         <div className="cd-header__left">
-          <div className="cd-header__eyebrow">Client portal</div>
+          <div className="cd-header__eyebrow">
+            <span className="cd-header__live-dot" />
+            Client project overview
+          </div>
           <h1 className="cd-header__title">{project.name || "Your Project"}</h1>
+          <p className="cd-header__description">
+            Your project, progress, and updates — all in one place.
+          </p>
           <div className="cd-header__meta">
             {project.start_date && (
               <>
@@ -264,18 +280,18 @@ export default function ClientDashboard() {
                 <span className="sep">·</span>
               </>
             )}
-            <span style={{ textTransform: "capitalize" }}>
-              {project.status || ""}
-            </span>
+            {project.location && <span>{project.location}</span>}
+            {(project.start_date || project.end_date || project.location) && (
+              <span className="sep">·</span>
+            )}
+            {project.status && (
+              <span className="cd-project-status">
+                {project.status.replace(/_/g, " ")}
+              </span>
+            )}
           </div>
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-          }}
-        >
+        <div className="cd-header__actions">
           {/* clients are external users: no attendance check-in here */}
           <ProjectSwitcher />
           <ProgressRing pct={progress} />
@@ -285,7 +301,7 @@ export default function ClientDashboard() {
       {/* Stat cards */}
       <section className="cd-stats">
         <StatCard
-          icon="📐"
+          icon={<Activity size={19} strokeWidth={2} />}
           label="Overall progress"
           value={`${progress}%`}
           sub={
@@ -298,7 +314,7 @@ export default function ClientDashboard() {
           subType={overview.delayed ? "warning" : progress > 0 ? "success" : "info"}
         />
         <StatCard
-          icon="🏗️"
+          icon={<Layers size={19} strokeWidth={2} />}
           label="Active milestones"
           value={overview.in_progress ?? 0}
           sub={
@@ -307,14 +323,14 @@ export default function ClientDashboard() {
           subType={overview.delayed ? "warning" : "success"}
         />
         <StatCard
-          icon="🧾"
+          icon={<Receipt size={19} strokeWidth={2} />}
           label="Total invoiced"
           value={fmtINR(invoicesData?.summary?.total_billed)}
           sub={fmtINR(invoicesData?.summary?.total_pending) + " pending"}
           subType="danger"
         />
         <StatCard
-          icon="⚠️"
+          icon={<AlertTriangle size={19} strokeWidth={2} />}
           label="Open incidents"
           value={openIncidents.length}
           sub="Awaiting response"

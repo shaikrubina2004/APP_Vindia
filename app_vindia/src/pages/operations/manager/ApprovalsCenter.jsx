@@ -28,7 +28,7 @@ export default function ApprovalsCenter() {
 
   const approveOffice = async (row) => {
     setBusyId(`or-${row.id}`);
-    try { await officeAdminService.updateRequestStatus(row.id, "in_progress"); flash(`${row.request_code} approved.`); await load(); }
+    try { await officeAdminService.updateRequestStatus(row.id, "approved"); flash(`${row.request_code} approved.`); await load(); }
     catch (e) { setError(errorText(e, "Approval failed")); }
     finally { setBusyId(null); }
   };

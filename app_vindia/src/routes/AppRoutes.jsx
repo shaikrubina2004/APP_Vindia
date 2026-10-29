@@ -3,7 +3,7 @@
 // FINAL MERGED VERSION
 
 
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 
 
 /* ── AUTH ────────────────────────────────────────────────── */
@@ -98,17 +98,17 @@ import ApprovalRequests from "../pages/siteEngineer/ApprovalRequests";
 
 /* ── OPERATIONS ──────────────────────────────────────────── */
 
-import CreatePO from "../pages/operations/PurchaseOrders/CreatePO";
+import CreatePO from "../pages/Operations/PurchaseOrders/CreatePO";
 
-import PurchaseOrderList from "../pages/operations/PurchaseOrders/PurchaseOrderList";
+import PurchaseOrderList from "../pages/Operations/PurchaseOrders/PurchaseOrderList";
 
-import PurchaseOrderDetail from "../pages/operations/PurchaseOrders/PurchaseOrderDetail";
+import PurchaseOrderDetail from "../pages/Operations/PurchaseOrders/PurchaseOrderDetail";
 
-import ApprovedRequests from "../pages/operations/MaterialRequests/ApprovedRequests";
+import ApprovedRequests from "../pages/Operations/MaterialRequests/ApprovedRequests";
 
-import VendorsView from "../pages/operations/procurement/VendorsView";
+import VendorsView from "../pages/Operations/procurement/VendorsView";
 
-import ProcurementDailyReport from "../pages/operations/procurement/ProcurementDailyReport";
+import ProcurementDailyReport from "../pages/Operations/procurement/ProcurementDailyReport";
 
 
 /* ── SHARED COMPONENTS ───────────────────────────────────── */
@@ -136,7 +136,6 @@ import Qsquantityreport from "../pages/Quality Surveyor/Qsquantityreport";
 
 import Qscostreport from "../pages/Quality Surveyor/Qscostreport";
 
-import Qsmeasurement from "../pages/Quality Surveyor/Qsmeasurement";
 
 
 /* ── MEP ─────────────────────────────────────────────────── */
@@ -226,11 +225,11 @@ import BDAReportsWithRole from "../pages/business-development/business-developme
 
 import OfficeAdministratorRoutes from "./OfficeAdministratorRoutes";
 
-import ProcurementOfficerDashboard from "../pages/operations/procurement/ProcurementOfficerDashboard";
+import ProcurementOfficerDashboard from "../pages/Operations/procurement/ProcurementOfficerDashboard";
 
-import LogisticsCoordinatorDashboard from "../pages/operations/logistics/LogisticsCoordinatorDashboard";
+import LogisticsCoordinatorDashboard from "../pages/Operations/logistics/LogisticsCoordinatorDashboard";
 
-import InventoryControllerDashboard from "../pages/operations/inventory/InventoryControllerDashboard";
+import InventoryControllerDashboard from "../pages/Operations/inventory/InventoryControllerDashboard";
 
 
 /* ── COMMON ──────────────────────────────────────────────── */
@@ -275,17 +274,17 @@ import InventoryControllerLayout from "../layouts/InventoryControllerLayout";
 
 /* ── INVENTORY / LOGISTICS ───────────────────────────────── */
 
-import ItemMaster from "../pages/operations/inventory/ItemMaster";
+import ItemMaster from "../pages/Operations/inventory/ItemMaster";
 
-import StockIn from "../pages/operations/inventory/StockIn";
+import StockIn from "../pages/Operations/inventory/StockIn";
 
-import StockOut from "../pages/operations/inventory/StockOut";
+import StockOut from "../pages/Operations/inventory/StockOut";
 
-import Deliveries from "../pages/operations/logistics/Deliveries";
+import Deliveries from "../pages/Operations/logistics/Deliveries";
 
-import InventoryDailyUpdate from "../pages/operations/inventory/InventoryDailyUpdate";
+import InventoryDailyUpdate from "../pages/Operations/inventory/InventoryDailyUpdate";
 
-import LogisticsDailyUpdate from "../pages/operations/logistics/LogisticsDailyUpdate";
+import LogisticsDailyUpdate from "../pages/Operations/logistics/LogisticsDailyUpdate";
 
 
 /* ── REPORTS / ANALYTICS / SETTINGS ──────────────────────── */
@@ -1009,6 +1008,13 @@ const AppRoutes = () => {
 
         {/* ══ QUANTITY SURVEYOR ═════════════════════════════ */}
 
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.QUANTITY_SURVEYOR]}>
+              <Outlet />
+            </ProtectedRoute>
+          }
+        >
 
         <Route
 
@@ -1150,15 +1156,7 @@ const AppRoutes = () => {
 
           path="/quantity-surveyor/measurement"
 
-          element={
-
-            <QuantitySurveyorLayout>
-
-              <Qsmeasurement />
-
-            </QuantitySurveyorLayout>
-
-          }
+          element={<Navigate to="/quantity-surveyor/quantity-report" replace />}
 
         />
 
@@ -1183,6 +1181,7 @@ const AppRoutes = () => {
 
         />
 
+        </Route>
 
         {/* ══ MEP / CLIENT ══════════════════════════════════ */}
 
@@ -1303,7 +1302,13 @@ const AppRoutes = () => {
 
           element={
 
-            <ProtectedRoute allowedRoles={[ROLES.ACCOUNTANT]}>
+            <ProtectedRoute
+              allowedRoles={[
+                ROLES.ACCOUNTANT,
+                ROLES.FINANCE_MANAGER,
+                ROLES.CEO,
+              ]}
+            >
 
               <AccountantLayout>
 
@@ -1918,7 +1923,13 @@ const AppRoutes = () => {
 
             <ProtectedRoute
 
-              allowedRoles={[ROLES.CEO, ROLES.HR_MANAGER, ...PROJECT_ROLES]}
+              allowedRoles={[
+                ROLES.CEO,
+                ROLES.HR_MANAGER,
+                ROLES.OPERATIONS_MANAGER,
+                ROLES.FINANCE_MANAGER,
+                ...PROJECT_ROLES,
+              ]}
 
             >
 

@@ -60,7 +60,7 @@ export default function JournalEntries() {
     .replace(/\s+/g, "_");
 
   const isAccountant = role === "accountant";
-  const canCreate = ["accountant", "finance_manager", "ceo"].includes(role);
+  const canCreate = isAccountant;
   const canApprove = ["finance_manager", "ceo"].includes(role);
   const canPost = ["finance_manager", "ceo"].includes(role);
   const canReverse = ["finance_manager", "ceo"].includes(role);
@@ -302,13 +302,6 @@ export default function JournalEntries() {
       return;
     }
     await runAction("reverse entry", accountantService.reverseJournalEntry, id);
-  };
-
-  const deleteDraft = async (id) => {
-    if (!window.confirm("Delete this draft journal entry? This cannot be undone.")) {
-      return;
-    }
-    await runAction("delete entry", accountantService.deleteJournalEntry, id);
   };
 
   const accountName = (line) => {
@@ -853,24 +846,14 @@ export default function JournalEntries() {
 
             <div className="je-modal-actions">
               {isAccountant && selectedEntry.status === "draft" && (
-                <>
-                  <button
-                    type="button"
-                    className="je-danger-button"
-                    onClick={() => deleteDraft(selectedEntry.id)}
-                    disabled={workingId === selectedEntry.id}
-                  >
-                    Delete Draft
-                  </button>
-                  <button
-                    type="button"
-                    className="je-secondary-button"
-                    onClick={() => submitDraft(selectedEntry.id)}
-                    disabled={workingId === selectedEntry.id}
-                  >
-                    {workingId === selectedEntry.id ? "Submitting…" : "Submit for Review"}
-                  </button>
-                </>
+                <button
+                  type="button"
+                  className="je-secondary-button"
+                  onClick={() => submitDraft(selectedEntry.id)}
+                  disabled={workingId === selectedEntry.id}
+                >
+                  {workingId === selectedEntry.id ? "Submitting…" : "Submit for Review"}
+                </button>
               )}
 
               {canApprove && selectedEntry.status === "submitted" && (

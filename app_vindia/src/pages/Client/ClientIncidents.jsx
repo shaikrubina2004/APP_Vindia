@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { API } from "../../services/authService";
+import { useAuth } from "../../context/useAuth";
 import {
   useClientAPI,
   getClientProjectId,
@@ -89,7 +90,7 @@ function NewIncident({ onClose, onCreated }) {
   );
 }
 
-function IncidentDetail({ id, onClose }) {
+function IncidentDetail({ id, onClose, canWrite }) {
   const { data, loading, error, refetch } = useClientAPI(`/client/incidents/${id}`);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -144,13 +145,13 @@ function IncidentDetail({ id, onClose }) {
             )) : <p className="cl-muted-note">No messages yet.</p>}
           </div>
 
-          {inc.status !== "Closed" ? (
+          {canWrite && inc.status !== "Closed" ? (
             <div className="cl-reply">
               {err && <div className="cl-alert cl-alert--error">{err}</div>}
               <textarea className="cl-input" rows={2} value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} placeholder="Add a comment for the team…" />
               <button className="cl-btn cl-btn--primary" disabled={busy || !text.trim()} onClick={send}>{busy ? "Sending…" : "Send"}</button>
             </div>
-          ) : <p className="cl-muted-note">This incident is closed.</p>}
+          ) : <p className="cl-muted-note">{canWrite ? "This incident is closed." : "CEO preview is read-only."}</p>}
         </>
       )}
     </ClientModal>
@@ -158,6 +159,8 @@ function IncidentDetail({ id, onClose }) {
 }
 
 export default function ClientIncidents() {
+  const { user } = useAuth();
+  const canWrite = String(user?.role || "").toLowerCase() !== "ceo";
   const { data, loading, error, refetch } = useClientAPI("/client/incidents");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -184,7 +187,7 @@ export default function ClientIncidents() {
           <h1 className="cl-page-title">Incidents</h1>
           <p className="cl-page-sub">Issues you have raised with your project team</p>
         </div>
-        <button className="cl-btn cl-btn--primary" onClick={() => setCreating(true)}>+ Raise incident</button>
+        {canWrite && <button className="cl-btn cl-btn--primary" onClick={() => setCreating(true)}>+ Raise incident</button>}
       </div>
 
       {notice && <div className="cl-alert cl-alert--success">{notice}</div>}
@@ -229,13 +232,13 @@ export default function ClientIncidents() {
         </div>
       </div>
 
-      {creating && (
+      {creating && canWrite && (
         <NewIncident
           onClose={() => setCreating(false)}
           onCreated={() => { setCreating(false); setNotice("Incident raised. Your project team has been notified."); refetch(); }}
         />
       )}
-      {openId && <IncidentDetail id={openId} onClose={() => setOpenId(null)} />}
+      {openId && <IncidentDetail id={openId} canWrite={canWrite} onClose={() => setOpenId(null)} />}
     </div>
   );
 }

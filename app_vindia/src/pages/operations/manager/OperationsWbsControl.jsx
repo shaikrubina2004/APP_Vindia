@@ -5,13 +5,31 @@ import "./OperationsWbsControl.css";
 
 const flattenWbs = (rows = []) => {
   const result = [];
+  const nodes = new Map(
+    rows.map((row) => [String(row.id), { ...row, _children: [] }])
+  );
+  const roots = [];
 
-  const visit = (row, level = 0) => {
-    result.push({ ...row, _level: level });
-    (row.tasks || []).forEach((task) => visit(task, level + 1));
+  rows.forEach((row) => {
+    const node = nodes.get(String(row.id));
+    const parent = row.parent_id == null ? null : nodes.get(String(row.parent_id));
+    if (parent && parent !== node) {
+      parent._children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  const visited = new Set();
+  const visit = (node, level = 0) => {
+    if (visited.has(String(node.id))) return;
+    visited.add(String(node.id));
+    result.push({ ...node, _level: level });
+    node._children.forEach((child) => visit(child, level + 1));
   };
 
-  rows.forEach((row) => visit(row, 0));
+  roots.forEach((root) => visit(root));
+  nodes.forEach((node) => visit(node));
   return result;
 };
 

@@ -52,7 +52,7 @@ export default function ClientPayment() {
         <div className="cl-page-header__left">
           <div className="cl-eyebrow">Finance</div>
           <h1 className="cl-page-title">Payments</h1>
-          <p className="cl-page-sub">Payment status for each finalised milestone invoice</p>
+          <p className="cl-page-sub">Payments recorded against your project's invoices</p>
         </div>
       </div>
 
@@ -70,7 +70,7 @@ export default function ClientPayment() {
           <div className="stat-card__body">
             <span className="stat-card__label">Total billed</span>
             <span className="stat-card__value" style={{ fontSize: 18 }}>{fmtINR(billed)}</span>
-            <span className="stat-card__sub stat-card__sub--info">{schedule.length} finalised invoice{schedule.length !== 1 ? "s" : ""}</span>
+            <span className="stat-card__sub stat-card__sub--info">{schedule.length} invoice{schedule.length !== 1 ? "s" : ""}</span>
           </div>
         </div>
         <div className="stat-card">
@@ -98,13 +98,13 @@ export default function ClientPayment() {
       <div className="cl-card">
         <div className="cl-card__head">
           <span className="cl-card__title">Payment schedule</span>
-          <span className="cl-card__hint">Oldest invoice first</span>
+          <span className="cl-card__hint">Matched payments and unallocated advances</span>
         </div>
 
         {schedule.length === 0 ? (
           <div className="cl-empty">
             <div className="cl-empty__icon">💰</div>
-            <p>No invoices yet. Your schedule appears as milestones are finalised.</p>
+            <p>No invoices have been issued for this project yet.</p>
           </div>
         ) : (
           <div className="pay-timeline">
@@ -114,9 +114,9 @@ export default function ClientPayment() {
                 <div key={b.id} className="pay-item">
                   <div className={`pay-dot ${st.dot}`}>{st.icon}</div>
                   <div className="pay-content">
-                    <div className="pay-content__title">{b.milestone_name || `Invoice #${b.id}`}</div>
+                    <div className="pay-content__title">{b.milestone_name || b.invoice_number || `Invoice #${b.id}`}</div>
                     <div className="pay-content__meta">
-                      Finalised {fmtDate(b.invoice_date)}
+                      Issued {fmtDate(b.invoice_date)}
                       {b.paid_amount > 0 ? ` · Paid ${fmtINR(b.paid_amount)}` : ""}
                       {b.balance > 0 ? ` · Balance ${fmtINR(b.balance)}` : ""}
                     </div>

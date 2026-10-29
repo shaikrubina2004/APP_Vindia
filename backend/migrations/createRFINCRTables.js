@@ -29,11 +29,16 @@ async function createTables() {
       CREATE TABLE IF NOT EXISTS ncr (
         id SERIAL PRIMARY KEY,
         raised_by INTEGER,
+        project_id INTEGER,
+        title VARCHAR(255),
         description TEXT NOT NULL,
+        severity VARCHAR(20) DEFAULT 'medium',
         zone VARCHAR(255),
-        priority VARCHAR(50) DEFAULT 'medium',
+        assigned_to INTEGER,
+        immediate_action TEXT,
+        hold_placed BOOLEAN DEFAULT false,
+        attachments JSONB NOT NULL DEFAULT '[]'::jsonb,
         status VARCHAR(50) DEFAULT 'open',
-        "holdPlaced" BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
@@ -55,6 +60,7 @@ async function createTables() {
     // Create indexes for performance
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_rfi_status ON rfi(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_ncr_status ON ncr(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_ncr_project_created ON ncr(project_id, created_at DESC)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date)`);
     console.log("✅ Indexes created");
 

@@ -70,10 +70,10 @@ const userRole = String(
 
 //   const userRole = currentUser?.role || "site_engineer";
 
-  function canTransition(nextStatus) {
+  const canTransition = useCallback((nextStatus) => {
     const allowed = ROLE_ALLOWED_TRANSITIONS[userRole] || ROLE_ALLOWED_TRANSITIONS.site_engineer;
     return allowed.includes(nextStatus);
-  }
+  }, [userRole]);
 
   // ── State ──────────────────────────────────────────────────
   const [snags, setSnags]       = useState([]);
@@ -207,7 +207,7 @@ push(
     } finally {
       if (alive.current) setUpdating(null);
     }
-  }, [updating, resolution, photos, currentUser, userRole, push]);
+  }, [updating, resolution, photos, currentUser, userRole, canTransition, push]);
 
   // ── Filters ────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -227,7 +227,7 @@ push(
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages]);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
   const stats = useMemo(() => ({
     open:        snags.filter(s => s.status === "open").length,
