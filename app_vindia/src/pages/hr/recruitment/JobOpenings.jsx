@@ -87,21 +87,40 @@ const JobOpenings = () => {
 
   // Departments + roles come straight from the database, so anything
   // added there later shows up here with no code change.
+  // The roles call also carries each role's department name, so the department
+  // list is built from it — no extra permission is needed (the old separate
+  // /users/departments call returned 403 for HR).
   useEffect(() => {
     (async () => {
+      let roleRows = [];
+      try {
+        const res = await api.get("/roles");
+        roleRows = res.data || [];
+        setRoles(roleRows);
+      } catch (err) {
+        console.warn("Could not load roles", err);
+        setRoles([]);
+      }
+
+      const fromRoles = [
+        ...new Map(
+          roleRows
+            .filter((r) => r.department_id != null && r.department_name)
+            .map((r) => [r.department_id, { id: r.department_id, name: r.department_name }]),
+        ).values(),
+      ].sort((a, b) => a.name.localeCompare(b.name));
+
+      if (fromRoles.length > 0) {
+        setDepartments(fromRoles);
+        return;
+      }
+
       try {
         const res = await api.get("/users/departments");
         setDepartments(res.data || []);
       } catch (err) {
         console.warn("Could not load departments, using fallback list", err);
         setDepartments(FALLBACK_DEPARTMENTS.map((name, i) => ({ id: i + 1, name })));
-      }
-      try {
-        const res = await api.get("/roles");
-        setRoles(res.data || []);
-      } catch (err) {
-        console.warn("Could not load roles", err);
-        setRoles([]);
       }
     })();
   }, []);

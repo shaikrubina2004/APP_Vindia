@@ -1,6 +1,7 @@
 // src/controllers/authController.js
 const bcrypt = require("bcryptjs");
 const jwt    = require("jsonwebtoken");
+const pool   = require("../config/db");
 const { createUser, getUserByEmail } = require("../models/User");
 
 /* ── TOKEN ──────────────────────────────────────────────── */
@@ -82,6 +83,9 @@ const login = async (req, res) => {
         email:  user.email,
         role:   user.role,    // ← was user.role_code — FIXED
         status: user.status,
+        // true while the person is still on the temporary password they were
+        // emailed — the app then invites them to set their own.
+        must_change_password: user.must_change_password === true,
       },
     });
 
@@ -91,4 +95,67 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { signup, login };
+/* ── CHANGE PASSWORD (logged-in user changes THEIR OWN password) ───────────
+   POST /api/auth/change-password
+   Body: { currentPassword, newPassword }
+   Only the password changes — the login ID (email) and employee ID never do.
+──────────────────────────────────────────────────────────────────────── */
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+
+    if (!currentPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Current password and new password are required" });
+    }
+    if (newPassword.length < 8) {
+      return res
+        .status(400)
+        .json({ message: "New password must be at least 8 characters" });
+    }
+    if (newPassword.length > 72) {
+      return res
+        .status(400)
+        .json({ message: "New password must be 72 characters or fewer" });
+    }
+    if (!/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+      return res
+        .status(400)
+        .json({ message: "New password must include at least one letter and one number" });
+    }
+    if (newPassword === currentPassword) {
+      return res
+        .status(400)
+        .json({ message: "New password must be different from the current one" });
+    }
+
+    const found = await pool.query("SELECT password FROM users WHERE id = $1", [
+      req.user.id,
+    ]);
+    if (found.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const matches = await bcrypt.compare(currentPassword, found.rows[0].password);
+    if (!matches) {
+      // 400 (not 401) so the app does not treat this as an expired login
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      `UPDATE users
+          SET password = $1, must_change_password = FALSE, password_changed_at = NOW()
+        WHERE id = $2`,
+      [hashed, req.user.id]
+    );
+
+    res.status(200).json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+module.exports = { signup, login, changePassword };

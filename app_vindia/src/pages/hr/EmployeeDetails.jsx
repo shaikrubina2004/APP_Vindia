@@ -2,6 +2,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { deleteEmployee, getEmployeeById } from "../../services/employeeService";
 import employeeDocumentService from "../../services/employeeDocumentService";
+import api from "../../services/api";
 import "./EmployeeDetails.css";
 function EmployeeDetails() {
   const { id } = useParams();
@@ -18,6 +19,23 @@ function EmployeeDetails() {
   const [docUploading, setDocUploading] = useState(false);
   const [docUploadProgress, setDocUploadProgress] = useState("");
   const [docError, setDocError] = useState(null);
+
+  // ── Login access (resend the login email) ──
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState(null); // { type: "ok" | "warn" | "error", text }
+
+  // Who is looking at this page? (only used to decide which button to show —
+  // the server checks the real role on every request)
+  const myRole = (() => {
+    try {
+      return String(JSON.parse(localStorage.getItem("user"))?.role || "")
+        .toLowerCase()
+        .replace(/[\s-]+/g, "_");
+    } catch {
+      return "";
+    }
+  })();
+  const iAmCeo = myRole === "ceo";
 
   useEffect(() => {
     fetchEmployee();
@@ -54,6 +72,34 @@ function EmployeeDetails() {
     if (window.confirm("Delete this employee?")) {
       await deleteEmployee(employee.id);
       navigate("/hr/employees");
+    }
+  };
+
+  // Sends a NEW temporary password to the employee's email. The old one
+  // stops working. (The password is never shown here — only emailed.)
+  const handleResendLogin = async () => {
+    if (
+      !window.confirm(
+        `Send a new temporary password to ${employee.email}?\nTheir earlier password will stop working.`
+      )
+    )
+      return;
+
+    setResending(true);
+    setResendMsg(null);
+    try {
+      const res = await api.post(`/employees/${employee.id}/resend-credentials`);
+      setResendMsg({
+        type: res.data?.sent ? "ok" : "warn",
+        text: res.data?.message || "Done.",
+      });
+    } catch (err) {
+      setResendMsg({
+        type: "error",
+        text: err.response?.data?.message || "Could not resend the login email.",
+      });
+    } finally {
+      setResending(false);
     }
   };
 
@@ -150,6 +196,17 @@ function EmployeeDetails() {
     { label: "Certificates", field: "certificates" },
   ];
 
+  // Login access: is the employee still on the temporary password we emailed?
+  const hasLogin = !!employee.user_id;
+  const passwordPending = employee.login_password_pending === true;
+  const canResend = hasLogin && (passwordPending || iAmCeo);
+
+  const msgColors = {
+    ok:    { bg: "#dcfce7", fg: "#166534" },
+    warn:  { bg: "#fef3c7", fg: "#92400e" },
+    error: { bg: "#fee2e2", fg: "#991b1b" },
+  };
+
   return (
     <div className="ed-page">
 
@@ -216,6 +273,78 @@ function EmployeeDetails() {
               </div>
             </div>
           )}
+
+          {/* ── LOGIN ACCESS ── */}
+          <div className="ed-divider" />
+          <div className="ed-attrs-section">
+            <p className="ed-section-label">Login access</p>
+
+            {!hasLogin ? (
+              <p style={{ margin: 0, fontSize: "0.85rem", color: "#64748b" }}>
+                No login account is linked to this employee.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "0.85rem", color: "#475569" }}>
+                    Login ID: <strong>{employee.email}</strong>
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      padding: "3px 10px",
+                      borderRadius: 999,
+                      background: passwordPending ? "#fef3c7" : "#f1f5f9",
+                      color: passwordPending ? "#92400e" : "#475569",
+                    }}
+                  >
+                    {passwordPending
+                      ? "Temporary password — not changed yet"
+                      : "No temporary password pending"}
+                  </span>
+                </div>
+
+                {canResend ? (
+                  <div>
+                    <button
+                      className="ed-btn ed-btn--edit"
+                      onClick={handleResendLogin}
+                      disabled={resending}
+                    >
+                      {resending
+                        ? "Sending…"
+                        : passwordPending
+                          ? "✉ Resend login email"
+                          : "✉ Reset password & email"}
+                    </button>
+                    <p style={{ margin: "6px 0 0", fontSize: "0.75rem", color: "#94a3b8" }}>
+                      Sends a new temporary password to the employee. It is never shown here.
+                    </p>
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, fontSize: "0.78rem", color: "#94a3b8" }}>
+                    The employee manages their own password now.
+                  </p>
+                )}
+
+                {resendMsg && (
+                  <div
+                    role="status"
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      fontSize: "0.82rem",
+                      background: msgColors[resendMsg.type].bg,
+                      color: msgColors[resendMsg.type].fg,
+                    }}
+                  >
+                    {resendMsg.text}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="ed-actions">
             <button className="ed-btn ed-btn--edit" onClick={() => navigate("/hr/add-employee", { state: employee })}>

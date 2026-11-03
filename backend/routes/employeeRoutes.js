@@ -7,6 +7,7 @@ const upload = require("../middleware/upload");
 
 const {
   createEmployee,
+  resendCredentials,
   getAllEmployees,
   getEmployeeById,
   updateEmployee,
@@ -28,6 +29,9 @@ router.get("/birthdays", authMiddleware, getBirthdays);
 
 // ✅ BACKFILL MISSING EMPLOYEE CODES
 router.post("/backfill-codes", authMiddleware, HR_ONLY, backfillEmployeeCodes);
+
+// ✅ RESEND LOGIN EMAIL (new temporary password, emailed to the employee)
+router.post("/:id/resend-credentials", authMiddleware, HR_ONLY, resendCredentials);
 
 // ✅ CREATE EMPLOYEE (WITH FILE UPLOAD)
 router.post(

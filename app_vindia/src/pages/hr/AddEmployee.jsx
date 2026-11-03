@@ -83,8 +83,7 @@ export default function AddEmployee() {
   // ─── Load employees + roles + departments on mount ──────────────────────────
   useEffect(() => {
     fetchEmployees();
-    fetchRoles();
-    fetchDepartments();
+    fetchRoles(); // also fills the department list
     if (!isEditingExisting) {
       fetchNextCode();
     }
@@ -109,17 +108,32 @@ export default function AddEmployee() {
     }
   };
 
+  // Roles come with their department name, so the department list is built
+  // from the same call (the separate /users/departments call is not available
+  // to HR — it returned 403).
   const fetchRoles = async () => {
+    let rows = [];
     try {
       const res = await api.get("/roles");
       const data = res.data;
-      setRoles(Array.isArray(data) ? data : data.data || []);
+      rows = Array.isArray(data) ? data : data.data || [];
+      setRoles(rows);
     } catch (err) {
       console.error("Failed to load roles", err);
     }
-  };
 
-  const fetchDepartments = async () => {
+    const fromRoles = [
+      ...new Map(
+        rows
+          .filter((r) => r.department_id != null && r.department_name)
+          .map((r) => [r.department_id, { id: r.department_id, name: r.department_name }]),
+      ).values(),
+    ];
+    if (fromRoles.length > 0) {
+      setDepartments(fromRoles);
+      return;
+    }
+
     try {
       const res = await api.get("/users/departments");
       const data = res.data;
@@ -439,15 +453,34 @@ export default function AddEmployee() {
       if (form.certificates instanceof File)
         formData.append("certificates", form.certificates);
 
+      let navDelay = 2000;
+
       if (isEditingExisting) {
         await updateEmployee(editingEmployee.id, formData);
         showToast("Employee updated successfully", "success");
       } else {
         const createRes = await createEmployee(formData);
-        showToast(
-          `Employee added! Login: ${form.email} / Password: Vindia@123`,
-          "success",
-        );
+
+        // The server now creates a unique temporary password and EMAILS it to
+        // the employee, so no password is shown here any more.
+        const mail = createRes?.data?.credentials_email;
+        if (createRes?.data?.credentials === "existing_account") {
+          showToast(
+            "Employee added and linked to their existing login.",
+            "success",
+          );
+        } else if (mail?.sent) {
+          showToast(
+            `Employee added! Login details were emailed to ${form.email}.`,
+            "success",
+          );
+        } else {
+          navDelay = 6000; // give HR time to read the warning
+          showToast(
+            `Employee added, but the login email could not be sent. Open the employee and use "Resend login email".`,
+            "error",
+          );
+        }
 
         // If this employee came from Recruitment, close the loop:
         // link the candidate to the new employee and flip their stage
@@ -468,7 +501,7 @@ export default function AddEmployee() {
         }
       }
 
-      setTimeout(() => navigate("/hr/employees"), 2000);
+      setTimeout(() => navigate("/hr/employees"), navDelay);
     } catch (err) {
       console.error(err.response?.data || err);
       showToast("Something went wrong. Please try again.", "error");

@@ -139,24 +139,37 @@ const Recruitment = {
   },
 
   getCandidateById: async (id) => {
-    const candidateResult = await pool.query(
-      `SELECT c.*, jo.title AS job_title, jo.department, jo.project_id
+        const candidateResult = await pool.query(
+      `SELECT c.*, jo.title AS job_title, jo.department, jo.project_id,
+              m.name AS offered_manager_name,
+              c.joining_date::text AS joining_date_text
        FROM candidates c
        LEFT JOIN job_openings jo ON jo.id = c.job_opening_id
+       LEFT JOIN employees m ON m.id = c.offered_manager_id
        WHERE c.id = $1`,
       [id],
     );
 
     if (candidateResult.rows.length === 0) return null;
 
+    // scheduled_at is read back as text so the date and time are shown exactly
+    // as HR typed them (no time-zone shifting).
     const interviewsResult = await pool.query(
-      `SELECT * FROM candidate_interviews
+      `SELECT *, scheduled_at::text AS scheduled_at_text
+       FROM candidate_interviews
        WHERE candidate_id = $1
-       ORDER BY round_number ASC`,
+       ORDER BY round_number ASC, id ASC`,
       [id],
     );
 
-    return { ...candidateResult.rows[0], interviews: interviewsResult.rows };
+    const interviews = interviewsResult.rows.map((r) => ({
+      ...r,
+      scheduled_at_local: r.scheduled_at_text
+        ? r.scheduled_at_text.replace(" ", "T").slice(0, 16)
+        : null,
+    }));
+
+    return { ...candidateResult.rows[0], interviews };
   },
 
   // Generic stage move: screening, interview, offer, rejected.
@@ -175,9 +188,20 @@ const Recruitment = {
     return result.rows[0];
   },
 
+  // Saving offer details (re)opens the offer: the reply status is cleared, so a
+  // changed offer must be released again. (The controller refuses to edit an
+  // offer that has already been accepted.)
   updateOfferDetails: async (
     id,
-    { offered_role, offered_salary, joining_date, offer_letter_url },
+    {
+      offered_role,
+      offered_salary,
+      joining_date,
+      offer_letter_url,
+      offered_location,
+      offered_employment_type,
+      offered_manager_id,
+    },
   ) => {
     const result = await pool.query(
       `UPDATE candidates
@@ -185,17 +209,62 @@ const Recruitment = {
            offered_salary = $2,
            joining_date = $3,
            offer_letter_url = $4,
+           offered_location = $5,
+           offered_employment_type = $6,
+           offered_manager_id = $7,
+           offer_status = NULL,
            stage = 'offer',
            updated_at = NOW()
-       WHERE id = $5
+       WHERE id = $8
        RETURNING *`,
       [
         offered_role,
         offered_salary,
         joining_date || null,
         offer_letter_url || null,
+        offered_location || null,
+        offered_employment_type || null,
+        offered_manager_id || null,
         id,
       ],
+    );
+    return result.rows[0];
+  },
+
+  // The offer email went out.
+  markOfferSent: async (id) => {
+    const result = await pool.query(
+      `UPDATE candidates
+       SET offer_status = 'sent',
+           offer_sent_at = NOW(),
+           offer_responded_at = NULL,
+           offer_response_note = NULL,
+           offer_response_by = NULL,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id],
+    );
+    return result.rows[0];
+  },
+
+  // HR records the candidate's reply (read from the info@ mailbox).
+  // 'declined' also closes the candidate's process.
+  recordOfferResponse: async (id, { response, note, userId }) => {
+    const declineReason =
+      "Offer declined by candidate" + (note ? `: ${note}` : "");
+    const result = await pool.query(
+      `UPDATE candidates
+       SET offer_status = $1,
+           offer_responded_at = NOW(),
+           offer_response_note = $2,
+           offer_response_by = $3,
+           stage = CASE WHEN $1 = 'declined' THEN 'rejected' ELSE stage END,
+           rejection_reason = CASE WHEN $1 = 'declined' THEN $4 ELSE rejection_reason END,
+           updated_at = NOW()
+       WHERE id = $5
+       RETURNING *`,
+      [response, note || null, userId || null, declineReason, id],
     );
     return result.rows[0];
   },
@@ -219,6 +288,7 @@ const Recruitment = {
      INTERVIEW ROUNDS
   ═══════════════════════════════════════ */
 
+  // Legacy: log a round that already happened (kept so nothing else breaks).
   addInterviewRound: async (
     candidateId,
     { round_number, interviewer_name, interview_date, feedback, rating },
@@ -229,8 +299,8 @@ const Recruitment = {
 
       const roundResult = await client.query(
         `INSERT INTO candidate_interviews
-           (candidate_id, round_number, interviewer_name, interview_date, feedback, rating)
-         VALUES ($1, $2, $3, $4, $5, $6)
+           (candidate_id, round_number, interviewer_name, interview_date, feedback, rating, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'completed')
          RETURNING *`,
         [
           candidateId,
@@ -261,6 +331,43 @@ const Recruitment = {
     }
   },
 
+  // Schedule a round: date + time, online / in person, link or place.
+  // scheduled_at is "YYYY-MM-DDTHH:mm" exactly as typed by HR.
+  scheduleInterviewRound: async (
+    candidateId,
+    { round_number, interviewer_name, scheduled_at, mode, location_or_link },
+  ) => {
+    const result = await pool.query(
+      `INSERT INTO candidate_interviews
+         (candidate_id, round_number, interviewer_name, interview_date,
+          scheduled_at, mode, location_or_link, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'scheduled')
+       RETURNING *`,
+      [
+        candidateId,
+        round_number,
+        interviewer_name || null,
+        scheduled_at.slice(0, 10), // the date part, for older screens
+        scheduled_at,
+        mode,
+        location_or_link,
+      ],
+    );
+    return result.rows[0];
+  },
+
+  // After the interview: record rating + feedback and mark the round done.
+  completeInterviewRound: async (candidateId, roundId, { feedback, rating }) => {
+    const result = await pool.query(
+      `UPDATE candidate_interviews
+       SET feedback = $1, rating = $2, status = 'completed'
+       WHERE id = $3 AND candidate_id = $4
+       RETURNING *`,
+      [feedback || null, rating || null, roundId, candidateId],
+    );
+    return result.rows[0];
+  },
+
   /* ═══════════════════════════════════════
      SCREENING
   ═══════════════════════════════════════ */
@@ -284,8 +391,11 @@ const Recruitment = {
 
   /* ═══════════════════════════════════════
      APTITUDE TEST
+     The test itself runs on the separate aptitude portal, which emails the
+     candidate on its own. The ERP only records the score and the decision.
   ═══════════════════════════════════════ */
 
+  // Legacy (no longer used by the page): saved a test link.
   sendAptitudeTest: async (id, testLink) => {
     const result = await pool.query(
       `UPDATE candidates
@@ -299,19 +409,34 @@ const Recruitment = {
     return result.rows[0];
   },
 
-  // Recording a score always marks the test completed and advances to
-  // interview — a bad score doesn't auto-reject; HR uses the existing
-  // universal Reject action if the result isn't good enough.
-  completeAptitudeTest: async (id, score) => {
+  // Record the score. The candidate STAYS at the aptitude stage until HR
+  // decides (see decideAptitude).
+  completeAptitudeTest: async (id, score, max) => {
     const result = await pool.query(
       `UPDATE candidates
        SET aptitude_test_status = 'completed',
            aptitude_test_score = $1,
-           stage = 'interview',
+           aptitude_test_max = $2,
            updated_at = NOW()
-       WHERE id = $2
+       WHERE id = $3
        RETURNING *`,
-      [score, id]
+      [score, max ?? null, id]
+    );
+    return result.rows[0];
+  },
+
+  // HR's call after seeing the score.
+  // 'qualify' -> interview, 'reject' -> rejected
+  decideAptitude: async (id, { decision, rejection_reason }) => {
+    const nextStage = decision === "qualify" ? "interview" : "rejected";
+    const result = await pool.query(
+      `UPDATE candidates
+       SET stage = $1,
+           rejection_reason = $2,
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [nextStage, decision === "reject" ? rejection_reason || null : null, id]
     );
     return result.rows[0];
   },
@@ -372,7 +497,9 @@ const Recruitment = {
   },
 
   /* ═══════════════════════════════════════
-     EMAIL LOG
+     HISTORY (emails AND recorded decisions)
+     Rows with status 'sent' / 'failed' are emails; rows with status
+     'recorded' are decisions HR logged (aptitude score, offer reply...).
   ═══════════════════════════════════════ */
 
   logCandidateEmail: async (candidateId, { email_type, subject, sent_to, status, error_message }) => {
@@ -387,7 +514,7 @@ const Recruitment = {
 
   getCandidateEmails: async (candidateId) => {
     const result = await pool.query(
-      `SELECT * FROM candidate_emails WHERE candidate_id = $1 ORDER BY sent_at DESC`,
+      `SELECT * FROM candidate_emails WHERE candidate_id = $1 ORDER BY sent_at DESC, id DESC`,
       [candidateId]
     );
     return result.rows;

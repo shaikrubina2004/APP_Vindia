@@ -1,4 +1,3 @@
-// ===== FILE: APP_Vindia/app_vindia/src/services/recruitmentService.js =====
 import api from "./api";
 
 // api.js already sets baseURL and attaches the Bearer token automatically —
@@ -24,6 +23,10 @@ const recruitmentService = {
 
   /* ── Interview Rounds ─────────────────────────────────── */
   addInterviewRound: (id, data) => api.post(`${R}/candidates/${id}/interviews`, data),
+  scheduleInterview: (id, data) =>
+    api.post(`${R}/candidates/${id}/interviews/schedule`, data),
+  submitInterviewFeedback: (id, roundId, data) =>
+    api.patch(`${R}/candidates/${id}/interviews/${roundId}/feedback`, data),
 
   /* ── Screening ────────────────────────────────────────── */
   submitScreening: (id, data) => api.post(`${R}/candidates/${id}/screening`, data),
@@ -31,8 +34,10 @@ const recruitmentService = {
   /* ── Aptitude Test ────────────────────────────────────── */
   sendAptitudeTestLink: (id, testLink) =>
     api.post(`${R}/candidates/${id}/aptitude-test/send`, { test_link: testLink }),
-  completeAptitudeTest: (id, score) =>
-    api.patch(`${R}/candidates/${id}/aptitude-test/complete`, { score }),
+  completeAptitudeTest: (id, score, max_score) =>
+    api.patch(`${R}/candidates/${id}/aptitude-test/complete`, { score, max_score }),
+  decideAptitude: (id, data) =>
+    api.post(`${R}/candidates/${id}/aptitude-test/decision`, data),
 
   /* ── Internal Approval ────────────────────────────────── */
   moveToApproval: (id) => api.post(`${R}/candidates/${id}/approval/start`),
@@ -42,8 +47,10 @@ const recruitmentService = {
   /* ── BGV ──────────────────────────────────────────────── */
   updateBGV: (id, data) => api.patch(`${R}/candidates/${id}/bgv`, data),
 
-  /* ── Offer Release ────────────────────────────────────── */
+  /* ── Offer ────────────────────────────────────────────── */
   releaseOffer: (id) => api.post(`${R}/candidates/${id}/offer/release`),
+  recordOfferResponse: (id, data) =>
+    api.patch(`${R}/candidates/${id}/offer/response`, data),
 };
 
 export default recruitmentService;

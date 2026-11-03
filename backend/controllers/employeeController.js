@@ -1,5 +1,33 @@
 const pool = require("../config/db");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const { sendMail, welcomeCredentialsEmailTemplate } = require("../utils/mailer");
+
+// ✅ TEMPORARY PASSWORD — a unique, random, 12-character password for each new
+//    login (instead of the same default for everybody). Easy-to-confuse
+//    characters (0 O 1 l I) are left out so it can be typed from the email.
+const generateTempPassword = () => {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnopqrstuvwxyz";
+  const digits = "23456789";
+  const symbols = "@#$%*";
+  const all = upper + lower + digits;
+  const pick = (set) => set[crypto.randomInt(set.length)];
+
+  const chars = [pick(upper), pick(lower), pick(digits), pick(symbols)];
+  while (chars.length < 12) chars.push(pick(all));
+
+  // shuffle so the guaranteed characters are not always in the first four places
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+};
+
+// ✅ Who is calling? (from the verified login token, never from the client)
+const callerRole = (req) =>
+  String(req.user?.role || "").toLowerCase().replace(/[\s-]+/g, "_");
 
 // ✅ GENERATE NEXT UNIQUE EMPLOYEE CODE from a known set of used codes (in-memory, no extra DB call)
 //    Pass in the Set of already-assigned codes so each call just increments a counter.
@@ -49,7 +77,9 @@ const DEFAULTS = {
 // ✅ VALID GOV ID TYPES
 const validTypes = ["pan", "aadhar", "passport", "driving", "voter"];
 
-// ✅ CREATE EMPLOYEE → also creates/links a user account
+// ✅ CREATE EMPLOYEE → also creates/links a user account, and EMAILS the
+//    employee their first login details (employee ID, login ID, temporary
+//    password). The user and employee are saved together or not at all.
 const createEmployee = async (req, res) => {
   const {
     name, email, phone, department, designation, salary,
@@ -59,7 +89,7 @@ const createEmployee = async (req, res) => {
     shift_timing, experience, previous_company,
     account_no, ifsc,
     gov_id_type, gov_id_number,
-    password  // ✅ optional: HR can set a login password for the employee
+    password  // optional: HR may choose the first password; it is emailed like a generated one
   } = req.body;
 
   const files = req.files || {};
@@ -68,6 +98,9 @@ const createEmployee = async (req, res) => {
   const id_proof = files.id_proof?.[0]?.filename || DEFAULTS.id_proof;
   const offer_letter = files.offer_letter?.[0]?.filename || DEFAULTS.offer_letter;
   const certificates = files.certificates?.[0]?.filename || DEFAULTS.certificates;
+
+  const client = await pool.connect();
+  let began = false;
 
   try {
     if (!name || !email || !phone || !department || !designation || salary == null || !join_date) {
@@ -80,7 +113,7 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    const existingEmployee = await pool.query(
+    const existingEmployee = await client.query(
       "SELECT id FROM employees WHERE LOWER(email) = LOWER($1)",
       [email]
     );
@@ -88,32 +121,38 @@ const createEmployee = async (req, res) => {
       return res.status(400).json({ message: "Employee with this email already exists" });
     }
 
+    await client.query("BEGIN");
+    began = true;
+
     // ✅ STEP 1: Check if a user account already exists for this email
     let userId = null;
-    const existingUser = await pool.query(
+    let tempPassword = null; // only set when a NEW login is created here
+    const existingUser = await client.query(
       "SELECT id FROM users WHERE LOWER(email) = LOWER($1)",
       [email]
     );
 
     if (existingUser.rows.length > 0) {
-      // User already exists — just grab their ID to link
+      // User already exists — just grab their ID to link (their password is untouched)
       userId = existingUser.rows[0].id;
     } else {
-      // ✅ STEP 2: No user exists — create one automatically
-      const rawPassword = password || "Vindia@123";
-      const hashedPassword = await bcrypt.hash(rawPassword, 10);
+      // ✅ STEP 2: No user exists — create one with a temporary password
+      tempPassword = password || generateTempPassword();
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
       // ✅ Look up role_id from the roles table using the designation name
       // This ensures the new user gets the correct role so they land on the right dashboard
-      const roleResult = await pool.query(
+      const roleResult = await client.query(
         "SELECT id FROM roles WHERE LOWER(name) = LOWER($1) LIMIT 1",
         [designation.trim()]
       );
       const roleId = roleResult.rows[0]?.id || null;
 
-      const newUser = await pool.query(
-        `INSERT INTO users (name, email, password, role_id, status)
-         VALUES ($1, $2, $3, $4, 'active')
+      // must_change_password = TRUE → the employee is invited to set their own
+      // password the first time they sign in.
+      const newUser = await client.query(
+        `INSERT INTO users (name, email, password, role_id, status, must_change_password)
+         VALUES ($1, $2, $3, $4, 'active', TRUE)
          RETURNING id`,
         [name.trim(), email.toLowerCase().trim(), hashedPassword, roleId]
       );
@@ -123,7 +162,7 @@ const createEmployee = async (req, res) => {
     // ✅ STEP 2.5: Auto-generate employee_code if not provided
     let finalEmployeeCode = employee_code?.trim();
     if (!finalEmployeeCode) {
-      const codeResult = await pool.query(`
+      const codeResult = await client.query(`
         SELECT employee_code FROM employees
         WHERE employee_code ~ '^EMP[0-9]+$'
         ORDER BY CAST(SUBSTRING(employee_code FROM 4) AS INTEGER) DESC
@@ -138,7 +177,7 @@ const createEmployee = async (req, res) => {
     }
 
     // ✅ STEP 3: Insert the employee record, linked to the user
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO employees (
         name, email, phone, department, designation, salary,
         join_date, manager_id, status, address,
@@ -187,18 +226,122 @@ const createEmployee = async (req, res) => {
       ]
     );
 
+    await client.query("COMMIT");
+    began = false;
+
+    const employee = result.rows[0];
+
+    // ✅ STEP 4: Email the login details (only when a NEW login was created).
+    //    The employee is already saved, so a mail problem never undoes it —
+    //    the response tells HR whether the email went out.
+    let credentialsEmail = { sent: false, skipped: true, error: null };
+    if (tempPassword) {
+      const template = welcomeCredentialsEmailTemplate({
+        name: employee.name,
+        email: employee.email,
+        employeeCode: employee.employee_code,
+        tempPassword,
+      });
+      const mail = await sendMail({ to: employee.email, ...template });
+      credentialsEmail = {
+        sent: mail.success,
+        skipped: false,
+        error: mail.success ? null : mail.error,
+      };
+    }
+
     res.status(201).json({
       message: "Employee created successfully 🚀",
-      employee: result.rows[0],
+      employee,
       user_id: userId,
-      note: existingUser.rows.length > 0
-        ? "Linked to existing user account"
-        : "New user account created with default password: Vindia@123"
+      credentials: tempPassword ? "new_account" : "existing_account",
+      credentials_email: credentialsEmail,
+      note: tempPassword
+        ? credentialsEmail.sent
+          ? "New login created; login details emailed to the employee"
+          : "New login created, but the login email could not be sent — use Resend login email"
+        : "Linked to existing user account",
     });
 
   } catch (error) {
+    if (began) {
+      try { await client.query("ROLLBACK"); } catch (_) { /* ignore */ }
+    }
     console.error("Create error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
+  } finally {
+    client.release();
+  }
+};
+
+// ✅ RESEND LOGIN EMAIL — issues a NEW temporary password (the old one is stored
+//    hashed and cannot be read back) and emails it to the employee. HR / CEO only.
+//    HR can resend only while the employee is still on a temporary password;
+//    the CEO can reset anyone. Only the CEO can reset the CEO's login.
+const resendCredentials = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const found = await pool.query(
+      `SELECT e.name, e.email, e.employee_code, e.user_id,
+              u.must_change_password, r.code AS role_code
+         FROM employees e
+         LEFT JOIN users u ON u.id = e.user_id
+         LEFT JOIN roles r ON r.id = u.role_id
+        WHERE e.id = $1`,
+      [id]
+    );
+
+    if (found.rows.length === 0) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    const row = found.rows[0];
+    if (!row.user_id) {
+      return res.status(400).json({ message: "This employee has no login account" });
+    }
+
+    const callerIsCeo = callerRole(req) === "ceo";
+    const targetIsCeo = String(row.role_code || "").toLowerCase() === "ceo";
+
+    if (targetIsCeo && !callerIsCeo) {
+      return res.status(403).json({ message: "Only the CEO can reset the CEO's login" });
+    }
+    if (!row.must_change_password && !callerIsCeo) {
+      return res.status(409).json({
+        message:
+          "This employee has already set their own password, so the login email cannot be resent.",
+      });
+    }
+
+    const tempPassword = generateTempPassword();
+    const hashed = await bcrypt.hash(tempPassword, 10);
+
+    await pool.query(
+      `UPDATE users
+          SET password = $1, must_change_password = TRUE, password_changed_at = NULL
+        WHERE id = $2`,
+      [hashed, row.user_id]
+    );
+
+    const template = welcomeCredentialsEmailTemplate({
+      name: row.name,
+      email: row.email,
+      employeeCode: row.employee_code,
+      tempPassword,
+    });
+    const mail = await sendMail({ to: row.email, ...template });
+
+    res.status(200).json({
+      sent: mail.success,
+      message: mail.success
+        ? `Login details emailed to ${row.email}`
+        : "A new temporary password was set, but the email could not be sent. Please try again.",
+      error: mail.success ? null : mail.error,
+    });
+  } catch (error) {
+    console.error("Resend credentials error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -264,7 +407,7 @@ const getBirthdays = async (req, res) => {
   }
 };
 
-// ✅ GET BY ID
+// ✅ GET BY ID  (also says whether the employee is still on a temporary password)
 const getEmployeeById = async (req, res) => {
   const { id } = req.params;
 
@@ -275,7 +418,8 @@ const getEmployeeById = async (req, res) => {
         m.name AS manager_name,
         m.designation AS manager_designation,
         r.name AS role,
-        u.status AS login_status
+        u.status AS login_status,
+        u.must_change_password AS login_password_pending
       FROM employees e
       LEFT JOIN employees m ON e.manager_id = m.id
       LEFT JOIN users u ON u.id = e.user_id
@@ -494,6 +638,7 @@ const backfillEmployeeCodes = async (req, res) => {
 
 module.exports = {
   createEmployee,
+  resendCredentials,
   getAllEmployees,
   getEmployeeById,
   updateEmployee,
