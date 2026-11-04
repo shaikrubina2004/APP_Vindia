@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Search, Users, RefreshCw } from "lucide-react";
 import { fetchTeamOverview } from "../../../api/teamApi";
-import { errorText } from "../shared/opsFormat";
-import "../shared/operationsHub.css";
+import { errorText } from "../../operations/shared/opsFormat";
+import "../../operations/shared/operationsHub.css";
 
 const STATUS_TONE = { Active: "emerald", "On Leave": "amber", Suspended: "amber", Inactive: "gray" };
 const SOURCE_LABEL = { team: "Project team", labour_registry: "Labour registry", staff: "Staff record" };

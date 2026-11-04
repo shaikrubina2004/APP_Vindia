@@ -12,7 +12,7 @@ import InventoryOverview from "../pages/operations/manager/InventoryOverview";
 import OperationsReports from "../pages/operations/manager/OperationsReports";
 import OperationsWbsControl from "../pages/operations/manager/OperationsWbsControl";
 import OperationsDailyUpdatesReview from "../pages/operations/manager/OperationsDailyUpdatesReview";
-import TeamOverview from "../pages/operations/manager/TeamOverview";
+import TeamOverview from "../pages/Operations/manager/TeamOverview";
 import VendorsView from "../pages/operations/procurement/VendorsView";
 import OfficeRequests from "../pages/operations/administrator/OfficeRequests";
 import AppShell from "../components/incidents/AppShell";
