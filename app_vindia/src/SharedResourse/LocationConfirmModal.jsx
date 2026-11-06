@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { getCurrentLocation, reverseGeocodeShort, geocodeSearch } from "../utils/geolocation";
+import { getCurrentLocation, reverseGeocodeShort } from "../utils/geolocation";
 import "./LocationConfirmModal.css";
 
 // Leaflet's default marker icon breaks under most bundlers (Vite/webpack
@@ -21,10 +21,14 @@ const pinIcon = L.icon({
 /* ══════════════════════════════════════════════════════════
    LOCATION CONFIRM MODAL
    Shown before a check-in/check-out is actually saved — mirrors
-   PagarBook's "Mark Attendance" flow: auto-detect a starting point,
-   show it on a map, let the employee drag the pin or search for their
-   real address if it's wrong, then require an explicit Submit before
-   anything is sent to the backend.
+   PagarBook's "Mark Attendance" flow: auto-detect the employee's
+   REAL location, show it on a map, then require an explicit Submit
+   before anything is sent to the backend.
+
+   The detected location is LOCKED: the pin cannot be dragged, the
+   address cannot be edited/searched, and the map cannot be panned
+   away to pick another spot. Only the device's own GPS fix is ever
+   submitted, so attendance can't be marked from a different place.
 
    Props:
      title      — "Check In" | "Check Out" (shown in the subtitle)
@@ -39,11 +43,10 @@ const LocationConfirmModal = ({ title, onCancel, onConfirm }) => {
 
   const [coords, setCoords] = useState(null); // { lat, lng }
   const [address, setAddress] = useState("");
-  const [searchText, setSearchText] = useState("");
+  const [locError, setLocError] = useState(false);
 
   const [locating, setLocating] = useState(true);
   const [resolvingAddress, setResolvingAddress] = useState(false);
-  const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const now = new Date();
@@ -72,16 +75,18 @@ const LocationConfirmModal = ({ title, onCancel, onConfirm }) => {
     const resolved = await reverseGeocodeShort(lat, lng);
     setResolvingAddress(false);
     setAddress(resolved || `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-    setSearchText("");
   };
 
   // Grab the browser's best-guess location (GPS / Wi-Fi / IP fallback).
   const locateMe = async () => {
     setLocating(true);
+    setLocError(false);
     const loc = await getCurrentLocation();
     setLocating(false);
     if (loc) {
       await applyCoords(loc.lat, loc.lng, true);
+    } else {
+      setLocError(true);
     }
   };
 
@@ -98,6 +103,15 @@ const LocationConfirmModal = ({ title, onCancel, onConfirm }) => {
       center: [coords.lat, coords.lng],
       zoom: 16,
       attributionControl: true,
+      // Locked view: the employee can't pan/zoom the map away from
+      // their real position.
+      dragging: false,
+      touchZoom: false,
+      doubleClickZoom: false,
+      scrollWheelZoom: false,
+      boxZoom: false,
+      keyboard: false,
+      zoomControl: false,
     });
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -107,13 +121,10 @@ const LocationConfirmModal = ({ title, onCancel, onConfirm }) => {
 
     const marker = L.marker([coords.lat, coords.lng], {
       icon: pinIcon,
-      draggable: true,
+      draggable: false,
+      interactive: false,
+      keyboard: false,
     }).addTo(map);
-
-    marker.on("dragend", async () => {
-      const pos = marker.getLatLng();
-      await applyCoords(pos.lat, pos.lng, false);
-    });
 
     mapRef.current = map;
     markerRef.current = marker;
@@ -130,19 +141,6 @@ const LocationConfirmModal = ({ title, onCancel, onConfirm }) => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords !== null]);
-
-  const handleSearch = async () => {
-    if (!searchText.trim()) return;
-    setSearching(true);
-    const result = await geocodeSearch(searchText);
-    setSearching(false);
-
-    if (result) {
-      await applyCoords(result.lat, result.lng, true);
-    } else {
-      alert("Couldn't find that location. Try a more specific search.");
-    }
-  };
 
   const handleSubmit = async () => {
     if (!coords) return;
@@ -184,23 +182,22 @@ const LocationConfirmModal = ({ title, onCancel, onConfirm }) => {
           {locating && !coords && (
             <div className="lcm-map-loading">Getting your location…</div>
           )}
+          {locError && !coords && (
+            <div className="lcm-map-loading">
+              Couldn't get your location. Allow location access in your
+              browser, then{" "}
+              <button
+                type="button"
+                onClick={locateMe}
+                style={{ border: "none", background: "none", color: "#2563eb", fontWeight: 700, cursor: "pointer", padding: 0 }}
+              >
+                try again
+              </button>
+              .
+            </div>
+          )}
           <div ref={mapContainerRef} className="lcm-map" />
 
-          <button
-            type="button"
-            className="lcm-locate-btn"
-            onClick={locateMe}
-            title="Use my current location"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="8" />
-              <circle cx="12" cy="12" r="2" />
-              <line x1="12" y1="2" x2="12" y2="5" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-              <line x1="2" y1="12" x2="5" y2="12" />
-              <line x1="19" y1="12" x2="22" y2="12" />
-            </svg>
-          </button>
         </div>
 
         <div className="lcm-address-row">
@@ -211,29 +208,13 @@ const LocationConfirmModal = ({ title, onCancel, onConfirm }) => {
 
           <input
             className="lcm-address-input"
-            value={resolvingAddress ? "Locating address…" : searchText || address}
-            onChange={(e) => setSearchText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="Search for your location"
-            disabled={resolvingAddress}
+            value={resolvingAddress ? "Locating address…" : address}
+            readOnly
+            tabIndex={-1}
+            placeholder="Detecting your location…"
+            title="Your location is detected automatically and can't be changed"
+            style={{ cursor: "default" }}
           />
-
-          <button
-            type="button"
-            className="lcm-search-btn"
-            onClick={handleSearch}
-            disabled={searching || !searchText.trim()}
-            title="Search this address"
-          >
-            {searching ? (
-              "…"
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            )}
-          </button>
         </div>
 
         <div className="lcm-actions">

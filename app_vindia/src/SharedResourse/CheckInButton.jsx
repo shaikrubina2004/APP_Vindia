@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import api from "../services/api";
+import axios from "axios";
 import { isCEO, getCurrentLocation } from "../utils/geolocation";
 import LocationConfirmModal from "./LocationConfirmModal";
 
-// All requests below go through the shared `api` client, which attaches the
-// login token. (This file used plain axios before, which sent no token.)
+const API = "http://localhost:5000/api";
 
-// How often to ping location once checked in. 3 min is a reasonable
-// balance between tracking granularity, battery usage, and API load —
-// tune to taste.
-const TRACK_INTERVAL_MS = 3 * 60 * 1000;
+// How often to ping location once checked in. 1 min gives a much
+// smoother path than the old 3 min; raise it if battery / API load
+// becomes a concern.
+const TRACK_INTERVAL_MS = 60 * 1000;
 
 const fmtTime = (t) => {
   if (!t) return "—";
@@ -26,6 +25,8 @@ const CheckInButton = ({ employeeId, designation }) => {
   const [modalAction, setModalAction] = useState(null);
   const timerRef = useRef(null);
   const trackingRef = useRef(null); // setInterval id for live tracking
+  const wakeLockRef = useRef(null); // Screen Wake Lock sentinel
+  const lastLocRef = useRef(null);  // last known { lat, lng } for tab-close ping
 
   const skipLocation = isCEO(designation);
 
@@ -66,9 +67,9 @@ const CheckInButton = ({ employeeId, designation }) => {
   const fetchTodayAttendance = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/attendance/today", {
-        params: { employee_id: employeeId },
-      });
+      const res = await axios.get(
+        `${API}/attendance/today?employee_id=${employeeId}`
+      );
       setAttendance(res.data || null);
     } catch (err) {
       if (err.response?.status !== 404) console.error(err);
@@ -80,11 +81,12 @@ const CheckInButton = ({ employeeId, designation }) => {
 
   // ── Live tracking: fire one ping now, then on an interval, until
   //    stopTracking() is called at check-out / unmount. ──
-  const sendLocationPing = async (attendanceId) => {
-    const loc = await getCurrentLocation();
+  const sendLocationPing = async (attendanceId, knownLoc = null) => {
+    const loc = knownLoc || (await getCurrentLocation());
     if (!loc) return; // permission denied / no fix this cycle — just skip it
+    lastLocRef.current = { lat: loc.lat, lng: loc.lng };
     try {
-      await api.post(`/attendance/${attendanceId}/track`, {
+      await axios.post(`${API}/attendance/${attendanceId}/track`, {
         lat: loc.lat,
         lng: loc.lng,
         recorded_at: new Date().toISOString(),
@@ -94,13 +96,80 @@ const CheckInButton = ({ employeeId, designation }) => {
     }
   };
 
-  const startTracking = (attendanceId) => {
+  // ── Keep the screen awake while checked in (Wake Lock API). The
+  //    browser auto-releases it when the tab is hidden, so it is
+  //    re-requested whenever the tab becomes visible again. ──
+  const requestWakeLock = async () => {
+    try {
+      if (!("wakeLock" in navigator) || wakeLockRef.current) return;
+      const sentinel = await navigator.wakeLock.request("screen");
+      wakeLockRef.current = sentinel;
+      sentinel.addEventListener("release", () => {
+        if (wakeLockRef.current === sentinel) wakeLockRef.current = null;
+      });
+    } catch {
+      // unsupported / denied (e.g. low battery) — tracking still works
+    }
+  };
+
+  const releaseWakeLock = async () => {
+    try {
+      await wakeLockRef.current?.release();
+    } catch { /* ignore */ }
+    wakeLockRef.current = null;
+  };
+
+  // While checked in: ping immediately when the tab comes back into view,
+  // and fire one last ping with the last known location as the tab/page
+  // closes (keepalive lets the request finish after the page is gone).
+  useEffect(() => {
+    const isIn = attendance?.check_in && !attendance?.check_out;
+    if (skipLocation || !isIn || !attendance?.id) return;
+    const attId = attendance.id;
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        requestWakeLock();
+        sendLocationPing(attId);
+      }
+    };
+
+    const onPageHide = () => {
+      const loc = lastLocRef.current;
+      if (!loc) return;
+      try {
+        fetch(`${API}/attendance/${attId}/track`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lat: loc.lat,
+            lng: loc.lng,
+            recorded_at: new Date().toISOString(),
+          }),
+          keepalive: true,
+        });
+      } catch { /* best effort */ }
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attendance?.id, attendance?.check_in, attendance?.check_out, skipLocation]);
+
+  const startTracking = (attendanceId, firstLoc = null) => {
     if (skipLocation || trackingRef.current || !attendanceId) return;
-    sendLocationPing(attendanceId);
+    // At check-in we already have the confirmed location — record it as
+    // the first point of the path instead of waiting for a fresh GPS fix.
+    sendLocationPing(attendanceId, firstLoc);
     trackingRef.current = setInterval(
       () => sendLocationPing(attendanceId),
       TRACK_INTERVAL_MS
     );
+    requestWakeLock();
   };
 
   const stopTracking = () => {
@@ -108,6 +177,7 @@ const CheckInButton = ({ employeeId, designation }) => {
       clearInterval(trackingRef.current);
       trackingRef.current = null;
     }
+    releaseWakeLock();
   };
 
   const performCheckIn = async (lat, lng, address) => {
@@ -120,7 +190,7 @@ const CheckInButton = ({ employeeId, designation }) => {
       shiftStart.setHours(9, 0, 0, 0);
       const lateMinutes = Math.floor(Math.max(0, now - shiftStart) / 60000);
 
-      const res = await api.post("/attendance", {
+      const res = await axios.post(`${API}/attendance`, {
         employee_id:      employeeId,
         date:             dateStr,
         check_in:         timeStr,
@@ -133,7 +203,11 @@ const CheckInButton = ({ employeeId, designation }) => {
         check_in_address: address,
       });
       setAttendance(res.data);
-      startTracking(res.data.id);
+      if (lat != null && lng != null) {
+        startTracking(res.data.id, { lat, lng });
+      } else {
+        startTracking(res.data.id);
+      }
     } catch (err) {
       console.error(err);
       alert("Check-in failed. Please try again.");
@@ -149,7 +223,7 @@ const CheckInButton = ({ employeeId, designation }) => {
     try {
       const timeStr = new Date().toTimeString().slice(0, 8);
 
-      const res = await api.put(`/attendance/${attendance.id}`, {
+      const res = await axios.put(`${API}/attendance/${attendance.id}`, {
         check_out:         timeStr,
         check_out_lat:     lat,
         check_out_lng:     lng,
@@ -158,6 +232,8 @@ const CheckInButton = ({ employeeId, designation }) => {
       setAttendance(res.data);
       clearInterval(timerRef.current);
       stopTracking();
+      // The confirmed check-out lat/lng are stored on the attendance row
+      // above; the server adds them as the last point of the path.
     } catch (err) {
       console.error(err);
       alert("Check-out failed. Please try again.");
@@ -242,6 +318,11 @@ const CheckInButton = ({ employeeId, designation }) => {
           In: {fmtTime(attendance.check_in)}
           {elapsed && <> &nbsp;·&nbsp; <strong style={{ color: "#2563eb" }}>{elapsed}</strong></>}
         </span>
+        {!skipLocation && (
+          <span style={{ fontSize: 10, color: "#b45309", fontWeight: 600 }}>
+            📍 Keep this tab open until check-out
+          </span>
+        )}
       </div>
     );
   } else {
