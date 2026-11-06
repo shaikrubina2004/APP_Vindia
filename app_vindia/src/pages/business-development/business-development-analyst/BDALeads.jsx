@@ -48,6 +48,21 @@ const ALL_STATUSES = ["New","Interested","Follow Up","Converted","Not Interested
 const ALL_SOURCES  = ["JustDial","Facebook/Meta","Manual","Website","Walk-in","Referral"];
 const MAX_TRACK_SEC = 300;
 
+/* ─── assignment helpers ─── */
+const normName = (v) => (v || "").trim().replace(/\s+/g, " ").toLowerCase();
+const isUnassigned = (l) => {
+  const a = normName(l.assigned_to);
+  return !a || a === "unassigned";
+};
+const authHeaders = () => {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+const assignErrorMsg = (err) =>
+  err.response?.status === 401
+    ? "Your session expired — please log in again."
+    : err.response?.data?.error || "Could not assign the lead. Please try again.";
+
 const Sk = ({ h=16, r=6 }) => (
   <div className="bda-lsk" style={{ height:h, borderRadius:r }} />
 );
@@ -93,10 +108,12 @@ function useTimeTracker(active, onStop) {
 /* ════════════════════════════════════════
    LEAD ROW
 ════════════════════════════════════════ */
-const LeadRow = ({ lead, onEdit, onJunk, bdaEmail, bdaName, isCEO }) => {
+const LeadRow = ({ lead, onEdit, onJunk, onAssign, onQuickAssign, canAssign, bdaEmail, bdaName, isCEO }) => {
   const [open, setOpen] = useState(false);
   const src  = srcStyle(lead.source);
   const stat = statusStyle(lead.status);
+  const unassigned = isUnassigned(lead);
+  const escalated  = unassigned && !!lead.escalated_at;
 
   const handleViewStop = async (secs) => {
     if (!bdaEmail || secs <= 0) return;
@@ -135,7 +152,20 @@ const LeadRow = ({ lead, onEdit, onJunk, bdaEmail, bdaName, isCEO }) => {
           </span>
         </td>
         <td className="blr__city">{lead.city || "—"}</td>
-        <td className="blr__assign">{lead.assigned_to || "—"}</td>
+        <td className="blr__assign">
+          {unassigned ? (
+            <>
+              <span className="bda-pill bda-pill--unassigned">Unassigned</span>
+              {escalated && (
+                <span className="bda-pill bda-pill--escalated" title={lead.last_assignee ? `Not followed up by ${lead.last_assignee}` : "Escalated"}>
+                  ⚡ Escalated
+                </span>
+              )}
+            </>
+          ) : (
+            lead.assigned_to
+          )}
+        </td>
         <td className="blr__date">
           {lead.created_at
             ? new Date(lead.created_at).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})
@@ -143,6 +173,14 @@ const LeadRow = ({ lead, onEdit, onJunk, bdaEmail, bdaName, isCEO }) => {
         </td>
         <td onClick={e => e.stopPropagation()}>
           <div className="blr__actions">
+            {unassigned && !isCEO && (
+              <button className="blr__btn blr__btn--me" onClick={() => onQuickAssign(lead)}>Assign to me</button>
+            )}
+            {canAssign && (
+              <button className="blr__btn blr__btn--assign" onClick={() => onAssign(lead)}>
+                {unassigned ? "Assign" : "Reassign"}
+              </button>
+            )}
             <button className="blr__btn blr__btn--edit" onClick={() => onEdit(lead)}>Edit</button>
             <button className="blr__btn blr__btn--junk" onClick={() => onJunk(lead)}>Junk</button>
           </div>
@@ -169,6 +207,9 @@ const LeadRow = ({ lead, onEdit, onJunk, bdaEmail, bdaName, isCEO }) => {
                 <DetailItem label="Budget"         value={lead.budget ? `₹${Number(lead.budget).toLocaleString("en-IN")}` : null} />
                 <DetailItem label="Quotation Sent" value={lead.quotation_sent === true ? "Yes" : lead.quotation_sent === false ? "No" : null} />
                 <DetailItem label="Follow-up"      value={lead.snooze_until ? new Date(lead.snooze_until).toLocaleDateString("en-IN") : null} />
+                <DetailItem label="Assigned By"    value={lead.assigned_by} />
+                <DetailItem label="Assigned On"    value={lead.assigned_at ? new Date(lead.assigned_at).toLocaleString("en-IN",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}) : null} />
+                <DetailItem label="Previously With" value={lead.last_assignee} />
                 <DetailItem label="Description"    value={lead.description} wide />
               </div>
             </div>
@@ -245,7 +286,11 @@ const EditModal = ({ lead, onClose, onSave, bdaEmail, bdaName, isCEO }) => {
             <Field label="City"          value={form.city}          onChange={v => set("city",v)} />
             <FieldSelect label="Status"  value={form.status}        onChange={v => set("status",v)} options={ALL_STATUSES} />
             <FieldSelect label="Source"  value={form.source}        onChange={v => set("source",v)} options={ALL_SOURCES} />
-            <Field label="Assigned To"   value={form.assigned_to}   onChange={v => set("assigned_to",v)} />
+            <div className="bda-field">
+              <label className="bda-field__label">Assigned To</label>
+              <input className="bda-field__input" value={isUnassigned(lead) ? "Unassigned" : lead.assigned_to} disabled
+                     title="Use the Assign / Reassign button on the lead to change the owner" />
+            </div>
             <Field label="Budget (₹)"    value={form.budget}        onChange={v => set("budget",v)} />
             <Field label="Building Type" value={form.building_type} onChange={v => set("building_type",v)} />
             <Field label="Floors"        value={form.floors}        onChange={v => set("floors",v)} />
@@ -282,6 +327,97 @@ const FieldSelect = ({ label, value, onChange, options }) => (
 );
 
 /* ════════════════════════════════════════
+   ASSIGN MODAL
+   • BDA : can pick any BDA (incl. themselves) — never the CEO
+   • CEO : can pick any BDA
+   The server enforces the same rules; this just hides invalid choices.
+════════════════════════════════════════ */
+const AssignModal = ({ lead, assignees, bdaEmail, isCEO, onClose, onDone }) => {
+  const [selected, setSelected] = useState("");
+  const [saving,   setSaving]   = useState(false);
+  const [err,      setErr]      = useState("");
+  const unassigned = isUnassigned(lead);
+  const me = (bdaEmail || "").toLowerCase();
+
+  const submit = async (email) => {
+    if (!email) { setErr("Please choose a BDA"); return; }
+    setSaving(true); setErr("");
+    try {
+      const res = await axios.put(
+        `${API}/leads/${lead.id}/assign`,
+        { assignee_email: email },
+        { headers: authHeaders() }
+      );
+      const who = res.data?.lead?.assigned_to || "BDA";
+      onDone(`"${lead.name}" assigned to ${who}`);
+    } catch (e) {
+      setErr(assignErrorMsg(e));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bda-modal-overlay" onClick={onClose}>
+      <div className="bda-modal bda-modal--assign" onClick={e => e.stopPropagation()}>
+        <div className="bda-modal__header">
+          <div>
+            <h2 className="bda-modal__title">{unassigned ? "Assign Lead" : "Reassign Lead"}</h2>
+            <p className="bda-assign__sub">{lead.name} · {lead.phone}</p>
+          </div>
+          <button className="bda-modal__close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="bda-modal__body">
+          {!unassigned && (
+            <div className="bda-assign__current">Currently with <b>{lead.assigned_to}</b></div>
+          )}
+          {err && <div className="bda-assign__error">⚠ {err}</div>}
+
+          {!isCEO && me && assignees.some(a => (a.email||"").toLowerCase() === me) && (
+            <button className="bda-assign__me" disabled={saving} onClick={() => submit(bdaEmail)}>
+              ✋ Assign to me
+            </button>
+          )}
+
+          <p className="bda-assign__label">{isCEO ? "Assign to BDA" : "…or assign to another BDA"}</p>
+          {assignees.length === 0 ? (
+            <p className="bda-assign__empty">No active BDAs found.</p>
+          ) : (
+            <div className="bda-assign__list">
+              {assignees.map(a => {
+                const isMe = (a.email||"").toLowerCase() === me;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    className={`bda-assign__opt ${selected === a.email ? "is-selected" : ""}`}
+                    onClick={() => { setSelected(a.email); setErr(""); }}
+                  >
+                    <span className="bda-assign__avatar">{(a.name || "?").trim().charAt(0).toUpperCase()}</span>
+                    <span className="bda-assign__who">
+                      <span className="bda-assign__name">{a.name}{isMe && " (You)"}</span>
+                      <span className="bda-assign__email">{a.email}</span>
+                    </span>
+                    <span className="bda-assign__tick">{selected === a.email ? "✓" : ""}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="bda-modal__footer">
+          <button className="bda-btn-outline" onClick={onClose}>Cancel</button>
+          <button className="bda-btn-primary" disabled={!selected || saving} onClick={() => submit(selected)}>
+            {saving ? "Assigning…" : "Confirm"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════
    MAIN PAGE
 ════════════════════════════════════════ */
 const BDALeads = () => {
@@ -303,21 +439,71 @@ const BDALeads = () => {
   const [sort,     setSort]     = useState("newest");
   const [page,     setPage]     = useState(1);
   const [editLead, setEditLead] = useState(null);
+  const [assignLead,  setAssignLead]  = useState(null);
+  const [assignees,   setAssignees]   = useState([]);
+  const [toast,       setToast]       = useState(null);   // { msg, type }
   const PER_PAGE = 12;
 
-  useEffect(() => { fetchLeads(); }, []);
+  const showToast = (msg, type = "ok") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
-  const fetchLeads = async () => {
-    setLoading(true);
+  const ownedByMe = (l) =>
+    (l.assigned_email && bdaEmail && l.assigned_email.toLowerCase() === bdaEmail.toLowerCase()) ||
+    (!!bdaName && normName(l.assigned_to) === normName(bdaName));
+
+  // CEO: any lead.  BDA: unassigned leads, or leads they already own (hand-over).
+  const canAssign = (l) => isCEO || isUnassigned(l) || ownedByMe(l);
+
+  useEffect(() => {
+    fetchLeads();
+    axios.get(`${API}/leads/assignees`)
+      .then(r => setAssignees(r.data.assignees || []))
+      .catch(err => console.error("assignees:", err));
+  }, []);
+
+  // New leads (Meta / JustDial / manual) show up without pressing Refresh
+  useEffect(() => {
+    const id = setInterval(() => fetchLeads(true), 30000);
+    return () => clearInterval(id);
+  }, [role, bdaName, bdaEmail]);
+
+  const fetchLeads = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await axios.get(`${API}/leads`, {
-        params: { role, name: bdaName },
+        params: { role, name: bdaName, email: bdaEmail },
       });
       setLeads(res.data.leads || []);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+    }
+  };
+
+  const handleAssigned = (msg) => {
+    setAssignLead(null);
+    showToast(msg);
+    fetchLeads(true);
+    window.refreshBDANotifications?.();
+  };
+
+  const quickAssignToMe = async (lead) => {
+    try {
+      const res = await axios.put(
+        `${API}/leads/${lead.id}/assign`,
+        { assignee_email: bdaEmail },
+        { headers: authHeaders() }
+      );
+      showToast(`"${lead.name}" is now yours`);
+      fetchLeads(true);
+      window.refreshBDANotifications?.();
+      return res;
+    } catch (err) {
+      showToast(assignErrorMsg(err), "err");
+      fetchLeads(true);   // someone else may have grabbed it — refresh the list
     }
   };
 
@@ -336,9 +522,9 @@ const BDALeads = () => {
     if (sourceF !== "All")
       arr = arr.filter(l => normalizeSource(l.source) === sourceF);
     if (assignF === "assigned")
-      arr = arr.filter(l => l.assigned_to && l.assigned_to.trim() !== "");
+      arr = arr.filter(l => !isUnassigned(l));
     if (assignF === "unassigned")
-      arr = arr.filter(l => !l.assigned_to || l.assigned_to.trim() === "");
+      arr = arr.filter(l => isUnassigned(l));
     arr.sort((a, b) => {
       if (sort === "newest") return new Date(b.created_at) - new Date(a.created_at);
       if (sort === "oldest") return new Date(a.created_at) - new Date(b.created_at);
@@ -369,8 +555,9 @@ const BDALeads = () => {
   const hasFilters = statusF !== "All" || sourceF !== "All" || assignF !== "All" || search;
 
   const counts = useMemo(() => {
-    const c = { total: leads.length, new: 0, followup: 0, converted: 0 };
+    const c = { total: leads.length, new: 0, followup: 0, converted: 0, unassigned: 0 };
     leads.forEach(l => {
+      if (isUnassigned(l)) c.unassigned++;
       const s = (l.status||"").toLowerCase();
       if (s === "new")       c.new++;
       if (s === "follow up") c.followup++;
@@ -402,6 +589,17 @@ const BDALeads = () => {
             <span className="bda-chip2__label">Total</span>
           </div>
           <span className="bda-chip2__icon">📋</span>
+        </div>
+        <div
+          className="bda-chip2 bda-chip2--red bda-chip2--click"
+          onClick={() => { setAssignF("unassigned"); setPage(1); }}
+          title="Show unassigned leads"
+        >
+          <div className="bda-chip2__left">
+            <span className="bda-chip2__num">{counts.unassigned}</span>
+            <span className="bda-chip2__label">Unassigned</span>
+          </div>
+          <span className="bda-chip2__icon">📥</span>
         </div>
         <div className="bda-chip2 bda-chip2--green">
           <div className="bda-chip2__left">
@@ -500,6 +698,9 @@ const BDALeads = () => {
                     lead={lead}
                     onEdit={setEditLead}
                     onJunk={handleJunk}
+                    onAssign={setAssignLead}
+                    onQuickAssign={quickAssignToMe}
+                    canAssign={canAssign(lead)}
                     bdaEmail={bdaEmail}
                     bdaName={bdaName}
                     isCEO={isCEO}
@@ -538,6 +739,20 @@ const BDALeads = () => {
           </span>
         </div>
       )}
+
+      {/* ── ASSIGN MODAL ── */}
+      {assignLead && (
+        <AssignModal
+          lead={assignLead}
+          assignees={assignees}
+          bdaEmail={bdaEmail}
+          isCEO={isCEO}
+          onClose={() => setAssignLead(null)}
+          onDone={handleAssigned}
+        />
+      )}
+
+      {toast && <div className={`bda-toast bda-toast--${toast.type}`}>{toast.msg}</div>}
 
       {/* ── EDIT MODAL ── */}
       {editLead && (

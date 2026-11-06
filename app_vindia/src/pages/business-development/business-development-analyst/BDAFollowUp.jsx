@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../../../context/useAuth";
@@ -42,6 +42,16 @@ function isUpcoming(d) {
 function daysOverdue(d) {
   const diff = todayDate() - toDateOnly(d);
   return Math.floor(diff / 86400000);
+}
+
+const CLOSED = ["converted", "not interested", "junk", "junk_requested"];
+const isClosed = (status) => CLOSED.includes((status || "").toLowerCase());
+
+/* Hours left before an un-followed-up lead is escalated back to the pool */
+function hoursLeft(assignedAt, escalationHours) {
+  if (!assignedAt || !escalationHours) return null;
+  const left = escalationHours - (Date.now() - new Date(assignedAt).getTime()) / 3600000;
+  return Math.max(0, Math.ceil(left));
 }
 
 const StatusPill = ({ status }) => {
@@ -179,8 +189,16 @@ const PreviousFollowUps = ({ leadId }) => {
 /* ════════════════════════════════════════
    LEAD CARD
 ════════════════════════════════════════ */
-const LeadCard = ({ lead, badge, onFollowUp }) => (
+const LeadCard = ({ lead, badge, onFollowUp, escalationHours }) => {
+  const left = badge === "fresh" ? hoursLeft(lead.assigned_at, escalationHours) : null;
+  return (
   <div className={`fu-card fu-card--${badge}`}>
+    {badge === "fresh" && (
+      <div className={`fu-card__fresh-bar ${left !== null && left <= 4 ? "is-urgent" : ""}`}>
+        🆕 Needs first follow-up
+        {left !== null && ` · ${left}h left before it moves to other BDAs`}
+      </div>
+    )}
     {badge === "overdue" && (
       <div className="fu-card__overdue-bar">
         ⚠ {daysOverdue(lead.next_followup)} day{daysOverdue(lead.next_followup) !== 1 ? "s" : ""} overdue
@@ -217,7 +235,8 @@ const LeadCard = ({ lead, badge, onFollowUp }) => (
       </button>
     </div>
   </div>
-);
+  );
+};
 
 /* ════════════════════════════════════════
    MAIN PAGE
@@ -227,8 +246,9 @@ const BDAFollowUp = () => {
 
   // ✅ Same pattern as BDALeads — role/name needed to filter data per-user
   const { user } = useAuth();
-  const role = user?.role || null;   // role CODE, e.g. "bda"
-  const name = user?.name || null;
+  const role  = user?.role  || null;   // role CODE, e.g. "bda"
+  const name  = user?.name  || null;
+  const email = user?.email || "";
 
   const [loading, setLoading]   = useState(true);
   const [allLeads, setAllLeads] = useState([]);
@@ -236,18 +256,30 @@ const BDAFollowUp = () => {
   const [search, setSearch]     = useState("");
   const [activeTab, setActiveTab] = useState("today");
   const [modalLead, setModalLead] = useState(null);
+  const [escalationHours, setEscalationHours] = useState(24);
+  const tabChosen = useRef(false);   // true once the user (or first load) picked a tab
 
   useEffect(() => { loadData(); }, []);
 
-  const loadData = async () => {
-    setLoading(true);
+  // Keep the list fresh: newly assigned / escalated leads appear on their own
+  useEffect(() => {
+    const id = setInterval(() => loadData(true), 60000);
+    return () => clearInterval(id);
+  }, [role, name, email]);
+
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
+      // Only leads ASSIGNED to this BDA (CEO: every assigned lead).
+      // The unassigned pool lives on the Leads page, not here.
+      const params = { role, name, email };
       const [leadsRes, todayRes, pendingRes] = await Promise.all([
-        axios.get(`${API}/leads`, { params: { role, name } }),
-        axios.get(`${API}/leads/follow-ups/today`, { params: { role, name } }),
-        axios.get(`${API}/leads/follow-ups/pending`, { params: { role, name } }),
+        axios.get(`${API}/leads`, { params: { ...params, assigned_only: 1 } }),
+        axios.get(`${API}/leads/follow-ups/today`, { params }),
+        axios.get(`${API}/leads/follow-ups/pending`, { params }),
       ]);
       setAllLeads(leadsRes.data.leads || []);
+      if (leadsRes.data.escalationHours) setEscalationHours(leadsRes.data.escalationHours);
       setFollowUps([
         ...(todayRes.data.todayFollowUps    || []).map(f => ({ ...f, _type: "today" })),
         ...(pendingRes.data.pendingFollowUps || []).map(f => ({ ...f, _type: "overdue" })),
@@ -255,7 +287,7 @@ const BDAFollowUp = () => {
     } catch (err) {
       console.error("Follow up load error:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -278,7 +310,8 @@ const BDAFollowUp = () => {
     const todaySet    = new Map(); // id → lead
     const overdueSet  = new Map();
     const upcomingSet = new Map();
-    const allSet      = new Map(); // every non-deleted lead
+    const allSet      = new Map(); // every lead assigned to me
+    const freshSet    = new Map(); // assigned, but no follow-up logged yet
 
     // Build a map: lead_id → latest followup next_followup date from followups table
     const fuMap = new Map();
@@ -332,6 +365,12 @@ const BDAFollowUp = () => {
           return;
         }
       }
+
+      // Assigned but never followed up and nothing scheduled → "Not Started".
+      // This is the clock that escalates to other BDAs if ignored.
+      if (!isClosed(lead.status) && !(lead.followup_count > 0) && !snooze) {
+        freshSet.set(lead.id, lead);
+      }
     });
 
     // Sort overdue: most overdue first
@@ -343,7 +382,13 @@ const BDAFollowUp = () => {
       (a, b) => new Date(a.next_followup) - new Date(b.next_followup)
     );
 
+    // Oldest assignment first = closest to escalation
+    const sortedFresh = [...freshSet.values()].sort(
+      (a, b) => new Date(a.assigned_at || a.created_at) - new Date(b.assigned_at || b.created_at)
+    );
+
     return {
+      fresh:    sortedFresh,
       today:    [...todaySet.values()],
       overdue:  sortedOverdue,
       upcoming: sortedUpcoming,
@@ -352,6 +397,7 @@ const BDAFollowUp = () => {
   }, [allLeads, followUps]);
 
   const counts = {
+    fresh:    categorized.fresh.length,
     today:    categorized.today.length,
     overdue:  categorized.overdue.length,
     upcoming: categorized.upcoming.length,
@@ -369,13 +415,21 @@ const BDAFollowUp = () => {
     );
   }, [categorized, activeTab, search]);
 
+  // First load: land on "Not Started" if there are freshly assigned leads waiting
+  useEffect(() => {
+    if (loading || tabChosen.current) return;
+    tabChosen.current = true;
+    if (categorized.fresh.length > 0) setActiveTab("fresh");
+  }, [loading, categorized]);
+
   const handleSaved = () => { setModalLead(null); loadData(); };
 
   const TABS = [
+    { key:"fresh",    label:"Not Started",    color:"#0ea5e9" },
     { key:"today",    label:"Today",         color:"#ef4444" },
     { key:"overdue",  label:"Overdue",        color:"#f59e0b" },
     { key:"upcoming", label:"Upcoming",       color:"#2563eb" },
-    { key:"all",      label:"All Follow-ups", color:"#7c3aed" },
+    { key:"all",      label:"All Assigned",   color:"#7c3aed" },
   ];
 
   return (
@@ -390,13 +444,18 @@ const BDAFollowUp = () => {
         <div className="bda-header-actions">
           <button className="bda-btn-outline" onClick={loadData}>↻ Refresh</button>
           <button className="bda-btn-primary" onClick={() => navigate("/bda/leads")}>
-            View All Leads
+            Leads (Assign)
           </button>
         </div>
       </div>
 
       {/* ── SUMMARY CARDS ── */}
       <div className="fu-summary">
+        <div className="fu-sum-card fu-sum-card--sky">
+          <span className="fu-sum-card__num">{counts.fresh}</span>
+          <span className="fu-sum-card__label">Not Started</span>
+          <span className="fu-sum-card__icon">🆕</span>
+        </div>
         <div className="fu-sum-card fu-sum-card--red">
           <span className="fu-sum-card__num">{counts.today}</span>
           <span className="fu-sum-card__label">Due Today</span>
@@ -414,7 +473,7 @@ const BDAFollowUp = () => {
         </div>
         <div className="fu-sum-card fu-sum-card--purple">
           <span className="fu-sum-card__num">{counts.all}</span>
-          <span className="fu-sum-card__label">All Leads</span>
+          <span className="fu-sum-card__label">My Leads</span>
           <span className="fu-sum-card__icon">📋</span>
         </div>
       </div>
@@ -427,7 +486,7 @@ const BDAFollowUp = () => {
             return (
               <button
                 key={t.key}
-                onClick={() => setActiveTab(t.key)}
+                onClick={() => { tabChosen.current = true; setActiveTab(t.key); }}
                 style={{
                   display:      "inline-flex",
                   alignItems:   "center",
@@ -490,16 +549,21 @@ const BDAFollowUp = () => {
       ) : filtered.length === 0 ? (
         <div className="fu-empty">
           <div className="fu-empty__icon">
-            {activeTab === "today" ? "🎉" : activeTab === "overdue" ? "✅" : "📭"}
+            {activeTab === "today" ? "🎉" : activeTab === "overdue" ? "✅" : activeTab === "fresh" ? "👍" : "📭"}
           </div>
           <p className="fu-empty__title">
-            {activeTab === "today"    ? "No follow-ups due today!"  :
+            {activeTab === "fresh"    ? "Nothing waiting to be started!" :
+             activeTab === "today"    ? "No follow-ups due today!"  :
              activeTab === "overdue"  ? "No overdue follow-ups!"    :
              activeTab === "upcoming" ? "No upcoming follow-ups"    :
-             "No leads found"}
+             "No assigned leads yet"}
           </p>
           <p className="fu-empty__sub">
-            {search ? "Try a different search term" : "Check other tabs or add leads"}
+            {search
+              ? "Try a different search term"
+              : activeTab === "all"
+                ? "Pick up leads from the Leads page — they appear here once assigned to you"
+                : "Check other tabs"}
           </p>
         </div>
       ) : (
@@ -514,6 +578,7 @@ const BDAFollowUp = () => {
                 lead={lead}
                 badge={activeTab === "all" ? "all" : activeTab}
                 onFollowUp={setModalLead}
+                escalationHours={escalationHours}
               />
             ))}
           </div>

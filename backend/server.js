@@ -314,30 +314,28 @@ app.use("/api/ceo-insights",      ceoInsightsRoutes);
 
 app.use(errorHandler);
 
-/* ═════════ BDA FOLLOW-UP CRON JOBS ═════════
-   Runs once a day at 08:00 (server local time):
+/* ═════════ BDA LEAD ASSIGNMENT: SCHEMA + CRON JOBS ═════════
+   1. ensureLeadAssignmentSchema — adds the assignment columns to the
+      `leads` table on startup (idempotent, safe to run every boot).
+      Same SQL lives in migrations/lead_assignment.sql.
 
-    1. generateFollowUpNotifications — reminds BDAs about
-       today's / overdue / tomorrow's follow-ups.
+   2. escalateStaleLeads (every 30 min) — an ASSIGNED lead that nobody
+      follows up on (no follow-up within LEAD_ESCALATION_HOURS, or a
+      follow-up date missed by more than LEAD_OVERDUE_GRACE_DAYS) goes
+      back to the unassigned pool. Every other BDA + the CEO is notified.
 
-    2. escalateOverdueFollowUps — the "missed follow-up
-       goes to the backup BDA" behaviour, configured in
-       backend/config/bdaEscalation.js.
+   3. generateFollowUpNotifications (daily 08:00 IST) — reminds the
+      OWNER BDA about overdue / today's / tomorrow's follow-ups.
 
-   Previously neither of these was ever scheduled — the
-   functions existed but nothing called cron.schedule().
+   NOTE: this replaces the previous escalateOverdueFollowUps /
+   config/bdaEscalation.js block (backup-BDA behaviour).
 */
 const cron = require("node-cron");
-
+const { ensureLeadAssignmentSchema } = require("./utils/leadAssignment");
 const {
+  escalateStaleLeads,
   generateFollowUpNotifications,
-  escalateOverdueFollowUps,
 } = require("./controllers/bdaNotificationsController");
-
-cron.schedule("0 8 * * *", async () => {
-  await generateFollowUpNotifications();
-  await escalateOverdueFollowUps();
-});
 
 /* ═════════ START ═════════ */
 
@@ -345,4 +343,17 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+
+  // Schema first, THEN schedule the jobs (they use the new columns)
+  ensureLeadAssignmentSchema().then(() => {
+    cron.schedule("*/30 * * * *", escalateStaleLeads, {
+      timezone: "Asia/Kolkata",
+    });
+    cron.schedule("0 8 * * *", generateFollowUpNotifications, {
+      timezone: "Asia/Kolkata",
+    });
+    console.log(
+      "⏰ BDA schedulers started (escalation every 30 min, reminders 8 AM IST)"
+    );
+  });
 });
