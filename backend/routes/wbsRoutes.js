@@ -62,10 +62,15 @@ router.use(async (req, res, next) => {
         [detailId]
       );
       projectId = result.rows[0]?.project_id;
-    } else if (req.params.id && /^\/\d+$/.test(path)) {
+    } else if (req.method === "GET" && /^\/\d+$/.test(path)) {
+      projectId = path.slice(1);
+    } else if (
+      ["PATCH", "DELETE"].includes(req.method) &&
+      /^\/\d+$/.test(path)
+    ) {
       const result = await pool.query(
         "SELECT project_id FROM wbs WHERE id = $1",
-        [req.params.id]
+        [path.slice(1)]
       );
       projectId = result.rows[0]?.project_id;
     }
