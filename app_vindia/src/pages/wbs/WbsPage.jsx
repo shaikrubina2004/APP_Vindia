@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import authFetch from "../../utils/authFetch";
+import { API_ORIGIN } from "../../services/api";
 import "./WBSSection.css";
-
-const API = "http://localhost:5000/api";
 
 const emptyDetails = () => ({
   labour: [],
@@ -13,7 +12,9 @@ const emptyDetails = () => ({
 
 function WBSSection({ selectedProject }) {
   const [wbsTree, setWbsTree] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [reloadVersion, setReloadVersion] = useState(0);
 
   const [expandedWBS, setExpandedWBS] = useState({});
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -31,19 +32,61 @@ function WBSSection({ selectedProject }) {
 
   // ── Fetch WBS tree whenever project changes ───────────────────────────────
   useEffect(() => {
-    if (!selectedProject?.id) return;
-    setLoading(true);
-    authFetch(`${API}/wbs/${selectedProject.id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        setWbsTree(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch((err) => {
+    let active = true;
+    let requestId = 0;
+    const projectId = selectedProject?.id;
+
+    if (!projectId) {
+      return undefined;
+    }
+
+    const fetchWBS = async () => {
+      const currentRequestId = ++requestId;
+      try {
+        const response = await authFetch(`${API_ORIGIN}/api/wbs/${projectId}`);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          throw new Error(
+            errorData?.error ||
+              errorData?.message ||
+              `Request failed (${response.status})`,
+          );
+        }
+
+        const data = await response.json();
+        if (!Array.isArray(data)) {
+          throw new Error("The WBS response was not a list.");
+        }
+
+        if (active && currentRequestId === requestId) {
+          setWbsTree(data);
+          setLoadError("");
+        }
+      } catch (err) {
         console.error("WBS fetch error:", err);
-        setLoading(false);
-      });
-  }, [selectedProject?.id]);
+        if (active && currentRequestId === requestId) {
+          setLoadError(err.message || "Unable to load WBS.");
+        }
+      } finally {
+        if (active && currentRequestId === requestId) setLoading(false);
+      }
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") fetchWBS();
+    };
+
+    fetchWBS();
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      active = false;
+      requestId += 1;
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [selectedProject?.id, reloadVersion]);
 
   // ── helpers ───────────────────────────────────────────────────────────────
   const generateWBSCode = () => `${wbsTree.length + 1}`;
@@ -66,7 +109,7 @@ function WBSSection({ selectedProject }) {
       prev.map((w) => (w.id === wbs.id ? { ...w, visible_to_client: next } : w))
     );
     try {
-      const res = await authFetch(`${API}/wbs/${wbs.id}`, {
+      const res = await authFetch(`${API_ORIGIN}/api/wbs/${wbs.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ visible_to_client: next }),
@@ -114,7 +157,7 @@ function WBSSection({ selectedProject }) {
     try {
       if (newTask.type === "task") {
         // Top-level WBS item
-        const res = await authFetch(`${API}/wbs`, {
+        const res = await authFetch(`${API_ORIGIN}/api/wbs`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -128,7 +171,7 @@ function WBSSection({ selectedProject }) {
       } else {
         // Child task (subtask)
         const parent = wbsTree.find((w) => w.id === newTask.wbsId);
-        const res = await authFetch(`${API}/wbs/task`, {
+        const res = await authFetch(`${API_ORIGIN}/api/wbs/task`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -180,7 +223,7 @@ function WBSSection({ selectedProject }) {
     };
 
     try {
-      const res = await authFetch(`${API}/wbs/${endpointMap[tab]}`, {
+      const res = await authFetch(`${API_ORIGIN}/api/wbs/${endpointMap[tab]}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task_id: drawer.taskId, ...addRowForm }),
@@ -352,18 +395,33 @@ function WBSSection({ selectedProject }) {
       <div className="wbs-header-bar">
         <h2>📊 Work Breakdown Structure</h2>
         <div className="header-bar-right">
-          <span className="wbs-count">{wbsTree.length} items</span>
+          <span className="wbs-count">
+            {loadError && wbsTree.length === 0
+              ? "Unavailable"
+              : `${wbsTree.length} items`}
+          </span>
           <button className="btn-add-task-global" onClick={handleAddMainTask}>
             ➕ Add Task
           </button>
         </div>
       </div>
 
+      {loadError && (
+        <div className="wbs-load-error" role="alert">
+          <span>Couldn't load WBS: {loadError}</span>
+          <button onClick={() => setReloadVersion((version) => version + 1)}>
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="wbs-container">
         {wbsTree.length === 0 ? (
           <div className="empty-state">
             <p>
-              No WBS items yet. Click "➕ Add Task" to create your first task.
+              {loadError
+                ? "The WBS could not be loaded. Retry the request to check for milestones again."
+                : 'No WBS items yet. Click "➕ Add Task" to create your first task.'}
             </p>
           </div>
         ) : (
