@@ -241,6 +241,7 @@ export default function DailyDiary() {
   const [tab,        setTab]        = useState("new");
   const [viewIdx,    setViewIdx]    = useState(null);
   const [diaries,    setDiaries]    = useState([]);
+  const [historyError, setHistoryError] = useState("");
   const [projects,   setProjects]   = useState([]);
   const [milestones, setMilestones] = useState([]);
   const [wbsList,    setWbsList]    = useState([]);
@@ -266,9 +267,18 @@ export default function DailyDiary() {
   async function loadHistory() {
     try {
       const res = await api.get("/diary");
-      if (alive.current)
+      if (alive.current) {
         setDiaries(Array.isArray(res?.data) ? res.data.slice().reverse() : []);
-    } catch {}
+        setHistoryError("");
+      }
+    } catch (error) {
+      console.error("Diary history load error:", error);
+      if (alive.current) {
+        setHistoryError(
+          error?.response?.data?.error || "Unable to load diary history.",
+        );
+      }
+    }
   }
 
   async function loadProjects() {
@@ -797,7 +807,12 @@ navigate("/site-engineer/labour-report");
             <span className="dd-pill dd-pill--navy">{diaries.length} entries</span>
           </div>
 
-          {diaries.length === 0 ? (
+          {historyError ? (
+            <div className="dd-empty" role="alert">
+              <p>Couldn’t load diary history: {historyError}</p>
+              <button type="button" onClick={loadHistory}>Retry</button>
+            </div>
+          ) : diaries.length === 0 ? (
             <div className="dd-empty">No diary entries submitted yet</div>
           ) : (
             diaries.map((d, i) => (

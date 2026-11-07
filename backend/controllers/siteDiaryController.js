@@ -283,14 +283,14 @@ exports.getDiary = async (req, res) => {
         `
           SELECT *
           FROM site_engineer_daily_updates
-          WHERE submitted_by = $1
+          WHERE submitted_by = $1::text
             AND project_id IN (
-              SELECT id FROM projects WHERE site_engineer_id = $1
+              SELECT id FROM projects WHERE site_engineer_id = $1::int
             )
             AND ($2::int IS NULL OR project_id = $2)
           ORDER BY report_date DESC, id DESC
         `,
-        [String(userId), projectId]
+        [userId, projectId]
       );
     } else if (role === "project_manager") {
       if (projectId !== null && !(await isManagedProject(userId, projectId))) {
