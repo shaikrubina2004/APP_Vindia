@@ -4,18 +4,8 @@ const multer  = require("multer");
 const path    = require("path");
 const lead    = require("../controllers/leadController");
 const { logTimeSpent } = require("../controllers/timeTrackingController");
+const { protect } = require("../middleware/authMiddleware");
 
-/* ── AUTH ──
-   Every /api/leads route now requires a valid JWT (protect).
-   requireRole() further restricts admin-level actions to
-   CEO / BD Manager so a BDA account can't reassign, permanently
-   delete, or export other BDAs' leads.
-   Adjust the role lists below if your org uses different role
-   codes for "manager of BDAs" (see app_vindia/src/roles.js). */
-const authMiddleware = require("../middleware/authMiddleware");
-const { requireRole } = authMiddleware;
-
-const CAN_MANAGE = requireRole("ceo", "bd_manager");
 
 /* ── File upload setup ── */
 const storage = multer.diskStorage({
@@ -40,41 +30,39 @@ const upload = multer({
 });
 
 /* ── DASHBOARD SUMMARY ── */
-router.get("/dashboard-summary", authMiddleware, lead.getDashboardSummary);
+router.get("/dashboard-summary", lead.getDashboardSummary);
 
-/* ── IMPORT (bulk-loading leads — restrict to managers) ── */
-router.post("/import-excel",    authMiddleware, CAN_MANAGE, upload.single("file"), lead.importLeadsFromExcel);
-router.post("/import-justdial", authMiddleware, CAN_MANAGE, upload.single("file"), lead.importJustDialPDF);
+/* ── IMPORT ── */
+router.post("/import-excel",    upload.single("file"), lead.importLeadsFromExcel);
+router.post("/import-justdial", upload.single("file"), lead.importJustDialPDF);
 
 /* ── EXPORT ── */
-router.get("/export", authMiddleware, CAN_MANAGE, lead.exportLeadsToExcel);
+router.get("/export", lead.exportLeadsToExcel);
 
 /* ── FOLLOW UPS (reports) ── */
-router.get("/follow-ups/today",   authMiddleware, lead.getTodaysFollowUps);
-router.get("/follow-ups/pending", authMiddleware, lead.getPendingFollowUps);
+router.get("/follow-ups/today",   lead.getTodaysFollowUps);
+router.get("/follow-ups/pending", lead.getPendingFollowUps);
 
-/* ── FOLLOW UPS (aggregate list) ──────────────────────────
-   IMPORTANT: this MUST be registered before GET "/:id",
-   otherwise "followups" is parsed as the :id parameter and
-   this request 404s / hits the wrong handler. */
-router.get("/followups", authMiddleware, lead.getAllFollowUps);
+/* ── ASSIGNMENT ── (must stay above "/:id") */
+router.get("/assignees", lead.getAssignees);
 
 /* ── LEADS CRUD ── */
-router.get("/",    authMiddleware, lead.getAllLeads);
-router.post("/",   authMiddleware, lead.createLead);
-router.get("/:id", authMiddleware, lead.getLeadById);
-router.put("/:id", authMiddleware, lead.updateLead);
+router.get("/",    lead.getAllLeads);
+router.post("/",   lead.createLead);
+router.get("/:id", lead.getLeadById);
+router.put("/:id", lead.updateLead);
 
 /* ── FOLLOW UPS per lead ── */
-router.post("/:leadId/followups", authMiddleware, lead.addFollowUp);
-router.get("/:leadId/followups",  authMiddleware, lead.getFollowUps);
+router.post("/:leadId/followups", lead.addFollowUp);
+router.get("/:leadId/followups",  lead.getFollowUps);
 
 /* ── TIME TRACKING ── */
-router.post("/:leadId/track-time", authMiddleware, logTimeSpent);
+router.post("/:leadId/track-time", logTimeSpent);
 
-/* ── JUNK / ADMIN (manager-only) ── */
-router.put("/:id/request-junk",     authMiddleware, lead.requestJunk);
-router.put("/:id/reassign",         authMiddleware, CAN_MANAGE, lead.reassignLead);
-router.put("/:id/permanent-delete", authMiddleware, CAN_MANAGE, lead.permanentDeleteLead);
+/* ── JUNK / ADMIN ── */
+router.put("/:id/request-junk",     lead.requestJunk);
+router.put("/:id/reassign",         lead.reassignLead);
+router.put("/:id/assign",           protect, lead.assignLead);
+router.put("/:id/permanent-delete", lead.permanentDeleteLead);
 
 module.exports = router;

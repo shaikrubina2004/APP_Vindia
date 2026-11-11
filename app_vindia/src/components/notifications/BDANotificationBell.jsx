@@ -7,6 +7,8 @@ const API = "http://localhost:5000/api";
 /* ── Type config — label, colour, icon ── */
 const TYPE_CFG = {
   new_lead:          { label: "New Lead",  color: "#2563eb", bg: "#eff6ff",  icon: "👤" },
+  lead_assigned:     { label: "Assigned",  color: "#059669", bg: "#ecfdf5",  icon: "📌" },
+  lead_escalated:    { label: "Escalated", color: "#c2410c", bg: "#fff7ed",  icon: "⚡" },
   followup_today:    { label: "Today",     color: "#ea580c", bg: "#fff7ed",  icon: "📅" },
   followup_overdue:  { label: "Overdue",   color: "#dc2626", bg: "#fef2f2",  icon: "⚠️" },
   followup_upcoming: { label: "Upcoming",  color: "#7c3aed", bg: "#f5f3ff",  icon: "🔔" },
@@ -52,7 +54,9 @@ function formatTime(ts) {
 
 /* ── Route map based on notification type ── */
 function getRoute(notif) {
-  if (notif.type === "new_lead")          return "/bda/leads";
+  if (notif.type === "new_lead")          return "/bda/leads";      // unassigned → pick it up
+  if (notif.type === "lead_escalated")    return "/bda/leads";      // back in the pool
+  if (notif.type === "lead_assigned")     return "/bda/follow-up";  // mine → start following up
   if (notif.type === "followup_today")    return "/bda/follow-up";
   if (notif.type === "followup_overdue")  return "/bda/follow-up";
   if (notif.type === "followup_upcoming") return "/bda/follow-up";
@@ -124,6 +128,8 @@ export default function BDANotificationBell({ bdaEmail }) {
   const FILTERS = [
     { key: "all",              label: "All" },
     { key: "new_lead",         label: "New Leads" },
+    { key: "lead_assigned",    label: "Assigned" },
+    { key: "lead_escalated",   label: "Escalated" },
     { key: "followup_today",   label: "Today" },
     { key: "followup_overdue", label: "Overdue" },
     { key: "followup_upcoming",label: "Upcoming" },

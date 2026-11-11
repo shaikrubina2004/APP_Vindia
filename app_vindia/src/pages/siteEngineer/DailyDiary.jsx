@@ -241,6 +241,7 @@ export default function DailyDiary() {
   const [tab,        setTab]        = useState("new");
   const [viewIdx,    setViewIdx]    = useState(null);
   const [diaries,    setDiaries]    = useState([]);
+  const [historyError, setHistoryError] = useState("");
   const [projects,   setProjects]   = useState([]);
   const [milestones, setMilestones] = useState([]);
   const [wbsList,    setWbsList]    = useState([]);
@@ -266,9 +267,18 @@ export default function DailyDiary() {
   async function loadHistory() {
     try {
       const res = await api.get("/diary");
-      if (alive.current)
+      if (alive.current) {
         setDiaries(Array.isArray(res?.data) ? res.data.slice().reverse() : []);
-    } catch {}
+        setHistoryError("");
+      }
+    } catch (error) {
+      console.error("Diary history load error:", error);
+      if (alive.current) {
+        setHistoryError(
+          error?.response?.data?.error || "Unable to load diary history.",
+        );
+      }
+    }
   }
 
   async function loadProjects() {
@@ -341,7 +351,9 @@ export default function DailyDiary() {
 
       (form.attachments || []).forEach(file => fd.append("attachments", file));
 
-      const res = await api.post("/diary", fd);
+      const res = await api.post("/diary", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
 sessionStorage.setItem(
     "selectedDailyDiary",
@@ -702,7 +714,12 @@ navigate("/site-engineer/labour-report");
                     </div>
                     <div className="dd-field" style={{ marginTop: 10 }}>
                       <label className="dd-label">Attachments (photos, PDFs)</label>
-                      <input type="file" multiple onChange={handleFiles}/>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,application/pdf"
+                        multiple
+                        onChange={handleFiles}
+                      />
                       {(form.attachments || []).length > 0 && (
                         <div className="dd-file-list">
                           {form.attachments.map((f, i) => (
@@ -797,7 +814,12 @@ navigate("/site-engineer/labour-report");
             <span className="dd-pill dd-pill--navy">{diaries.length} entries</span>
           </div>
 
-          {diaries.length === 0 ? (
+          {historyError ? (
+            <div className="dd-empty" role="alert">
+              <p>Couldn’t load diary history: {historyError}</p>
+              <button type="button" onClick={loadHistory}>Retry</button>
+            </div>
+          ) : diaries.length === 0 ? (
             <div className="dd-empty">No diary entries submitted yet</div>
           ) : (
             diaries.map((d, i) => (

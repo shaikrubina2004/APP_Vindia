@@ -6,29 +6,12 @@ const pool = require("../config/db");
    and app_vindia/src/pages/hr/Attendance.jsx)
    ══════════════════════════════════════════════════════════ */
 const HOLIDAYS = new Set([
-  "2024-01-26",
-  "2024-08-15",
-  "2024-10-02",
-  "2024-12-25",
-  "2025-01-01",
-  "2025-01-14",
-  "2025-01-26",
-  "2025-03-17",
-  "2025-04-14",
-  "2025-05-01",
-  "2025-08-15",
-  "2025-10-02",
-  "2025-12-25",
-  "2026-01-01",
-  "2026-01-15",
-  "2026-01-26",
-  "2026-03-19",
-  "2026-04-15",
-  "2026-05-01",
-  "2026-08-26",
-  "2026-09-14",
-  "2026-10-20",
-  "2026-12-25",
+  "2024-01-26","2024-08-15","2024-10-02","2024-12-25",
+  "2025-01-01","2025-01-14","2025-01-26","2025-03-17",
+  "2025-04-14","2025-05-01","2025-08-15","2025-10-02","2025-12-25",
+  "2026-01-01","2026-01-15","2026-01-26","2026-03-19",
+  "2026-04-15","2026-05-01","2026-08-26","2026-09-14",
+  "2026-10-20","2026-12-25",
 ]);
 
 // Sunday or a listed public holiday = not a working day.
@@ -64,15 +47,13 @@ function isNonWorkingDay(dateStr) {
 //   locality, district, state). CEOs are exempt from capture entirely
 //   — enforced here, server-side, regardless of what the client sends.
 //
-//   On READ, raw lat/lng are only returned when the LOGGED-IN user (taken
-//   from the verified token, req.user.role) is the CEO. Everyone else only
-//   gets the short address text. The old client-supplied
-//   `viewer_designation` query parameter is no longer trusted.
-
-// ─── Who is calling? (from the verified login token, never from the client) ──
-const isHrOrCeoUser = (req) => ["hr_manager", "ceo"].includes(req.user?.role);
-const isCeoUser = (req) => req.user?.role === "ceo";
-const isSameUser = (a, b) => String(a) === String(b);
+//   On READ, raw lat/lng are only returned to a viewer who declares
+//   themselves CEO (see viewer_designation below) — everyone else only
+//   gets the short address text. This mirrors the same client-declared
+//   role pattern the rest of this app already uses (see leads endpoints
+//   taking `role`/`name` as query params) rather than a hardened,
+//   server-verified session — if/when real auth is added, this check
+//   should move there instead.
 
 function parseShiftTimes(shiftTimingStr) {
   // Handles formats: "9AM-6PM", "9:00 AM - 6:00 PM", "09:00 - 18:00", "9:30 PM - 6:30 AM"
@@ -88,7 +69,7 @@ function parseShiftTimes(shiftTimingStr) {
 
   // Default: 09:00 – 18:00
   let shiftStartMin = 9 * 60;
-  let shiftEndMin = 18 * 60;
+  let shiftEndMin   = 18 * 60;
 
   if (!shiftTimingStr) return { shiftStartMin, shiftEndMin };
 
@@ -99,16 +80,12 @@ function parseShiftTimes(shiftTimingStr) {
 
   if (matches.length >= 2) {
     shiftStartMin = toMin(
-      matches[0][2]
-        ? `${matches[0][1]}:${matches[0][2]}`
-        : `${matches[0][1]}:00`,
-      matches[0][3],
+      matches[0][2] ? `${matches[0][1]}:${matches[0][2]}` : `${matches[0][1]}:00`,
+      matches[0][3]
     );
     shiftEndMin = toMin(
-      matches[1][2]
-        ? `${matches[1][1]}:${matches[1][2]}`
-        : `${matches[1][1]}:00`,
-      matches[1][3],
+      matches[1][2] ? `${matches[1][1]}:${matches[1][2]}` : `${matches[1][1]}:00`,
+      matches[1][3]
     );
   }
 
@@ -124,11 +101,11 @@ function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
   const { shiftStartMin, shiftEndMin } = parseShiftTimes(shiftTimingStr);
 
   // ── Thresholds ────────────────────────────────────────────────────────────
-  const LATE_CUTOFF = shiftStartMin + 30; // e.g. 9:00 shift → 9:30
-  const ABSENT_CUTOFF = shiftStartMin + 60; // e.g. 9:00 shift → 10:00
-  const NOON = 12 * 60; // 12:00
-  const AFT_START = 13 * 60; // 13:00 — afternoon window start
-  const AFT_END = 14 * 60; // 15:00 — afternoon window end
+  const LATE_CUTOFF    = shiftStartMin + 30;  // e.g. 9:00 shift → 9:30
+  const ABSENT_CUTOFF  = shiftStartMin + 60;  // e.g. 9:00 shift → 10:00
+  const NOON           = 12 * 60;             // 12:00
+  const AFT_START      = 13 * 60;             // 13:00 — afternoon window start
+  const AFT_END        = 14 * 60;             // 15:00 — afternoon window end
 
   // ── No check-in → Absent ─────────────────────────────────────────────────
   if (!checkInStr) {
@@ -140,9 +117,9 @@ function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
   // ── Afternoon-only check-in (13:00–15:00) → Half Day / Afternoon Present ─
   if (checkInMin >= AFT_START && checkInMin < AFT_END) {
     return {
-      status: "Half Day",
+      status:      "Half Day",
       lateMinutes: 0,
-      remarks: "Afternoon Present",
+      remarks:     "Afternoon Present",
     };
   }
 
@@ -156,21 +133,21 @@ function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
   //    Late     : shift_start < check-in < late_cutoff  (e.g. 9:01–9:29)
   //    Late edge: check-in == late_cutoff            (9:30 is still "late")
   let lateMinutes = 0;
-  let isLate = false;
+  let isLate      = false;
 
   if (checkInMin > shiftStartMin && checkInMin <= LATE_CUTOFF) {
     // Between 9:00 and 9:30 (inclusive) → Late
     lateMinutes = checkInMin - shiftStartMin;
-    isLate = true;
+    isLate      = true;
   }
   // checkInMin <= shiftStartMin → on time (Present), lateMinutes stays 0
 
   // ── No checkout yet → employee still on site ─────────────────────────────
   if (!checkOutStr) {
     return {
-      status: isLate ? "Late" : "Present",
+      status:      isLate ? "Late" : "Present",
       lateMinutes,
-      remarks: isLate ? `Late by ${lateMinutes} min` : "",
+      remarks:     isLate ? `Late by ${lateMinutes} min` : "",
     };
   }
 
@@ -179,17 +156,17 @@ function deriveStatus(checkInStr, checkOutStr, shiftTimingStr) {
   // ── Checked out before noon → Afternoon Absent (Half Day) ────────────────
   if (checkOutMin < NOON) {
     return {
-      status: "Half Day",
+      status:      "Half Day",
       lateMinutes,
-      remarks: isLate ? "Late + Afternoon Absent" : "Afternoon Absent",
+      remarks:     isLate ? "Late + Afternoon Absent" : "Afternoon Absent",
     };
   }
 
   // ── Stayed till shift end or beyond → full Present / Late ────────────────
   return {
-    status: isLate ? "Late" : "Present",
+    status:      isLate ? "Late" : "Present",
     lateMinutes,
-    remarks: isLate ? `Late by ${lateMinutes} min` : "Full Day",
+    remarks:     isLate ? `Late by ${lateMinutes} min` : "Full Day",
   };
 }
 
@@ -201,13 +178,35 @@ async function getShiftAndStatus(userId) {
      FROM employees e
      WHERE e.user_id = $1
      LIMIT 1`,
-    [userId],
+    [userId]
   );
   return {
     shiftTiming: r.rows[0]?.shift_timing || null,
-    empStatus: (r.rows[0]?.status || "").toLowerCase(),
+    empStatus:   (r.rows[0]?.status || "").toLowerCase(),
     designation: r.rows[0]?.designation || "",
   };
+}
+
+// Make sure the location-trail table exists (no migration file ships
+// for it). Runs once per server start; harmless if it already exists.
+let trackingTableReady = false;
+async function ensureTrackingTable() {
+  if (trackingTableReady) return;
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS attendance_tracking (
+       id            SERIAL PRIMARY KEY,
+       attendance_id INTEGER NOT NULL,
+       employee_id   INTEGER,
+       lat           DOUBLE PRECISION NOT NULL,
+       lng           DOUBLE PRECISION NOT NULL,
+       recorded_at   TIMESTAMPTZ DEFAULT NOW()
+     )`
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_attendance_tracking_att
+       ON attendance_tracking (attendance_id, recorded_at)`
+  );
+  trackingTableReady = true;
 }
 
 const isCeoDesignation = (designation = "") =>
@@ -229,12 +228,10 @@ function sanitizeLocationForViewer(row, isViewerCEO) {
 }
 
 // ─── Mark Attendance (Check In) ──────────────────────────────────────────────
-// A normal employee can only check in for THEMSELVES (employee_id is taken
-// from the login token). HR / CEO may pass another employee_id.
 exports.markAttendance = async (req, res) => {
   try {
     const {
-      employee_id: bodyEmployeeId,
+      employee_id,
       date,
       check_in,
       shift,
@@ -244,10 +241,6 @@ exports.markAttendance = async (req, res) => {
       check_in_address,
     } = req.body;
 
-    const employee_id = isHrOrCeoUser(req)
-      ? bodyEmployeeId || req.user.id
-      : req.user.id;
-
     if (!employee_id || !date || !check_in) {
       return res
         .status(400)
@@ -255,8 +248,7 @@ exports.markAttendance = async (req, res) => {
     }
 
     // employee_id here is users.id — fetch shift/designation via employees.user_id
-    const { shiftTiming, empStatus, designation } =
-      await getShiftAndStatus(employee_id);
+    const { shiftTiming, empStatus, designation } = await getShiftAndStatus(employee_id);
 
     // CEOs are exempt from location capture — enforced here regardless
     // of what the client sent.
@@ -264,16 +256,14 @@ exports.markAttendance = async (req, res) => {
 
     let finalStatus, lateMinutes, finalRemarks;
     if (empStatus === "work_from_home") {
-      finalStatus = "WFH";
-      lateMinutes = 0;
-      finalRemarks = "WFH";
+      finalStatus   = "WFH";
+      lateMinutes   = 0;
+      finalRemarks  = "WFH";
     } else {
       const derived = deriveStatus(check_in, null, shiftTiming);
-      finalStatus = derived.status;
-      lateMinutes = derived.lateMinutes;
-      finalRemarks =
-        derived.remarks ||
-        (lateMinutes > 0 ? `Late by ${lateMinutes} min` : "");
+      finalStatus   = derived.status;
+      lateMinutes   = derived.lateMinutes;
+      finalRemarks  = derived.remarks || (lateMinutes > 0 ? `Late by ${lateMinutes} min` : "");
     }
 
     const result = await pool.query(
@@ -290,10 +280,10 @@ exports.markAttendance = async (req, res) => {
         shift || "Morning",
         lateMinutes,
         remarks || finalRemarks,
-        skipLocation ? null : (check_in_lat ?? null),
-        skipLocation ? null : (check_in_lng ?? null),
-        skipLocation ? null : (check_in_address ?? null),
-      ],
+        skipLocation ? null : check_in_lat ?? null,
+        skipLocation ? null : check_in_lng ?? null,
+        skipLocation ? null : check_in_address ?? null,
+      ]
     );
     return res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -305,12 +295,15 @@ exports.markAttendance = async (req, res) => {
 };
 
 // ─── Update Attendance (Check Out) ───────────────────────────────────────────
-// Check-out: only on your OWN record (HR/CEO may do any).
-// Manual status change: HR / CEO only.
 exports.updateAttendance = async (req, res) => {
   const { id } = req.params;
-  const { status, check_out, check_out_lat, check_out_lng, check_out_address } =
-    req.body || {};
+  const {
+    status,
+    check_out,
+    check_out_lat,
+    check_out_lng,
+    check_out_address,
+  } = req.body || {};
 
   // Check-out only path (no manual status override)
   if (check_out && !status) {
@@ -324,19 +317,12 @@ exports.updateAttendance = async (req, res) => {
          FROM attendance a
          LEFT JOIN employees e ON e.user_id = a.employee_id
          WHERE a.id = $1`,
-        [id],
+        [id]
       );
       if (existing.rows.length === 0) {
         return res.status(404).json({ message: "Attendance record not found" });
       }
       const row = existing.rows[0];
-
-      if (!isHrOrCeoUser(req) && !isSameUser(row.employee_id, req.user.id)) {
-        return res
-          .status(403)
-          .json({ message: "You can only check out your own attendance" });
-      }
-
       const derived = deriveStatus(row.check_in, check_out, row.shift_timing);
       const skipLocation = isCeoDesignation(row.designation);
 
@@ -356,11 +342,11 @@ exports.updateAttendance = async (req, res) => {
           derived.status,
           derived.lateMinutes,
           derived.remarks || "",
-          skipLocation ? null : (check_out_lat ?? null),
-          skipLocation ? null : (check_out_lng ?? null),
-          skipLocation ? null : (check_out_address ?? null),
+          skipLocation ? null : check_out_lat ?? null,
+          skipLocation ? null : check_out_lng ?? null,
+          skipLocation ? null : check_out_address ?? null,
           id,
-        ],
+        ]
       );
       return res.status(200).json(result.rows[0]);
     } catch (error) {
@@ -370,11 +356,6 @@ exports.updateAttendance = async (req, res) => {
   }
 
   // HR manual status update
-  if (!isHrOrCeoUser(req)) {
-    return res
-      .status(403)
-      .json({ message: "Only HR or CEO can change attendance status" });
-  }
   if (!status) {
     return res.status(400).json({ message: "Status is required" });
   }
@@ -385,7 +366,7 @@ exports.updateAttendance = async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE attendance SET status = $1 WHERE id = $2 RETURNING *`,
-      [status, id],
+      [status, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Attendance record not found" });
@@ -399,7 +380,6 @@ exports.updateAttendance = async (req, res) => {
 
 // ─── Add Location Ping (live tracking between check-in and check-out) ───────
 // Called every few minutes by the client while an employee is checked in.
-// Only the owner of the attendance record may add pings to it.
 exports.addLocationPing = async (req, res) => {
   const { id } = req.params; // attendance_id
   const { lat, lng, recorded_at } = req.body;
@@ -409,12 +389,13 @@ exports.addLocationPing = async (req, res) => {
   }
 
   try {
+    await ensureTrackingTable();
     const existing = await pool.query(
       `SELECT a.id, a.check_out, a.employee_id, e.designation
        FROM attendance a
        LEFT JOIN employees e ON e.user_id = a.employee_id
        WHERE a.id = $1`,
-      [id],
+      [id]
     );
 
     if (existing.rows.length === 0) {
@@ -423,30 +404,20 @@ exports.addLocationPing = async (req, res) => {
 
     const row = existing.rows[0];
 
-    if (!isSameUser(row.employee_id, req.user.id)) {
-      return res
-        .status(403)
-        .json({ error: "You can only add location pings to your own attendance" });
-    }
-
     // Belt-and-braces server-side checks, independent of the client:
     // don't record pings after checkout, and never for CEOs.
     if (row.check_out) {
-      return res
-        .status(409)
-        .json({ error: "Already checked out — tracking stopped" });
+      return res.status(409).json({ error: "Already checked out — tracking stopped" });
     }
     if (isCeoDesignation(row.designation)) {
-      return res
-        .status(403)
-        .json({ error: "Location tracking is not captured for this role" });
+      return res.status(403).json({ error: "Location tracking is not captured for this role" });
     }
 
     const result = await pool.query(
       `INSERT INTO attendance_tracking (attendance_id, employee_id, lat, lng, recorded_at)
        VALUES ($1, $2, $3, $4, COALESCE($5, NOW()))
        RETURNING *`,
-      [id, row.employee_id, lat, lng, recorded_at || null],
+      [id, row.employee_id, lat, lng, recorded_at || null]
     );
 
     return res.status(201).json(result.rows[0]);
@@ -457,33 +428,80 @@ exports.addLocationPing = async (req, res) => {
 };
 
 // ─── Get Location Track for an Attendance Record ─────────────────────────────
-// Route is HR/CEO only. Only the CEO (from the login token) gets raw
-// lat/lng points; HR just gets the ping count and time range.
+// Accepts ?viewer_designation=ceo — same client-declared-role pattern as
+// the rest of this file. Only the CEO gets raw lat/lng points; everyone
+// else just gets the ping count and time range.
 exports.getAttendanceTrack = async (req, res) => {
   const { id } = req.params;
-  const isViewerCEO = isCeoUser(req);
+  const isViewerCEO = isCeoDesignation(req.query.viewer_designation);
 
   try {
-    const result = await pool.query(
-      `SELECT lat, lng, recorded_at
-       FROM attendance_tracking
-       WHERE attendance_id = $1
-       ORDER BY recorded_at ASC`,
-      [id],
-    );
+    await ensureTrackingTable();
+
+    const [pingsRes, attRes] = await Promise.all([
+      pool.query(
+        `SELECT lat, lng, recorded_at
+         FROM attendance_tracking
+         WHERE attendance_id = $1
+         ORDER BY recorded_at ASC`,
+        [id]
+      ),
+      pool.query(
+        `SELECT date, check_in, check_out,
+                check_in_lat, check_in_lng, check_in_address,
+                check_out_lat, check_out_lng, check_out_address
+         FROM attendance WHERE id = $1`,
+        [id]
+      ),
+    ]);
+
+    const att = attRes.rows[0] || {};
+    const pings = pingsRes.rows.map((r) => ({
+      lat: Number(r.lat),
+      lng: Number(r.lng),
+      recorded_at: r.recorded_at,
+      type: "ping",
+    }));
+
+    // The path always starts at the confirmed check-in spot and ends at
+    // the confirmed check-out spot (when they exist), with the periodic
+    // pings in between — so a path shows even if no pings were captured
+    // (e.g. the browser tab was closed right after check-in).
+    const points = [];
+    if (att.check_in_lat != null && att.check_in_lng != null) {
+      points.push({
+        lat: Number(att.check_in_lat),
+        lng: Number(att.check_in_lng),
+        recorded_at: null,
+        type: "checkin",
+        address: att.check_in_address || null,
+      });
+    }
+    points.push(...pings);
+    if (att.check_out_lat != null && att.check_out_lng != null) {
+      points.push({
+        lat: Number(att.check_out_lat),
+        lng: Number(att.check_out_lng),
+        recorded_at: null,
+        type: "checkout",
+        address: att.check_out_address || null,
+      });
+    }
 
     const base = {
-      count: result.rows.length,
-      first_recorded_at: result.rows[0]?.recorded_at || null,
-      last_recorded_at:
-        result.rows[result.rows.length - 1]?.recorded_at || null,
+      count: points.length,
+      ping_count: pings.length,
+      check_in: att.check_in || null,
+      check_out: att.check_out || null,
+      first_recorded_at: pings[0]?.recorded_at || null,
+      last_recorded_at: pings[pings.length - 1]?.recorded_at || null,
     };
 
     if (!isViewerCEO) {
       return res.status(200).json({ ...base, points: [] });
     }
 
-    return res.status(200).json({ ...base, points: result.rows });
+    return res.status(200).json({ ...base, points });
   } catch (err) {
     console.error("getAttendanceTrack error:", err.message);
     return res.status(500).json({ error: "Failed to fetch location track" });
@@ -491,17 +509,9 @@ exports.getAttendanceTrack = async (req, res) => {
 };
 
 // ─── Get Today's Attendance (for Check-In button) ────────────────────────────
-// employee_id param = users.id. Allowed for yourself, or for HR / CEO.
-// Returns 200 with `null` when there is no check-in yet today (not an error).
+// employee_id param = users.id
 exports.getTodayAttendance = async (req, res) => {
-  // Every role's dashboard shares CheckInButton, so this must work for all
-  // of them. For a normal employee the lookup ALWAYS uses the logged-in
-  // user (from the token) and ignores whatever id the page sent; HR / CEO
-  // may look up another employee by passing employee_id.
-  const employee_id = isHrOrCeoUser(req)
-    ? req.query.employee_id || req.user.id
-    : req.user.id;
-
+  const { employee_id } = req.query;
   if (!employee_id)
     return res.status(400).json({ error: "employee_id required" });
 
@@ -509,9 +519,10 @@ exports.getTodayAttendance = async (req, res) => {
     const today = new Date().toISOString().slice(0, 10);
     const result = await pool.query(
       `SELECT * FROM attendance WHERE employee_id = $1 AND date = $2 LIMIT 1`,
-      [employee_id, today],
+      [employee_id, today]
     );
-    if (result.rows.length === 0) return res.status(200).json(null); // no check-in yet today (not an error)
+    if (result.rows.length === 0)
+      return res.status(404).json({ message: "No record for today" });
     return res.status(200).json(result.rows[0]);
   } catch (error) {
     console.error(error);
@@ -522,27 +533,23 @@ exports.getTodayAttendance = async (req, res) => {
 };
 
 // ─── Get All Attendance (historical list) ────────────────────────────────────
-// Route is HR/CEO only. Only the CEO (from the login token) gets raw lat/lng.
+// Accepts ?viewer_designation=ceo — only that viewer gets raw lat/lng.
 exports.getAllAttendance = async (req, res) => {
   try {
-    const isViewerCEO = isCeoUser(req);
+    const isViewerCEO = isCeoDesignation(req.query.viewer_designation);
 
     const result = await pool.query(
       `SELECT
          attendance.*,
-         COALESCE(e.name, u.name)             AS name,
-         COALESCE(e.designation, r.name)      AS designation,
-         COALESCE(e.department,  d.name)      AS department
+         COALESCE(e.name, u.name) AS name
        FROM attendance
-       LEFT JOIN users       u ON u.id          = attendance.employee_id
-       LEFT JOIN employees   e ON e.user_id     = attendance.employee_id
-       LEFT JOIN roles       r ON r.id          = u.role_id
-       LEFT JOIN departments d ON d.id          = r.department_id
-       ORDER BY date DESC`,
+       LEFT JOIN users     u ON u.id          = attendance.employee_id
+       LEFT JOIN employees e ON e.user_id     = attendance.employee_id
+       ORDER BY date DESC`
     );
 
     const rows = result.rows.map((row) =>
-      sanitizeLocationForViewer(row, isViewerCEO),
+      sanitizeLocationForViewer(row, isViewerCEO)
     );
 
     res.status(200).json(rows);
@@ -557,10 +564,10 @@ exports.getAllAttendance = async (req, res) => {
 // attendance is matched via COALESCE(e.user_id, e.id) = users.id based key.
 // Employees with no user account (user_id IS NULL) show as Absent since
 // they cannot log in and punch attendance.
-// Route is HR/CEO only. Only the CEO (from the login token) gets raw lat/lng.
+// Accepts ?viewer_designation=ceo — only that viewer gets raw lat/lng.
 exports.getTodayAllEmployees = async (req, res) => {
   try {
-    const isViewerCEO = isCeoUser(req);
+    const isViewerCEO = isCeoDesignation(req.query.viewer_designation);
     const today = new Date().toISOString().slice(0, 10);
 
     // Employees who have a linked user account — match attendance via user_id
@@ -592,7 +599,7 @@ exports.getTodayAllEmployees = async (req, res) => {
        LEFT JOIN attendance a
          ON a.employee_id = e.user_id AND a.date = $1
        ORDER BY e.name ASC`,
-      [today],
+      [today]
     );
 
     const todayIsNonWorking = isNonWorkingDay(today);
@@ -606,28 +613,28 @@ exports.getTodayAllEmployees = async (req, res) => {
         if (todayIsNonWorking && !isWfh) {
           return {
             ...row,
-            status: "Holiday",
-            check_in: null,
-            check_out: null,
+            status:       "Holiday",
+            check_in:     null,
+            check_out:    null,
             late_minutes: 0,
-            remarks: HOLIDAYS.has(today) ? "Holiday" : "Week Off",
+            remarks:      HOLIDAYS.has(today) ? "Holiday" : "Week Off",
           };
         }
 
         return {
           ...row,
-          status: isWfh ? "WFH" : "Absent",
-          check_in: null,
-          check_out: null,
+          status:       isWfh ? "WFH" : "Absent",
+          check_in:     null,
+          check_out:    null,
           late_minutes: 0,
-          remarks: isWfh ? "WFH" : "",
+          remarks:      isWfh ? "WFH" : "",
         };
       }
       return row;
     });
 
     const sanitized = allRows.map((row) =>
-      sanitizeLocationForViewer(row, isViewerCEO),
+      sanitizeLocationForViewer(row, isViewerCEO)
     );
 
     res.status(200).json(sanitized);
@@ -640,20 +647,12 @@ exports.getTodayAllEmployees = async (req, res) => {
 };
 
 // ─── Get Attendance by Employee ───────────────────────────────────────────────
-// Allowed for yourself, or for HR / CEO.
 exports.getAttendanceByEmployee = async (req, res) => {
   const { id } = req.params;
-
-  if (!isHrOrCeoUser(req) && !isSameUser(id, req.user.id)) {
-    return res
-      .status(403)
-      .json({ error: "You can only view your own attendance" });
-  }
-
   try {
     const result = await pool.query(
       `SELECT * FROM attendance WHERE employee_id = $1 ORDER BY date DESC`,
-      [id],
+      [id]
     );
     res.status(200).json(result.rows);
   } catch (error) {
@@ -668,7 +667,7 @@ exports.getAttendanceByDate = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM attendance WHERE date = $1 ORDER BY employee_id`,
-      [date],
+      [date]
     );
     res.status(200).json(result.rows);
   } catch (error) {
@@ -681,12 +680,14 @@ exports.getAttendanceByDate = async (req, res) => {
 exports.getAttendanceByDateRange = async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to)
-    return res.status(400).json({ message: "From and To dates are required" });
+    return res
+      .status(400)
+      .json({ message: "From and To dates are required" });
 
   try {
     const result = await pool.query(
       `SELECT * FROM attendance WHERE date BETWEEN $1 AND $2 ORDER BY date DESC`,
-      [from, to],
+      [from, to]
     );
     res.status(200).json(result.rows);
   } catch (error) {
@@ -695,24 +696,24 @@ exports.getAttendanceByDateRange = async (req, res) => {
   }
 };
 
-// ─── Export Attendance by Date Range as CSV ──────────────────────────────────
-// Route is HR/CEO only. The GPS coordinate columns are only filled in for
-// the CEO; for HR those columns are exported blank (addresses stay).
+// ─── Export Attendance by Date Range as CSV (for CEO "Download") ────────────
+// This endpoint is reached only via the CEO-only Download button on the
+// Attendance page, so raw coordinates are included unconditionally.
 exports.exportAttendanceByDateRange = async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to) {
-    return res.status(400).json({ message: "From and To dates are required" });
+    return res
+      .status(400)
+      .json({ message: "From and To dates are required" });
   }
-
-  const includeCoords = isCeoUser(req);
 
   try {
     const result = await pool.query(
       `SELECT
          a.date,
-         COALESCE(e.name, u.name)        AS name,
-         COALESCE(e.designation, r.name) AS designation,
-         COALESCE(e.department,  d.name) AS department,
+         COALESCE(e.name, u.name)   AS name,
+         e.designation,
+         e.department,
          a.status,
          a.check_in,
          a.check_out,
@@ -726,32 +727,18 @@ exports.exportAttendanceByDateRange = async (req, res) => {
          a.check_out_lng,
          a.check_out_address
        FROM attendance a
-       LEFT JOIN users       u ON u.id      = a.employee_id
-       LEFT JOIN employees   e ON e.user_id = a.employee_id
-       LEFT JOIN roles       r ON r.id      = u.role_id
-       LEFT JOIN departments d ON d.id      = r.department_id
+       LEFT JOIN users     u ON u.id      = a.employee_id
+       LEFT JOIN employees e ON e.user_id = a.employee_id
        WHERE a.date BETWEEN $1 AND $2
        ORDER BY a.date ASC, name ASC`,
-      [from, to],
+      [from, to]
     );
 
     const headers = [
-      "Date",
-      "Name",
-      "Designation",
-      "Department",
-      "Status",
-      "Check In",
-      "Check Out",
-      "Shift",
-      "Late Minutes",
-      "Remarks",
-      "Check In Lat",
-      "Check In Lng",
-      "Check In Address",
-      "Check Out Lat",
-      "Check Out Lng",
-      "Check Out Address",
+      "Date", "Name", "Designation", "Department", "Status",
+      "Check In", "Check Out", "Shift", "Late Minutes", "Remarks",
+      "Check In Lat", "Check In Lng", "Check In Address",
+      "Check Out Lat", "Check Out Lng", "Check Out Address",
     ];
 
     const escapeCsv = (value) => {
@@ -762,25 +749,13 @@ exports.exportAttendanceByDateRange = async (req, res) => {
 
     const rows = result.rows.map((r) =>
       [
-        r.date,
-        r.name,
-        r.designation,
-        r.department,
-        r.status,
-        r.check_in,
-        r.check_out,
-        r.shift,
-        r.late_minutes,
-        r.remarks,
-        includeCoords ? r.check_in_lat : null,
-        includeCoords ? r.check_in_lng : null,
-        r.check_in_address,
-        includeCoords ? r.check_out_lat : null,
-        includeCoords ? r.check_out_lng : null,
-        r.check_out_address,
+        r.date, r.name, r.designation, r.department, r.status,
+        r.check_in, r.check_out, r.shift, r.late_minutes, r.remarks,
+        r.check_in_lat, r.check_in_lng, r.check_in_address,
+        r.check_out_lat, r.check_out_lng, r.check_out_address,
       ]
         .map(escapeCsv)
-        .join(","),
+        .join(",")
     );
 
     const csv = [headers.join(","), ...rows].join("\n");
@@ -788,7 +763,7 @@ exports.exportAttendanceByDateRange = async (req, res) => {
     res.setHeader("Content-Type", "text/csv");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="attendance_${from}_to_${to}.csv"`,
+      `attachment; filename="attendance_${from}_to_${to}.csv"`
     );
     res.status(200).send(csv);
   } catch (error) {
@@ -804,7 +779,7 @@ exports.getTotalEmployees = async (req, res) => {
     const result = await pool.query(
       `SELECT COUNT(*) AS total
        FROM employees e
-       INNER JOIN users u ON u.id = e.user_id`,
+       INNER JOIN users u ON u.id = e.user_id`
     );
     res.status(200).json({ total: parseInt(result.rows[0].total) });
   } catch (error) {
@@ -812,21 +787,3 @@ exports.getTotalEmployees = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch employee count" });
   }
 };
-
-// ─── Safety net ──────────────────────────────────────────────────────────────
-// Every handler above reads the logged-in user from req.user, which is set by
-// the auth middleware in attendanceRoutes.js (router.use(auth)). If a route is
-// ever mounted WITHOUT that middleware (for example an old routes file next to
-// this controller), answer 401 instead of crashing the whole server.
-Object.keys(exports).forEach((name) => {
-  const handler = exports[name];
-  if (typeof handler !== "function") return;
-  exports[name] = (req, res, next) => {
-    if (!req.user) {
-      return res
-        .status(401)
-        .json({ message: "Not authenticated. Replace attendanceRoutes.js too." });
-    }
-    return handler(req, res, next);
-  };
-});

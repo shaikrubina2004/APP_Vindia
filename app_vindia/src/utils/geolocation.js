@@ -35,27 +35,44 @@ export const getCurrentLocation = (timeoutMs = 8000) => {
 };
 
 /**
- * Reverse-geocodes lat/lng into a SHORT, coarse address — landmark /
- * locality, district, state. Uses OpenStreetMap's free Nominatim API.
- * Returns null if geocoding fails.
+ * Reverse-geocodes lat/lng into an EXACT, detailed street address —
+ * building/house no., road, area, city, PIN code, state. Uses
+ * OpenStreetMap's free Nominatim API at street-level zoom (18).
+ * Falls back to Nominatim's full display_name if the structured parts
+ * are missing. Returns null if geocoding fails.
+ *
+ * (Name kept as reverseGeocodeShort so existing imports keep working.)
  */
 export const reverseGeocodeShort = async (lat, lng) => {
   try {
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
     );
     const data = await response.json();
     const addr = data?.address || {};
 
-    const landmark =
-      addr.suburb || addr.neighbourhood || addr.village ||
-      addr.town || addr.city_district || addr.city || null;
-
+    const place =
+      addr.amenity || addr.building || addr.shop || addr.office ||
+      addr.tourism || addr.leisure || null;
+    const houseRoad = [addr.house_number, addr.road]
+      .filter(Boolean)
+      .join(", ") || null;
+    const area =
+      addr.neighbourhood || addr.suburb || addr.city_district ||
+      addr.residential || addr.quarter || null;
+    const city =
+      addr.city || addr.town || addr.village || addr.municipality || null;
     const district = addr.county || addr.state_district || null;
     const state = addr.state || null;
+    const pin = addr.postcode || null;
 
-    const parts = [landmark, district, state].filter(Boolean);
-    return parts.length ? parts.join(", ") : null;
+    const parts = [place, houseRoad, area, city, district, state, pin]
+      .filter(Boolean)
+      // drop consecutive duplicates (e.g. city == district)
+      .filter((v, i, arr) => i === 0 || v !== arr[i - 1]);
+
+    if (parts.length) return parts.join(", ");
+    return data?.display_name || null;
   } catch {
     return null;
   }

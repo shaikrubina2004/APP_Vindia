@@ -1156,7 +1156,12 @@ function ProjectManagement() {
             </p>
           )}
 
-          {activeTab === "wbs" && <WbsPage selectedProject={selectedProject} />}
+          {activeTab === "wbs" && (
+            <WbsPage
+              key={selectedProject?.id ?? "no-project"}
+              selectedProject={selectedProject}
+            />
+          )}
 
           {activeTab === "timesheet" && (
             <div className="timesheet-section" style={{ padding: 24 }}>

@@ -187,11 +187,14 @@ const safeArr = (val) => {
   if (typeof val === "string") {
     try {
       const p = JSON.parse(val);
-      return Array.isArray(p) ? p : [];
+      if (Array.isArray(p)) return p;
+      if (p && typeof p === "object") return [p];
+      return [];
     } catch {
       return [];
     }
   }
+  if (typeof val === "object") return [val];
   return [];
 };
 
@@ -453,7 +456,7 @@ export default function PMCostReports() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      setReports(data);
+      setReports(Array.isArray(data) ? data : []);
     } catch (err) {
       notify("Could not load reports: " + err.message, "error");
     } finally {
@@ -485,7 +488,8 @@ export default function PMCostReports() {
         headers: authHeaders(),
       });
       const data = await res.json();
-      if (res.ok) setViewingReport(data);
+      if (res.ok && data && typeof data === "object") setViewingReport(data);
+      else setViewingReport(null);
     } catch (_) {}
   };
 
@@ -503,7 +507,8 @@ export default function PMCostReports() {
       fetchReports();
       if (viewingReport?.id === id) {
         const r = await fetch(`${CR_API}/${id}`, { headers: authHeaders() });
-        setViewingReport(await r.json());
+        const next = await r.json();
+        setViewingReport(next && typeof next === "object" ? next : null);
       }
     } catch (err) {
       notify(err.message, "error");
@@ -539,7 +544,8 @@ export default function PMCostReports() {
       fetchReports();
       if (viewingReport?.id === id) {
         const r = await fetch(`${CR_API}/${id}`, { headers: authHeaders() });
-        setViewingReport(await r.json());
+        const next = await r.json();
+        setViewingReport(next && typeof next === "object" ? next : null);
       }
     } catch (err) {
       notify(err.message, "error");

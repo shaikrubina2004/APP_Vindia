@@ -2,23 +2,28 @@ const pool = require("../config/db");
 const XLSX = require("xlsx");
 const path = require("path");
 const fs   = require("fs");
-const { notifyNewLead, notifyFollowUp } = require("./bdaNotificationsController");
-const { notifyNewMarketingLead } = require("./digitalMarketingNotificationsController");
+const {
+  notifyNewLead, notifyFollowUp, notifyImport,
+  notifyLeadAssigned, clearPoolAlerts,
+} = require("./bdaNotificationsController");
+const {
+  ESCALATION_HOURS, UNASSIGNED_SQL, ASSIGNED_TO_ME_SQL,
+  getBdaUsers, getUserById, findBdaByEmail, findBdaByName,
+} = require("../utils/leadAssignment");
 
 /* ══════════════════════════════════════
    DASHBOARD SUMMARY
 ══════════════════════════════════════ */
 exports.getDashboardSummary = async (req, res) => {
   try {
-    const role = req.user?.role || null;
-    const name = req.user?.name || null;
+    const { role, name, email } = req.query;
     const isBda = role === "bda";
 
-    // Base clause + params, reused across all queries
+    // Leads: a BDA sees their own leads + the unassigned pool
     const leadFilter = isBda
-      ? "AND (LOWER(TRIM(assigned_to)) = LOWER(TRIM($1)) OR assigned_to IS NULL) AND status != 'JUNK_REQUESTED'"
+      ? `AND (${ASSIGNED_TO_ME_SQL("$1", "$2")} OR ${UNASSIGNED_SQL()}) AND status != 'JUNK_REQUESTED'`
       : "";
-    const leadVals = isBda ? [name] : [];
+    const leadVals = isBda ? [name || "", email || ""] : [];
 
     const [total, todayNew, converted, interested, todayConverted] = await Promise.all([
       pool.query(
@@ -50,8 +55,10 @@ exports.getDashboardSummary = async (req, res) => {
       ),
     ]);
 
-    // Follow-ups: join to leads so we can apply the same assigned_to filter
-    const fuFilter = isBda ? "AND (LOWER(TRIM(l.assigned_to)) = LOWER(TRIM($1)) OR l.assigned_to IS NULL)" : "";
+    // Follow-ups: ONLY leads assigned to this BDA (unassigned pool excluded)
+    const fuFilter = isBda
+      ? `AND ${ASSIGNED_TO_ME_SQL("$1", "$2", "l")}`
+      : `AND NOT ${UNASSIGNED_SQL("l")}`;
 
     const [todayFU, pendingFU] = await Promise.all([
       pool.query(
@@ -90,19 +97,31 @@ exports.getDashboardSummary = async (req, res) => {
 ══════════════════════════════════════ */
 exports.getAllLeads = async (req, res) => {
   try {
-    const role = req.user?.role || null;
-    const name = req.user?.name || null;
-    let sql = "SELECT * FROM leads WHERE deleted_by_admin = false";
+    const { role, name, email, assigned_only } = req.query;
+    const assignedOnly = assigned_only === "1" || assigned_only === "true";
+
+    let sql = `SELECT l.*,
+                 (SELECT COUNT(*) FROM followups f WHERE f.lead_id = l.id)::int AS followup_count
+               FROM leads l
+               WHERE l.deleted_by_admin = false`;
     const vals = [];
 
     if (role === "bda") {
-      vals.push(name);
-      sql += ` AND (LOWER(TRIM(assigned_to)) = LOWER(TRIM($${vals.length})) OR assigned_to IS NULL) AND status != 'JUNK_REQUESTED'`;
+      vals.push(name || "", email || "");
+      const me = ASSIGNED_TO_ME_SQL(`$${vals.length - 1}`, `$${vals.length}`, "l");
+      sql += assignedOnly
+        // Follow-up page: only the leads that are mine
+        ? ` AND ${me} AND l.status != 'JUNK_REQUESTED'`
+        // Leads page: mine + the unassigned pool (so I can pick things up)
+        : ` AND (${me} OR ${UNASSIGNED_SQL("l")}) AND l.status != 'JUNK_REQUESTED'`;
+    } else if (assignedOnly) {
+      // CEO on the follow-up page: every lead that has an owner
+      sql += ` AND NOT ${UNASSIGNED_SQL("l")}`;
     }
 
-    sql += " ORDER BY created_at DESC";
+    sql += " ORDER BY l.created_at DESC";
     const { rows } = await pool.query(sql, vals);
-    res.json({ leads: rows });
+    res.json({ leads: rows, escalationHours: ESCALATION_HOURS });
   } catch (err) {
     console.error("Get leads error:", err.message);
     res.status(500).json({ error: "Failed to fetch leads" });
@@ -131,7 +150,7 @@ exports.createLead = async (req, res) => {
     call_status, building_type, floors, measurement, sqft,
     budget, assigned_to, quotation_sent, project_start,
     snooze_until, description, date_and_time, search_category,
-    area, designs_sent, campaign_id, platform, medium,
+    area, designs_sent,
   } = req.body;
 
   if (!name || !phone)
@@ -141,48 +160,51 @@ exports.createLead = async (req, res) => {
     // If lead is created with status "Converted" directly, set converted_at too
     const isConverted = (status || "").toLowerCase() === "converted";
 
+    // Only a real BDA can own a lead. Anything else (CEO name, typo, blank)
+    // drops the lead into the unassigned pool and notifies every BDA.
+    const owner = assigned_to ? await findBdaByName(assigned_to) : null;
+
     const { rows } = await pool.query(
       `INSERT INTO leads (
         name,phone,whatsapp,email,city,source,status,call_status,
         building_type,floors,measurement,sqft,budget,assigned_to,
         quotation_sent,project_start,snooze_until,description,
         date_and_time,search_category,area,designs_sent,
-        converted_at,deleted_by_admin,campaign_id,platform,medium
+        converted_at,deleted_by_admin,
+        assigned_email,assigned_by,assigned_at
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
         $13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-        $23,false,$24,$25,$26
+        $23,false,
+        $24,$25,$26
       ) RETURNING id`,
       [
         name, phone, whatsapp || phone, email || null,
         city || null, source || "Manual", status || "New",
         call_status || null, building_type || null, floors || null,
         measurement || null, sqft || null, budget || null,
-        assigned_to || null, quotation_sent || false,
+        owner ? owner.name : null, quotation_sent || false,
         project_start || null, snooze_until || null,
         description || null, date_and_time || null,
         search_category || null, area || null,
         parseInt(designs_sent) || 0,
         isConverted ? new Date() : null, // ✅ set converted_at if created as converted
-        campaign_id || null, platform || null, medium || null,
+        owner ? owner.email : null,
+        owner ? owner.name  : null,       // created & owned by the same person
+        owner ? new Date()  : null,
       ]
     );
 
     const newLeadId = rows[0].id;
 
-    notifyNewLead({
-      leadId: newLeadId,
-      name,
-      source: source || "Manual",
-      phone,
-    }).catch(err => console.error("Notify new lead error:", err.message));
-
-    if (campaign_id) {
-      pool.query("SELECT name FROM marketing_campaigns WHERE id = $1", [campaign_id])
-        .then(({ rows: c }) => notifyNewMarketingLead({
-          leadId: newLeadId, name, campaignId: campaign_id, campaignName: c[0]?.name,
-        }))
-        .catch(err => console.error("Notify new marketing lead error:", err.message));
+    // Unassigned → alert every BDA + CEO (pool). Already owned → no broadcast.
+    if (!owner) {
+      notifyNewLead({
+        leadId: newLeadId,
+        name,
+        source: source || "Manual",
+        phone,
+      }).catch(err => console.error("Notify new lead error:", err.message));
     }
 
     res.json({ success: true, leadId: newLeadId });
@@ -203,10 +225,9 @@ exports.updateLead = async (req, res) => {
 
   const fields = [
     "email","city","source","status","call_status","building_type",
-    "floors","measurement","sqft","budget","assigned_to",
+    "floors","measurement","sqft","budget",
     "quotation_sent","project_start","snooze_until","description",
     "date_and_time","search_category","area","designs_sent",
-    "campaign_id","platform","medium",
   ];
 
   const setClauses = [];
@@ -263,6 +284,14 @@ exports.addFollowUp = async (req, res) => {
   if (!note) return res.status(400).json({ error: "Note required" });
 
   try {
+    const own = await pool.query(
+      `SELECT ${UNASSIGNED_SQL()} AS unassigned FROM leads WHERE id = $1`,
+      [leadId]
+    );
+    if (!own.rows.length) return res.status(404).json({ error: "Lead not found" });
+    if (own.rows[0].unassigned)
+      return res.status(409).json({ error: "Assign this lead to a BDA before adding a follow-up" });
+
     await pool.query(
       "INSERT INTO followups (lead_id, note, status, next_followup) VALUES ($1, $2, $3, $4)",
       [leadId, note, status || null, nextFollowUp || null]
@@ -298,13 +327,13 @@ exports.addFollowUp = async (req, res) => {
 
     if (nextFollowUp) {
       const { rows } = await pool.query(
-        "SELECT name, phone, assigned_to FROM leads WHERE id = $1",
+        "SELECT name, phone, assigned_to, assigned_email FROM leads WHERE id = $1",
         [leadId]
       );
 
       // Only attempt to notify if the lead actually has someone assigned
       if (rows.length && rows[0].assigned_to) {
-        const userRes = await pool.query(
+        const userRes = rows[0].assigned_email ? { rows: [{ email: rows[0].assigned_email }] } : await pool.query(
           `SELECT email FROM users
            WHERE REGEXP_REPLACE(LOWER(TRIM(name)), '\\s+', ' ', 'g') =
                  REGEXP_REPLACE(LOWER(TRIM($1)), '\\s+', ' ', 'g')
@@ -337,37 +366,6 @@ exports.addFollowUp = async (req, res) => {
 };
 
 /* ══════════════════════════════════════
-   GET ALL FOLLOW UPS (aggregate, across leads)
-   Used by dashboards (e.g. Digital Marketing) that need
-   the full follow-up list rather than a single lead's.
-   Supports the same role/name scoping as getAllLeads.
-══════════════════════════════════════ */
-exports.getAllFollowUps = async (req, res) => {
-  try {
-    const role = req.user?.role || null;
-    const name = req.user?.name || null;
-    const isBda = role === "bda";
-    const filter = isBda ? "AND (LOWER(TRIM(l.assigned_to)) = LOWER(TRIM($1)) OR l.assigned_to IS NULL)" : "";
-    const vals = isBda ? [name] : [];
-
-    const { rows } = await pool.query(
-      `SELECT f.*, l.name, l.phone, l.city, l.status, l.source, l.assigned_to,
-              l.campaign_id, l.platform
-       FROM followups f
-       JOIN leads l ON f.lead_id = l.id
-       WHERE l.deleted_by_admin = false ${filter}
-       ORDER BY f.created_at DESC
-       LIMIT 500`,
-      vals
-    );
-    res.json({ followUps: rows });
-  } catch (err) {
-    console.error("Get all followups error:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-};
-
-/* ══════════════════════════════════════
    GET FOLLOW UPS
 ══════════════════════════════════════ */
 exports.getFollowUps = async (req, res) => {
@@ -395,6 +393,9 @@ exports.importLeadsFromExcel = async (req, res) => {
 
     if (!rows.length) return res.status(400).json({ error: "Excel file is empty" });
 
+    const bdaList = await getBdaUsers();
+    const normName = (x) => String(x || "").trim().replace(/\s+/g, " ").toLowerCase();
+
     let inserted = 0;
     for (const r of rows) {
       const keys = Object.keys(r).reduce((acc, k) => { acc[k.toLowerCase().trim()] = r[k]; return acc; }, {});
@@ -402,14 +403,17 @@ exports.importLeadsFromExcel = async (req, res) => {
       const phone = String(keys["phone"] || "").trim();
       if (!name || !phone) continue;
 
-      const isConverted = (keys["status"] || "").toLowerCase() === "converted";
+      const isConverted = String(keys["status"] || "").toLowerCase() === "converted";
+      const owner = keys["assigned_to"]
+        ? bdaList.find(u => normName(u.name) === normName(keys["assigned_to"])) || null
+        : null;
 
       await pool.query(
         `INSERT INTO leads (name,phone,whatsapp,email,city,source,status,call_status,
           building_type,floors,measurement,sqft,budget,assigned_to,
           quotation_sent,description,search_category,area,designs_sent,
-          converted_at,deleted_by_admin)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,false)
+          converted_at,deleted_by_admin,assigned_email,assigned_by,assigned_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,false,$21,$22,$23)
          ON CONFLICT DO NOTHING`,
         [
           String(name).trim(), phone, phone,
@@ -418,19 +422,24 @@ exports.importLeadsFromExcel = async (req, res) => {
           keys["call_status"] || null, keys["building_type"] || null,
           keys["floors"] || null, keys["measurement"] || null,
           keys["sqft"] || null, keys["budget"] || null,
-          keys["assigned_to"] || null,
+          owner ? owner.name : null,
           keys["quotation_sent"] || false,
           keys["description"] || null,
           keys["search_category"] || null,
           keys["area"] || null,
           parseInt(keys["designs_sent"]) || 0,
           isConverted ? new Date() : null, // ✅
+          owner ? owner.email : null,
+          owner ? "Import"    : null,
+          owner ? new Date()  : null,
         ]
       );
       inserted++;
     }
 
     fs.unlinkSync(req.file.path);
+    notifyImport({ count: inserted, source: "Excel" })
+      .catch(err => console.error("Notify import error:", err.message));
     res.json({ success: true, affectedRows: inserted });
   } catch (err) {
     console.error("Excel import error:", err.message);
@@ -491,6 +500,8 @@ exports.importJustDialPDF = async (req, res) => {
       }
 
       fs.unlinkSync(req.file.path);
+      notifyImport({ count: inserted, source: "JustDial" })
+        .catch(err => console.error("Notify import error:", err.message));
       return res.json({ success: true, affectedRows: inserted });
     }
 
@@ -513,6 +524,8 @@ exports.importJustDialPDF = async (req, res) => {
       }
 
       fs.unlinkSync(req.file.path);
+      notifyImport({ count: inserted, source: "JustDial" })
+        .catch(err => console.error("Notify import error:", err.message));
       return res.json({ success: true, affectedRows: inserted });
     }
 
@@ -564,10 +577,23 @@ exports.requestJunk = async (req, res) => {
 
 exports.reassignLead = async (req, res) => {
   try {
+    const owner = req.body.assigned_to ? await findBdaByName(req.body.assigned_to) : null;
     await pool.query(
-      "UPDATE leads SET assigned_to=$1, status='New', junk_requested_at=NULL WHERE id=$2",
-      [req.body.assigned_to, req.params.id]
+      `UPDATE leads
+          SET assigned_to=$1, assigned_email=$2, assigned_by='Admin',
+              assigned_at=CASE WHEN $1::text IS NULL THEN NULL ELSE NOW() END,
+              status='New', junk_requested_at=NULL
+        WHERE id=$3`,
+      [owner ? owner.name : null, owner ? owner.email : null, req.params.id]
     );
+    if (owner) {
+      const { rows } = await pool.query("SELECT name, phone FROM leads WHERE id=$1", [req.params.id]);
+      if (rows.length)
+        notifyLeadAssigned({
+          leadId: req.params.id, name: rows[0].name, phone: rows[0].phone,
+          assigneeEmail: owner.email, assignedByName: "Admin",
+        }).catch(() => {});
+    }
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 };
@@ -584,11 +610,12 @@ exports.permanentDeleteLead = async (req, res) => {
 ══════════════════════════════════════ */
 exports.getTodaysFollowUps = async (req, res) => {
   try {
-    const role = req.user?.role || null;
-    const name = req.user?.name || null;
+    const { role, name, email } = req.query;
     const isBda  = role === "bda";
-    const filter = isBda ? "AND (LOWER(TRIM(l.assigned_to)) = LOWER(TRIM($1)) OR l.assigned_to IS NULL)" : "";
-    const vals   = isBda ? [name] : [];
+    const filter = isBda
+      ? `AND ${ASSIGNED_TO_ME_SQL("$1", "$2", "l")}`
+      : `AND NOT ${UNASSIGNED_SQL("l")}`;
+    const vals   = isBda ? [name || "", email || ""] : [];
 
     const { rows } = await pool.query(
       `SELECT f.*, l.name, l.phone, l.city, l.status, l.source, l.assigned_to
@@ -611,11 +638,12 @@ exports.getTodaysFollowUps = async (req, res) => {
 ══════════════════════════════════════ */
 exports.getPendingFollowUps = async (req, res) => {
   try {
-    const role = req.user?.role || null;
-    const name = req.user?.name || null;
+    const { role, name, email } = req.query;
     const isBda  = role === "bda";
-    const filter = isBda ? "AND (LOWER(TRIM(l.assigned_to)) = LOWER(TRIM($1)) OR l.assigned_to IS NULL)" : "";
-    const vals   = isBda ? [name] : [];
+    const filter = isBda
+      ? `AND ${ASSIGNED_TO_ME_SQL("$1", "$2", "l")}`
+      : `AND NOT ${UNASSIGNED_SQL("l")}`;
+    const vals   = isBda ? [name || "", email || ""] : [];
 
     const { rows } = await pool.query(
       `SELECT f.*, l.name, l.phone, l.city, l.status, l.source, l.assigned_to
@@ -630,5 +658,104 @@ exports.getPendingFollowUps = async (req, res) => {
   } catch (err) {
     console.error("Pending followups error:", err.message);
     res.status(500).json({ error: err.message });
+  }
+};
+
+/* ══════════════════════════════════════
+   ASSIGNEES (dropdown for the Assign modal)
+   GET /api/leads/assignees
+   Only BDAs — the CEO is never a valid target.
+══════════════════════════════════════ */
+exports.getAssignees = async (req, res) => {
+  try {
+    const users = await getBdaUsers();
+    res.json({ assignees: users.map(u => ({ id: u.id, name: u.name, email: u.email })) });
+  } catch (err) {
+    console.error("Get assignees error:", err.message);
+    res.status(500).json({ error: "Failed to load BDAs" });
+  }
+};
+
+/* ══════════════════════════════════════
+   ASSIGN / REASSIGN A LEAD
+   PUT /api/leads/:id/assign   { assignee_email }
+   (requires a valid login token — identity comes from the JWT,
+    never from the request body)
+
+   Rules
+   • target must be an active BDA  → nobody can assign the CEO
+   • CEO  → may assign / reassign any lead to any BDA
+   • BDA  → may assign an UNASSIGNED lead (to self or another BDA)
+            or hand over a lead they already own;
+            may NOT take a lead that belongs to someone else
+══════════════════════════════════════ */
+exports.assignLead = async (req, res) => {
+  const { id } = req.params;
+  const { assignee_email } = req.body || {};
+
+  try {
+    const actor = await getUserById(req.user.id);
+    if (!actor) return res.status(401).json({ error: "User not found" });
+
+    const isCEO = actor.role_code === "ceo";
+    const isBDA = !isCEO && (await findBdaByEmail(actor.email)) !== null;
+    if (!isCEO && !isBDA)
+      return res.status(403).json({ error: "Only the CEO or a BDA can assign leads" });
+
+    if (!assignee_email)
+      return res.status(400).json({ error: "Choose a BDA to assign this lead to" });
+
+    const target = await findBdaByEmail(assignee_email);
+    if (!target)
+      return res.status(400).json({ error: "Leads can only be assigned to a BDA" });
+
+    // One atomic UPDATE: the WHERE clause enforces the ownership rule, so two
+    // BDAs clicking Assign at the same moment cannot both win.
+    const params = [target.name, target.email, actor.name, id];
+    let where = `id = $4 AND deleted_by_admin = false`;
+    if (!isCEO) {
+      params.push(actor.name, actor.email);
+      where += ` AND ( ${UNASSIGNED_SQL()} OR ${ASSIGNED_TO_ME_SQL("$5", "$6")} )`;
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE leads
+          SET last_assignee  = CASE WHEN ${UNASSIGNED_SQL()} THEN last_assignee ELSE assigned_to END,
+              assigned_to    = $1,
+              assigned_email = $2,
+              assigned_by    = $3,
+              assigned_at    = NOW(),
+              escalated_at   = NULL
+        WHERE ${where}
+    RETURNING id, name, phone, assigned_to, assigned_email, assigned_by, assigned_at`,
+      params
+    );
+
+    if (!rows.length) {
+      const exists = await pool.query(
+        "SELECT assigned_to FROM leads WHERE id=$1 AND deleted_by_admin=false", [id]);
+      if (!exists.rows.length) return res.status(404).json({ error: "Lead not found" });
+      return res.status(409).json({
+        error: `This lead is already assigned to ${exists.rows[0].assigned_to}. Only the CEO can reassign it.`,
+      });
+    }
+
+    const lead = rows[0];
+
+    // Tell the new owner (unless they assigned it to themselves)
+    if ((target.email || "").toLowerCase() !== (actor.email || "").toLowerCase()) {
+      notifyLeadAssigned({
+        leadId: lead.id, name: lead.name, phone: lead.phone,
+        assigneeEmail: target.email, assignedByName: actor.name,
+      }).catch(e => console.error("Notify assigned error:", e.message));
+    }
+    // Clear the "new / escalated lead" alerts for everyone else
+    clearPoolAlerts(lead.id, target.email)
+      .catch(e => console.error("Clear alerts error:", e.message));
+
+    res.json({ success: true, lead });
+  } catch (err) {
+    console.error("Assign lead error:", err.message);
+    res.status(500).json({ error: "Failed to assign lead" });
   }
 };

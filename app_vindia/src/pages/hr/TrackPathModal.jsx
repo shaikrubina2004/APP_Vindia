@@ -14,8 +14,18 @@ const pinIcon = L.icon({
   shadowSize: [41, 41],
 });
 
+const fmtClock = (t) => {
+  if (!t) return "—";
+  const [h, m] = String(t).split(":");
+  const hh = parseInt(h, 10);
+  return `${hh % 12 || 12}:${m} ${hh >= 12 ? "PM" : "AM"}`;
+};
+
 const fmtTime = (iso) => {
   if (!iso) return "—";
+  // Postgres often returns timestamps without a timezone marker, which
+  // JS then misreads as local time instead of UTC. Appending "Z" forces
+  // correct UTC parsing so it converts properly to the viewer's local time.
   const withZ = iso.endsWith("Z") ? iso : `${iso}Z`;
   return new Date(withZ).toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -68,7 +78,10 @@ const TrackPathModal = ({ attendanceId, employeeName, onClose }) => {
   useEffect(() => {
     if (!track || !track.points?.length || mapRef.current || !mapContainerRef.current) return;
 
-    const latlngs = track.points.map((p) => [p.lat, p.lng]);
+    const latlngs = track.points
+      .map((p) => [Number(p.lat), Number(p.lng)])
+      .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
+    if (!latlngs.length) return;
 
     const map = L.map(mapContainerRef.current, { attributionControl: true });
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -78,14 +91,29 @@ const TrackPathModal = ({ attendanceId, employeeName, onClose }) => {
 
     const line = L.polyline(latlngs, { color: "#2563eb", weight: 3 }).addTo(map);
 
-    L.marker(latlngs[0], { icon: pinIcon }).addTo(map).bindPopup("Check-in ping");
+    // Small dots for the in-between pings
+    track.points.forEach((p) => {
+      if (p.type === "ping") {
+        L.circleMarker([Number(p.lat), Number(p.lng)], {
+          radius: 4, color: "#2563eb", fillColor: "#fff", fillOpacity: 1, weight: 2,
+        }).addTo(map);
+      }
+    });
+
+    const hasOut = track.points[track.points.length - 1]?.type === "checkout";
+    L.marker(latlngs[0], { icon: pinIcon }).addTo(map).bindPopup("Check-in");
     if (latlngs.length > 1) {
       L.marker(latlngs[latlngs.length - 1], { icon: pinIcon })
         .addTo(map)
-        .bindPopup("Latest ping");
+        .bindPopup(hasOut ? "Check-out" : "Latest location");
     }
 
-    map.fitBounds(line.getBounds(), { padding: [30, 30] });
+    if (latlngs.length > 1) {
+      map.fitBounds(line.getBounds(), { padding: [30, 30], maxZoom: 17 });
+    } else {
+      // A single point has no bounds to fit — just centre on it.
+      map.setView(latlngs[0], 16);
+    }
     mapRef.current = map;
 
     setTimeout(() => map.invalidateSize(), 150);
@@ -129,16 +157,17 @@ const TrackPathModal = ({ attendanceId, employeeName, onClose }) => {
 
         {!loading && !error && track && track.count === 0 && (
           <p style={{ color: "#64748b", fontSize: 13 }}>
-            No location pings recorded for this day — the employee may still be checked in, or
-            location was not captured (e.g. CEO exemption or denied permission).
+            No location was recorded for this attendance — location permission may have been
+            denied, or this record was created before path tracking was enabled.
           </p>
         )}
 
         {!loading && !error && track && track.count > 0 && (
           <>
             <p style={{ fontSize: 12, color: "#64748b", marginTop: 4, marginBottom: 10 }}>
-              {track.count} location ping{track.count !== 1 ? "s" : ""} ·{" "}
-              {fmtTime(track.first_recorded_at)} – {fmtTime(track.last_recorded_at)}
+              {track.count} point{track.count !== 1 ? "s" : ""} ·{" "}
+              Check-in {fmtClock(track.check_in)} – Check-out {fmtClock(track.check_out)}
+              {track.ping_count > 0 && <> · {track.ping_count} live ping{track.ping_count !== 1 ? "s" : ""}</>}
             </p>
             <div
               ref={mapContainerRef}
