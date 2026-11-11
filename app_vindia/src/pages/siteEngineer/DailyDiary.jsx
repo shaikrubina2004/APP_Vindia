@@ -351,7 +351,9 @@ export default function DailyDiary() {
 
       (form.attachments || []).forEach(file => fd.append("attachments", file));
 
-      const res = await api.post("/diary", fd);
+      const res = await api.post("/diary", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
 sessionStorage.setItem(
     "selectedDailyDiary",
@@ -712,7 +714,12 @@ navigate("/site-engineer/labour-report");
                     </div>
                     <div className="dd-field" style={{ marginTop: 10 }}>
                       <label className="dd-label">Attachments (photos, PDFs)</label>
-                      <input type="file" multiple onChange={handleFiles}/>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,application/pdf"
+                        multiple
+                        onChange={handleFiles}
+                      />
                       {(form.attachments || []).length > 0 && (
                         <div className="dd-file-list">
                           {form.attachments.map((f, i) => (

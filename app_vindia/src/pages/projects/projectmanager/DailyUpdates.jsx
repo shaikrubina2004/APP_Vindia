@@ -273,8 +273,8 @@ const ROLE_SOURCES = [
     endpoint: "/architect-daily-log/all",
     approveEndpoint: null,
     transform: (item) => {
-      const tasks = item.tasks || [];
-      const issues = item.issues || [];
+      const tasks = asArray(item.tasks);
+      const issues = asArray(item.issues);
       return {
         id: item.id,
         roleKey: "architect",
@@ -533,6 +533,8 @@ const ROLE_SOURCES = [
   },
 ];
 
+const asArray = (value) => (Array.isArray(value) ? value : []);
+
 const STATUS_COLORS = {
   "on-track": {
     bg: "#d1fae5",
@@ -615,7 +617,16 @@ export default function DailyUpdates() {
               : [];
           rows.forEach((row) => {
             try {
-              results.push(source.transform(row));
+              const report = source.transform(row);
+              results.push({
+                ...report,
+                workItems: asArray(report.workItems),
+                manpower: asArray(report.manpower),
+                equipment: asArray(report.equipment),
+                materials: asArray(report.materials),
+                issues: asArray(report.issues),
+                tomorrowPlan: asArray(report.tomorrowPlan),
+              });
             } catch (_) {}
           });
         } catch (err) {
@@ -828,6 +839,24 @@ export default function DailyUpdates() {
     const r = selectedReport;
     const sc = STATUS_COLORS[r.overallStatus] || STATUS_COLORS["on-track"];
     const source = ROLE_SOURCES.find((s) => s.key === r.roleKey);
+    const workItems = asArray(r.workItems).filter(
+      (w) => w && (typeof w === "object" ? w.activity : Boolean(w)),
+    );
+    const manpower = asArray(r.manpower).filter(
+      (m) => m && (typeof m === "object" ? m.trade : Boolean(m)),
+    );
+    const equipment = asArray(r.equipment).filter(
+      (e) => e && (typeof e === "object" ? e.name : Boolean(e)),
+    );
+    const materials = asArray(r.materials).filter(
+      (m) => m && (typeof m === "object" ? m.material : Boolean(m)),
+    );
+    const issues = asArray(r.issues).filter(
+      (i) => i && (typeof i === "object" ? i.issue : Boolean(i)),
+    );
+    const tomorrowPlan = asArray(r.tomorrowPlan).filter(
+      (t) => t && (typeof t === "object" ? t.activity : Boolean(t)),
+    );
     const isApproving = approvingId === `${r.roleKey}-${r.id}`;
     return (
       <div className="du-view-page">
@@ -899,99 +928,89 @@ export default function DailyUpdates() {
               )}
             </div>
           </div>
-          {(r.workItems || []).filter((w) => w.activity).length > 0 && (
+          {workItems.length > 0 && (
             <ViewSection title="1. Work Completed Today">
-              {r.workItems
-                .filter((w) => w.activity)
-                .map((w, i) => (
-                  <div key={i} className="du-rv-row">
-                    <span className="du-rv-col-3">{w.activity}</span>
-                    <span className="du-rv-col-2 du-muted">{w.location}</span>
-                    <span className="du-rv-col-1 du-muted">
-                      {w.quantity} {w.unit}
-                    </span>
-                    <span className="du-rv-col-1">
-                      <StatusPill status={w.status} map={WORK_STATUS} />
-                    </span>
-                  </div>
-                ))}
+              {workItems.map((w, i) => (
+                <div key={i} className="du-rv-row">
+                  <span className="du-rv-col-3">{w.activity}</span>
+                  <span className="du-rv-col-2 du-muted">{w.location}</span>
+                  <span className="du-rv-col-1 du-muted">
+                    {w.quantity} {w.unit}
+                  </span>
+                  <span className="du-rv-col-1">
+                    <StatusPill status={w.status} map={WORK_STATUS} />
+                  </span>
+                </div>
+              ))}
             </ViewSection>
           )}
-          {(r.manpower || []).filter((m) => m.trade).length > 0 && (
+          {manpower.length > 0 && (
             <ViewSection title="2. Manpower">
-              {r.manpower
-                .filter((m) => m.trade)
-                .map((m, i) => (
-                  <div key={i} className="du-rv-row">
-                    <span className="du-rv-col-3">{m.trade}</span>
-                    <span className="du-rv-col-1 du-muted">
-                      Planned: {m.planned}
-                    </span>
-                    <span
-                      className={`du-rv-col-1 ${m.present < m.planned ? "du-danger" : "du-success"}`}
-                    >
-                      Present: {m.present}
-                    </span>
-                    <span className="du-rv-col-2 du-muted">{m.remark}</span>
-                  </div>
-                ))}
+              {manpower.map((m, i) => (
+                <div key={i} className="du-rv-row">
+                  <span className="du-rv-col-3">{m.trade}</span>
+                  <span className="du-rv-col-1 du-muted">
+                    Planned: {m.planned}
+                  </span>
+                  <span
+                    className={`du-rv-col-1 ${m.present < m.planned ? "du-danger" : "du-success"}`}
+                  >
+                    Present: {m.present}
+                  </span>
+                  <span className="du-rv-col-2 du-muted">{m.remark}</span>
+                </div>
+              ))}
             </ViewSection>
           )}
-          {(r.equipment || []).filter((e) => e.name).length > 0 && (
+          {equipment.length > 0 && (
             <ViewSection title="3. Equipment">
-              {r.equipment
-                .filter((e) => e.name)
-                .map((e, i) => (
-                  <div key={i} className="du-rv-row">
-                    <span className="du-rv-col-3">{e.name}</span>
-                    <span className="du-rv-col-1 du-muted">
-                      {e.nos} unit(s)
-                    </span>
-                    <span className="du-rv-col-2">
-                      <StatusPill status={e.status} map={EQUIP_STATUS} />
-                    </span>
-                    <span className="du-rv-col-1 du-muted">{e.hours} hrs</span>
-                  </div>
-                ))}
+              {equipment.map((e, i) => (
+                <div key={i} className="du-rv-row">
+                  <span className="du-rv-col-3">{e.name}</span>
+                  <span className="du-rv-col-1 du-muted">
+                    {e.nos} unit(s)
+                  </span>
+                  <span className="du-rv-col-2">
+                    <StatusPill status={e.status} map={EQUIP_STATUS} />
+                  </span>
+                  <span className="du-rv-col-1 du-muted">{e.hours} hrs</span>
+                </div>
+              ))}
             </ViewSection>
           )}
-          {(r.materials || []).filter((m) => m.material).length > 0 && (
+          {materials.length > 0 && (
             <ViewSection title="4. Materials">
-              {r.materials
-                .filter((m) => m.material)
-                .map((m, i) => (
-                  <div key={i} className="du-rv-row">
-                    <span className="du-rv-col-3">{m.material}</span>
-                    <span className="du-rv-col-1 du-muted">{m.quantity}</span>
-                    <span className="du-rv-col-2 du-muted">{m.supplier}</span>
-                    <span className="du-rv-col-1">
-                      <StatusPill status={m.qc} map={QC_STATUS} />
-                    </span>
-                  </div>
-                ))}
+              {materials.map((m, i) => (
+                <div key={i} className="du-rv-row">
+                  <span className="du-rv-col-3">{m.material}</span>
+                  <span className="du-rv-col-1 du-muted">{m.quantity}</span>
+                  <span className="du-rv-col-2 du-muted">{m.supplier}</span>
+                  <span className="du-rv-col-1">
+                    <StatusPill status={m.qc} map={QC_STATUS} />
+                  </span>
+                </div>
+              ))}
             </ViewSection>
           )}
           <ViewSection title="5. Issues / Problems">
-            {(r.issues || []).filter((i) => i.issue).length === 0 ? (
+            {issues.length === 0 ? (
               <div className="du-rv-nil">No issues logged ✓</div>
             ) : (
-              r.issues
-                .filter((i) => i.issue)
-                .map((issue, i) => (
-                  <div key={i} className="du-issue-card">
-                    <div className="du-issue-card-title">⚠ {issue.issue}</div>
-                    {issue.impact && (
-                      <div className="du-issue-impact">
-                        Impact: {issue.impact}
-                      </div>
-                    )}
-                    {issue.action && (
-                      <div className="du-issue-action">
-                        Action: {issue.action}
-                      </div>
-                    )}
-                  </div>
-                ))
+              issues.map((issue, i) => (
+                <div key={i} className="du-issue-card">
+                  <div className="du-issue-card-title">⚠ {issue.issue}</div>
+                  {issue.impact && (
+                    <div className="du-issue-impact">
+                      Impact: {issue.impact}
+                    </div>
+                  )}
+                  {issue.action && (
+                    <div className="du-issue-action">
+                      Action: {issue.action}
+                    </div>
+                  )}
+                </div>
+              ))
             )}
           </ViewSection>
           {r.progress && Object.keys(r.progress).length > 0 && (
@@ -1032,17 +1051,15 @@ export default function DailyUpdates() {
                 ))}
             </ViewSection>
           )}
-          {(r.tomorrowPlan || []).filter((t) => t.activity).length > 0 && (
+          {tomorrowPlan.length > 0 && (
             <ViewSection title="8. Tomorrow's Plan">
-              {r.tomorrowPlan
-                .filter((t) => t.activity)
-                .map((t, i) => (
-                  <div key={i} className="du-rv-row">
-                    <span className="du-rv-col-3">{t.activity}</span>
-                    <span className="du-rv-col-2 du-muted">{t.location}</span>
-                    <span className="du-rv-col-1 du-accent">{t.target}</span>
-                  </div>
-                ))}
+              {tomorrowPlan.map((t, i) => (
+                <div key={i} className="du-rv-row">
+                  <span className="du-rv-col-3">{t.activity}</span>
+                  <span className="du-rv-col-2 du-muted">{t.location}</span>
+                  <span className="du-rv-col-1 du-accent">{t.target}</span>
+                </div>
+              ))}
             </ViewSection>
           )}
           {r.pmRemarks && (
@@ -2075,7 +2092,25 @@ export default function DailyUpdates() {
             const sc =
               STATUS_COLORS[r.overallStatus] || STATUS_COLORS["on-track"];
             const source = ROLE_SOURCES.find((s) => s.key === r.roleKey);
-            const issueCount = (r.issues || []).filter((i) => i.issue).length;
+            const workItems = asArray(r.workItems).filter(
+              (w) => w && (typeof w === "object" ? w.activity : Boolean(w)),
+            );
+            const manpower = asArray(r.manpower).filter(
+              (m) => m && (typeof m === "object" ? m.trade : Boolean(m)),
+            );
+            const equipment = asArray(r.equipment).filter(
+              (e) => e && (typeof e === "object" ? e.name : Boolean(e)),
+            );
+            const materials = asArray(r.materials).filter(
+              (m) => m && (typeof m === "object" ? m.material : Boolean(m)),
+            );
+            const issues = asArray(r.issues).filter(
+              (i) => i && (typeof i === "object" ? i.issue : Boolean(i)),
+            );
+            const tomorrowPlan = asArray(r.tomorrowPlan).filter(
+              (t) => t && (typeof t === "object" ? t.activity : Boolean(t)),
+            );
+            const issueCount = issues.length;
             const isApproving = approvingId === `${r.roleKey}-${r.id}`;
             return (
               <div
@@ -2117,15 +2152,14 @@ export default function DailyUpdates() {
                   </div>
                 </div>
                 <div className="du-rc-stats">
-                  {(r.workItems || []).filter((w) => w.activity).length > 0 && (
+                  {workItems.length > 0 && (
                     <span className="du-rc-stat">
-                      🏗 {r.workItems.filter((w) => w.activity).length} work
-                      items
+                      🏗 {workItems.length} work item{workItems.length > 1 ? "s" : ""}
                     </span>
                   )}
-                  {(r.manpower || []).filter((m) => m.trade).length > 0 && (
+                  {manpower.length > 0 && (
                     <span className="du-rc-stat">
-                      👷 {r.manpower.filter((m) => m.trade).length} trade(s)
+                      👷 {manpower.length} trade{manpower.length > 1 ? "s" : ""}
                     </span>
                   )}
                   {issueCount > 0 && (
