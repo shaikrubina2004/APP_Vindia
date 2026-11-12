@@ -1,6 +1,6 @@
 // src/pages/siteEngineer/DailyDiary.jsx
 // Labour input REMOVED — reads from LabourReport (single source of truth)
-// LabourSummaryCard shows today's crew + "Edit →" link to LabourReport page
+// LabourSummaryCard shows today's crew or a link to create a missing report
 // All other diary fields unchanged
 
 import React, { useEffect, useRef, useState } from "react";
@@ -96,9 +96,12 @@ function LabourSummaryCard({ date, projectId }) {
   useEffect(() => {
     if (!date) return;
     setLoading(true);
-    // Fetch by date only — project filter is optional
-    const params = new URLSearchParams({ date });
-    api.get(`/labour-report?${params}`)
+    api.get("/labour-report", {
+      params: {
+        date,
+        ...(projectId ? { project_id: projectId } : {}),
+      },
+    })
       .then(r => {
         const list = Array.isArray(r?.data) ? r.data : [];
         if (!list.length) { setData(null); return; }
@@ -210,6 +213,17 @@ setData(match || null);
         </div>
       )}
 
+      {data.notes && (
+        <div style={{
+          padding: "8px 16px",
+          fontSize: 11,
+          color: "var(--c-text-2,#49769F)",
+          borderTop: "1px solid var(--c-border,rgba(10,65,116,.06))",
+        }}>
+          {data.notes}
+        </div>
+      )}
+
       <div style={{
         padding: "8px 16px", fontSize: 11, color: "var(--c-text-3)",
         borderTop: "1px solid var(--c-border,rgba(10,65,116,.06))",
@@ -228,11 +242,12 @@ export default function DailyDiary() {
   const draft      = ls.load(DRAFT_KEY);
   const autoSave   = useRef(null);
   const alive      = useRef(true);
+  const dateEdited = useRef(false);
 
   const [form, setForm] = useState({
     ...BLANK,
-    date: nowISO(),
     ...draft,
+    date: nowISO(),
     attachments: [],   // never restore file objects from draft
   });
   const [errors,     setErrors]     = useState({});
@@ -262,6 +277,20 @@ export default function DailyDiary() {
       const c = { ...form }; delete c.attachments; ls.save(DRAFT_KEY, c);
     }, 1200);
   }, [form]);
+
+  useEffect(() => {
+    const refreshCurrentDate = () => {
+      if (dateEdited.current) return;
+      const currentDate = nowISO();
+      setForm((current) => current.date === currentDate ? current : { ...current, date: currentDate });
+    };
+    const intervalId = window.setInterval(refreshCurrentDate, 30_000);
+    window.addEventListener("focus", refreshCurrentDate);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshCurrentDate);
+    };
+  }, []);
 
   /* ── loaders ── */
   async function loadHistory() {
@@ -306,6 +335,7 @@ export default function DailyDiary() {
 
   /* ── field helpers ── */
   const setF = (k, v) => {
+    if (k === "date") dateEdited.current = true;
     setForm(f => ({ ...f, [k]: v }));
     setErrors(e => { const c = { ...e }; delete c[k]; return c; });
     setStatus("");
@@ -364,6 +394,7 @@ await loadHistory();
 
 ls.del(DRAFT_KEY);
 
+dateEdited.current = false;
 setForm({
     ...BLANK,
     date: nowISO(),
@@ -425,7 +456,7 @@ setStatus("Diary submitted ✓");
                     Save Draft
                   </button>
                   <button type="button" className="dd-btn dd-btn--ghost"
-                    onClick={() => { ls.del(DRAFT_KEY); setForm({ ...BLANK, date: nowISO(), attachments: [] }); }}>
+                    onClick={() => { dateEdited.current = false; ls.del(DRAFT_KEY); setForm({ ...BLANK, date: nowISO(), attachments: [] }); }}>
                     Clear
                   </button>
                 </div>
@@ -545,48 +576,6 @@ setStatus("Diary submitted ✓");
                   <div className="dd-form-section">
                     <div className="dd-section-title">Labour on Site Today</div>
                     <LabourSummaryCard date={form.date} projectId={form.project_id}/>
-                    {/* Quick link if no report yet */}
-                    <div style={{
-                      marginTop: 12,
-                      display: "flex", alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "12px 16px",
-                      background: "var(--c-surface-2,#F4F8FB)",
-                      border: "1px solid var(--c-border,rgba(10,65,116,.10))",
-                      borderLeft: "4px solid var(--c-navy-700,#0A4174)",
-                      borderRadius: 10, gap: 16, flexWrap: "wrap",
-                    }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--c-navy-900)", marginBottom: 2 }}>
-                          Need trade-wise breakdown?
-                        </div>
-                        <div style={{ fontSize: 12, color: "var(--c-text-3)", lineHeight: 1.5 }}>
-                          Complete the Labour Report after submitting this diary — it carries the diary, project and milestone details forward.
-                        </div>
-                      </div>
-                      <button type="button" className="dd-btn dd-btn--primary" style={{ flexShrink: 0 }}
-                       onClick={() => {
-
-sessionStorage.setItem(
-    "selectedDailyDiary",
-    JSON.stringify({
-        id: form.id || null,
-        report_date: form.date,
-        project_id: form.project_id,
-        milestone_id: form.milestone_id,
-        zone: form.zone,
-        weather_am: form.weather_am,
-        shift: form.shift,
-        notes: form.notes
-    })
-);
-
-navigate("/site-engineer/labour-report");
-
-}}>
-                        Complete Labour Report →
-                      </button>
-                    </div>
                   </div>
 
                   {/* ── WORK DONE ────────────────────────────── */}

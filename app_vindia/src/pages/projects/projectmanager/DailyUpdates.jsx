@@ -3,6 +3,8 @@ import "../../../styles/DailyUpdates.css";
 import "./PMDailyUpdates.css";
 import { API } from "../../../services/authService";
 
+const API_ORIGIN = API.defaults.baseURL.replace(/\/api\/?$/, "");
+
 // ─── 7-day default date range ─────────────────────────────────
 const today = () => new Date().toISOString().split("T")[0];
 const sevenDaysAgo = () => {
@@ -157,6 +159,7 @@ const ROLE_SOURCES = [
           ? [{ activity: item.next_day, location: "", target: "" }]
           : [],
         equipment: item.plant ? [{ equipment: item.plant }] : [],
+        attachments: Array.isArray(item.attachments) ? item.attachments : [],
         materials: mats.map((m) => ({
           material: m.material || m.name || m.item || "",
           quantity: m.qty || m.quantity || "",
@@ -1065,6 +1068,26 @@ export default function DailyUpdates() {
           {r.pmRemarks && (
             <ViewSection title="9. Notes / Remarks">
               <div className="du-rv-remarks">{r.pmRemarks}</div>
+            </ViewSection>
+          )}
+          {r.roleKey === "se" && asArray(r.attachments).length > 0 && (
+            <ViewSection title="10. Attachments">
+              {asArray(r.attachments).map((attachment, i) => {
+                const url = attachment?.url;
+                if (!url) return null;
+                const href = /^https?:\/\//i.test(url)
+                  ? url
+                  : `${API_ORIGIN}/${url.replace(/^\/+/, "")}`;
+                const name =
+                  attachment.filename || url.split("/").pop() || `Attachment ${i + 1}`;
+                return (
+                  <div key={`${url}-${i}`} className="du-rv-row">
+                    <a href={href} target="_blank" rel="noopener noreferrer">
+                      📎 {name}
+                    </a>
+                  </div>
+                );
+              })}
             </ViewSection>
           )}
           <div className="du-rv-footer">

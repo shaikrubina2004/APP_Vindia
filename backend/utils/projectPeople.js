@@ -16,6 +16,10 @@ const se = require("../controllers/siteEngineerNotificationsController");
 const qs = require("../controllers/qsNotificationController");
 const architect = require("../controllers/architectNotificationsController");
 const pc = require("../controllers/pcNotificationsController");
+const mep = require("../controllers/mepNotificationsController");
+const structural = require("./createSENotification");
+const threeD = require("../controllers/threeDNotificationsController");
+const digitalMarketing = require("../controllers/digitalMarketingNotificationsController");
 
 /* Projects a user is the assigned Site Engineer on */
 async function projectIdsForEngineer(userId) {
@@ -76,12 +80,20 @@ async function writeFor(role, userId, n) {
   switch (role) {
     case "site_engineer":
       return se.insertNotification(userId, type, title, description, link, severity, projectId);
+    case "structural_engineer":
+      return structural({ type, severity, message: title, description, link: link || "/structural-engineer/rfi" });
+    case "mep_engineer":
+      return mep.insertMEPNotification(userId, type, title, description, severity, refId, projectId);
     case "quantity_surveyor":
       return qs.insertNotification(userId, type, title, description, link, severity, refId);
     case "architect":
       return architect.insertArchitectNotification(userId, type, title, description, link, severity, refId);
     case "project_coordinator":
       return pc.insertNotification(userId, type, title, description, link, severity, projectId);
+    case "3d_visualizer":
+      return threeD.insertThreeDNotification(userId, type, title, description, link, severity, refId);
+    case "digital_marketing":
+      return digitalMarketing.insertNotification(userId, type, title, description, link, severity, refId);
     default:
       // project_manager and everything else use the generic per-user table
       return ops.insertNotification(userId, type, title, description, link, severity, projectId, role, refId);
@@ -118,4 +130,17 @@ async function notifyEngineer({ userId, projectId, ...n }) {
   }
 }
 
-module.exports = { projectIdsForEngineer, projectPeople, resolveRoleUsers, notifyReviewers, notifyEngineer };
+/* Notify one known participant through the notification store their role reads. */
+async function notifyUser({ role, userId, ...n }) {
+  if (!role || !userId) return 0;
+  try {
+    const roleCode = String(role).trim().toLowerCase().replace(/[\s-]+/g, "_");
+    await writeFor(roleCode, userId, n);
+    return 1;
+  } catch (err) {
+    console.error("notifyUser failed:", err.message);
+    return 0;
+  }
+}
+
+module.exports = { projectIdsForEngineer, projectPeople, resolveRoleUsers, notifyReviewers, notifyEngineer, notifyUser };

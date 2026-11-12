@@ -31,6 +31,12 @@ export const ProjectManagerMenu = [
   },
 
   {
+    name: "RFI Register",
+    path: "/project-manager/rfi",
+    icon: "file-text",
+  },
+
+  {
     name: "Project Approvals",
     path: "/pm/project-approvals",
     icon: "check-circle",

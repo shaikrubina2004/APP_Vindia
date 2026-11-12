@@ -8,6 +8,8 @@ import QSNotificationBell from "../../components/notifications/QSNotificationBel
 import MEPNotificationBell from "../notifications/MepNotificationBell";
 import BDANotificationBell from "../../components/notifications/BDANotificationBell";
 import ArchitectNotificationBell from "../../components/notifications/ArchitectNotificationBell";
+import SiteEngineerNotificationBell from "../../components/notifications/SiteEngineerNotificationBell";
+import OperationsNotificationBell from "../../components/notifications/OperationsNotificationBell";
 import "../../styles/layout/Navbar.css";
 import logo from "../../assets/logo.png.png";
 
@@ -88,6 +90,8 @@ function Navbar() {
     quantity_surveyor:   QSNotificationBell,
     mep_engineer:        MEPNotificationBell,
     architect:           ArchitectNotificationBell,
+    site_engineer:       ({ userId }) => <SiteEngineerNotificationBell userId={userId} routes={{ rfi: "/site-engineer/rfi", default: "/site-engineer/dashboard" }} />,
+    project_manager:     ({ userId }) => <OperationsNotificationBell userId={userId} role="project_manager" routes={{ rfi: "/project-manager/rfi", default: "/project-manager/dashboard" }} />,
     bda:                           ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
     bda1:                          ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
     bda2:                          ({ userId }) => <BDANotificationBell bdaEmail={userId} />,

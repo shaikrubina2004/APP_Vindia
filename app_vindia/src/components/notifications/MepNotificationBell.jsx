@@ -9,6 +9,7 @@ const TYPE_CFG = {
   drawing: { label: "Drawing", color: "#0ea5e9", bg: "#e0f2fe" },
   approval: { label: "Approval", color: "#10b981", bg: "#ecfdf5" },
   task: { label: "Task", color: "#7c3aed", bg: "#f5f3ff" },
+  rfi: { label: "RFI", color: "#7c3aed", bg: "#f5f3ff" },
 };
 
 const SEV_COLOR = {
@@ -18,7 +19,7 @@ const SEV_COLOR = {
   ok: "#10b981",
 };
 
-const FILTERS = ["all", "incident", "clash", "drawing", "approval", "task"];
+const FILTERS = ["all", "rfi", "incident", "clash", "drawing", "approval", "task"];
 
 export default function MEPNotificationBell({ userId }) {
   const navigate = useNavigate();
@@ -89,6 +90,7 @@ export default function MEPNotificationBell({ userId }) {
     setOpen(false);
 
     const routes = {
+      rfi: "/mep/dashboard",
       incident: "/mep/incidents",
       clash: "/mep/shared/drawings",
       drawing: "/mep/shared/drawings",

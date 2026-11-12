@@ -4,6 +4,7 @@ const path = require("path");
 const pool = require("../config/db");
 const auth = require("../middleware/authMiddleware");
 const { notifyProjectClient } = require("../utils/clientNotifications");
+const { notifyUser } = require("../utils/projectPeople");
 
 const router = express.Router();
 router.use(auth);
@@ -17,6 +18,42 @@ const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 function roleOf(req) {
   return String(req.user?.role || "").trim().toLowerCase();
+}
+
+function rfiLinkForRole(role) {
+  const roleCode = String(role || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return {
+    project_manager: "/project-manager/rfi",
+    site_engineer: "/site-engineer/rfi",
+    structural_engineer: "/structural-engineer/rfi",
+    quantity_surveyor: "/quantity-surveyor/rfi",
+    architect: "/architect/rfi",
+    project_coordinator: "/project-coordinator/rfi",
+    mep_engineer: "/mep/dashboard",
+    "3d_visualizer": "/3d-visualizer/rfi",
+    digital_marketing: "/digital-marketing/rfi",
+  }[roleCode] || "/site-engineer/dashboard";
+}
+
+async function notifyOtherParticipants(rfi, actorId, notification) {
+  const participants = [
+    { role: rfi.raised_by_role, userId: rfi.raised_by_id },
+    { role: rfi.assigned_to_role, userId: rfi.assigned_to_user_id },
+  ];
+  const notified = new Set();
+  for (const participant of participants) {
+    if (!participant.userId || String(participant.userId) === String(actorId) || notified.has(String(participant.userId))) continue;
+    if (String(participant.role || "").trim().toLowerCase() === "client") continue;
+    notified.add(String(participant.userId));
+    await notifyUser({
+      ...notification,
+      role: participant.role,
+      userId: participant.userId,
+      link: rfiLinkForRole(participant.role),
+      projectId: rfi.project_id,
+      refId: rfi.id,
+    });
+  }
 }
 
 async function getRequesterEmployee(userId) {
@@ -109,13 +146,18 @@ async function getProjectManager(projectId) {
 async function resolveAssignee(req, project, assignedTo) {
   if (assignedTo) {
     const result = await pool.query(
-      `SELECT id, name, role FROM users WHERE id = $1 LIMIT 1`,
+      `SELECT u.id, u.name, u.role, r.code AS role_code
+         FROM users u
+         LEFT JOIN roles r ON r.id = u.role_id
+        WHERE u.id = $1
+        LIMIT 1`,
       [Number(assignedTo)]
     );
     if (!result.rows.length) return null;
     const target = result.rows[0];
-    if (String(target.role || "").toLowerCase() === "client") return null;
-    return { userId: target.id, role: String(target.role || "").trim().toLowerCase(), name: target.name || target.role || "User" };
+    const role = String(target.role_code || target.role || "").trim().toLowerCase();
+    if (role === "client") return null;
+    return { userId: target.id, role, name: target.name || role || "User" };
   }
 
   const manager = await getProjectManager(project.id);
@@ -243,6 +285,18 @@ router.post("/", upload.array("attachments", 10), async (req, res) => {
       }
     }
 
+    await notifyUser({
+      role: assignee.role,
+      userId: assignee.userId,
+      type: "rfi",
+      title: `New RFI: ${subject}`,
+      description: `${userName} raised an RFI for ${project.name}: "${subject}"`,
+      link: rfiLinkForRole(assignee.role),
+      severity: ["critical", "high"].includes(priority) ? "critical" : "warn",
+      projectId: project.id,
+      refId: result.rows[0].id,
+    });
+
     return res.status(201).json({
       ...result.rows[0],
       title: result.rows[0].subject,
@@ -266,6 +320,14 @@ router.put("/:id/status", async (req, res) => {
       `UPDATE rfis SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
       [status, req.params.id]
     );
+    if (rfi.status !== status) {
+      await notifyOtherParticipants(result.rows[0], req.user.id, {
+        type: "rfi",
+        title: `RFI status updated: ${result.rows[0].subject}`,
+        description: `Status changed to ${status}.`,
+        severity: "info",
+      });
+    }
     if (
       result.rows[0].project_id &&
       (String(result.rows[0].raised_by_role).toLowerCase() === "client" ||
@@ -304,6 +366,12 @@ router.put("/:id/answer", async (req, res) => {
       `UPDATE rfis SET status = 'responded', updated_at = NOW() WHERE id = $1 RETURNING *`,
       [req.params.id]
     );
+    await notifyOtherParticipants(result.rows[0], req.user.id, {
+      type: "rfi",
+      title: `RFI response: ${result.rows[0].subject}`,
+      description: `${req.user?.name || "Your project team"} added a response to this RFI.`,
+      severity: "info",
+    });
     if (
       result.rows[0].project_id &&
       (String(result.rows[0].raised_by_role).toLowerCase() === "client" ||
