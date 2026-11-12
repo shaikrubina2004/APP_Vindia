@@ -35,7 +35,7 @@ const SEV_COLOR = {
   ok: "#10b981",
 };
 
-const FILTERS = ["all", "approval", "task", "incident", "material", "measurement", "snag", "work"];
+const FILTERS = ["all", "rfi", "approval", "task", "incident", "material", "measurement", "snag", "work"];
 
 /**
  * routes = {

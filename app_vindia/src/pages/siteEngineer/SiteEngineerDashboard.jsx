@@ -4,7 +4,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
-import { useNotifications } from "../../context/Notificationcontext";
 import { useAutoReminders } from "../../hooks/useAutoReminders";
 import CheckInButton from "../../SharedResourse/CheckInButton";
 import "../../styles/siteEngineer.css";
@@ -116,7 +115,6 @@ export default function SiteEngineerDashboard() {
   // ── hooks ─────────────────────────────────────────────────
   useAutoReminders(); // fires deadline/RFI/task reminders automatically
   const navigate = useNavigate();
-  const { unreadCount } = useNotifications();
 
   // ── Current user, for the check-in button and notification bell ──
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -136,11 +134,14 @@ export default function SiteEngineerDashboard() {
   const [openSnags, setOpenSnags]   = useState([]);
   const [pendingMaterials, setPendingMaterials] = useState([]);
   const [diaryToday, setDiaryToday] = useState(false);
+  const [latestDiary, setLatestDiary] = useState(null);
   const [labourReports, setLabourReports] = useState([]);
-const [measurements, setMeasurements] = useState([]);
+  const [measurements, setMeasurements] = useState([]);
+  const [moduleAvailability, setModuleAvailability] = useState({});
+  const [notificationStatus, setNotificationStatus] = useState({ userId: null, unreadCount: null, available: false });
 
   // Real assigned project(s) — replaces the hard-coded "Al-Noor Residential Tower › Phase 2 › Block C".
-  const { projects: myProjects, activeProject, setActiveProject, loading: projectsLoading } = useMyProjects();
+  const { projects: myProjects, activeProject, setActiveProject, loading: projectsLoading, error: projectsError } = useMyProjects();
 
   // ── clock ──────────────────────────────────────────────────
   // Was never wired: `time` was set once at load, so the date/time in the hero froze
@@ -154,70 +155,103 @@ const [measurements, setMeasurements] = useState([]);
   useEffect(() => {
     if (projectsLoading) return undefined;
     let cancelled = false;
-    const today = nowISO();
+    let inFlight = false;
+    let initialLoad = true;
 
     const loadData = async () => {
+      if (inFlight) return;
+      if (initialLoad) {
+        setLoading(true);
+        initialLoad = false;
+      }
       if (!activeProject?.id) {
+        setRFIs([]);
+        setIncidents([]);
+        setProg([]);
+        setPendingApprovals([]);
+        setOpenSnags([]);
+        setPendingMaterials([]);
+        setDiaryToday(false);
+        setLatestDiary(null);
+        setLabourReports([]);
+        setMeasurements([]);
+        setModuleAvailability({});
         setLoading(false);
         return;
       }
 
-      setLoading(true);
-      const results = await Promise.allSettled([
-        api.get("/site-engineer-dashboard", { params: { project_id: activeProject.id } }),
-        api.get("/site-engineer/rfi", { params: { project_id: activeProject.id } }),
-        api.get("/incidents", { params: { project_id: activeProject.id } }),
-        api.get("/site-progress", { params: { project_id: activeProject.id } }),
-        api.get("/approvals"),
-        api.get("/snags"),
-        api.get("/material-request", { params: { project_id: activeProject.id } }),
-        api.get("/diary", { params: { project_id: activeProject.id } }),
-        api.get("/labour-report", { params: { project_id: activeProject.id } }),
-        api.get("/site-measurements", { params: { projectId: activeProject.id } }),
-      ]);
+      inFlight = true;
+      try {
+        const results = await Promise.allSettled([
+          api.get("/site-engineer/rfi", { params: { project_id: activeProject.id } }),
+          api.get("/incidents", { params: { project_id: activeProject.id } }),
+          api.get("/site-progress", { params: { project_id: activeProject.id } }),
+          api.get("/approvals"),
+          api.get("/snags"),
+          api.get("/material-request", { params: { project_id: activeProject.id } }),
+          api.get("/diary", { params: { project_id: activeProject.id } }),
+          api.get("/labour-report", { params: { project_id: activeProject.id } }),
+          api.get("/site-measurements", { params: { projectId: activeProject.id } }),
+        ]);
 
-      if (cancelled) return;
-      const rowsFrom = (result) => {
-        if (result.status !== "fulfilled") return [];
-        const body = result.value?.data;
-        if (Array.isArray(body)) return body;
-        return Array.isArray(body?.data) ? body.data : [];
-      };
-      const [
-        dashboardResult,
-        rfiResult,
-        incidentResult,
-        progressResult,
-        approvalResult,
-        snagResult,
-        materialResult,
-        diaryResult,
-        labourResult,
-        measurementResult,
-      ] = results;
+        if (cancelled) return;
+        const rowsFrom = (result) => {
+          if (result.status !== "fulfilled") return [];
+          const body = result.value?.data;
+          if (Array.isArray(body)) return body;
+          return Array.isArray(body?.data) ? body.data : [];
+        };
+        const rfiResult = results[0];
+        const incidentResult = results[1];
+        const progressResult = results[2];
+        const approvalResult = results[3];
+        const snagResult = results[4];
+        const materialResult = results[5];
+        const diaryResult = results[6];
+        const labourResult = results[7];
+        const measurementResult = results[8];
 
-      if (dashboardResult.status === "rejected") {
-        console.error("Site Engineer project dashboard failed:", dashboardResult.reason);
+        const requestNames = [
+          "rfis", "incidents", "progress", "approvals", "snags",
+          "materials", "diary", "labour", "measurements",
+        ];
+        setModuleAvailability(Object.fromEntries(
+          requestNames.map((name, index) => [name, results[index].status === "fulfilled"])
+        ));
+        results.forEach((result, index) => {
+          if (result.status === "rejected") {
+            console.error(`Site Engineer dashboard ${requestNames[index]} request failed:`, result.reason);
+          }
+        });
+
+        setRFIs(rowsFrom(rfiResult));
+        setIncidents(rowsFrom(incidentResult));
+        setProg(rowsFrom(progressResult));
+        setPendingApprovals(rowsFrom(approvalResult).filter(
+          (approval) => String(approval.status || "").trim().toLowerCase() === "pending"
+        ));
+        setOpenSnags(rowsFrom(snagResult).filter((snag) => {
+          const status = String(snag.status || "").trim().toLowerCase();
+          return status && !["closed", "resolved", "completed", "complete", "done"].includes(status);
+        }));
+        setPendingMaterials(rowsFrom(materialResult).filter(
+          (request) => String(request.status || "").trim().toLowerCase() === "requested"
+        ));
+        const diaries = rowsFrom(diaryResult);
+        const diaryDate = (diary) => diary.report_date || diary.date || diary.created_at || diary.createdAt;
+        const mostRecentDiary = [...diaries].sort(
+          (a, b) => new Date(diaryDate(b) || 0) - new Date(diaryDate(a) || 0)
+        )[0] || null;
+        setLatestDiary(mostRecentDiary);
+        setDiaryToday(diaries.some((diary) =>
+          String(diary.report_date || diary.date || "").slice(0, 10) === nowISO()
+        ));
+        setLabourReports(rowsFrom(labourResult));
+        setMeasurements(rowsFrom(measurementResult));
+      } finally {
+        inFlight = false;
+        if (!cancelled) setLoading(false);
       }
-
-      setRFIs(rowsFrom(rfiResult));
-      setIncidents(rowsFrom(incidentResult));
-      setProg(rowsFrom(progressResult));
-      setPendingApprovals(
-        rowsFrom(approvalResult).filter((approval) => !approval.status || approval.status === "pending")
-      );
-      setOpenSnags(rowsFrom(snagResult).filter((snag) => snag.status !== "closed"));
-      setPendingMaterials(
-        rowsFrom(materialResult).filter((request) => request.status === "requested")
-      );
-      setDiaryToday(
-        rowsFrom(diaryResult).some((diary) =>
-          String(diary.report_date || diary.date || "").slice(0, 10) === today
-        )
-      );
-      setLabourReports(rowsFrom(labourResult));
-      setMeasurements(rowsFrom(measurementResult));
-      setLoading(false);
     };
 
     loadData().catch((error) => {
@@ -226,19 +260,73 @@ const [measurements, setMeasurements] = useState([]);
         setLoading(false);
       }
     });
+    const refreshId = window.setInterval(() => {
+      loadData().catch((error) => console.error("Site Engineer dashboard refresh failed:", error));
+    }, 60_000);
+    const refreshOnFocus = () => {
+      loadData().catch((error) => console.error("Site Engineer dashboard refresh failed:", error));
+    };
+    window.addEventListener("focus", refreshOnFocus);
 
     return () => {
       cancelled = true;
+      window.clearInterval(refreshId);
+      window.removeEventListener("focus", refreshOnFocus);
     };
   }, [activeProject?.id, projectsLoading]);
 
+  useEffect(() => {
+    const userId = currentUser?.id;
+    if (!userId) return undefined;
+
+    let cancelled = false;
+    const loadNotifications = async () => {
+      try {
+        const response = await api.get(`/site-engineer-notifications/${encodeURIComponent(userId)}`);
+        if (cancelled) return;
+        const body = response?.data;
+        const rows = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : null;
+        if (!rows) throw new TypeError("Unexpected Site Engineer notifications response");
+        setNotificationStatus({
+          userId,
+          unreadCount: rows.filter((notification) => !notification.is_read).length,
+          available: true,
+        });
+      } catch (error) {
+        if (!cancelled) {
+          setNotificationStatus({ userId, unreadCount: null, available: false });
+          console.error("Site Engineer dashboard notifications failed:", error);
+        }
+      }
+    };
+
+    loadNotifications();
+    const intervalId = window.setInterval(loadNotifications, 30_000);
+    window.addEventListener("focus", loadNotifications);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", loadNotifications);
+    };
+  }, [currentUser?.id]);
+
+  const notificationStatusMatchesUser = String(notificationStatus.userId) === String(currentUser?.id);
+  const unreadCount = notificationStatusMatchesUser ? notificationStatus.unreadCount : null;
+  const notificationsAvailable = notificationStatusMatchesUser && notificationStatus.available;
+
   // ── derived ────────────────────────────────────────────────
-  const openRFIs  = useMemo(() => rfis.filter(r => !r?.status || r.status === "open"), [rfis]);
+  const openRFIs  = useMemo(
+    () => rfis.filter((r) => String(r?.status || "").trim().toLowerCase() === "open"),
+    [rfis]
+  );
   const openIncidents = useMemo(
-  () => incidents.filter(i => !["Resolved", "Closed"].includes(i.status)),
-  [incidents]
-);
-const today = nowISO();
+    () => incidents.filter((incident) => {
+      const status = String(incident.status || "").trim().toLowerCase();
+      return status && !["resolved", "closed", "completed", "complete", "done"].includes(status);
+    }),
+    [incidents]
+  );
+  const today = nowISO();
 
 const labourToday = useMemo(
   () =>
@@ -359,7 +447,7 @@ const pendingMeasurements = useMemo(
     items.push({
       label: "Daily Diary submitted today ✓",
       type: "dsr",
-      time: new Date().toISOString(),
+      time: latestDiary?.created_at || latestDiary?.createdAt || latestDiary?.submitted_at || latestDiary?.report_date || latestDiary?.date,
     });
   }
 
@@ -393,9 +481,17 @@ const pendingMeasurements = useMemo(
   openSnags,
   pendingApprovals,
   diaryToday,
+  latestDiary,
   labourToday,
   pendingMeasurements,
 ]);
+  const activityHasSourceData = [
+    "rfis", "incidents", "snags", "approvals", "diary", "labour", "measurements",
+  ].some((module) => moduleAvailability[module]);
+  const activityEmptyMessage = !activeProject
+    ? projectsError ? "Project data unavailable" : "No project assigned"
+    : activityHasSourceData ? "No activity recorded" : "Activity data unavailable";
+
   // ── loading ────────────────────────────────────────────────
   if (loading) {
     return (
@@ -424,7 +520,7 @@ const pendingMeasurements = useMemo(
               {projectsLoading ? (
                 "Loading your project…"
               ) : !activeProject ? (
-                <strong>No project assigned yet — ask your Project Manager</strong>
+                <strong>{projectsError ? "Project information is unavailable" : "No project assigned yet — ask your Project Manager"}</strong>
               ) : (
                 <>
                   {myProjects.length > 1 ? (
@@ -462,7 +558,7 @@ const pendingMeasurements = useMemo(
             <div className="dash-hero-date">{fmtDate(time)} · {fmtTime(time)}</div>
 
             {/* Diary not submitted warning */}
-            {!diaryToday && (
+            {activeProject && moduleAvailability.diary && !diaryToday && (
               <div
                 onClick={() => navigate("/site-engineer/daily-diary")}
                 style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px", background: "rgba(184,50,50,0.18)", border: "1px solid rgba(184,50,50,0.4)", borderRadius: 8, cursor: "pointer", fontSize: 13, color: "#ffcdd2", fontWeight: 500 }}
@@ -480,17 +576,29 @@ const pendingMeasurements = useMemo(
               </div>
             )}
 
-            {/* Weather */}
+            {/* Site conditions recorded in the latest daily diary */}
             <div className="dash-weather">
               <div className="dash-weather-top">
-                <span className="dash-weather-icon">⛅</span>
+                <span className="dash-weather-icon">📋</span>
                 <div>
-                  <div className="dash-weather-temp">29°C</div>
-                  <div className="dash-weather-cond">Partly Cloudy — Site Clear</div>
+                  <div className="dash-weather-temp">
+                    {latestDiary?.temp_c != null && latestDiary.temp_c !== ""
+                      ? `${latestDiary.temp_c}°C`
+                      : "—"}
+                  </div>
+                  <div className="dash-weather-cond">
+                    {!moduleAvailability.diary
+                      ? "Diary data unavailable"
+                      : latestDiary?.weather_am || latestDiary?.weather_pm || "No diary weather recorded"}
+                  </div>
                 </div>
               </div>
               <div className="dash-weather-stats">
-                {[["68%", "Humidity"], ["12 km/h", "Wind"], ["Good", "Visibility"]].map(([v, l], i) => (
+                {[
+                  ["AM", latestDiary?.weather_am],
+                  ["PM", latestDiary?.weather_pm],
+                  ["Diary date", latestDiary?.report_date || latestDiary?.date || (latestDiary?.created_at ? String(latestDiary.created_at).slice(0, 10) : null)],
+                ].filter(([, value]) => value).map(([l, v], i) => (
                   <React.Fragment key={l}>
                     {i > 0 && <div className="dash-weather-div" />}
                     <div className="dash-weather-stat">
@@ -499,6 +607,11 @@ const pendingMeasurements = useMemo(
                     </div>
                   </React.Fragment>
                 ))}
+                {!latestDiary?.weather_am && !latestDiary?.weather_pm && !latestDiary?.report_date && !latestDiary?.date && !latestDiary?.created_at && (
+                  <div className="dash-weather-stat">
+                    <div className="dash-weather-lbl">Weather comes from the daily diary</div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -511,6 +624,13 @@ const pendingMeasurements = useMemo(
 
       {/* ── BODY ──────────────────────────────────────────── */}
       <div className="dash-body">
+        {!activeProject && (
+          <div className="dash-empty" role="status" style={{ marginBottom: 20 }}>
+            {projectsError
+              ? "Project data could not be loaded. Dashboard project metrics are unavailable."
+              : "No project is assigned to your account yet. Project-specific metrics will appear here after assignment."}
+          </div>
+        )}
 
         {/* ── ALERT STRIP — action items needing attention ── */}
         {(openSnags.length > 0 || pendingApprovals.length > 0) && (
@@ -528,7 +648,7 @@ const pendingMeasurements = useMemo(
               <div onClick={() => navigate("/site-engineer/approvals")} style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: "#E6F1FB", border: "1px solid #90C1EF", borderRadius: 10, cursor: "pointer" }}>
                 <span style={{ fontSize: 20 }}>✅</span>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#185FA5" }}>{pendingApprovals.length} approval request{pendingApprovals.length > 1 ? "s" : ""} pending</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#185FA5" }}>{pendingApprovals.length} approval request{pendingApprovals.length > 1 ? "s" : ""} awaiting review</div>
                   <div style={{ fontSize: 11, color: "#2E7BD6" }}>Tap to view →</div>
                 </div>
               </div>
@@ -545,9 +665,11 @@ const pendingMeasurements = useMemo(
             onClick={() => navigate("/site-engineer/progress")}
           >
             <div className="dash-kpi-label">Overall Progress</div>
-            <div className="dash-kpi-value">{avgActual}%</div>
+            <div className="dash-kpi-value">{moduleAvailability.progress ? `${avgActual}%` : "—"}</div>
             <div className="dash-kpi-sub">
-              {overallDelay > 0
+              {!moduleAvailability.progress
+                ? "Progress data unavailable"
+                : overallDelay > 0
                 ? <span style={{ color: "#ffcdd2", fontWeight: 600 }}>▼ {overallDelay}% behind plan ({avgPlanned}%)</span>
                 : overallDelay < 0
                   ? <span style={{ color: "#b9fad8", fontWeight: 600 }}>▲ {Math.abs(overallDelay)}% ahead of plan</span>
@@ -562,8 +684,8 @@ const pendingMeasurements = useMemo(
 
           <div className="dash-kpi dash-kpi--sky" style={{ cursor: "pointer" }} onClick={() => navigate("/site-engineer/rfi")}>
             <div className="dash-kpi-label">Open RFIs</div>
-            <div className="dash-kpi-value">{openRFIs.length}</div>
-            <div className="dash-kpi-sub">{rfis.length} total raised</div>
+            <div className="dash-kpi-value">{moduleAvailability.rfis ? openRFIs.length : "—"}</div>
+            <div className="dash-kpi-sub">{moduleAvailability.rfis ? `${rfis.length} total raised` : "RFI data unavailable"}</div>
           </div>
 
           <div
@@ -571,18 +693,18 @@ const pendingMeasurements = useMemo(
   onClick={() => navigate("/site-engineer/incidents")}
 >
   <div className="dash-kpi-label">Incidents</div>
-  <div className="dash-kpi-value">{openIncidents.length}</div>
+  <div className="dash-kpi-value">{moduleAvailability.incidents ? openIncidents.length : "—"}</div>
   <div className="dash-kpi-sub">
-    {incidents.length} total · {
+    {moduleAvailability.incidents ? `${incidents.length} total · ${
       incidents.filter(i => i.priority === "P1").length
-    } urgent
+    } urgent` : "Incident data unavailable"}
   </div>
 </div>
 
           <div className="dash-kpi dash-kpi--navy" style={{ cursor: "pointer" }} onClick={() => navigate("/site-engineer/materials")}>
             <div className="dash-kpi-label">Material Requests</div>
-            <div className="dash-kpi-value">{pendingMaterials.length}</div>
-            <div className="dash-kpi-sub">Awaiting procurement</div>
+            <div className="dash-kpi-value">{moduleAvailability.materials ? pendingMaterials.length : "—"}</div>
+            <div className="dash-kpi-sub">{moduleAvailability.materials ? "Awaiting procurement" : "Material data unavailable"}</div>
           </div>
         </div>
 
@@ -608,13 +730,16 @@ const pendingMeasurements = useMemo(
                       strokeDasharray={`${(avgActual / 100) * 87.96} 87.96`} strokeLinecap="round"
                       style={{ transform: "rotate(-90deg)", transformOrigin: "50% 50%" }} />
                   </svg>
-                  <span className="dash-ring-val">{avgActual}%</span>
+                  <span className="dash-ring-val">{moduleAvailability.progress ? `${avgActual}%` : "—"}</span>
                   <div className="dash-ring-lbl">Actual</div>
                 </div>
               </div>
               <div className="dash-panel-body">
                 {zoneSummary.length === 0 ? (
-                  <div className="dash-empty">No progress entries yet — <span style={{ color: "#6EA2B3", cursor: "pointer" }} onClick={e => { e.stopPropagation(); navigate("/site-engineer/progress"); }}>log first entry</span></div>
+                  <div className="dash-empty">{moduleAvailability.progress
+                    ? <>No progress entries yet — <span style={{ color: "#6EA2B3", cursor: "pointer" }} onClick={e => { e.stopPropagation(); navigate("/site-engineer/progress"); }}>log first entry</span></>
+                    : "Progress data unavailable"}
+                  </div>
                 ) : (
                   zoneSummary.map(z => {
                     const zc = ZONE_CFG[z.status] || ZONE_CFG.not_started;
@@ -657,7 +782,10 @@ const pendingMeasurements = useMemo(
                 </div>
               </div>
               {rfis.length === 0
-                ? <div className="dash-empty">No RFIs raised yet — <span style={{ color: "#6EA2B3", cursor: "pointer" }} onClick={() => navigate("/site-engineer/rfi")}>raise first RFI</span></div>
+                ? <div className="dash-empty">{moduleAvailability.rfis
+                  ? <>No RFIs raised yet — <span style={{ color: "#6EA2B3", cursor: "pointer" }} onClick={() => navigate("/site-engineer/rfi")}>raise first RFI</span></>
+                  : "RFI data unavailable"}
+                </div>
                 : (
                   <div className="dash-table-wrap">
                     <table className="dash-table">
@@ -688,11 +816,13 @@ const pendingMeasurements = useMemo(
                 </div>
                 {openSnags.length > 0
                   ? <span className="dash-pill" style={{ background: "#FAEEDA", color: "#633806", border: "0.5px solid #EF9F27" }}>{openSnags.length} Open</span>
-                  : <span className="dash-pill" style={{ background: "#E1F5EE", color: "#085041", border: "0.5px solid #5DCAA5" }}>All Closed ✓</span>
+                    : moduleAvailability.snags
+                      ? <span className="dash-pill" style={{ background: "#E1F5EE", color: "#085041", border: "0.5px solid #5DCAA5" }}>All Closed ✓</span>
+                      : <span className="dash-pill">Unavailable</span>
                 }
-              </div>
-              {openSnags.length === 0
-                ? <div className="dash-empty">No open snags — well done!</div>
+                </div>
+                {openSnags.length === 0
+                  ? <div className="dash-empty">{moduleAvailability.snags ? "No open snags — well done!" : "Snag data unavailable"}</div>
                 : (
                   <div className="dash-table-wrap">
                     <table className="dash-table">
@@ -722,57 +852,41 @@ const pendingMeasurements = useMemo(
             <div className="dash-panel">
               <div className="dash-panel-head">
                 <div className="dash-panel-title">System Status</div>
-                <div className="dash-panel-hint">All connected modules</div>
+                <div className="dash-panel-hint">Live data status</div>
               </div>
               <div className="dash-panel-body">
                 {[
-                  { label: "Daily Diary",       icon: "📋", value: diaryToday ? "Submitted ✓" : "⚠ Not submitted", ok: diaryToday,  route: "/site-engineer/daily-diary"             },
-                  {
-  label: "Labour Report",
-  icon: "👷",
-  value:
-    labourToday.length > 0
-      ? `${labourToday.length} submitted today`
-      : "⚠ Not submitted today",
-  ok: labourToday.length > 0,
-  route: "/site-engineer/labour-report",
-},
-
-{
-  label: "Measurements",
-  icon: "📏",
-  value:
-    pendingMeasurements.length > 0
-      ? `${pendingMeasurements.length} awaiting QS review`
-      : "All reviewed ✓",
-  ok: pendingMeasurements.length === 0,
-  route: "/site-engineer/qs-measurements",
-},
-                  { label: "Open RFIs",         icon: "❓", value: `${openRFIs.length} open`,                       ok: openRFIs.length === 0, route: "/site-engineer/rfi"     },
-{ 
-  label: "Incidents", 
-  icon: "🚨", 
-  value: `${openIncidents.length} open`, 
-  ok: openIncidents.length === 0, 
-  route: "/site-engineer/incidents" 
-},
-                  { label: "Snag List",         icon: "🔧", value: `${openSnags.length} open`,                      ok: openSnags.length === 0, route: "/site-engineer/snag-list" },
-                  { label: "Approvals",         icon: "✅", value: `${pendingApprovals.length} pending`,             ok: pendingApprovals.length === 0, route: "/site-engineer/approvals" },
-                  { label: "Materials",         icon: "📦", value: `${pendingMaterials.length} awaiting procurement`, ok: pendingMaterials.length === 0, route: "/site-engineer/materials" },
-                  { label: "Notifications",     icon: "🔔", value: `${unreadCount} unread`,                         ok: unreadCount === 0, route: null },
-                ].map(({ label, icon, value, ok, route }) => (
-                  <div
-                    key={label}
-                    onClick={() => route && navigate(route)}
-                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "0.5px solid var(--color-border-tertiary)", cursor: route ? "pointer" : "default" }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 14 }}>{icon}</span>
-                      <span style={{ fontSize: 13, color: "var(--color-text-primary)" }}>{label}</span>
+                  { label: "Daily Diary", icon: "📋", available: moduleAvailability.diary, value: diaryToday ? "Submitted today" : "Not submitted today", ok: diaryToday, route: "/site-engineer/daily-diary" },
+                  { label: "Progress", icon: "📈", available: moduleAvailability.progress, value: `${progressEntries.length} progress entries`, ok: true, route: "/site-engineer/progress" },
+                  { label: "Labour Report", icon: "👷", available: moduleAvailability.labour, value: labourToday.length ? `${labourToday.length} submitted today` : "Not submitted today", ok: labourToday.length > 0, route: "/site-engineer/labour-report" },
+                  { label: "Measurements", icon: "📏", available: moduleAvailability.measurements, value: pendingMeasurements.length ? `${pendingMeasurements.length} awaiting QS review` : "No pending review", ok: pendingMeasurements.length === 0, route: "/site-engineer/qs-measurements" },
+                  { label: "Open RFIs", icon: "❓", available: moduleAvailability.rfis, value: `${openRFIs.length} open`, ok: openRFIs.length === 0, route: "/site-engineer/rfi" },
+                  { label: "Incidents", icon: "🚨", available: moduleAvailability.incidents, value: `${openIncidents.length} open`, ok: openIncidents.length === 0, route: "/site-engineer/incidents" },
+                  { label: "Snag List", icon: "🔧", available: moduleAvailability.snags, value: `${openSnags.length} open`, ok: openSnags.length === 0, route: "/site-engineer/snag-list" },
+                  { label: "Approvals", icon: "✅", available: moduleAvailability.approvals, value: `${pendingApprovals.length} awaiting review`, ok: pendingApprovals.length === 0, route: "/site-engineer/approvals" },
+                  { label: "Materials", icon: "📦", available: moduleAvailability.materials, value: `${pendingMaterials.length} awaiting procurement`, ok: pendingMaterials.length === 0, route: "/site-engineer/materials" },
+                  { label: "Notifications", icon: "🔔", available: notificationsAvailable, value: unreadCount == null ? "Unavailable" : `${unreadCount} unread`, ok: notificationsAvailable && unreadCount === 0, route: null },
+                ].map(({ label, icon, available, value, ok, route }) => {
+                  const statusValue = !activeProject && label !== "Notifications"
+                    ? projectsError ? "Project data unavailable" : "No project assigned"
+                    : !available
+                      ? "Data unavailable"
+                      : value;
+                  const isOk = Boolean(activeProject || label === "Notifications") && available && ok;
+                  return (
+                    <div
+                      key={label}
+                      onClick={() => route && navigate(route)}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "0.5px solid var(--color-border-tertiary)", cursor: route ? "pointer" : "default" }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 14 }}>{icon}</span>
+                        <span style={{ fontSize: 13, color: "var(--color-text-primary)" }}>{label}</span>
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: isOk ? "#085041" : "#b83232" }}>{statusValue}</span>
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 500, color: ok ? "#085041" : "#b83232" }}>{value}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -786,7 +900,7 @@ const pendingMeasurements = useMemo(
               </div>
               <div className="dash-feed">
                 {activityFeed.length === 0
-                  ? <div className="dash-empty">No activity yet today</div>
+                  ? <div className="dash-empty">{activityEmptyMessage}</div>
                   : activityFeed.map((a, i) => (
                       <div key={i} className="dash-feed-item">
                         <div className="dash-feed-pip" style={{ background: PIP[a.type] || "#94a3b8" }} />

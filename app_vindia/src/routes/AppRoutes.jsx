@@ -507,6 +507,28 @@ const AppRoutes = () => {
         />
 
         <Route
+          path="/project-manager/rfi"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
+              <ProjectManagerLayout>
+                <RFIPage />
+              </ProjectManagerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/project-manager/rfi/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.PROJECT_MANAGER]}>
+              <ProjectManagerLayout>
+                <RFIDetailPage />
+              </ProjectManagerLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
 
           path="/pm/team"
 

@@ -6,13 +6,12 @@ const {
   isManagedProject,
 } = require("../utils/siteEngineerAccess");
 
-/* pg returns DATE columns as a JS Date at SERVER-LOCAL midnight. JSON-serialising that
-   (toISOString) shifts it to the previous day for any server east of UTC (e.g. IST), so a
-   diary submitted "today" looked like yesterday's. Return the calendar date as YYYY-MM-DD. */
+/* pg parses DATE columns as UTC midnight. Use UTC fields to preserve the database
+   calendar date regardless of the server's timezone. */
 const ymd = (v) => {
   if (!(v instanceof Date)) return v;
   const p = (n) => String(n).padStart(2, "0");
-  return `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`;
+  return `${v.getUTCFullYear()}-${p(v.getUTCMonth() + 1)}-${p(v.getUTCDate())}`;
 };
 const withPlainDate = (row) => {
   const date = ymd(row.report_date);

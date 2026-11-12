@@ -10,6 +10,7 @@ const createSENotification = require("../utils/createSENotification");
 const { insertThreeDNotification } = require("../controllers/threeDNotificationsController");
 const { insertNotification: insertDigitalMarketingNotification } = require("../controllers/digitalMarketingNotificationsController");
 const { notifyProjectClient } = require("../utils/clientNotifications");
+const { notifyUser, notifyReviewers } = require("../utils/projectPeople");
 
 // ── Multer ────────────────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
@@ -57,11 +58,34 @@ async function getUserIdsByNormalizedRole(normalizedTarget) {
   }
 }
 
-async function notifyRFIRecipients(assignedToRole, assignedToUserId, { title, description, severity = "info" }) {
+async function notifyRFIRecipients(assignedToRole, assignedToUserId, {
+  title,
+  description,
+  severity = "info",
+  projectId = null,
+  refId = null,
+}) {
   const role = normRole(assignedToRole);
+  const roleCode = String(assignedToRole || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const link = {
+    project_manager: "/project-manager/rfi",
+    site_engineer: "/site-engineer/rfi",
+    architect: "/architect/rfi",
+    quantity_surveyor: "/quantity-surveyor/rfi",
+    project_coordinator: "/project-coordinator/rfi",
+    "3d_visualizer": "/3d-visualizer/rfi",
+    digital_marketing: "/digital-marketing/rfi",
+    mep_engineer: "/mep/dashboard",
+  }[roleCode] || "/rfi";
   try {
     if (role === "structuralengineer") {
-      await createSENotification({ type: "rfi", severity, title, description });
+      await createSENotification({
+        type: "rfi",
+        severity,
+        message: title,
+        description,
+        link: "/structural-engineer/rfi",
+      });
       return;
     }
 
@@ -71,7 +95,7 @@ async function notifyRFIRecipients(assignedToRole, assignedToUserId, { title, de
       // rather than assuming the exact DB code string.
       const targets = assignedToUserId ? [assignedToUserId] : await getUserIdsByNormalizedRole("3dvisualizer");
       for (const uid of targets) {
-        await insertThreeDNotification(uid, "rfi", title, description, "/3d-visualizer/rfi", severity, null);
+        await insertThreeDNotification(uid, "rfi", title, description, "/3d-visualizer/rfi", severity, refId);
       }
       return;
     }
@@ -81,16 +105,29 @@ async function notifyRFIRecipients(assignedToRole, assignedToUserId, { title, de
       return;
     }
 
-    // Shared notifications table is the generic fallback for PM, QS, SE,
-    // Architect, Coordinator and other internal RFI recipients. When the
-    // notification schema is role-based, the assigned user id is still
-    // persisted on the RFI itself for exact access control.
-    if (assignedToRole) {
-      await pool.query(
-        `INSERT INTO notifications (role, type, severity, message, description)
-         VALUES ($1,'rfi',$2,$3,$4)`,
-        [assignedToRole, severity, title, description]
-      );
+    if (assignedToUserId) {
+      await notifyUser({
+        role: roleCode,
+        userId: assignedToUserId,
+        type: "rfi",
+        title,
+        description,
+        link,
+        severity,
+        projectId,
+        refId,
+      });
+    } else if (roleCode && projectId) {
+      await notifyReviewers({
+        role: roleCode,
+        projectId,
+        type: "rfi",
+        title,
+        description,
+        link,
+        severity,
+        refId,
+      });
     }
   } catch (err) {
     console.error("notifyRFIRecipients error:", err.message);
@@ -341,6 +378,8 @@ router.post("/", protect, upload.single("file"), async (req, res) => {
           title: `New RFI: ${subject}`,
           description: `${ROLE_LABELS[raisedByCode] || raisedByCode} raised an RFI to you: "${subject}"`,
           severity: ["critical", "high"].includes(priority) ? "critical" : "warn",
+          projectId: linkedProjectId,
+          refId: newRFI.id,
         });
       } catch (e) { console.error("Notify err:", e.message); }
     }
@@ -406,16 +445,24 @@ router.post("/:id/respond", protect, upload.single("file"), async (req, res) => 
     if (rfi.status === "open")
       await pool.query(`UPDATE rfis SET status='responded', updated_at=NOW() WHERE id=$1`, [id]);
 
-    const otherRole = rfi.raised_by_role === code ? rfi.assigned_to_role : rfi.raised_by_role;
-    const otherUserId = rfi.raised_by_role === code ? rfi.assigned_to_user_id : rfi.raised_by_id;
-    if (otherRole && otherRole.toLowerCase() !== code?.toLowerCase()) {
-      try {
-        await notifyRFIRecipients(otherRole, otherUserId, {
-          title: `RFI Response: ${rfi.subject}`,
-          description: `${ROLE_LABELS[code] || code} responded to your RFI "${rfi.subject}"`,
-          severity: "info",
-        });
-      } catch (e) { console.error("Notify err:", e.message); }
+    const participants = [
+      { role: rfi.raised_by_role, userId: rfi.raised_by_id },
+      { role: rfi.assigned_to_role, userId: rfi.assigned_to_user_id },
+    ];
+    const notified = new Set();
+    for (const participant of participants) {
+      if (!participant.role || !participant.userId ||
+          String(participant.userId) === String(userId) ||
+          notified.has(String(participant.userId)) ||
+          String(participant.role).toLowerCase() === "client") continue;
+      notified.add(String(participant.userId));
+      await notifyRFIRecipients(participant.role, participant.userId, {
+        title: `RFI Response: ${rfi.subject}`,
+        description: `${ROLE_LABELS[code] || code} responded to your RFI "${rfi.subject}"`,
+        severity: "info",
+        projectId: rfi.project_id,
+        refId: rfi.id,
+      });
     }
     if (
       rfi.project_id &&
@@ -464,6 +511,26 @@ router.patch("/:id/status", protect, async (req, res) => {
 
     if (!result.rowCount)
       return res.status(404).json({ success: false, message: "Not found or access denied" });
+
+    const participants = [
+      { role: result.rows[0].raised_by_role, userId: result.rows[0].raised_by_id },
+      { role: result.rows[0].assigned_to_role, userId: result.rows[0].assigned_to_user_id },
+    ];
+    const notified = new Set();
+    for (const participant of participants) {
+      if (!participant.role || !participant.userId ||
+          String(participant.userId) === String(userId) ||
+          notified.has(String(participant.userId)) ||
+          String(participant.role).toLowerCase() === "client") continue;
+      notified.add(String(participant.userId));
+      await notifyRFIRecipients(participant.role, participant.userId, {
+        title: `RFI status updated: ${result.rows[0].subject}`,
+        description: `Status changed to ${status}.`,
+        severity: "info",
+        projectId: result.rows[0].project_id,
+        refId: result.rows[0].id,
+      });
+    }
 
     if (
       result.rows[0].project_id &&

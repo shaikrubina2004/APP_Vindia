@@ -21,6 +21,7 @@ const TYPE_CFG = {
   task:      { label: "Task",      color: "#7c3aed", bg: "#f5f3ff" },
   daily_update: { label: "Daily Update", color: "#0891b2", bg: "#ecfeff" },
   approval:  { label: "Approval",  color: "#b45309", bg: "#fffbeb" },
+  rfi:       { label: "RFI",       color: "#7c3aed", bg: "#f5f3ff" },
   request:   { label: "Request",   color: "#4338ca", bg: "#eef2ff" },
   diary:     { label: "Site Diary", color: "#0f766e", bg: "#f0fdfa" },
   project:   { label: "Project", color: "#1d4ed8", bg: "#eff6ff" },
@@ -44,7 +45,7 @@ const ROLE_FILTERS = {
   operations_manager:    ["all", "approval", "delay", "receipt", "low_stock", "daily_update", "incident", "task"],
   office_administrator:  ["all", "request", "daily_update", "incident", "task"],
   finance_manager:       ["all", "incident", "task"],
-  project_manager:       ["all", "approval", "diary", "daily_update", "incident", "task"],
+  project_manager:       ["all", "approval", "diary", "rfi", "daily_update", "incident", "task"],
   procurement_officer:   ["all", "request", "approval", "receipt", "delay", "daily_update", "incident", "task"],
 
 };
