@@ -449,12 +449,8 @@ const BDALeads = () => {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const ownedByMe = (l) =>
-    (l.assigned_email && bdaEmail && l.assigned_email.toLowerCase() === bdaEmail.toLowerCase()) ||
-    (!!bdaName && normName(l.assigned_to) === normName(bdaName));
-
-  // CEO: any lead.  BDA: unassigned leads, or leads they already own (hand-over).
-  const canAssign = (l) => isCEO || isUnassigned(l) || ownedByMe(l);
+  // CEO: any lead (assign / reassign).  BDA: unassigned leads only.
+  const canAssign = (l) => isCEO || isUnassigned(l);
 
   useEffect(() => {
     fetchLeads();
@@ -526,6 +522,11 @@ const BDALeads = () => {
     if (assignF === "unassigned")
       arr = arr.filter(l => isUnassigned(l));
     arr.sort((a, b) => {
+      // Leads waiting for an owner always come first (escalated ones on top),
+      // so nothing in the pool is buried on page 4.
+      const ua = isUnassigned(a), ub = isUnassigned(b);
+      if (ua !== ub) return ua ? -1 : 1;
+      if (ua && ub && !!a.escalated_at !== !!b.escalated_at) return a.escalated_at ? -1 : 1;
       if (sort === "newest") return new Date(b.created_at) - new Date(a.created_at);
       if (sort === "oldest") return new Date(a.created_at) - new Date(b.created_at);
       if (sort === "name")   return (a.name||"").localeCompare(b.name||"");
