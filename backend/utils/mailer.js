@@ -241,6 +241,72 @@ const welcomeCredentialsEmailTemplate = ({ name, email, employeeCode, tempPasswo
   return { subject: "Welcome to Vindia — your login details", html, text };
 };
 
+/* ═══════════════════════════════════════
+   BGV REQUEST
+   Tells the candidate which documents to upload and gives them the drive
+   link to upload to. The list below is easy to edit.
+═══════════════════════════════════════ */
+
+const BGV_COMPANY = process.env.COMPANY_NAME || "Vindia Infrasec";
+
+const BGV_DOCUMENTS = [
+  "Updated resume",
+  "Aadhaar card",
+  "PAN card",
+  "Passport-size photograph",
+  "Current address proof",
+  "Educational certificates and marksheets (10th onwards)",
+  "Previous employment documents, if any — experience / relieving letters and last 3 payslips",
+];
+
+const bgvRequestEmailTemplate = ({ candidateName, jobTitle, driveLink, deadline, note }) => {
+  const deadlineText = deadline
+    ? new Date(`${deadline}T00:00:00`).toLocaleDateString("en-IN", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
+
+  const html = `
+    <p>Hello ${esc(candidateName)},</p>
+    <p>Congratulations on moving forward for the <strong>${esc(jobTitle || "position")}</strong>
+    role at ${esc(BGV_COMPANY)}. As the next step we need to complete your background verification.</p>
+    <p>Please upload the following documents to our secure drive folder${
+      deadlineText ? ` by <strong>${esc(deadlineText)}</strong>` : ""
+    }:</p>
+    <ul>
+      ${BGV_DOCUMENTS.map((d) => `<li>${esc(d)}</li>`).join("\n      ")}
+    </ul>
+    <p><a href="${esc(driveLink)}">Upload your documents here</a><br/>
+    <span style="color:#555">${esc(driveLink)}</span></p>
+    ${note ? `<p>${esc(note)}</p>` : ""}
+    <p>Please keep the file names clear (for example "Aadhaar.pdf"). If you have any trouble with
+    the link, just reply to this email.</p>
+    <p>Thanks &amp; Regards,<br/>HR Team<br/>${esc(BGV_COMPANY)}</p>
+  `;
+
+  const text = [
+    `Hello ${candidateName},`,
+    "",
+    `Congratulations on moving forward for the ${jobTitle || "position"} role at ${BGV_COMPANY}. As the next step we need to complete your background verification.`,
+    "",
+    `Please upload the following documents${deadlineText ? ` by ${deadlineText}` : ""}:`,
+    ...BGV_DOCUMENTS.map((d) => `- ${d}`),
+    "",
+    `Upload link: ${driveLink}`,
+    note ? `\n${note}` : "",
+    "",
+    `Thanks & Regards,\nHR Team\n${BGV_COMPANY}`,
+  ].join("\n");
+
+  return {
+    subject: `Background verification — documents required (${jobTitle || "your application"})`,
+    html,
+    text,
+  };
+};
+
 module.exports = {
   sendMail,
   qualifiedEmailTemplate,
@@ -250,4 +316,5 @@ module.exports = {
   interviewScheduledEmailTemplate,
   offerReleaseEmailTemplate,
   welcomeCredentialsEmailTemplate,
+  bgvRequestEmailTemplate,
 };

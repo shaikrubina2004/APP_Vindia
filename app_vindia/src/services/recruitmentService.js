@@ -45,6 +45,8 @@ const recruitmentService = {
     api.patch(`${R}/candidates/${id}/approval`, { decision }),
 
   /* ── BGV ──────────────────────────────────────────────── */
+  getBgvConfig: () => api.get(`${R}/bgv-config`),
+  sendBgvRequest: (id, data) => api.post(`${R}/candidates/${id}/bgv/send`, data),
   updateBGV: (id, data) => api.patch(`${R}/candidates/${id}/bgv`, data),
 
   /* ── Offer ────────────────────────────────────────────── */

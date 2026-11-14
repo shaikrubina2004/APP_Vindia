@@ -6,6 +6,7 @@ const {
   rejectedEmailTemplate,
   offerReleaseEmailTemplate,
   interviewScheduledEmailTemplate,
+  bgvRequestEmailTemplate,
 } = require("../utils/mailer");
 
 /* ═══════════════════════════════════════
@@ -602,10 +603,105 @@ exports.scheduleInterview = async (req, res) => {
 
 /* ═══════════════════════════════════════
    BGV
-   PATCH /api/recruitment/candidates/:id/bgv
-   Body: { bgv_status, bgv_document_url, bgv_notes }
+   POST  /api/recruitment/candidates/:id/bgv/send   (email the drive link)
+   PATCH /api/recruitment/candidates/:id/bgv        (HR review: approve / flag)
 ═══════════════════════════════════════ */
 
+// GET /api/recruitment/bgv-config
+// Tells the page whether a default drive link is set in backend/.env
+// (BGV_DEFAULT_DRIVE_LINK) so it can offer "Default link" as an option.
+exports.getBgvConfig = (req, res) => {
+  const link = (process.env.BGV_DEFAULT_DRIVE_LINK || "").trim();
+  res.status(200).json({ defaultDriveLink: link || null });
+};
+
+const isHttpUrl = (v) => {
+  try {
+    const u = new URL(String(v));
+    return u.protocol === "https:" || u.protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
+// POST /api/recruitment/candidates/:id/bgv/send
+// Body: { link_source: 'default'|'custom', drive_link?, deadline?: 'YYYY-MM-DD', note? }
+// Emails the candidate the drive link + document checklist. The request only
+// counts as "sent" (and the status only changes) if the email really went out.
+exports.sendBgvRequest = async (req, res) => {
+  try {
+    const { link_source, drive_link, deadline, note } = req.body;
+
+    const candidate = await Recruitment.getCandidateById(req.params.id);
+    if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+    if (candidate.stage !== "bgv") {
+      return res.status(409).json({ error: "A BGV request can only be sent while the candidate is at the BGV stage" });
+    }
+    if (!candidate.email) {
+      return res.status(400).json({ error: "Add the candidate's email address before sending the BGV request" });
+    }
+
+    let link;
+    if (link_source === "default") {
+      link = (process.env.BGV_DEFAULT_DRIVE_LINK || "").trim();
+      if (!link) {
+        return res.status(400).json({ error: "No default drive link is configured. Paste a link instead." });
+      }
+    } else if (link_source === "custom") {
+      link = String(drive_link || "").trim();
+      if (!isHttpUrl(link)) {
+        return res.status(400).json({ error: "Enter a valid drive link (starting with https://)" });
+      }
+    } else {
+      return res.status(400).json({ error: "link_source must be 'default' or 'custom'" });
+    }
+
+    if (deadline && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
+      return res.status(400).json({ error: "deadline must be a valid date" });
+    }
+    const cleanNote = note && String(note).trim() ? String(note).trim().slice(0, 500) : null;
+
+    const template = bgvRequestEmailTemplate({
+      candidateName: candidate.name,
+      jobTitle: candidate.job_title,
+      driveLink: link,
+      deadline: deadline || null,
+      note: cleanNote,
+    });
+
+    const mailResult = await sendMail({ to: candidate.email, ...template });
+
+    // A history-log problem must never hide the fact that the email went out.
+    try {
+      await Recruitment.logCandidateEmail(req.params.id, {
+        email_type: "bgv_request",
+        subject: template.subject,
+        sent_to: candidate.email,
+        status: mailResult.success ? "sent" : "failed",
+        error_message: mailResult.error,
+      });
+    } catch (logErr) {
+      console.error("BGV REQUEST LOG ERROR:", logErr.message);
+    }
+
+    if (!mailResult.success) {
+      return res.status(200).json({ emailSent: false, error: mailResult.error });
+    }
+
+    const updated = await Recruitment.sendBgvRequest(req.params.id, {
+      drive_link: link,
+      deadline: deadline || null,
+    });
+    res.status(200).json({ emailSent: true, candidate: updated });
+  } catch (err) {
+    console.error("SEND BGV REQUEST ERROR:", err.message);
+    res.status(500).json({ error: "Failed to send the BGV request" });
+  }
+};
+
+// PATCH /api/recruitment/candidates/:id/bgv
+// Body: { bgv_status, bgv_notes?, bgv_document_url? }
+// HR's review: 'cleared' (approve -> Offer stage), 'flagged', or 'in_progress'.
 exports.updateBGV = async (req, res) => {
   try {
     const { bgv_status, bgv_document_url, bgv_notes } = req.body;
@@ -615,7 +711,12 @@ exports.updateBGV = async (req, res) => {
       return res.status(400).json({ error: `bgv_status must be one of: ${validStatuses.join(", ")}` });
     }
 
-    const candidate = await Recruitment.updateBGV(req.params.id, { bgv_status, bgv_document_url, bgv_notes });
+    const candidate = await Recruitment.updateBGV(req.params.id, {
+      bgv_status,
+      bgv_document_url,
+      bgv_notes,
+      reviewerId: req.user?.id,
+    });
     if (!candidate) return res.status(404).json({ error: "Candidate not found" });
 
     res.status(200).json(candidate);

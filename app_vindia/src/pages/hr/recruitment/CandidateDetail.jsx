@@ -41,6 +41,7 @@ const HISTORY_LABELS = {
   aptitude_score: "Aptitude score",
   aptitude_decision: "Aptitude decision",
   interview_scheduled: "Interview scheduled",
+  bgv_request: "BGV request email",
   offer_release: "Offer email",
   offer_accepted: "Offer accepted",
   offer_declined: "Offer declined",
@@ -118,12 +119,16 @@ const CandidateDetail = () => {
   });
 
   // bgv
-  const [showBgvForm, setShowBgvForm] = useState(false);
-  const [bgvForm, setBgvForm] = useState({
-    bgv_status: "in_progress",
-    bgv_document_url: "",
-    bgv_notes: "",
+  const [bgvDefaultLink, setBgvDefaultLink] = useState(null); // from backend/.env
+  const [showBgvSendForm, setShowBgvSendForm] = useState(false); // resend / change link
+  const [bgvSend, setBgvSend] = useState({
+    link_source: "custom", // 'default' | 'custom'
+    drive_link: "",
+    deadline: "",
+    note: "",
   });
+  const [bgvNotes, setBgvNotes] = useState("");
+  const [bgvError, setBgvError] = useState(null); // shown inside the BGV panel
 
   // offer
   const [showOfferForm, setShowOfferForm] = useState(false);
@@ -148,11 +153,7 @@ const CandidateDetail = () => {
           offered_manager_id: c.offered_manager_id || "",
           offer_letter_url: c.offer_letter_url || "",
         });
-        setBgvForm({
-          bgv_status: c.bgv_status || "in_progress",
-          bgv_document_url: c.bgv_document_url || "",
-          bgv_notes: c.bgv_notes || "",
-        });
+        setBgvNotes(c.bgv_notes || "");
         setScoreForm({
           score: c.aptitude_test_score ?? "",
           max: c.aptitude_test_max ?? "",
@@ -169,6 +170,18 @@ const CandidateDetail = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  // is a default BGV drive link configured on the server?
+  useEffect(() => {
+    recruitmentService
+      .getBgvConfig()
+      .then((res) => {
+        const link = res.data?.defaultDriveLink || null;
+        setBgvDefaultLink(link);
+        if (link) setBgvSend((prev) => ({ ...prev, link_source: "default" }));
+      })
+      .catch(() => {});
+  }, []);
 
   // people who can be named as the reporting manager in the offer
   useEffect(() => {
@@ -468,20 +481,97 @@ const CandidateDetail = () => {
 
   /* ── BGV ─────────────────────────────────────────────── */
 
-  const handleBgvChange = (e) => {
+  const handleBgvSendChange = (e) => {
     const { name, value } = e.target;
-    setBgvForm((prev) => ({ ...prev, [name]: value }));
+    setBgvSend((prev) => ({ ...prev, [name]: value }));
+    setBgvError(null);
   };
 
-  const handleSaveBgv = async () => {
-    setBusy(true);
-    clearMsgs();
+  // "drive.google.com/x" -> "https://drive.google.com/x"; returns null if it
+  // still does not look like a real web address (e.g. just "link").
+  const normalizeDriveLink = (raw) => {
+    const text = String(raw || "").trim();
+    if (!text) return null;
+    const withProtocol = /^https?:\/\//i.test(text) ? text : `https://${text}`;
     try {
-      await recruitmentService.updateBGV(id, bgvForm);
-      setShowBgvForm(false);
+      const u = new URL(withProtocol);
+      return u.hostname.includes(".") ? u.href : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Email the candidate the drive link (default or pasted by HR).
+  const handleSendBgvRequest = async () => {
+    clearMsgs();
+    setBgvError(null);
+
+    let customLink;
+    if (bgvSend.link_source === "custom") {
+      customLink = normalizeDriveLink(bgvSend.drive_link);
+      if (!customLink) {
+        setBgvError(
+          "Enter a valid drive link, for example https://drive.google.com/drive/folders/...",
+        );
+        return;
+      }
+    }
+
+    setBusy(true);
+    try {
+      const res = await recruitmentService.sendBgvRequest(id, {
+        link_source: bgvSend.link_source,
+        drive_link: customLink,
+        deadline: bgvSend.deadline || undefined,
+        note: bgvSend.note.trim() || undefined,
+      });
+      if (res.data?.emailSent) {
+        setActionMsg(
+          "BGV request emailed. Review the documents in the drive once the candidate uploads them, then approve.",
+        );
+        setShowBgvSendForm(false);
+        setBgvSend((prev) => ({ ...prev, drive_link: "", deadline: "", note: "" }));
+        await load(true);
+      } else {
+        setBgvError(
+          `Could not send the BGV email${res.data?.error ? `: ${res.data.error}` : " — check SMTP settings."}`,
+        );
+      }
+    } catch (err) {
+      setBgvError(err.response?.data?.error || "Failed to send the BGV request");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // HR's review after looking at the uploaded documents.
+  const handleBgvDecision = async (status) => {
+    clearMsgs();
+    setBgvError(null);
+    if (status === "flagged" && !bgvNotes.trim()) {
+      setBgvError("Add a note explaining why this verification is flagged.");
+      return;
+    }
+    if (
+      status === "cleared" &&
+      !window.confirm("Approve this background verification? The candidate will move to the Offer stage.")
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await recruitmentService.updateBGV(id, {
+        bgv_status: status,
+        bgv_notes: bgvNotes.trim() || undefined,
+      });
+      setActionMsg(
+        status === "cleared"
+          ? "BGV approved. The candidate is now at the Offer stage."
+          : "BGV flagged.",
+      );
       await load(true);
     } catch (err) {
-      setActionError(err.response?.data?.error || "Failed to save BGV status");
+      setBgvError(err.response?.data?.error || "Failed to save BGV status");
     } finally {
       setBusy(false);
     }
@@ -1025,90 +1115,167 @@ const CandidateDetail = () => {
       {stage === "bgv" && (
         <div className="cd-section">
           <h2>Background Verification</h2>
-          {!showBgvForm ? (
+
+          {candidate.bgv_requested_at && (
+            <p className="cd-note">
+              Status:{" "}
+              <span
+                className={`cd-stage-badge cd-stage-badge--${candidate.bgv_status || "not_started"}`}
+              >
+                {(candidate.bgv_status || "not_started").replace("_", " ")}
+              </span>
+            </p>
+          )}
+
+          {!candidate.bgv_requested_at || showBgvSendForm ? (
             <>
               <p className="cd-note">
-                Status:{" "}
-                <span
-                  className={`cd-stage-badge cd-stage-badge--${candidate.bgv_status || "not_started"}`}
+                Email the candidate a drive link where they upload their
+                documents. After you review them, approve the verification to
+                move on to the offer.
+              </p>
+
+              <label className="cd-field">
+                Drive link
+                <select
+                  name="link_source"
+                  value={bgvSend.link_source}
+                  onChange={handleBgvSendChange}
                 >
-                  {(candidate.bgv_status || "not_started").replace("_", " ")}
-                </span>
+                  <option value="default" disabled={!bgvDefaultLink}>
+                    Default company drive link
+                    {!bgvDefaultLink ? " (not configured)" : ""}
+                  </option>
+                  <option value="custom">Paste a different link</option>
+                </select>
+              </label>
+
+              {bgvSend.link_source === "default" ? (
+                <p className="cd-note">
+                  Will send:{" "}
+                  <a href={bgvDefaultLink} target="_blank" rel="noreferrer">
+                    {bgvDefaultLink}
+                  </a>
+                </p>
+              ) : (
+                <label className="cd-field">
+                  Link to send
+                  <input
+                    name="drive_link"
+                    value={bgvSend.drive_link}
+                    onChange={handleBgvSendChange}
+                    placeholder="https://drive.google.com/drive/folders/..."
+                  />
+                </label>
+              )}
+
+              <label className="cd-field">
+                Upload deadline (optional)
+                <input
+                  type="date"
+                  name="deadline"
+                  value={bgvSend.deadline}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={handleBgvSendChange}
+                />
+              </label>
+
+              <label className="cd-field">
+                Message to the candidate (optional)
+                <textarea
+                  rows={2}
+                  name="note"
+                  value={bgvSend.note}
+                  onChange={handleBgvSendChange}
+                  placeholder="Anything extra you want to tell them"
+                />
+              </label>
+
+              {bgvError && <p className="cd-inline-error">{bgvError}</p>}
+              <div className="cd-modal-actions">
+                {candidate.bgv_requested_at && (
+                  <button
+                    className="cd-cancel-btn"
+                    disabled={busy}
+                    onClick={() => setShowBgvSendForm(false)}
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  className="cd-primary-btn"
+                  disabled={busy}
+                  onClick={handleSendBgvRequest}
+                >
+                  {busy
+                    ? "Sending…"
+                    : candidate.bgv_requested_at
+                      ? "Resend BGV request"
+                      : "Send BGV request"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="cd-note">
+                Request emailed on {formatDateTime(candidate.bgv_requested_at)}
+                {candidate.bgv_deadline_text
+                  ? ` — documents due by ${formatDate(candidate.bgv_deadline_text)}`
+                  : ""}
+                .
+              </p>
+              <p className="cd-note">
+                Drive link sent:{" "}
+                <a href={candidate.bgv_drive_link} target="_blank" rel="noreferrer">
+                  {candidate.bgv_drive_link}
+                </a>
               </p>
               {candidate.bgv_document_url && (
                 <p className="cd-note">
-                  Document:{" "}
-                  <a
-                    href={candidate.bgv_document_url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
+                  Verification report:{" "}
+                  <a href={candidate.bgv_document_url} target="_blank" rel="noreferrer">
                     {candidate.bgv_document_url}
                   </a>
                 </p>
               )}
-              {candidate.bgv_notes && (
-                <p className="cd-note">{candidate.bgv_notes}</p>
-              )}
-              <button
-                className="cd-action-btn"
-                disabled={busy}
-                onClick={() => setShowBgvForm(true)}
-              >
-                Update BGV
-              </button>
-            </>
-          ) : (
-            <>
+
               <label className="cd-field">
-                Status
-                <select
-                  name="bgv_status"
-                  value={bgvForm.bgv_status}
-                  onChange={handleBgvChange}
-                >
-                  <option value="in_progress">In Progress</option>
-                  <option value="cleared">Cleared</option>
-                  <option value="flagged">Flagged</option>
-                </select>
-              </label>
-              <label className="cd-field">
-                Document link
-                <input
-                  name="bgv_document_url"
-                  value={bgvForm.bgv_document_url}
-                  onChange={handleBgvChange}
-                  placeholder="Link to BGV report/document"
-                />
-              </label>
-              <label className="cd-field">
-                Notes
+                Review notes
                 <textarea
                   rows={3}
-                  name="bgv_notes"
-                  value={bgvForm.bgv_notes}
-                  onChange={handleBgvChange}
+                  value={bgvNotes}
+                  onChange={(e) => setBgvNotes(e.target.value)}
+                  placeholder="What you checked, or why something is flagged"
                 />
               </label>
-              <div className="cd-modal-actions">
+
+              {bgvError && <p className="cd-inline-error">{bgvError}</p>}
+              <div className="cd-actions">
                 <button
-                  className="cd-cancel-btn"
+                  className="cd-action-btn"
                   disabled={busy}
-                  onClick={() => setShowBgvForm(false)}
+                  onClick={() => setShowBgvSendForm(true)}
                 >
-                  Cancel
+                  Resend / change link
+                </button>
+                <button
+                  className="cd-reject-btn"
+                  disabled={busy}
+                  onClick={() => handleBgvDecision("flagged")}
+                >
+                  Flag an issue
                 </button>
                 <button
                   className="cd-primary-btn"
                   disabled={busy}
-                  onClick={handleSaveBgv}
+                  onClick={() => handleBgvDecision("cleared")}
                 >
-                  {busy ? "Saving…" : "Save"}
+                  Approve — move to Offer
                 </button>
               </div>
               <p className="cd-note">
-                Marking "Cleared" automatically moves the candidate to the Offer
-                stage.
+                If the verification fails, use the Reject action to close the
+                candidate's process.
               </p>
             </>
           )}

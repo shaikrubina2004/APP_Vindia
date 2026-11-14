@@ -142,7 +142,8 @@ const Recruitment = {
         const candidateResult = await pool.query(
       `SELECT c.*, jo.title AS job_title, jo.department, jo.project_id,
               m.name AS offered_manager_name,
-              c.joining_date::text AS joining_date_text
+              c.joining_date::text AS joining_date_text,
+              c.bgv_deadline::text AS bgv_deadline_text
        FROM candidates c
        LEFT JOIN job_openings jo ON jo.id = c.job_opening_id
        LEFT JOIN employees m ON m.id = c.offered_manager_id
@@ -477,21 +478,53 @@ const Recruitment = {
      BGV (BACKGROUND VERIFICATION)
   ═══════════════════════════════════════ */
 
+  // Called after the BGV request email has really gone out: stores the link
+  // that was sent and starts (or restarts) the verification.
+  sendBgvRequest: async (id, { drive_link, deadline }) => {
+    const result = await pool.query(
+      `UPDATE candidates
+       SET bgv_drive_link = $1,
+           bgv_requested_at = NOW(),
+           bgv_deadline = $2,
+           bgv_status = 'in_progress',
+           bgv_reviewed_by = NULL,
+           bgv_reviewed_at = NULL,
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [drive_link, deadline || null, id]
+    );
+    return result.rows[0];
+  },
+
   // bgv_status 'cleared' auto-advances to the offer stage; 'flagged' or
   // 'in_progress' just records status — HR decides manually from there,
   // same universal Reject action covers a failed BGV.
-  updateBGV: async (id, { bgv_status, bgv_document_url, bgv_notes }) => {
+  // Fields that are not sent keep their current value (notes, report link).
+  // 'cleared' / 'flagged' also record who reviewed it and when.
+  updateBGV: async (id, { bgv_status, bgv_document_url, bgv_notes, reviewerId }) => {
     const nextStage = bgv_status === "cleared" ? "offer" : null;
+    const decided = bgv_status === "cleared" || bgv_status === "flagged";
     const result = await pool.query(
       `UPDATE candidates
        SET bgv_status = $1,
-           bgv_document_url = $2,
-           bgv_notes = $3,
-           stage = COALESCE($4, stage),
+           bgv_document_url = COALESCE($2, bgv_document_url),
+           bgv_notes = COALESCE($3, bgv_notes),
+           bgv_reviewed_by = CASE WHEN $4::boolean THEN $5::integer ELSE bgv_reviewed_by END,
+           bgv_reviewed_at = CASE WHEN $4::boolean THEN NOW() ELSE bgv_reviewed_at END,
+           stage = COALESCE($6, stage),
            updated_at = NOW()
-       WHERE id = $5
+       WHERE id = $7
        RETURNING *`,
-      [bgv_status, bgv_document_url || null, bgv_notes || null, nextStage, id]
+      [
+        bgv_status,
+        bgv_document_url || null,
+        bgv_notes || null,
+        decided,
+        reviewerId || null,
+        nextStage,
+        id,
+      ]
     );
     return result.rows[0];
   },

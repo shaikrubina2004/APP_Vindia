@@ -38,7 +38,9 @@ router.post("/candidates/:id/aptitude-test/decision", recruitmentController.deci
 router.post("/candidates/:id/approval/start", recruitmentController.moveToApproval);
 router.patch("/candidates/:id/approval", recruitmentController.recordApproval);
 
-/* BGV */
+/* BGV: email the drive link, then HR reviews (approve / flag) */
+router.get("/bgv-config", recruitmentController.getBgvConfig);
+router.post("/candidates/:id/bgv/send", recruitmentController.sendBgvRequest);
 router.patch("/candidates/:id/bgv", recruitmentController.updateBGV);
 
 /* Offer: release the email, then record the candidate's reply */
