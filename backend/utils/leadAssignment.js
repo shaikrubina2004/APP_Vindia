@@ -40,10 +40,15 @@ const UNASSIGNED_SQL = (alias = "") => {
    to a normalised name match for older rows that only stored a name. */
 const ASSIGNED_TO_ME_SQL = (nameParam, emailParam, alias = "") => {
   const p = alias ? `${alias}.` : "";
+  // The caller's name comes from the DATABASE (looked up by email) so a stale
+  // name cached in the browser can never hide or leak leads.
+  const myName = `COALESCE(
+      (SELECT u.name FROM users u WHERE LOWER(u.email) = LOWER(${emailParam}) LIMIT 1),
+      ${nameParam})`;
   return `(
     (${emailParam} <> '' AND LOWER(${p}assigned_email) = LOWER(${emailParam}))
     OR LOWER(REGEXP_REPLACE(TRIM(COALESCE(${p}assigned_to,'')), '\\s+', ' ', 'g')) =
-       LOWER(REGEXP_REPLACE(TRIM(${nameParam}), '\\s+', ' ', 'g'))
+       LOWER(REGEXP_REPLACE(TRIM(${myName}), '\\s+', ' ', 'g'))
   )`;
 };
 
@@ -71,6 +76,24 @@ async function ensureLeadAssignmentSchema() {
       UPDATE leads SET assigned_at = COALESCE(assigned_at, NOW())
       WHERE assigned_at IS NULL AND ${UNASSIGNED_SQL()} = false
     `);
+
+    // Legacy leads that only stored a name: attach the email when exactly one
+    // active BDA has that name.
+    await pool.query(
+      `UPDATE leads l
+          SET assigned_email = (
+                SELECT MIN(u.email) FROM users u JOIN roles r ON r.id = u.role_id
+                 WHERE REGEXP_REPLACE(LOWER(TRIM(u.name)), '\\s+', ' ', 'g') =
+                       REGEXP_REPLACE(LOWER(TRIM(l.assigned_to)), '\\s+', ' ', 'g')
+                   AND LOWER(r.code) = ANY($1))
+        WHERE l.assigned_email IS NULL
+          AND ${UNASSIGNED_SQL("l")} = false
+          AND ( SELECT COUNT(*) FROM users u JOIN roles r ON r.id = u.role_id
+                 WHERE REGEXP_REPLACE(LOWER(TRIM(u.name)), '\\s+', ' ', 'g') =
+                       REGEXP_REPLACE(LOWER(TRIM(l.assigned_to)), '\\s+', ' ', 'g')
+                   AND LOWER(r.code) = ANY($1) ) = 1`,
+      [BDA_ROLE_CODES]
+    );
 
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_leads_assigned_email ON leads (LOWER(assigned_email))`

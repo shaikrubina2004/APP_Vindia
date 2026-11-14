@@ -685,9 +685,9 @@ exports.getAssignees = async (req, res) => {
    Rules
    • target must be an active BDA  → nobody can assign the CEO
    • CEO  → may assign / reassign any lead to any BDA
-   • BDA  → may assign an UNASSIGNED lead (to self or another BDA)
-            or hand over a lead they already own;
-            may NOT take a lead that belongs to someone else
+   • BDA  → may assign an UNASSIGNED lead (to self or another BDA);
+            may NOT reassign a lead that already has an owner —
+            only the CEO can reassign
 ══════════════════════════════════════ */
 exports.assignLead = async (req, res) => {
   const { id } = req.params;
@@ -714,8 +714,7 @@ exports.assignLead = async (req, res) => {
     const params = [target.name, target.email, actor.name, id];
     let where = `id = $4 AND deleted_by_admin = false`;
     if (!isCEO) {
-      params.push(actor.name, actor.email);
-      where += ` AND ( ${UNASSIGNED_SQL()} OR ${ASSIGNED_TO_ME_SQL("$5", "$6")} )`;
+      where += ` AND ${UNASSIGNED_SQL()}`;   // BDAs: unassigned leads only
     }
 
     const { rows } = await pool.query(

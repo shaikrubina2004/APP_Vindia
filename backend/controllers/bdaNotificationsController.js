@@ -254,7 +254,12 @@ exports.escalateStaleLeads = async () => {
                     AND l.snooze_until IS NULL )
                OR
                   -- Rule B: promised a follow-up date and missed it
+                  -- (only a date set AFTER the lead was assigned counts: old dates on
+                  --  legacy leads, or inherited from a previous owner, are not this
+                  --  BDA's missed promise)
                   ( l.snooze_until IS NOT NULL
+                    AND l.assigned_at IS NOT NULL
+                    AND DATE(l.snooze_until) >= (l.assigned_at AT TIME ZONE 'Asia/Kolkata')::date
                     AND DATE(l.snooze_until) < ((NOW() AT TIME ZONE 'Asia/Kolkata')::date - $2::int) )
                 )
             FOR UPDATE OF l SKIP LOCKED
