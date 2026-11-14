@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "migrate:diary": "node scripts/runSqlMigration.js migrations/addDiaryApprovalColumns.sql"
+    "migrate:diary": "node scripts/runSqlMigration.js migrations/addDiaryApprovalColumns.sql",
+    "migrate:site-progress": "node scripts/runSqlMigration.js migrations/site_progress_measurements.sql",
+    "test:site-progress": "node --test tests/siteProgress.test.js tests/siteProgressModel.test.js"
   },
   "keywords": [],
   "author": "",

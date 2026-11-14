@@ -6,16 +6,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/useAuth";
 import api from "../../services/api";
 import "../../styles/shared-pages.css";
 import "../../styles/Progress.css";
 import { todayISO } from "../../utils/localDate";
 
 const BASE_URL    = import.meta.env.VITE_API_URL;
-const DRAFT_KEY   = "progress:draft:v6";
-const QUEUE_KEY   = "progress:queue:v6";
 const PAGE_SIZE   = 8;
-const MEAS_STATUS = ["draft", "submitted", "approved"];
 const BLANK_M     = { item: "", qty: "", unit: "sqft", status: "draft" };
 const AREA_UNITS  = ["sqft","m²","m³","m","kg","tonne","no.","LS","bag","litre","rft"];
 
@@ -32,31 +30,35 @@ const BLANK = {
 };
 
 const ls = {
-  load: k => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch { return null; } },
-  save: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
-  del:  k => { try { localStorage.removeItem(k); } catch {} },
+  load: k => { if (!k) return null; try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch (error) { console.warn("Could not load progress draft:", error); return null; } },
+  save: (k, v) => { if (!k) return; try { localStorage.setItem(k, JSON.stringify(v)); } catch (error) { console.warn("Could not save progress draft:", error); } },
+  del:  k => { if (!k) return; try { localStorage.removeItem(k); } catch (error) { console.warn("Could not clear progress draft:", error); } },
 };
 
-function enqueue(p) {
-  const q = ls.load(QUEUE_KEY) || [];
+function enqueue(p, queueKey) {
+  if (!queueKey) return;
+  const q = ls.load(queueKey) || [];
   q.push({ id: `q_${Date.now()}`, payload: p, createdAt: new Date().toISOString() });
-  ls.save(QUEUE_KEY, q);
+  ls.save(queueKey, q);
 }
 
-async function flushQueue() {
-  const q = ls.load(QUEUE_KEY);
+async function flushQueue(queueKey) {
+  if (!queueKey) return;
+  const q = ls.load(queueKey);
   if (!Array.isArray(q) || !q.length) return;
   const rem = [];
   for (const item of q) {
     try {
       const r = await api.post("/site-progress", item.payload);
       if (!r || (r.status && r.status >= 400)) throw new Error();
-    } catch { rem.push(item); }
+    } catch (error) {
+      console.warn("Could not retry a queued progress entry:", error);
+      rem.push(item);
+    }
   }
-  ls.save(QUEUE_KEY, rem);
+  ls.save(queueKey, rem);
 }
 
-// Local calendar day (was UTC — wrong for part of every morning in India)
 function nowISO() { return todayISO(); }
 
 function validate(f) {
@@ -89,62 +91,46 @@ function scColor(s) {
 }
 
 /* ─────────────────────────────────────────────────────────
-   LABOUR CARD — reads from LabourReport, no input
+   LABOUR CARD — reads the selected project's LabourReport
 ───────────────────────────────────────────────────────── */
-// Paste this BEFORE the DailyDiary export default and BEFORE the Progress LabourCard
-// Replace both LabourSummaryCard (in DailyDiary) and LabourCard (in Progress) with this logic
-
-// ─────────────────────────────────────────────────────────
-// HOW THE BUG HAPPENED:
-//   lr.date === date                               ✅ correct
-//   && (!projectId || String(lr.project_id) === String(projectId))
-//
-//   When projectId is set but the labour report was saved with
-//   a different or empty project_id, the match fails → shows
-//   "No labour report" even though one exists for that date.
-//
-// FIX:
-//   Find ANY report for that date (most recent).
-//   If projectId is given, prefer one matching the project,
-//   but fall back to any report on that date.
-// ─────────────────────────────────────────────────────────
-
-
-// ══════════════════════════════════════════════
-// FOR Progress.jsx — replace LabourCard
-// ══════════════════════════════════════════════
 function LabourCard({ date, projectId }) {
   const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [loadedFor, setLoadedFor] = useState(null);
   const navigate = useNavigate();
+  const requestKey = `${date || ""}:${projectId || ""}`;
+  const loading = Boolean(date && loadedFor !== requestKey);
 
   useEffect(() => {
     if (!date) return;
-    setLoading(true);
+    let active = true;
     const params = new URLSearchParams({ date });
     api.get(`/labour-report?${params}`)
       .then(r => {
+        if (!active) return;
+        setLoadError(false);
         const list = Array.isArray(r?.data) ? r.data : [];
         if (!list.length) { setData(null); return; }
 
-        // Prefer matching project, fall back to first on that date
         const match = projectId
-  ? list.find(
-      lr =>
-        String(lr.project_id || "") ===
-        String(projectId || "")
-    )
-  : list[0];
-
-setData(match || null);
+          ? list.find(lr => String(lr.project_id || "") === String(projectId))
+          : list[0];
+        setData(match || null);
       })
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, [date, projectId]);
+      .catch(() => { if (active) { setData(null); setLoadError(true); } })
+      .finally(() => { if (active) setLoadedFor(requestKey); });
+    return () => { active = false; };
+  }, [date, projectId, requestKey]);
 
   if (loading) return (
     <div className="prog-labour-info" style={{ padding: "12px 0", fontSize: 12, color: "var(--c-text-3)" }}>
       Loading labour data…
+    </div>
+  );
+
+  if (loadError) return (
+    <div role="alert" className="prog-labour-info" style={{ padding: "12px 0", fontSize: 12, color: "#b83232" }}>
+      Unable to load labour data. Please try again.
     </div>
   );
 
@@ -248,30 +234,68 @@ setData(match || null);
 ═══════════════════════════════════════════════════════════ */
 export default function Progress() {
   const navigate = useNavigate();
-  const draft = ls.load(DRAFT_KEY);
-  const [form, setForm]       = useState({ ...BLANK, date: nowISO(), ...draft, photos: [], measurements: draft?.measurements || [{ ...BLANK_M }] });
+  const { user } = useAuth();
+  const draftKey = user?.id ? `progress:draft:v6:${user.id}` : null;
+  const queueKey = user?.id ? `progress:queue:v6:${user.id}` : null;
+  const measurementStatuses = user?.role === "quantity_surveyor"
+    ? ["draft", "submitted", "approved"]
+    : ["draft", "submitted"];
+  const [form, setForm]       = useState(() => {
+    const draft = ls.load(draftKey);
+    return { ...BLANK, date: nowISO(), ...draft, photos: [], measurements: draft?.measurements || [{ ...BLANK_M }] };
+  });
   const [errors, setErrors]   = useState({});
   const [status, setStatus]   = useState("");
   const [submitting, setSub]  = useState(false);
   const [entries, setEntries] = useState([]);
   const [listLoading, setLL]  = useState(true);
+  const [listError, setListError] = useState("");
   const [search, setSearch]   = useState("");
   const [filterZone, setFZ]   = useState("");
   const [filterDate, setFD]   = useState("");
   const [page, setPage]       = useState(1);
   const [activeTab, setTab]   = useState("morning");
   const [projects, setProjects]   = useState([]);
+  const [projectsError, setProjectsError] = useState("");
   const [wbsList, setWbsList]     = useState([]);
   const autoSave = useRef(null);
   const alive    = useRef(true);
 
+  const loadList = useCallback(async () => {
+    setLL(true);
+    setListError("");
+    try {
+      const res = await api.get("/site-progress");
+      if (!alive.current) return;
+      const raw = Array.isArray(res?.data?.data)
+        ? res.data.data.slice().reverse()
+        : Array.isArray(res?.data) ? res.data.slice().reverse() : [];
+      const seen = new Set();
+      setEntries(raw.filter(it => { const k = stableKey(it); if (seen.has(k)) return false; seen.add(k); return true; }));
+    } catch {
+      setListError("Unable to load progress entries. Please try again.");
+    }
+    finally { if (alive.current) setLL(false); }
+  }, []);
+
+  const loadProjects = useCallback(async () => {
+    setProjectsError("");
+    try {
+      const assignedRole = ["site_engineer", "project_manager"].includes(user?.role);
+      const res = await api.get(assignedRole ? "/projects/mine" : "/projects");
+      setProjects(res.data?.data || res.data?.projects || res.data || []);
+    } catch {
+      setProjectsError("Unable to load assigned projects.");
+    }
+  }, [user?.role]);
+
   useEffect(() => {
     alive.current = true;
     loadList();
-    flushQueue().catch(() => {});
+    flushQueue(queueKey).catch(error => console.error("Could not retry queued progress entries:", error));
     loadProjects();
     return () => { alive.current = false; clearTimeout(autoSave.current); };
-  }, []);
+  }, [queueKey, loadList, loadProjects]);
 
   useEffect(() => {
     if (!form.project_id) return;
@@ -293,35 +317,14 @@ export default function Progress() {
       planned_percent: last.planned_percent || f.planned_percent,
       activity: last.activity || f.activity,
     }));
-  }, [form.zone]);
-
-  async function loadList() {
-    setLL(true);
-    try {
-      const res = await api.get("/site-progress");
-      if (!alive.current) return;
-      const raw = Array.isArray(res?.data?.data)
-        ? res.data.data.slice().reverse()
-        : Array.isArray(res?.data) ? res.data.slice().reverse() : [];
-      const seen = new Set();
-      setEntries(raw.filter(it => { const k = stableKey(it); if (seen.has(k)) return false; seen.add(k); return true; }));
-    } catch {}
-    finally { if (alive.current) setLL(false); }
-  }
-
-  async function loadProjects() {
-    try {
-      const res = await api.get("/projects");
-      setProjects(res.data?.data || res.data?.projects || res.data || []);
-    } catch {}
-  }
+  }, [form.zone, entries]);
 
   useEffect(() => {
     clearTimeout(autoSave.current);
     autoSave.current = setTimeout(() => {
-      const c = { ...form }; delete c.photos; ls.save(DRAFT_KEY, c);
+      const c = { ...form }; delete c.photos; ls.save(draftKey, c);
     }, 1200);
-  }, [form]);
+  }, [form, draftKey]);
 
   const setF = useCallback((k, v) => {
     setForm(f => ({ ...f, [k]: v }));
@@ -339,7 +342,7 @@ export default function Progress() {
   const setM        = useCallback((i,k,v) => setForm(f => { const m=[...f.measurements]; m[i]={...m[i],[k]:v}; return {...f,measurements:m}; }), []);
   const addM        = useCallback(() => setForm(f => ({ ...f, measurements: [...f.measurements, {...BLANK_M}] })), []);
   const removeM     = useCallback(i => setForm(f => ({ ...f, measurements: f.measurements.filter((_,j)=>j!==i) })), []);
-  const clearForm   = useCallback(() => { ls.del(DRAFT_KEY); setForm({...BLANK,date:nowISO(),measurements:[{...BLANK_M}]}); setErrors({}); setStatus(""); }, []);
+  const clearForm   = useCallback(() => { ls.del(draftKey); setForm({...BLANK,date:nowISO(),measurements:[{...BLANK_M}]}); setErrors({}); setStatus(""); }, [draftKey]);
 
   const liveDelay = Number(form.planned_percent||0) - Number(form.percent_complete||0);
 
@@ -368,18 +371,20 @@ export default function Progress() {
       const res = await api.post("/site-progress", formData, { headers:{"Content-Type":"multipart/form-data"} });
       if (!res || (res.status && res.status >= 400)) throw new Error();
       await loadList();
-      ls.del(DRAFT_KEY);
+      ls.del(draftKey);
       setForm({...BLANK, date:nowISO(), measurements:[{...BLANK_M}]});
       setStatus("Progress saved ✓");
       setTimeout(() => setStatus(""), 3000);
       window.dispatchEvent(new Event("progress_updated"));
       setTab("morning");
     } catch {
-      enqueue((({photos:_,...p})=>p)(form));
+      const queuedPayload = { ...form };
+      delete queuedPayload.photos;
+      enqueue(queuedPayload, queueKey);
       setEntries(s => s.map(it => it.id===opt.id ? {...it,queued:true} : it));
       setStatus("Offline — queued for retry");
     } finally { if (alive.current) setSub(false); }
-  }, [form, submitting, entries]);
+  }, [form, submitting, entries, draftKey, queueKey, loadList]);
 
   const filtered = useMemo(() => {
     let list = entries.slice();
@@ -391,7 +396,7 @@ export default function Progress() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
   const pageItems  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
-  useEffect(() => { if (page>totalPages) setPage(totalPages); }, [totalPages]);
+  useEffect(() => { if (page>totalPages) setPage(totalPages); }, [page, totalPages]);
 
   const avgActual  = useMemo(() => entries.length ? Math.round(entries.reduce((s,x)=>s+Number(x.percent_complete||0),0)/entries.length) : 0, [entries]);
   const avgPlanned = useMemo(() => entries.length ? Math.round(entries.reduce((s,x)=>s+Number(x.planned_percent||0),0)/entries.length)  : 0, [entries]);
@@ -461,7 +466,7 @@ export default function Progress() {
                 </div>
               </div>
               <div className="prog-panel-actions">
-                <button type="button" className="prog-btn prog-btn--ghost" onClick={()=>{ls.save(DRAFT_KEY,form);setStatus("Draft saved");}}>Save Draft</button>
+                <button type="button" className="prog-btn prog-btn--ghost" onClick={()=>{ls.save(draftKey,form);setStatus("Draft saved");}}>Save Draft</button>
                 <button type="button" className="prog-btn prog-btn--ghost" onClick={clearForm}>Clear</button>
               </div>
             </div>
@@ -495,6 +500,7 @@ export default function Progress() {
                           <select className="prog-input" value={form.project_id}
                             onChange={e=>{setF("project_id",e.target.value);setF("wbs_id","");setWbsList([]);}}>
                             <option value="">Select project</option>
+                            {!projects.length && <option disabled>{projectsError || "No assigned projects"}</option>}
                             {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
                           </select>
                           {errors.project_id && <div className="prog-error">{errors.project_id}</div>}
@@ -747,7 +753,7 @@ export default function Progress() {
                           <select className="prog-input" value={m.status}
                             onChange={e=>setM(i,"status",e.target.value)}
                             style={{background:sc.bg,color:sc.color,borderColor:sc.border,fontWeight:600}}>
-                            {MEAS_STATUS.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                            {measurementStatuses.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
                           </select>
                           <button type="button" className="prog-meas-remove"
                             onClick={()=>removeM(i)} disabled={form.measurements.length===1}>×</button>
@@ -796,7 +802,12 @@ export default function Progress() {
                 onChange={e=>{setFD(e.target.value);setPage(1);}}/>
             </div>
 
-            {listLoading ? (
+            {listError ? (
+              <div role="alert" className="prog-empty">
+                {listError}{" "}
+                <button type="button" className="prog-btn prog-btn--ghost" onClick={loadList}>Retry</button>
+              </div>
+            ) : listLoading ? (
               <div className="prog-loading"><div className="prog-spinner"/>Loading…</div>
             ) : pageItems.length === 0 ? (
               <div className="prog-empty">No entries match this filter</div>

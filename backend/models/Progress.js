@@ -6,7 +6,7 @@ class Progress {
      CREATE
   ========================================================= */
 
-  static async create(data) {
+  static async create(data, db = pool) {
     const {
       project_id,
       wbs_id,
@@ -14,6 +14,7 @@ class Progress {
       zone,
       work_type,
       activity,
+      morning_note,
       morning_skilled,
       morning_unskilled,
       morning_supervisors,
@@ -38,6 +39,7 @@ class Progress {
         zone,
         work_type,
         activity,
+        morning_note,
         morning_skilled,
         morning_unskilled,
         morning_supervisors,
@@ -55,12 +57,12 @@ class Progress {
         created_at
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,
-        $7,$8,$9,
-        $10,$11,$12,
-        $13,$14,$15,
-        $16,$17,$18,
-        $19,$20,
+        $1,$2,$3,$4,$5,$6,$7,
+        $8,$9,$10,
+        $11,$12,$13,
+        $14,$15,$16,
+        $17,$18,$19,
+        $20,$21,
         NOW()
       )
       RETURNING *;
@@ -73,6 +75,7 @@ class Progress {
       zone,
       work_type,
       activity,
+      morning_note || null,
       morning_skilled,
       morning_unskilled,
       morning_supervisors,
@@ -89,7 +92,7 @@ class Progress {
       photos || [],
     ];
 
-    const result = await pool.query(query, values);
+    const result = await db.query(query, values);
 
     return result.rows[0];
   }
@@ -172,7 +175,7 @@ class Progress {
   static async update(id, data) {
     const allowed = [
       "project_id", "wbs_id", "date", "zone", "work_type", "activity",
-      "morning_skilled", "morning_unskilled", "morning_supervisors",
+      "morning_note", "morning_skilled", "morning_unskilled", "morning_supervisors",
       "sqft_completed", "sqft_unit", "evening_description", "percent_complete",
       "planned_percent", "delay_type", "linked_task", "linked_rfi",
       "linked_incident", "remarks", "photos",
@@ -203,11 +206,11 @@ class Progress {
      SAVE MEASUREMENTS
   ========================================================= */
 
-  static async saveMeasurements(progress_id, measurements) {
+  static async saveMeasurements(progress_id, measurements, db = pool) {
     for (const m of measurements) {
-      await pool.query(
+      await db.query(
         `
-          INSERT INTO measurements (
+          INSERT INTO site_progress_measurements (
             progress_id,
             item,
             qty,
@@ -227,6 +230,26 @@ class Progress {
     }
   }
 
+  static async createWithMeasurements(data, measurements = []) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const progress = await this.create(data, client);
+      await this.saveMeasurements(progress.id, measurements, client);
+      await client.query("COMMIT");
+      return { ...progress, measurements };
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("ROLLBACK SITE PROGRESS ERROR:", rollbackError);
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   /* =========================================================
      GET MEASUREMENTS
   ========================================================= */
@@ -235,7 +258,7 @@ class Progress {
     const result = await pool.query(
       `
         SELECT *
-        FROM measurements
+        FROM site_progress_measurements
         WHERE progress_id = $1
         ORDER BY id ASC
       `,

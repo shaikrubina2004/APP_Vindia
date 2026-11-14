@@ -44,6 +44,53 @@ const createSiteProgress = async (req, res) => {
       });
     }
 
+    const parsedDate = data.date ? new Date(`${data.date}T00:00:00.000Z`) : null;
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(data.date || "") ||
+      !parsedDate ||
+      Number.isNaN(parsedDate.getTime()) ||
+      parsedDate.toISOString().slice(0, 10) !== data.date
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid date is required",
+      });
+    }
+
+    if (!data.zone?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "zone is required",
+      });
+    }
+    data.zone = data.zone.trim();
+
+    for (const field of ["percent_complete", "planned_percent"]) {
+      const value = data[field] === undefined || data[field] === ""
+        ? 0
+        : Number(data[field]);
+      if (!Number.isFinite(value) || value < 0 || value > 100) {
+        return res.status(400).json({
+          success: false,
+          message: `${field} must be between 0 and 100`,
+        });
+      }
+      data[field] = value;
+    }
+
+    if (data.sqft_completed === "" || data.sqft_completed === undefined) {
+      data.sqft_completed = null;
+    } else {
+      const completed = Number(data.sqft_completed);
+      if (!Number.isFinite(completed) || completed < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "sqft_completed must be a non-negative number",
+        });
+      }
+      data.sqft_completed = completed;
+    }
+
     const projectId = Number(data.project_id);
     const wbsId = Number(data.wbs_id);
 
@@ -109,7 +156,10 @@ const createSiteProgress = async (req, res) => {
     }
 
     if (!Array.isArray(measurements)) {
-      measurements = [];
+      return res.status(400).json({
+        success: false,
+        message: "Measurements must be an array",
+      });
     }
 
     delete data.measurements;
@@ -124,27 +174,57 @@ const createSiteProgress = async (req, res) => {
       data.photos = [];
     }
 
-    /* ---------- CREATE MAIN RECORD ---------- */
+    const validMeasurements = [];
+    for (const measurement of measurements) {
+      if (!measurement || typeof measurement !== "object") {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid measurement row",
+        });
+      }
 
-    const progress = await Progress.create(data);
+      const item = typeof measurement.item === "string"
+        ? measurement.item.trim()
+        : "";
+      const hasQuantity = measurement.qty !== undefined && measurement.qty !== "";
+      if (!item && !hasQuantity) continue;
 
-    /* ---------- SAVE VALID MEASUREMENTS ---------- */
+      const quantity = Number(measurement.qty);
+      const status = measurement.status || "draft";
+      const unit = measurement.unit || "sqft";
+      if (status === "approved" && req.user?.role !== "quantity_surveyor") {
+        return res.status(403).json({
+          success: false,
+          message: "Only a quantity surveyor can approve measurements",
+        });
+      }
+      if (
+        !item ||
+        !Number.isFinite(quantity) ||
+        quantity <= 0 ||
+        typeof unit !== "string" ||
+        unit.length > 20 ||
+        !["draft", "submitted", "approved"].includes(status)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Each measurement requires an item, a positive quantity, and a valid status",
+        });
+      }
 
-    const validMeasurements = measurements.filter(
-      (m) =>
-        m &&
-        typeof m.item === "string" &&
-        m.item.trim() &&
-        Number.isFinite(Number(m.qty)) &&
-        Number(m.qty) > 0
-    );
-
-    if (validMeasurements.length > 0) {
-      await Progress.saveMeasurements(
-        progress.id,
-        validMeasurements
-      );
+      validMeasurements.push({
+        ...measurement,
+        item,
+        qty: quantity,
+        unit,
+        status,
+      });
     }
+
+    const progress = await Progress.createWithMeasurements(
+      data,
+      validMeasurements
+    );
 
     /* ---------- RESPONSE ---------- */
 
@@ -171,7 +251,9 @@ const createSiteProgress = async (req, res) => {
 
 const getSiteProgress = async (req, res) => {
   try {
-    const requestedProjectId = req.query.project_id ? Number(req.query.project_id) : null;
+    const requestedProjectId = req.query.project_id === undefined
+      ? null
+      : Number(req.query.project_id);
     if (
       requestedProjectId !== null &&
       (!Number.isInteger(requestedProjectId) || requestedProjectId <= 0)
@@ -197,7 +279,7 @@ const getSiteProgress = async (req, res) => {
       : req.user?.role === "project_manager"
         ? await getManagedProjectIds(req.user.id)
         : null;
-    if (projectIds && requestedProjectId !== null) projectIds = [requestedProjectId];
+    if (requestedProjectId !== null) projectIds = [requestedProjectId];
     const list = await Progress.getAll({ projectIds });
 
     const final = await Promise.all(
