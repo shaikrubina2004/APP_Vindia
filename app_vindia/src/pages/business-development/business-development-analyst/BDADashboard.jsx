@@ -143,7 +143,7 @@ const StatusPill = ({ status }) => {
     converted:        { bg: "#f0fdf4", color: "#16a34a" },
     contacted:        { bg: "#ecfdf5", color: "#059669" },
     junk:             { bg: "#fef2f2", color: "#dc2626" },
-    junk_requested:   { bg: "#fef2f2", color: "#dc2626" },
+    delete_requested:   { bg: "#fef2f2", color: "#dc2626" },
     "not interested": { bg: "#f8fafc", color: "#64748b" },
   };
   const cfg = map[norm] || { bg: "#f1f5f9", color: "#475569" };
@@ -252,7 +252,7 @@ const BDADashboard = () => {
   const funnelData = useMemo(() => {
     const KNOWN = [
       "new","interested","intrested","follow up",
-      "converted","not interested","junk","junk_requested",
+      "converted","not interested","junk","delete_requested",
     ];
     return STATUS_FUNNEL.map(s => {
       if (s.key === "__other__") {

@@ -116,6 +116,7 @@ const leadRoutes = require("./routes/leadRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const pmReportRoutes = require("./routes/pmReportRoutes");
 const metaRoutes = require("./routes/metaRoutes");
+const googleAdsRoutes = require("./routes/googleAdsRoutes");
 const bdaNotifRoutes = require("./routes/bdaNotificationRoutes");
 
 /* ✅ Finance Manager */
@@ -290,6 +291,7 @@ app.use("/api/leads", leadRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/pm-reports", pmReportRoutes);
 app.use("/api/meta", metaRoutes);
+app.use("/api/google-ads", googleAdsRoutes);
 app.use("/api/bda-notifications", bdaNotifRoutes);
 
 /* ✅ Finance Manager */

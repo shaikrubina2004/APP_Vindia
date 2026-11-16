@@ -49,6 +49,7 @@ router.get("/assignees", lead.getAssignees);
 /* ── LEADS CRUD ── */
 router.get("/",    lead.getAllLeads);
 router.post("/",   lead.createLead);
+router.get("/reminders/due", lead.getDueReminders);
 router.get("/:id", lead.getLeadById);
 router.put("/:id", lead.updateLead);
 
@@ -61,8 +62,10 @@ router.post("/:leadId/track-time", logTimeSpent);
 
 /* ── JUNK / ADMIN ── */
 router.put("/:id/request-junk",     lead.requestJunk);
-router.put("/:id/reassign",         lead.reassignLead);
+router.put("/:id/reject-delete",    lead.rejectDelete);
+router.put("/:id/reassign",         lead.reassignLead); 
 router.put("/:id/assign",           protect, lead.assignLead);
 router.put("/:id/permanent-delete", lead.permanentDeleteLead);
+router.put("/:id/ack-preferred-time", lead.ackPreferredTime);
 
 module.exports = router;

@@ -102,6 +102,8 @@ const SOURCE_LABELS = {
   "manual":        "Manual",
   "google":        "Google",
   "youtube":       "YouTube",
+   "google ads":    "Google Ads",     // ← add
+  "youtube ads":   "YouTube Ads",    // ← add
 };
 const SEVERITY_BY_SOURCE = {
   "Meta Ads":     "critical",
@@ -110,6 +112,8 @@ const SEVERITY_BY_SOURCE = {
   "YouTube":      "warn",
   "Website":      "info",
   "Excel Import": "info",
+  "Google Ads":   "critical",        
+  "YouTube Ads":  "warn",            
 };
 const normalizeSourceLabel = (source) =>
   SOURCE_LABELS[(source || "").toLowerCase().trim()] || source || "Unknown";

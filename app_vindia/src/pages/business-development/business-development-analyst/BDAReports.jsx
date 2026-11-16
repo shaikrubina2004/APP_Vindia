@@ -63,6 +63,7 @@ const BDAReports = ({ role }) => {
   const [sources,     setSources]     = useState([]);
   const [timeData,    setTimeData]    = useState(null);
   const [exporting,   setExporting]   = useState(null);
+  const [loadError,   setLoadError]   = useState("");
 
   /* Filters */
   const [from, setFrom]           = useState("");
@@ -80,6 +81,10 @@ const BDAReports = ({ role }) => {
   // ✅ Only CEO is allowed to see this page's data — skip fetching
   // entirely for anyone else instead of quietly hitting endpoints
   // that will now reject them server-side.
+  // FIX: depend on isCEO. `role` arrives from useAuth() AFTER the first render
+  // (the user is read from localStorage in an effect), so an empty dependency
+  // array ran once with role === undefined, decided "not CEO", and never
+  // fetched again -> every card showed 0.
   useEffect(() => {
     if (isCEO) {
       loadAll();
@@ -88,7 +93,8 @@ const BDAReports = ({ role }) => {
       setLoading(false);
       setTimeLoading(false);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCEO]);
 
   const loadAll = async (filters = {}) => {
     setLoading(true);
@@ -109,8 +115,11 @@ const BDAReports = ({ role }) => {
       setOverview(ovRes.data);
       setBda(bdaRes.data.data || []);
       setSources(srcRes.data.data || []);
+      setLoadError("");
     } catch (err) {
       console.error("Reports load error:", err);
+      const status = err.response?.status ? `HTTP ${err.response.status} — ` : "";
+      setLoadError(status + (err.response?.data?.error || err.response?.data?.message || err.message));
     } finally {
       setLoading(false);
     }
@@ -309,7 +318,7 @@ const BDAReports = ({ role }) => {
           <h1 className="bda-title">Reports & Analytics</h1>
         </div>
         <div className="bda-header-actions">
-          <button className="bda-btn-outline" onClick={() => { loadAll({}); loadTimeData({}); }}>↻ Refresh</button>
+          <button className="bda-btn-outline" onClick={() => { if (!isCEO) return; loadAll({}); loadTimeData({}); }}>↻ Refresh</button>
           {isCEO && (
             <>
               <button className="bda-btn-outline" onClick={handleExportAll} disabled={exporting !== null}>
@@ -351,7 +360,7 @@ const BDAReports = ({ role }) => {
               <label className="rp-filter-label">Source</label>
               <select className="rp-filter-input" value={sourceF} onChange={e => setSourceF(e.target.value)}>
                 <option value="">All Sources</option>
-                {["JustDial","Facebook/Meta","Manual","Website","Walk-in","Referral"].map(s =>
+                {["JustDial","Meta Ads","Facebook/Meta","Google Ads","YouTube Ads","Manual","Website","Walk-in","Referral"].map(s =>
                   <option key={s} value={s}>{s}</option>
                 )}
               </select>
@@ -370,6 +379,17 @@ const BDAReports = ({ role }) => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── LOAD ERROR (so a failed request is never silently shown as zeros) ── */}
+      {isCEO && loadError && (
+        <div style={{ background:"#fef2f2", border:"1px solid #fecaca", color:"#b91c1c",
+                      borderRadius:10, padding:"12px 16px", marginBottom:16, fontSize:13,
+                      display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+          <span>⚠ Could not load reports: <b>{loadError}</b></span>
+          <button className="bda-btn-outline" style={{ fontSize:12, padding:"5px 12px" }}
+                  onClick={() => { loadAll({}); loadTimeData({}); }}>Retry</button>
         </div>
       )}
 

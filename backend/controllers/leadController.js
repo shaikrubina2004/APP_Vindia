@@ -4,10 +4,10 @@ const path = require("path");
 const fs   = require("fs");
 const {
   notifyNewLead, notifyFollowUp, notifyImport,
-  notifyLeadAssigned, clearPoolAlerts,
+  notifyLeadAssigned, clearPoolAlerts, notifyMany,
 } = require("./bdaNotificationsController");
 const {
-  ESCALATION_HOURS, UNASSIGNED_SQL, ASSIGNED_TO_ME_SQL,
+  ESCALATION_HOURS, UNASSIGNED_SQL, ASSIGNED_TO_ME_SQL, CLOSED_STATUSES,
   getBdaUsers, getUserById, findBdaByEmail, findBdaByName,
 } = require("../utils/leadAssignment");
 
@@ -21,7 +21,7 @@ exports.getDashboardSummary = async (req, res) => {
 
     // Leads: a BDA sees their own leads + the unassigned pool
     const leadFilter = isBda
-      ? `AND (${ASSIGNED_TO_ME_SQL("$1", "$2")} OR ${UNASSIGNED_SQL()}) AND status != 'JUNK_REQUESTED'`
+      ? `AND (${ASSIGNED_TO_ME_SQL("$1", "$2")} OR ${UNASSIGNED_SQL()}) AND status != 'DELETE_REQUESTED'`
       : "";
     const leadVals = isBda ? [name || "", email || ""] : [];
 
@@ -111,9 +111,9 @@ exports.getAllLeads = async (req, res) => {
       const me = ASSIGNED_TO_ME_SQL(`$${vals.length - 1}`, `$${vals.length}`, "l");
       sql += assignedOnly
         // Follow-up page: only the leads that are mine
-        ? ` AND ${me} AND l.status != 'JUNK_REQUESTED'`
+        ? ` AND ${me} AND l.status != 'DELETE_REQUESTED'`
         // Leads page: mine + the unassigned pool (so I can pick things up)
-        : ` AND (${me} OR ${UNASSIGNED_SQL("l")}) AND l.status != 'JUNK_REQUESTED'`;
+        : ` AND (${me} OR ${UNASSIGNED_SQL("l")}) AND l.status != 'DELETE_REQUESTED'`;
     } else if (assignedOnly) {
       // CEO on the follow-up page: every lead that has an owner
       sql += ` AND NOT ${UNASSIGNED_SQL("l")}`;
@@ -222,11 +222,12 @@ exports.createLead = async (req, res) => {
 ══════════════════════════════════════ */
 exports.updateLead = async (req, res) => {
   const { id } = req.params;
+  const body = req.body || {};
 
   const fields = [
     "email","city","source","status","call_status","building_type",
     "floors","measurement","sqft","budget",
-    "quotation_sent","project_start","snooze_until","description",
+    "quotation_sent","project_start",
     "date_and_time","search_category","area","designs_sent",
   ];
 
@@ -235,40 +236,130 @@ exports.updateLead = async (req, res) => {
   let n = 1;
 
   fields.forEach(f => {
-    if (req.body[f] !== undefined) {
+    if (body[f] !== undefined) {
       setClauses.push(`${f} = $${n++}`);
-      values.push(req.body[f]);
+      values.push(body[f]);
     }
   });
 
-  // ✅ Handle converted_at automatically based on status change
-  if (req.body.status !== undefined) {
-    const isConverted = req.body.status.toLowerCase() === "converted";
-    if (isConverted) {
-      // Only set converted_at if not already set (first time converting)
-      setClauses.push(`converted_at = COALESCE(converted_at, NOW())`);
-    } else {
-      // Status changed away from Converted — clear converted_at
-      setClauses.push(`converted_at = NULL`);
+  // name / phone: only when a non-empty value is sent
+  ["name", "phone"].forEach(f => {
+    const v = typeof body[f] === "string" ? body[f].trim() : "";
+    if (v) { setClauses.push(`${f} = $${n++}`); values.push(v); }
+  });
+
+  // Lead type: Hot / Warm / Cold (empty clears it)
+  if (body.lead_type !== undefined) {
+    const v = String(body.lead_type || "").trim();
+    if (v && !["Hot", "Warm", "Cold"].includes(v))
+      return res.status(400).json({ error: "Lead type must be Hot, Warm or Cold" });
+    setClauses.push(`lead_type = $${n++}`);
+    values.push(v || null);
+  }
+
+  // Preferred call type (free text from a dropdown; empty clears it)
+  if (body.preferred_call_type !== undefined) {
+    setClauses.push(`preferred_call_type = $${n++}`);
+    values.push(String(body.preferred_call_type || "").trim() || null);
+  }
+
+  // Next call date (= the follow-up date). Saving it is what puts the lead on
+  // the Follow Up page (Today / Overdue / Upcoming). Empty clears it.
+  if (body.snooze_until !== undefined) {
+    setClauses.push(`snooze_until = $${n++}`);
+    values.push(body.snooze_until ? body.snooze_until : null);
+  }
+
+  // Preferred call time slot, e.g. "9 AM – 11 AM" (label only)
+  if (body.preferred_call_slot !== undefined) {
+    setClauses.push(`preferred_call_slot = $${n++}`);
+    values.push(String(body.preferred_call_slot || "").trim() || null);
+  }
+
+  // Preferred call time — the moment the popup fires (next call date + slot start).
+  // Changing it re-arms the popup reminder.
+  if (body.preferred_call_time !== undefined) {
+    let when = null;
+    if (body.preferred_call_time) {
+      const d = new Date(body.preferred_call_time);
+      if (isNaN(d.getTime()))
+        return res.status(400).json({ error: "Preferred call time is not a valid date" });
+      when = d.toISOString();
     }
+    setClauses.push(`preferred_call_time = $${n++}`);
+    values.push(when);
+    setClauses.push(`preferred_call_ack = NULL`);
+  }
+
+  // converted_at follows the status
+  if (body.status !== undefined) {
+    const isConverted = String(body.status || "").toLowerCase() === "converted";
+    setClauses.push(isConverted
+      ? `converted_at = COALESCE(converted_at, NOW())`
+      : `converted_at = NULL`);
+  }
+
+  // ── Photo set + Design set (each number can be sent only once) ──
+  const SET_DEFS = [
+    { key: "photo_set",  column: "photo_sets_sent",  label: "Photo Set"  },
+    { key: "design_set", column: "design_sets_sent", label: "Design Set" },
+  ];
+  const sending = [];
+  for (const def of SET_DEFS) {
+    const raw = body[def.key];
+    if (raw === undefined || raw === null || raw === "") continue;
+    const num = parseInt(raw, 10);
+    if (!Number.isInteger(num) || num < 1 || num > 10)
+      return res.status(400).json({ error: `${def.label} must be a number from 1 to 10` });
+    setClauses.push(`${def.column} = array_append(COALESCE(${def.column}, '{}'), $${n++}::int)`);
+    values.push(num);
+    sending.push({ ...def, num });
+  }
+
+  // ── New descriptions (append-only) ──
+  const fresh = (Array.isArray(body.new_descriptions) ? body.new_descriptions : [])
+    .map(t => String(t || "").trim().slice(0, 2000))
+    .filter(Boolean);
+  if (fresh.length) {
+    const by = String(body.edited_by || "").trim() || null;
+    const at = new Date().toISOString();
+    setClauses.push(`description_notes = COALESCE(description_notes, '[]'::jsonb) || $${n++}::jsonb`);
+    values.push(JSON.stringify(fresh.map(text => ({ text, by, at }))));
   }
 
   if (!setClauses.length) return res.status(400).json({ error: "No fields to update" });
 
+  let where = `id = $${n++}`;
   values.push(id);
+  for (const s of sending) {
+    where += ` AND NOT ($${n++}::int = ANY(COALESCE(${s.column}, '{}')))`;
+    values.push(s.num);
+  }
 
   try {
-    await pool.query(
-      `UPDATE leads SET ${setClauses.join(", ")} WHERE id = $${n}`,
+    const result = await pool.query(
+      `UPDATE leads SET ${setClauses.join(", ")} WHERE ${where}`,
       values
     );
+
+    if (result.rowCount === 0) {
+      const cur = await pool.query(
+        "SELECT photo_sets_sent, design_sets_sent FROM leads WHERE id = $1", [id]);
+      if (!cur.rows.length) return res.status(404).json({ error: "Lead not found" });
+
+      const clash = sending.find(s => (cur.rows[0][s.column] || []).includes(s.num));
+      return res.status(409).json({
+        error: clash
+          ? `${clash.label} ${clash.num} was already sent to this customer. Pick a different one.`
+          : "Update failed",
+      });
+    }
     res.json({ success: true });
   } catch (err) {
     console.error("Update lead error:", err.message);
     res.status(500).json({ error: "Update failed" });
   }
 };
-
 /* ══════════════════════════════════════
    ADD FOLLOW UP
    ✅ Notification is only ever sent to the
@@ -565,14 +656,66 @@ exports.exportLeadsToExcel = async (req, res) => {
 /* ══════════════════════════════════════
    JUNK / DELETE / REASSIGN
 ══════════════════════════════════════ */
+
 exports.requestJunk = async (req, res) => {
   try {
-    await pool.query(
-      "UPDATE leads SET status='JUNK_REQUESTED', junk_requested_at=NOW() WHERE id=$1",
+    const by = String((req.body && req.body.requested_by) || "").trim() || null;
+
+    const { rows } = await pool.query(
+      `UPDATE leads
+          SET status_before_delete = CASE
+                WHEN UPPER(COALESCE(status, '')) IN ('DELETE_REQUESTED', 'JUNK_REQUESTED')
+                  THEN status_before_delete
+                ELSE status END,
+              status              = 'DELETE_REQUESTED',
+              junk_requested_at   = NOW(),
+              delete_requested_by = $2
+        WHERE id = $1 AND deleted_by_admin = false
+    RETURNING id, name, phone`,
+      [req.params.id, by]
+    );
+    if (!rows.length) return res.status(404).json({ error: "Lead not found" });
+
+    // Tell the CEO(s) there is something to approve
+    const lead = rows[0];
+    getCeoUsers()
+      .then(ceos => notifyMany(ceos.map(u => u.email), {
+        type:        "delete_requested",
+        title:       `Delete request: ${lead.name}`,
+        description: `${by || "A BDA"} asked to delete ${lead.name} (${lead.phone || "No phone"}). Open Leads to approve or reject.`,
+        severity:    "warn",
+        lead_id:     lead.id,
+      }))
+      .catch(e => console.error("Notify delete request error:", e.message));
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Request delete error:", err.message);
+    res.status(500).json({ error: "Failed to send the delete request" });
+  }
+};
+
+/* CEO rejected the request: the lead returns to the BDA with its old status */
+exports.rejectDelete = async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE leads
+          SET status              = COALESCE(NULLIF(status_before_delete, ''), 'New'),
+              status_before_delete = NULL,
+              junk_requested_at    = NULL,
+              delete_requested_by  = NULL
+        WHERE id = $1
+          AND UPPER(COALESCE(status, '')) IN ('DELETE_REQUESTED', 'JUNK_REQUESTED')
+    RETURNING id`,
       [req.params.id]
     );
+    if (!rows.length)
+      return res.status(409).json({ error: "This lead has no pending delete request" });
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    console.error("Reject delete error:", err.message);
+    res.status(500).json({ error: "Failed to reject the request" });
+  }
 };
 
 exports.reassignLead = async (req, res) => {
@@ -582,7 +725,7 @@ exports.reassignLead = async (req, res) => {
       `UPDATE leads
           SET assigned_to=$1, assigned_email=$2, assigned_by='Admin',
               assigned_at=CASE WHEN $1::text IS NULL THEN NULL ELSE NOW() END,
-              status='New', junk_requested_at=NULL
+              status='New', delete_requested_at=NULL
         WHERE id=$3`,
       [owner ? owner.name : null, owner ? owner.email : null, req.params.id]
     );
@@ -756,5 +899,45 @@ exports.assignLead = async (req, res) => {
   } catch (err) {
     console.error("Assign lead error:", err.message);
     res.status(500).json({ error: "Failed to assign lead" });
+  }
+};
+
+exports.getDueReminders = async (req, res) => {
+  try {
+    const { name, email } = req.query;
+    if (!name && !email) return res.json({ reminders: [] });
+
+    const { rows } = await pool.query(
+      `SELECT l.id, l.name, l.phone, l.city, l.status, l.lead_type,
+              l.preferred_call_type, l.preferred_call_time, l.preferred_call_slot,
+              l.description, l.description_notes
+         FROM leads l
+        WHERE l.deleted_by_admin = false
+          AND ${ASSIGNED_TO_ME_SQL("$1", "$2", "l")}
+          AND l.preferred_call_time IS NOT NULL
+          AND l.preferred_call_time <= NOW()
+          AND l.preferred_call_time >  NOW() - INTERVAL '3 days'
+          AND (l.preferred_call_ack IS NULL OR l.preferred_call_ack < l.preferred_call_time)
+          AND LOWER(COALESCE(l.status, '')) <> ALL($3)
+        ORDER BY l.preferred_call_time ASC
+        LIMIT 10`,
+      [name || "", email || "", CLOSED_STATUSES]
+    );
+    res.json({ reminders: rows });
+  } catch (err) {
+    console.error("Due reminders error:", err.message);
+    res.status(500).json({ error: "Failed to load reminders" });
+  }
+};
+
+/* BDA pressed "Got it" — don't show this popup again for that time */
+exports.ackPreferredTime = async (req, res) => {
+  try {
+    await pool.query(
+      "UPDATE leads SET preferred_call_ack = NOW() WHERE id = $1", [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Ack reminder error:", err.message);
+    res.status(500).json({ error: "Failed to dismiss reminder" });
   }
 };

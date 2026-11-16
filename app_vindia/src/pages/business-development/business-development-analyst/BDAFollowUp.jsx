@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../../../context/useAuth";
@@ -6,53 +7,81 @@ import "./BDAFollowUp.css";
 
 const API = "http://localhost:5000/api";
 
-const STATUSES = ["New","Interested","Follow Up","Converted","Not Interested","Contacted","Junk"];
+const STATUSES     = ["New","Interested","Follow Up","Converted","Not Interested","Contacted","Junk"];
+const SET_NUMBERS  = [1,2,3,4,5,6,7,8,9,10];
 
-/* ─── helpers ─── */
+/* Preferred call slots — same list as the Leads → Edit window.
+   The pop-up reminder fires when the chosen slot STARTS (India time). */
+const CALL_SLOTS = [
+  { label: "7 AM – 9 AM",   start: "07:00" },
+  { label: "9 AM – 11 AM",  start: "09:00" },
+  { label: "11 AM – 1 PM",  start: "11:00" },
+  { label: "1 PM – 3 PM",   start: "13:00" },
+  { label: "3 PM – 5 PM",   start: "15:00" },
+  { label: "5 PM – 7 PM",   start: "17:00" },
+  { label: "7 PM – 9 PM",   start: "19:00" },
+];
+
+/* ─── dates: everything is read and shown in India time (IST) ─── */
+const IST = "Asia/Kolkata";
+
+const istDay   = (d) => (d ? new Date(d).toLocaleDateString("en-CA", { timeZone: IST }) : ""); // YYYY-MM-DD
+const todayIST = () => istDay(new Date());
+
 function formatDate(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
+  return new Date(d).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric", timeZone: IST });
 }
 function formatDateTime(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+  return new Date(d).toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", timeZone: IST });
 }
+const isToday    = (d) => !!d && istDay(d) === todayIST();
+const isOverdue  = (d) => !!d && istDay(d) <  todayIST();
+const isUpcoming = (d) => !!d && istDay(d) >  todayIST();
+const daysOverdue = (d) => Math.round((Date.parse(todayIST()) - Date.parse(istDay(d))) / 86400000);
 
-/* Compare only date part (ignore time) */
-function toDateOnly(d) {
-  const dt = new Date(d);
-  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
-}
-function todayDate() {
-  const t = new Date();
-  return new Date(t.getFullYear(), t.getMonth(), t.getDate());
-}
-function isToday(d) {
-  if (!d) return false;
-  return toDateOnly(d).getTime() === todayDate().getTime();
-}
-function isOverdue(d) {
-  if (!d) return false;
-  return toDateOnly(d).getTime() < todayDate().getTime();
-}
-function isUpcoming(d) {
-  if (!d) return false;
-  return toDateOnly(d).getTime() > todayDate().getTime();
-}
-function daysOverdue(d) {
-  const diff = todayDate() - toDateOnly(d);
-  return Math.floor(diff / 86400000);
-}
+/** next call date + slot -> the exact moment (ISO) the reminder should fire */
+const slotStartISO = (dateStr, slotLabel) => {
+  const slot = CALL_SLOTS.find(x => x.label === slotLabel);
+  if (!dateStr || !slot) return "";
+  return new Date(`${dateStr}T${slot.start}:00+05:30`).toISOString();
+};
 
-const CLOSED = ["converted", "not interested", "junk", "junk_requested"];
-const isClosed = (status) => CLOSED.includes((status || "").toLowerCase());
+/* ─── lead helpers ─── */
+const isDeleteRequested = (l) =>
+  ["delete_requested", "junk_requested"].includes((l?.status || "").toLowerCase());
 
-/* Hours left before an un-followed-up lead is escalated back to the pool */
-function hoursLeft(assignedAt, escalationHours) {
-  if (!assignedAt || !escalationHours) return null;
-  const left = escalationHours - (Date.now() - new Date(assignedAt).getTime()) / 3600000;
-  return Math.max(0, Math.ceil(left));
-}
+/** Sets already sent (sorted numbers) — column is photo_sets_sent or design_sets_sent */
+const getSentSets = (lead, column) => {
+  const raw = lead?.[column];
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.map(Number).filter(n => n >= 1 && n <= 10))].sort((a, b) => a - b);
+};
+const nextUnsent = (sent) => SET_NUMBERS.find(n => !sent.includes(n)) || null;
+
+/** Every description the lead has, oldest first (old single `description` column first) */
+const getSavedDescriptions = (lead) => {
+  const list = [];
+  if (lead?.description && String(lead.description).trim())
+    list.push({ text: String(lead.description).trim(), by: null, at: null });
+  (Array.isArray(lead?.description_notes) ? lead.description_notes : []).forEach(n => {
+    if (n && n.text && String(n.text).trim()) list.push(n);
+  });
+  return list;
+};
+const noteMeta = (n) => {
+  const parts = [];
+  if (n.by) parts.push(n.by);
+  if (n.at) parts.push(new Date(n.at).toLocaleString("en-IN", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit", timeZone: IST }));
+  return parts.join(" · ");
+};
+
+const LEAD_TYPE_STYLE = {
+  hot:  { bg:"#fef2f2", color:"#dc2626" },
+  warm: { bg:"#fff7ed", color:"#ea580c" },
+  cold: { bg:"#eff6ff", color:"#2563eb" },
+};
 
 const StatusPill = ({ status }) => {
   const map = {
@@ -68,26 +97,149 @@ const StatusPill = ({ status }) => {
   return <span className="fu-pill" style={{ background:cfg.bg, color:cfg.color }}>{status||"—"}</span>;
 };
 
+const LeadTypePill = ({ type }) => {
+  const st = LEAD_TYPE_STYLE[(type || "").toLowerCase()];
+  if (!st) return null;
+  return <span className="fu-pill" style={{ background:st.bg, color:st.color }}>{type}</span>;
+};
+
 const Sk = () => <div className="fu-sk" />;
 
 /* ════════════════════════════════════════
-   ADD FOLLOW-UP MODAL
+   SET PICKER  (Photo Set / Design Set)
+   A number that was already sent is greyed out and can't be chosen again.
 ════════════════════════════════════════ */
-const AddFollowUpModal = ({ lead, onClose, onSaved }) => {
+const SetPicker = ({ label, prefix, sent, value, onChange }) => {
+  const next = nextUnsent(sent);
+  return (
+    <div className="fu-field">
+      <label className="fu-label">{label}</label>
+      <select className="fu-input" value={value} onChange={e => onChange(e.target.value)}>
+        <option value="">— Select {prefix.toLowerCase()} to mark as sent —</option>
+        {SET_NUMBERS.map(n => {
+          const done = sent.includes(n);
+          return (
+            <option key={n} value={n} disabled={done}>
+              {prefix} {n}{done ? "  ✓ already sent" : ""}
+            </option>
+          );
+        })}
+      </select>
+      {sent.length > 0 ? (
+        <div className="fu-setchips">
+          <span className="fu-setchips__label">Sent:</span>
+          {sent.map(n => <span key={n} className="fu-setchip">{prefix} {n} ✓</span>)}
+          {next
+            ? <span className="fu-setnext">Next: {prefix} {next}</span>
+            : <span className="fu-setnext">All {SET_NUMBERS.length} sent</span>}
+        </div>
+      ) : (
+        <p className="fu-hint">Nothing sent yet — start with {prefix} 1.</p>
+      )}
+    </div>
+  );
+};
+
+/* ════════════════════════════════════════
+   READ-ONLY LEAD DETAILS  (everything collected so far)
+════════════════════════════════════════ */
+const Detail = ({ label, value }) => (
+  <div className="fu-detail">
+    <span className="fu-detail__label">{label}</span>
+    <span className="fu-detail__value">{value || "—"}</span>
+  </div>
+);
+
+const LeadDetails = ({ lead }) => (
+  <div className="fu-details">
+    <p className="fu-section-title">Lead details</p>
+    <div className="fu-details__grid">
+      <Detail label="Email"          value={lead.email} />
+      <Detail label="WhatsApp"       value={lead.whatsapp} />
+      <Detail label="City"           value={lead.city} />
+      <Detail label="Lead Type"      value={lead.lead_type} />
+      <Detail label="Call Status"    value={lead.call_status} />
+      <Detail label="Preferred Call" value={lead.preferred_call_type} />
+      <Detail label="Building Type"  value={lead.building_type} />
+      <Detail label="Floors"         value={lead.floors} />
+      <Detail label="Plot Size"      value={lead.measurement} />
+      <Detail label="Sq. Ft"         value={lead.sqft} />
+      <Detail label="Budget"         value={lead.budget ? `₹${Number(lead.budget).toLocaleString("en-IN")}` : null} />
+      <Detail label="Quotation Sent" value={lead.quotation_sent === true ? "Yes" : lead.quotation_sent === false ? "No" : null} />
+    </div>
+  </div>
+);
+
+/* ════════════════════════════════════════
+   FOLLOW-UP MODAL
+   • all collected data is shown
+   • Next Call Date + Preferred Call Time slot
+   • Photo Set / Design Set — a number can only be sent once
+   • Description — saved ones are locked, new text goes in new boxes
+════════════════════════════════════════ */
+const FollowUpModal = ({ lead, bdaName, onClose, onSaved }) => {
+  const futureDate = isUpcoming(lead.snooze_until) ? istDay(lead.snooze_until) : "";
+
   const [note, setNote]         = useState("");
   const [status, setStatus]     = useState(lead.status || "");
-  const [nextDate, setNextDate] = useState("");
+  const [nextDate, setNextDate] = useState(futureDate);
+  const [slot, setSlot]         = useState(futureDate ? (lead.preferred_call_slot || "") : "");
+  const [photoSet, setPhotoSet]   = useState("");
+  const [designSet, setDesignSet] = useState("");
+  const [newDescs, setNewDescs]   = useState([""]);
   const [saving, setSaving]     = useState(false);
   const [err, setErr]           = useState("");
 
+  const sentPhoto  = useMemo(() => getSentSets(lead, "photo_sets_sent"),  [lead]);
+  const sentDesign = useMemo(() => getSentSets(lead, "design_sets_sent"), [lead]);
+  const savedDescs = useMemo(() => getSavedDescriptions(lead), [lead]);
+
+  const setDescAt     = (i, v) => setNewDescs(a => a.map((d, k) => (k === i ? v : d)));
+  const addDescBox    = () => setNewDescs(a => [...a, ""]);
+  const removeDescBox = (i) => setNewDescs(a => (a.length === 1 ? [""] : a.filter((_, k) => k !== i)));
+
+  const locking = [
+    photoSet  !== "" && `Photo Set ${photoSet}`,
+    designSet !== "" && `Design ${designSet}`,
+  ].filter(Boolean);
+
   const handleSave = async () => {
-    if (!note.trim()) { setErr("Note is required"); return; }
+    const fresh = newDescs.map(d => d.trim()).filter(Boolean);
+
+    if (slot && !nextDate) { setErr("Pick the Next Call Date for the time slot you chose."); return; }
+
+    // The follow-up needs a note. If the BDA only sent a set / added a description,
+    // write a short note for them instead of making them type one.
+    let noteText = note.trim();
+    if (!noteText) {
+      const did = [];
+      if (photoSet  !== "") did.push(`Photo Set ${photoSet} sent`);
+      if (designSet !== "") did.push(`Design ${designSet} sent`);
+      if (did.length)       noteText = did.join(", ");
+      else if (fresh.length) noteText = "Description updated";
+      else { setErr("Write a note, or send a set / add a description."); return; }
+    }
+
     setSaving(true);
+    setErr("");
     try {
+      // 1) sets, descriptions, call slot — first, so "already sent" is caught
+      //    before any follow-up is recorded
+      const payload = {
+        edited_by:           bdaName || "",
+        preferred_call_slot: slot,
+        preferred_call_time: slotStartISO(nextDate, slot),   // "" when no slot
+      };
+      if (photoSet  !== "") payload.photo_set  = Number(photoSet);
+      if (designSet !== "") payload.design_set = Number(designSet);
+      if (fresh.length) payload.new_descriptions = fresh;
+      await axios.put(`${API}/leads/${lead.id}`, payload);
+
+      // 2) the follow-up itself (history + status + next call date)
       await axios.post(`${API}/leads/${lead.id}/followups`, {
-        note, status, nextFollowUp: nextDate || null,
+        note: noteText, status: status || null, nextFollowUp: nextDate || null,
       });
-      onSaved();
+      onSaved({ name: lead.name, nextDate });
     } catch (e) {
       setErr(e.response?.data?.error || "Failed to save");
     } finally {
@@ -95,12 +247,16 @@ const AddFollowUpModal = ({ lead, onClose, onSaved }) => {
     }
   };
 
-  return (
+  const currentNext = lead.snooze_until
+    ? `${formatDate(lead.snooze_until)}${lead.preferred_call_slot ? " · " + lead.preferred_call_slot : ""}`
+    : null;
+
+  return createPortal(
     <div className="fu-overlay" onClick={onClose}>
-      <div className="fu-modal" onClick={e => e.stopPropagation()}>
+      <div className="fu-modal fu-modal--wide" onClick={e => e.stopPropagation()}>
         <div className="fu-modal__header">
           <div>
-            <h2 className="fu-modal__title">Add Follow-up</h2>
+            <h2 className="fu-modal__title">Follow-up</h2>
             <p className="fu-modal__sub">{lead.name} · {lead.phone}</p>
           </div>
           <button className="fu-modal__close" onClick={onClose}>✕</button>
@@ -109,27 +265,80 @@ const AddFollowUpModal = ({ lead, onClose, onSaved }) => {
         <div className="fu-modal__body">
           {err && <div className="fu-alert fu-alert--error">⚠ {err}</div>}
 
+          <LeadDetails lead={lead} />
+
+          {/* ── NEXT CALL ── */}
+          <p className="fu-section-title">Next call</p>
+          <div className="fu-modal__row fu-modal__row--tight">
+            <div className="fu-field">
+              <label className="fu-label">Next Call Date</label>
+              <input className="fu-input" type="date" min={todayIST()}
+                value={nextDate} onChange={e => setNextDate(e.target.value)} />
+            </div>
+            <div className="fu-field">
+              <label className="fu-label">Preferred Call Time</label>
+              <select className="fu-input" value={slot} onChange={e => setSlot(e.target.value)}>
+                <option value="">— Select slot —</option>
+                {CALL_SLOTS.map(s => <option key={s.label} value={s.label}>{s.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <p className="fu-hint">
+            {currentNext ? <>Currently: <b>{currentNext}</b>. </> : null}
+            Pick the date of the next call — leaving it empty clears it. 🔔 A pop-up reminds you when the slot starts.
+          </p>
+
+          {/* ── PHOTO / DESIGN SETS ── */}
+          <p className="fu-section-title">Photo &amp; design sets</p>
+          <div className="fu-modal__row fu-modal__row--tight">
+            <SetPicker label="Photo Set"  prefix="Set"    sent={sentPhoto}  value={photoSet}  onChange={setPhotoSet} />
+            <SetPicker label="Design Set" prefix="Design" sent={sentDesign} value={designSet} onChange={setDesignSet} />
+          </div>
+          {locking.length > 0 && (
+            <p className="fu-lockwarn">
+              🔒 Saving will mark <b>{locking.join(" and ")}</b> as sent. This can't be undone, and it can't be sent to this customer again.
+            </p>
+          )}
+
+          {/* ── DESCRIPTIONS ── */}
+          <p className="fu-section-title">Description</p>
+          {savedDescs.map((d, i) => (
+            <div key={`s${i}`} className="fu-desc fu-desc--saved">
+              <textarea className="fu-input fu-textarea fu-desc__box" rows={2} readOnly value={d.text}
+                title="Saved descriptions can't be edited — add a new one below" />
+              <div className="fu-desc__meta">
+                <span>🔒 Description {i + 1}</span>
+                {noteMeta(d) && <span>{noteMeta(d)}</span>}
+              </div>
+            </div>
+          ))}
+          {newDescs.map((d, i) => (
+            <div key={`n${i}`} className="fu-desc">
+              <textarea className="fu-input fu-textarea fu-desc__box" rows={2} value={d}
+                placeholder={`Description ${savedDescs.length + i + 1}…`}
+                onChange={e => setDescAt(i, e.target.value)} />
+              {newDescs.length > 1 && (
+                <button type="button" className="fu-desc__remove" title="Remove this box"
+                        onClick={() => removeDescBox(i)}>✕</button>
+              )}
+            </div>
+          ))}
+          <button type="button" className="fu-desc__add" onClick={addDescBox}>+ Add another description</button>
+
+          {/* ── NOTE + STATUS ── */}
+          <p className="fu-section-title">This follow-up</p>
           <div className="fu-field">
-            <label className="fu-label">Note <span className="fu-req">*</span></label>
+            <label className="fu-label">Note</label>
             <textarea className="fu-input fu-textarea" rows={3}
               placeholder="What happened during this follow-up?"
               value={note} onChange={e => { setNote(e.target.value); setErr(""); }} />
           </div>
-
-          <div className="fu-modal__row">
-            <div className="fu-field">
-              <label className="fu-label">Update Status</label>
-              <select className="fu-input" value={status} onChange={e => setStatus(e.target.value)}>
-                <option value="">— Keep current —</option>
-                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div className="fu-field">
-              <label className="fu-label">Next Follow-up Date</label>
-              <input className="fu-input" type="date"
-                min={new Date().toISOString().slice(0,10)}
-                value={nextDate} onChange={e => setNextDate(e.target.value)} />
-            </div>
+          <div className="fu-field" style={{ marginTop: 14 }}>
+            <label className="fu-label">Update Status</label>
+            <select className="fu-input" value={status} onChange={e => setStatus(e.target.value)}>
+              <option value="">— Keep current —</option>
+              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
           </div>
 
           <PreviousFollowUps leadId={lead.id} />
@@ -142,7 +351,8 @@ const AddFollowUpModal = ({ lead, onClose, onSaved }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -189,52 +399,79 @@ const PreviousFollowUps = ({ leadId }) => {
 /* ════════════════════════════════════════
    LEAD CARD
 ════════════════════════════════════════ */
-const LeadCard = ({ lead, badge, onFollowUp, escalationHours }) => {
-  const left = badge === "fresh" ? hoursLeft(lead.assigned_at, escalationHours) : null;
+const LeadCard = ({ lead, badge, isCEO, onFollowUp }) => {
+  const sentPhoto  = getSentSets(lead, "photo_sets_sent");
+  const sentDesign = getSentSets(lead, "design_sets_sent");
+  const descs      = getSavedDescriptions(lead);
+  const lastDesc   = descs.length ? descs[descs.length - 1].text : "";
+  const nextPhoto  = nextUnsent(sentPhoto);
+  const nextDesign = nextUnsent(sentDesign);
+
   return (
-  <div className={`fu-card fu-card--${badge}`}>
-    {badge === "fresh" && (
-      <div className={`fu-card__fresh-bar ${left !== null && left <= 4 ? "is-urgent" : ""}`}>
-        🆕 Needs first follow-up
-        {left !== null && ` · ${left}h left before it moves to other BDAs`}
-      </div>
-    )}
-    {badge === "overdue" && (
-      <div className="fu-card__overdue-bar">
-        ⚠ {daysOverdue(lead.next_followup)} day{daysOverdue(lead.next_followup) !== 1 ? "s" : ""} overdue
-      </div>
-    )}
-    {badge === "today" && (
-      <div className="fu-card__today-bar">📅 Due Today</div>
-    )}
-    {badge === "upcoming" && (
-      <div className="fu-card__upcoming-bar">🔔 {formatDate(lead.next_followup)}</div>
-    )}
-    {badge === "all" && (
-      <div className="fu-card__all-bar">📋 Follow-up</div>
-    )}
+    <div className={`fu-card fu-card--${badge}`}>
+      {badge === "overdue" && (
+        <div className="fu-card__overdue-bar">
+          ⚠ {daysOverdue(lead.next_followup)} day{daysOverdue(lead.next_followup) !== 1 ? "s" : ""} overdue
+        </div>
+      )}
+      {badge === "today" && <div className="fu-card__today-bar">📅 Due Today</div>}
+      {badge === "upcoming" && <div className="fu-card__upcoming-bar">🔔 {formatDate(lead.next_followup)}</div>}
+      {badge === "all" && <div className="fu-card__all-bar">📋 Follow-up</div>}
 
-    <div className="fu-card__body">
-      <div className="fu-card__info">
-        <h3 className="fu-card__name">{lead.name}</h3>
-        <p className="fu-card__phone">{lead.phone}</p>
-        {lead.city && <p className="fu-card__city">📍 {lead.city}</p>}
+      <div className="fu-card__body">
+        <div className="fu-card__info">
+          <h3 className="fu-card__name">{lead.name}</h3>
+          <p className="fu-card__phone">{lead.phone}</p>
+          {lead.city && <p className="fu-card__city">📍 {lead.city}</p>}
+        </div>
+        <div className="fu-card__pills">
+          <StatusPill status={lead.status} />
+          <LeadTypePill type={lead.lead_type} />
+        </div>
       </div>
-      <StatusPill status={lead.status} />
+
+      {/* next call */}
+      <div className="fu-card__rows">
+        <div className="fu-card__row">
+          <span className="fu-card__rowlabel">📅 Next call</span>
+          <span className="fu-card__rowvalue">
+            {lead.snooze_until || lead.next_followup
+              ? <>{formatDate(lead.snooze_until || lead.next_followup)}
+                  {lead.preferred_call_slot ? ` · ${lead.preferred_call_slot}` : ""}</>
+              : <span className="fu-muted">Not set</span>}
+            {lead.preferred_call_type ? <span className="fu-card__chip">{lead.preferred_call_type}</span> : null}
+          </span>
+        </div>
+
+        {/* what has already been sent, and what is next */}
+        <div className="fu-card__row">
+          <span className="fu-card__rowlabel">📷 Photo</span>
+          <span className="fu-card__rowvalue">
+            {sentPhoto.length ? `Set ${sentPhoto.join(", ")} sent` : <span className="fu-muted">None sent</span>}
+            {nextPhoto && sentPhoto.length > 0 && <span className="fu-card__next">next: Set {nextPhoto}</span>}
+            {!nextPhoto && <span className="fu-card__next">all sent</span>}
+          </span>
+        </div>
+        <div className="fu-card__row">
+          <span className="fu-card__rowlabel">🎨 Design</span>
+          <span className="fu-card__rowvalue">
+            {sentDesign.length ? `Design ${sentDesign.join(", ")} sent` : <span className="fu-muted">None sent</span>}
+            {nextDesign && sentDesign.length > 0 && <span className="fu-card__next">next: Design {nextDesign}</span>}
+            {!nextDesign && <span className="fu-card__next">all sent</span>}
+          </span>
+        </div>
+      </div>
+
+      {lastDesc && <p className="fu-card__desc" title={lastDesc}>📝 {lastDesc}</p>}
+      {lead.last_note && <p className="fu-card__note">💬 {lead.last_note}</p>}
+
+      <div className="fu-card__footer">
+        {isCEO && lead.assigned_to && <span className="fu-card__assign">👤 {lead.assigned_to.trim()}</span>}
+        <button className="fu-card__btn" onClick={() => onFollowUp(lead)}>
+          + Follow Up
+        </button>
+      </div>
     </div>
-
-    {lead.last_note && (
-      <p className="fu-card__note">💬 {lead.last_note}</p>
-    )}
-
-    <div className="fu-card__footer">
-      <span className="fu-card__source">{lead.source || "Manual"}</span>
-      {lead.assigned_to && <span className="fu-card__assign">👤 {lead.assigned_to.trim()}</span>}
-      <button className="fu-card__btn" onClick={() => onFollowUp(lead)}>
-        + Follow Up
-      </button>
-    </div>
-  </div>
   );
 };
 
@@ -244,9 +481,9 @@ const LeadCard = ({ lead, badge, onFollowUp, escalationHours }) => {
 const BDAFollowUp = () => {
   const navigate = useNavigate();
 
-  // ✅ Same pattern as BDALeads — role/name needed to filter data per-user
   const { user } = useAuth();
-  const role  = user?.role  || null;   // role CODE, e.g. "bda"
+  const role  = user?.role || null;          // role CODE, e.g. "bda", "ceo"
+  const isCEO = role === "ceo";
   const name  = user?.name  || null;
   const email = user?.email || "";
 
@@ -256,30 +493,30 @@ const BDAFollowUp = () => {
   const [search, setSearch]     = useState("");
   const [activeTab, setActiveTab] = useState("today");
   const [modalLead, setModalLead] = useState(null);
-  const [escalationHours, setEscalationHours] = useState(24);
-  const tabChosen = useRef(false);   // true once the user (or first load) picked a tab
+  const [toast, setToast]       = useState("");
 
-  useEffect(() => { loadData(); }, []);
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
-  // Keep the list fresh: newly assigned / escalated leads appear on their own
+  // Wait until the logged-in user is known (before, the page asked the server with
+  // role = null and got the wrong list of leads).
   useEffect(() => {
-    const id = setInterval(() => loadData(true), 60000);
-    return () => clearInterval(id);
-  }, [role, name, email]);
+    if (!user) return;
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.email, role]);
 
-  const loadData = async (silent = false) => {
-    if (!silent) setLoading(true);
+  const loadData = async () => {
+    setLoading(true);
     try {
-      // Only leads ASSIGNED to this BDA (CEO: every assigned lead).
-      // The unassigned pool lives on the Leads page, not here.
-      const params = { role, name, email };
+      // every non-CEO user on this page is treated as a BDA by the server
+      const who = { role: isCEO ? "ceo" : "bda", name, email };
       const [leadsRes, todayRes, pendingRes] = await Promise.all([
-        axios.get(`${API}/leads`, { params: { ...params, assigned_only: 1 } }),
-        axios.get(`${API}/leads/follow-ups/today`, { params }),
-        axios.get(`${API}/leads/follow-ups/pending`, { params }),
+        // assigned_only: only leads that have an owner (a BDA sees just their own)
+        axios.get(`${API}/leads`, { params: { ...who, assigned_only: 1 } }),
+        axios.get(`${API}/leads/follow-ups/today`,   { params: who }),
+        axios.get(`${API}/leads/follow-ups/pending`, { params: who }),
       ]);
-      setAllLeads(leadsRes.data.leads || []);
-      if (leadsRes.data.escalationHours) setEscalationHours(leadsRes.data.escalationHours);
+      setAllLeads((leadsRes.data.leads || []).filter(l => !isDeleteRequested(l)));
       setFollowUps([
         ...(todayRes.data.todayFollowUps    || []).map(f => ({ ...f, _type: "today" })),
         ...(pendingRes.data.pendingFollowUps || []).map(f => ({ ...f, _type: "overdue" })),
@@ -287,117 +524,53 @@ const BDAFollowUp = () => {
     } catch (err) {
       console.error("Follow up load error:", err);
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
   };
 
   /* ══════════════════════════════════════
      CATEGORIZE LEADS
-     
-     Priority order for a lead:
-     1. snooze_until == today  → "today"
-     2. snooze_until < today   → "overdue"
-     3. snooze_until > today   → "upcoming"
-     4. No snooze, but followups table has a record with next_followup == today → "today"
-     5. No snooze, but followups table has a record with next_followup < today  → "overdue"
-     6. No snooze, but followups table has a record with next_followup > today  → "upcoming"
-     7. No snooze, status is any active status → "all"
-     
-     "All Follow-ups" = every lead that is NOT deleted, regardless of status
-     (so BDA can follow up on any lead)
+     Next call date = the lead's snooze_until (set in Leads → Edit or here);
+     fallback: the newest follow-up record's next date.
+       today / overdue / upcoming by that date (India time)
+       "All Follow-ups" = every lead that has an owner
   ══════════════════════════════════════ */
   const categorized = useMemo(() => {
-    const todaySet    = new Map(); // id → lead
+    const todaySet    = new Map();
     const overdueSet  = new Map();
     const upcomingSet = new Map();
-    const allSet      = new Map(); // every lead assigned to me
-    const freshSet    = new Map(); // assigned, but no follow-up logged yet
+    const allSet      = new Map();
 
-    // Build a map: lead_id → latest followup next_followup date from followups table
     const fuMap = new Map();
     followUps.forEach(fu => {
       if (!fu.next_followup) return;
       const existing = fuMap.get(fu.lead_id);
-      // keep the most recent followup entry by created_at
-      if (!existing || new Date(fu.created_at) > new Date(existing.created_at)) {
-        fuMap.set(fu.lead_id, fu);
-      }
+      if (!existing || new Date(fu.created_at) > new Date(existing.created_at)) fuMap.set(fu.lead_id, fu);
     });
 
     allLeads.forEach(lead => {
-      // Add to "all" always
       allSet.set(lead.id, lead);
 
-      // Determine the effective next follow-up date:
-      // prefer snooze_until from leads table, fallback to followups table
-      const snooze  = lead.snooze_until;
       const fuEntry = fuMap.get(lead.id);
-      const fuDate  = fuEntry?.next_followup;
+      const date    = lead.snooze_until || fuEntry?.next_followup;
+      if (!date) return;
 
-      // Check snooze_until first
-      if (snooze) {
-        if (isToday(snooze)) {
-          todaySet.set(lead.id, { ...lead, next_followup: snooze, last_note: fuEntry?.note });
-          return;
-        }
-        if (isOverdue(snooze)) {
-          overdueSet.set(lead.id, { ...lead, next_followup: snooze, last_note: fuEntry?.note });
-          return;
-        }
-        if (isUpcoming(snooze)) {
-          upcomingSet.set(lead.id, { ...lead, next_followup: snooze, last_note: fuEntry?.note });
-          return;
-        }
-      }
-
-      // Fallback: check followups table next_followup
-      if (fuDate) {
-        if (isToday(fuDate)) {
-          todaySet.set(lead.id, { ...lead, next_followup: fuDate, last_note: fuEntry?.note });
-          return;
-        }
-        if (isOverdue(fuDate)) {
-          overdueSet.set(lead.id, { ...lead, next_followup: fuDate, last_note: fuEntry?.note });
-          return;
-        }
-        if (isUpcoming(fuDate)) {
-          upcomingSet.set(lead.id, { ...lead, next_followup: fuDate, last_note: fuEntry?.note });
-          return;
-        }
-      }
-
-      // Assigned but never followed up and nothing scheduled → "Not Started".
-      // This is the clock that escalates to other BDAs if ignored.
-      if (!isClosed(lead.status) && !(lead.followup_count > 0) && !snooze) {
-        freshSet.set(lead.id, lead);
-      }
+      const item = { ...lead, next_followup: date, last_note: fuEntry?.note };
+      if (isToday(date))         todaySet.set(lead.id, item);
+      else if (isOverdue(date))  overdueSet.set(lead.id, item);
+      else if (isUpcoming(date)) upcomingSet.set(lead.id, item);
     });
 
-    // Sort overdue: most overdue first
-    const sortedOverdue = [...overdueSet.values()].sort(
-      (a, b) => new Date(a.next_followup) - new Date(b.next_followup)
-    );
-    // Sort upcoming: soonest first
-    const sortedUpcoming = [...upcomingSet.values()].sort(
-      (a, b) => new Date(a.next_followup) - new Date(b.next_followup)
-    );
-
-    // Oldest assignment first = closest to escalation
-    const sortedFresh = [...freshSet.values()].sort(
-      (a, b) => new Date(a.assigned_at || a.created_at) - new Date(b.assigned_at || b.created_at)
-    );
-
+    const byDate = (a, b) => new Date(a.next_followup) - new Date(b.next_followup);
     return {
-      fresh:    sortedFresh,
       today:    [...todaySet.values()],
-      overdue:  sortedOverdue,
-      upcoming: sortedUpcoming,
-      all:      [...allSet.values()],
+      overdue:  [...overdueSet.values()].sort(byDate),
+      upcoming: [...upcomingSet.values()].sort(byDate),
+      all:      [...allSet.values()].map(l => ({ ...l, ...(allSet.get(l.id) && {}) })),
     };
   }, [allLeads, followUps]);
 
   const counts = {
-    fresh:    categorized.fresh.length,
     today:    categorized.today.length,
     overdue:  categorized.overdue.length,
     upcoming: categorized.upcoming.length,
@@ -415,21 +588,20 @@ const BDAFollowUp = () => {
     );
   }, [categorized, activeTab, search]);
 
-  // First load: land on "Not Started" if there are freshly assigned leads waiting
-  useEffect(() => {
-    if (loading || tabChosen.current) return;
-    tabChosen.current = true;
-    if (categorized.fresh.length > 0) setActiveTab("fresh");
-  }, [loading, categorized]);
-
-  const handleSaved = () => { setModalLead(null); loadData(); };
+  const handleSaved = (info) => {
+    setModalLead(null);
+    loadData();
+    showToast(info?.nextDate
+      ? `Follow-up saved — next call ${formatDate(info.nextDate)}`
+      : "Follow-up saved");
+    window.refreshBDANotifications?.();
+  };
 
   const TABS = [
-    { key:"fresh",    label:"Not Started",    color:"#0ea5e9" },
     { key:"today",    label:"Today",         color:"#ef4444" },
     { key:"overdue",  label:"Overdue",        color:"#f59e0b" },
     { key:"upcoming", label:"Upcoming",       color:"#2563eb" },
-    { key:"all",      label:"All Assigned",   color:"#7c3aed" },
+    { key:"all",      label:"All Follow-ups", color:"#7c3aed" },
   ];
 
   return (
@@ -444,18 +616,13 @@ const BDAFollowUp = () => {
         <div className="bda-header-actions">
           <button className="bda-btn-outline" onClick={loadData}>↻ Refresh</button>
           <button className="bda-btn-primary" onClick={() => navigate("/bda/leads")}>
-            Leads (Assign)
+            View All Leads
           </button>
         </div>
       </div>
 
       {/* ── SUMMARY CARDS ── */}
       <div className="fu-summary">
-        <div className="fu-sum-card fu-sum-card--sky">
-          <span className="fu-sum-card__num">{counts.fresh}</span>
-          <span className="fu-sum-card__label">Not Started</span>
-          <span className="fu-sum-card__icon">🆕</span>
-        </div>
         <div className="fu-sum-card fu-sum-card--red">
           <span className="fu-sum-card__num">{counts.today}</span>
           <span className="fu-sum-card__label">Due Today</span>
@@ -473,7 +640,7 @@ const BDAFollowUp = () => {
         </div>
         <div className="fu-sum-card fu-sum-card--purple">
           <span className="fu-sum-card__num">{counts.all}</span>
-          <span className="fu-sum-card__label">My Leads</span>
+          <span className="fu-sum-card__label">All Leads</span>
           <span className="fu-sum-card__icon">📋</span>
         </div>
       </div>
@@ -486,7 +653,7 @@ const BDAFollowUp = () => {
             return (
               <button
                 key={t.key}
-                onClick={() => { tabChosen.current = true; setActiveTab(t.key); }}
+                onClick={() => setActiveTab(t.key)}
                 style={{
                   display:      "inline-flex",
                   alignItems:   "center",
@@ -500,9 +667,7 @@ const BDAFollowUp = () => {
                   transition:   "all .2s",
                   background:   isActive ? t.color : "#ffffff",
                   color:        isActive ? "#ffffff" : "#64748b",
-                  border:       isActive
-                    ? `1.5px solid ${t.color}`
-                    : "1.5px solid #e2e8f0",
+                  border:       isActive ? `1.5px solid ${t.color}` : "1.5px solid #e2e8f0",
                   outline: "none",
                 }}
               >
@@ -549,21 +714,16 @@ const BDAFollowUp = () => {
       ) : filtered.length === 0 ? (
         <div className="fu-empty">
           <div className="fu-empty__icon">
-            {activeTab === "today" ? "🎉" : activeTab === "overdue" ? "✅" : activeTab === "fresh" ? "👍" : "📭"}
+            {activeTab === "today" ? "🎉" : activeTab === "overdue" ? "✅" : "📭"}
           </div>
           <p className="fu-empty__title">
-            {activeTab === "fresh"    ? "Nothing waiting to be started!" :
-             activeTab === "today"    ? "No follow-ups due today!"  :
+            {activeTab === "today"    ? "No follow-ups due today!"  :
              activeTab === "overdue"  ? "No overdue follow-ups!"    :
              activeTab === "upcoming" ? "No upcoming follow-ups"    :
-             "No assigned leads yet"}
+             "No leads found"}
           </p>
           <p className="fu-empty__sub">
-            {search
-              ? "Try a different search term"
-              : activeTab === "all"
-                ? "Pick up leads from the Leads page — they appear here once assigned to you"
-                : "Check other tabs"}
+            {search ? "Try a different search term" : "Check other tabs or add leads"}
           </p>
         </div>
       ) : (
@@ -577,8 +737,8 @@ const BDAFollowUp = () => {
                 key={`${lead.id}-${lead.next_followup || "no-date"}`}
                 lead={lead}
                 badge={activeTab === "all" ? "all" : activeTab}
+                isCEO={isCEO}
                 onFollowUp={setModalLead}
-                escalationHours={escalationHours}
               />
             ))}
           </div>
@@ -587,12 +747,15 @@ const BDAFollowUp = () => {
 
       {/* ── MODAL ── */}
       {modalLead && (
-        <AddFollowUpModal
+        <FollowUpModal
           lead={modalLead}
+          bdaName={name}
           onClose={() => setModalLead(null)}
           onSaved={handleSaved}
         />
       )}
+
+      {toast && <div className="fu-toast">{toast}</div>}
     </div>
   );
 };

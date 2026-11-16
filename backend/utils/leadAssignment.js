@@ -25,6 +25,7 @@ const CLOSED_STATUSES = [
   "not interested",
   "junk",
   "junk_requested",
+  "delete_requested",
 ];
 
 /* SQL fragment: lead has nobody assigned.
