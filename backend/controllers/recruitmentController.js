@@ -187,6 +187,11 @@ exports.updateOfferDetails = async (req, res) => {
       return res.status(409).json({ error: "This offer was already accepted and can no longer be edited" });
     }
 
+    // The offer letter prints the work location, so it is required.
+    if (!offered_location || !String(offered_location).trim()) {
+      return res.status(400).json({ error: "Work location is required (it is printed in the offer letter)" });
+    }
+
     // The offer letter PDF needs these details, so they are checked here.
     const { errors, clean } = validateOfferLetterData(offer_letter_data, offered_salary);
     if (errors.length) {

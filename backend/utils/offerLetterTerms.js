@@ -137,7 +137,7 @@ const TERMS = [
   {
     title: "11) Data Privacy Compliance Policy",
     items: [
-      L0("You consent to the terms and conditions of the Data Privacy Compliance Policy stated below: -"),
+      L0("You consent to the terms and conditions of the Data Privacy Compliance Policy stated below: \u2013"),
       L0("11.1. You consent to the processing of your personal data in accordance with the Company data privacy policy (the \"Policy\"), a copy of which can be obtained upon request;"),
       L0("11.2. In particular, you explicitly consent to:"),
       L1("\u2022 The collection and processing of sensitive personal data about you to the limited extent and for the purposes described in the Policy;"),

@@ -21,22 +21,49 @@ const LETTERHEAD_IMAGE = path.join(__dirname, "..", "assets", "offer-letterhead.
 const LOGO_LETTERHEAD = path.join(__dirname, "..", "assets", "logo-letterhead.png");
 const LOGO_FALLBACK = path.join(__dirname, "..", "assets", "logo.png");
 
-/* ───────────── page geometry & colours ───────────── */
+// Carlito has the same letter widths as Calibri (the font of the original
+// offer letter), so line breaks match the original. If the font files are
+// missing the letter still works, using Helvetica instead.
+const FONT_REGULAR = path.join(__dirname, "..", "assets", "fonts", "Carlito-Regular.ttf");
+const FONT_BOLD = path.join(__dirname, "..", "assets", "fonts", "Carlito-Bold.ttf");
+const HAS_FONTS = fs.existsSync(FONT_REGULAR) && fs.existsSync(FONT_BOLD);
+const FONT = {
+  reg: HAS_FONTS ? "Body" : "Helvetica",
+  bold: HAS_FONTS ? "Body-Bold" : "Helvetica-Bold",
+  body: HAS_FONTS ? 10.8 : 9.6, // letter and terms text
+  small: HAS_FONTS ? 10.2 : 9.1, // clause headings and table text
+};
+
+/* ───────────── page geometry & colours (measured from the original) ───────────── */
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
-const MARGIN_L = 84;
-const MARGIN_R = 84;
+const MARGIN_L = 84.1;
+const MARGIN_R = 90; // text wraps at x = 505
 const MARGIN_TOP = 172;
 const MARGIN_BOTTOM = 142;
 const L = MARGIN_L;
-const W = PAGE_W - MARGIN_L - MARGIN_R; // 427
+const RIGHT = PAGE_W - MARGIN_R;
+const W = RIGHT - L; // ~421
+
+// Annexure 2: clause headings, clauses and sub-clauses are indented
+const T_HEAD_X = 100.3;
+const T_ITEM_X = 120.7;
+const T_SUB_X = 141.8;
+const T_RIGHT = 500;
+
+// Tables
+const TABLE_X = 84.7;
+const INFO_COLS = [175.2, 242.2];
+const SAL_COLS = [226.7, 91.6, 99.1];
+const ROW_H = 16.1;
+const HEAD_H = 28.2;
 
 const INK = "#111111";
 const SKY = "#4aa3df";
 const SKY_TEXT = "#5b9bd0";
 const TABLE_HEAD = "#ece9e1";
-const BORDER = "#222222";
+const BORDER = "#1a1a1a";
 
 const SALARY_KEYS = [
   "basic",
@@ -91,7 +118,8 @@ const todayIST = () => new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().sl
 
 /* ───────────── salary maths ───────────── */
 
-const monthly = (annual) => Math.round(annual / 12);
+// rounds half down, as the original letter does (4,049.5 -> 4,049)
+const monthly = (annual) => Math.ceil(annual / 12 - 0.5);
 
 function computeSalary(b) {
   const a = {};
@@ -136,8 +164,8 @@ function validateOfferLetterData(raw, ctcRaw) {
   if (!SALUTATIONS.includes(clean.salutation)) errors.push("Salutation must be Mr., Ms., Mrs. or Dr.");
   if (!clean.greeting_name) errors.push("Greeting name is required (for example the candidate's first name)");
   if (!clean.address) errors.push("Candidate address is required for the letter");
-  if (clean.acceptance_deadline && !/^\d{4}-\d{2}-\d{2}$/.test(clean.acceptance_deadline)) {
-    errors.push("Acceptance deadline must be a valid date");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(clean.acceptance_deadline)) {
+    errors.push("Acceptance deadline is required (the letter asks the candidate to accept by this date)");
   }
   if (!/^\d{1,2}:\d{2}$/.test(clean.reporting_time)) errors.push("Reporting time must be a valid time");
 
@@ -245,46 +273,77 @@ function drawLetterhead(doc) {
   doc.y = sy;
 }
 
-/* ───────────── text helpers (always explicit x / y) ───────────── */
+/* ───────────── text helpers ───────────── */
+
+// typographic quotes, like the original letter: "x" -> “x”, don't -> don’t
+const smart = (s) =>
+  String(s)
+    .replace(/(^|[\s(\[])"/g, "$1\u201C")
+    .replace(/"/g, "\u201D")
+    .replace(/(^|[\s(\[])'/g, "$1\u2018")
+    .replace(/'/g, "\u2019");
+
+// "ram kumar" -> "Ram Kumar" (only words typed fully in lower case are changed)
+const tidyName = (s) =>
+  String(s || "")
+    .trim()
+    .split(/\s+/)
+    .map((w) => (w && w === w.toLowerCase() ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(" ");
 
 function makeWriter(doc) {
   const bottom = () => PAGE_H - MARGIN_BOTTOM;
 
+  // start a new page if less than h points are left
   const ensure = (h) => {
     if (doc.y + h > bottom()) doc.addPage();
   };
 
+  const lineHeight = (size, font) =>
+    doc.font(font || FONT.reg).fontSize(size || FONT.body).currentLineHeight(true);
+
   const write = (text, o = {}) => {
-    doc.font(o.bold ? "Helvetica-Bold" : "Helvetica").fontSize(o.size || 10).fillColor(INK);
+    doc.font(o.bold ? FONT.bold : FONT.reg).fontSize(o.size || FONT.body).fillColor(INK);
     const x = o.x ?? L;
-    doc.text(text, x, doc.y, {
-      width: o.width ?? W - (x - L),
+    doc.text(smart(text), x, doc.y, {
+      width: o.width ?? (o.right ?? RIGHT) - x,
       align: o.align || "left",
-      lineGap: o.lineGap ?? 2,
+      lineGap: o.lineGap ?? 0,
     });
-    if (o.after !== undefined) doc.moveDown(o.after);
   };
 
-  return { ensure, write, bottom };
+  const gap = (pts) => {
+    doc.y += pts;
+  };
+  // one empty line of body text
+  const blank = (n = 1) => gap(lineHeight() * n);
+
+  return { ensure, write, gap, blank, bottom, lineHeight };
 }
 
 /* ───────────── tables ───────────── */
 
-function drawRow(doc, y, h, cols, cells, opts = {}) {
-  // cells: [{ text, align, bold }]
-  let x = L;
+function drawRow(doc, x0, y, h, cols, cells, opts = {}) {
+  // cells: [{ text, align, bold, sup }]
+  let x = x0;
+  const width = cols.reduce((a, b) => a + b, 0);
   if (opts.fill) {
-    doc.save().rect(L, y, W, h).fill(opts.fill).restore();
+    doc.save().rect(x0, y, width, h).fill(opts.fill).restore();
   }
   cols.forEach((w, i) => {
     doc.save().lineWidth(0.7).strokeColor(BORDER).rect(x, y, w, h).stroke().restore();
     const c = cells[i] || {};
-    doc.font(c.bold || opts.bold ? "Helvetica-Bold" : "Helvetica").fontSize(9.5).fillColor(INK);
-    doc.text(String(c.text ?? ""), x + 6, y + (h - 9.5) / 2 - 0.5, {
-      width: w - 12,
-      align: c.align || "left",
-      lineBreak: false,
-    });
+    const font = c.bold || opts.bold ? FONT.bold : FONT.reg;
+    const size = FONT.small;
+    const text = smart(String(c.text ?? ""));
+    doc.font(font).fontSize(size).fillColor(INK);
+    const ty = y + (h - size) / 2 - 0.8;
+    doc.text(text, x + 5, ty, { width: w - 10, align: c.align || "left", lineBreak: false });
+    if (c.sup) {
+      // small raised footnote number after the label
+      const tw = doc.widthOfString(text);
+      doc.fontSize(size * 0.62).text(c.sup, x + 5 + tw + 0.5, ty - 2.2, { lineBreak: false });
+    }
     x += w;
   });
 }
@@ -296,10 +355,13 @@ function buildPdf(candidate) {
   const salary = computeSalary(data.salary_breakup);
   const noticeWord = cap(numWord(Number(data.notice_months) || 3));
   const probationN = Number(data.probation_months) || 6;
-  const fill = (s) => s.replace(/\{\{NOTICE_WORD\}\}/g, noticeWord);
+  const fill = (str) => str.replace(/\{\{NOTICE_WORD\}\}/g, noticeWord);
 
   const joining = fmtDate(candidate.joining_date_text || candidate.joining_date);
-  const fullName = `${data.salutation ? `${data.salutation} ` : ""}${candidate.name}`.trim();
+  const greeting = tidyName(data.greeting_name || candidate.name);
+  const fullName = `${data.salutation ? `${data.salutation} ` : ""}${tidyName(candidate.name)}`.trim();
+  const role = tidyName(candidate.offered_role);
+  const location = tidyName(candidate.offered_location);
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -310,6 +372,10 @@ function buildPdf(candidate) {
         Author: T.COMPANY.legalName,
       },
     });
+    if (HAS_FONTS) {
+      doc.registerFont("Body", FONT_REGULAR);
+      doc.registerFont("Body-Bold", FONT_BOLD);
+    }
     const chunks = [];
     doc.on("data", (c) => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -317,54 +383,61 @@ function buildPdf(candidate) {
     doc.on("pageAdded", () => drawLetterhead(doc));
 
     try {
-      const { ensure, write, bottom } = makeWriter(doc);
+      const { ensure, write, gap, blank, bottom, lineHeight } = makeWriter(doc);
       drawLetterhead(doc);
       doc.x = L;
-      doc.y = MARGIN_TOP;
+      doc.y = 184.6;
 
-      /* ── page 1: the letter ── */
-      write("PRIVATE AND CONFIDENTIAL", { bold: true, align: "center", after: 1.2 });
+      /* ── the letter ── */
+      write("PRIVATE AND CONFIDENTIAL", { bold: true, align: "center" });
+      blank();
       write(fmtDate(data.letter_date) || fmtDate(todayIST()));
       write(fullName, { bold: true });
       String(data.address || "")
         .split(/\r?\n/)
-        .map((s) => s.trim())
+        .map((line) => line.trim())
         .filter(Boolean)
-        .forEach((line) => write(line, { lineGap: 1 }));
-      doc.moveDown(1);
-      write(`Dear ${data.greeting_name || candidate.name},`, { after: 0.9 });
-      write(`Welcome to ${T.COMPANY.letterName}!`, { after: 0.9 });
+        .forEach((line) => write(line));
+      blank();
+      write(`Dear ${greeting},`);
+      blank();
+      write(`Welcome to ${T.COMPANY.letterName}!`);
+      blank();
 
-      // paragraph with the role in bold
-      doc.font("Helvetica").fontSize(10).fillColor(INK);
+      // first paragraph, with the role in bold
       const probationText =
         probationN === 1
           ? "The first month of your employment shall be a probationary period."
           : `The first ${numWord(probationN)} months of your employment shall be a probationary period.`;
+      doc.font(FONT.reg).fontSize(FONT.body).fillColor(INK);
       doc.text(
-        `It was a pleasure meeting you to explore a career opportunity with ${T.COMPANY.letterName} ${T.COMPANY.division}. Based on our discussion, we are pleased to offer you the position of `,
-        L, doc.y, { width: W, align: "justify", lineGap: 2, continued: true },
+        smart(`It was a pleasure meeting you to explore a career opportunity with ${T.COMPANY.letterName} ${T.COMPANY.division}. Based on our discussion, we are pleased to offer you the position of `),
+        L, doc.y, { width: W, align: "left", continued: true },
       );
-      doc.font("Helvetica-Bold").text(candidate.offered_role, { continued: true });
-      doc.font("Helvetica").text(
-        `. ${probationText} The payment will be done on 1st Calendar day of the month and your salary would be as per Annexure 1. The details of the terms and conditions of the offer of employment are detailed in the enclosed annexure.`,
+      doc.font(FONT.bold).text(smart(`${role}.`), { continued: true });
+      doc.font(FONT.reg).text(
+        smart(`  ${probationText} The payment will be done on 1st Calendar day of the month and your salary would be as per Annexure 1. The details of the terms and conditions of the offer of employment are detailed in the enclosed annexure.`),
         { continued: false },
       );
-      doc.moveDown(0.9);
+      blank();
 
-      T.WELCOME_PARAGRAPHS.forEach((p) => write(p, { align: "justify", after: 0.9 }));
+      T.WELCOME_PARAGRAPHS.forEach((para) => {
+        write(para);
+        blank();
+      });
 
       const reportingTime = fmtTime(data.reporting_time);
-      const joinText =
+      write(
         `${T.BGV_CONTINGENCY} We look forward to you joining us at our ${T.COMPANY.reportingCity} office ` +
-        `(${data.reporting_address || T.COMPANY.officeAddress}) on ${joining}.` +
-        (reportingTime ? ` The reporting time is ${reportingTime}.` : "") +
-        (candidate.offered_location ? ` Kindly note your job location will be ${candidate.offered_location}.` : "") +
-        " Please keep your recruiter informed, in case of an advancement in the joining date.";
-      write(joinText, { align: "justify", after: 0.9 });
-
+          `(${data.reporting_address || T.COMPANY.officeAddress}) on ${joining}.` +
+          (reportingTime ? ` The reporting time is ${reportingTime}.` : "") +
+          (location ? ` Kindly note your job location will be ${location}.` : "") +
+          " Please keep your recruiter informed, in case of an advancement in the joining date.",
+      );
+      blank();
       if (data.acceptance_deadline) {
-        write(`Please endorse your acceptance on or before ${fmtDate(data.acceptance_deadline)}.`, { after: 1 });
+        write(`Please endorse your acceptance on or before ${fmtDate(data.acceptance_deadline)}.`);
+        blank();
       }
 
       /* ── Annexure 1 ── */
@@ -372,43 +445,40 @@ function buildPdf(candidate) {
         ["Name", fullName],
         ["Band", data.band || "Band 1"],
         ["Level", data.level || "Level 1"],
-        ["Designation", candidate.offered_role],
+        ["Designation", role],
       ];
       const salRows = [
         { label: "Basic", key: "basic" },
         { label: "House Rent Allowance", key: "hra" },
         { label: "Leave Travel Allowance", na: true },
         { label: "Special Allowance", key: "special_allowance" },
-        { label: "Ex-Gratia Bonus (1)", key: "ex_gratia" },
+        { label: "Ex-Gratia Bonus", sup: "1", key: "ex_gratia" },
         { label: "TOTAL FIXED CASH", total: salary.totalFixed, bold: true },
-        { label: "Variable Pay (2)", key: "variable_pay" },
+        { label: "Variable Pay", sup: "2", key: "variable_pay" },
         { label: "TARGET CASH COMPENSATION", total: salary.targetCash, bold: true },
         { label: "Medical Insurance Premium", key: "medical_insurance" },
         { label: "TARGET COST TO COMPANY", total: salary.ctc, bold: true },
       ];
-      const ROW = 21;
-      // title + both tables must fit together; the notes below may flow on
-      const annexHeight = 24 + infoRows.length * ROW + 6 + (salRows.length + 1) * ROW + 40;
-      // keep the title and the tables together on one page
-      if (doc.y + annexHeight > bottom()) doc.addPage();
-      else doc.moveDown(0.6);
+      // title and both tables stay together on one page
+      const annexHeight = lineHeight() + 4 + infoRows.length * ROW_H + 2 + HEAD_H + salRows.length * ROW_H + 40;
+      ensure(annexHeight);
 
-      write("Annexure -1", { bold: true, align: "center", after: 0.5 });
+      write("Annexure -1", { bold: true, align: "center", x: TABLE_X, width: INFO_COLS[0] + INFO_COLS[1] });
+      gap(2);
 
       let y = doc.y;
       infoRows.forEach(([k, v]) => {
-        drawRow(doc, y, ROW, [W * 0.4, W * 0.6], [{ text: k, bold: true }, { text: v, bold: true }]);
-        y += ROW;
+        drawRow(doc, TABLE_X, y, ROW_H, INFO_COLS, [{ text: k, bold: true }, { text: v, bold: true }]);
+        y += ROW_H;
       });
-      y += 4;
+      y += 0.5;
 
-      const cols = [W * 0.55, W * 0.225, W * 0.225];
       drawRow(
-        doc, y, ROW + 2, cols,
+        doc, TABLE_X, y, HEAD_H, SAL_COLS,
         [{ text: "SALARY COMPONENT", bold: true }, { text: "MONTHLY GROSS", bold: true, align: "right" }, { text: "ANNUAL GROSS", bold: true, align: "right" }],
         { fill: TABLE_HEAD },
       );
-      y += ROW + 2;
+      y += HEAD_H;
       salRows.forEach((r) => {
         let mo;
         let an;
@@ -423,68 +493,69 @@ function buildPdf(candidate) {
           an = inr(salary.a[r.key]);
         }
         drawRow(
-          doc, y, ROW, cols,
-          [{ text: r.label, bold: r.bold }, { text: mo, align: "right", bold: r.bold }, { text: an, align: "right", bold: r.bold }],
+          doc, TABLE_X, y, ROW_H, SAL_COLS,
+          [{ text: r.label, bold: r.bold, sup: r.sup }, { text: mo, align: "right", bold: r.bold }, { text: an, align: "right", bold: r.bold }],
         );
-        y += ROW;
+        y += ROW_H;
       });
       doc.x = L;
-      doc.y = y + 12;
+      doc.y = y + lineHeight() * 1.1;
 
-      write("Note:", { after: 0.4 });
-      T.SALARY_NOTES.forEach((n) => write(n, { size: 9.5, align: "justify", after: 0.4 }));
-      doc.moveDown(0.8);
+      write("Note:");
+      blank();
+      T.SALARY_NOTES.forEach((n) => write(n));
 
       /* ── Additional Benefits ── */
-      ensure(80);
-      write("Additional Benefits.", { bold: true, after: 0.5 });
+      blank();
+      ensure(lineHeight() * 6);
+      write("Additional Benefits.", { bold: true });
+      gap(lineHeight() + 3);
       T.ADDITIONAL_BENEFITS.forEach((b) => {
-        doc.font("Helvetica").fontSize(10);
-        const h = doc.heightOfString(b, { width: W - 22, lineGap: 2 });
-        ensure(h + 6);
+        doc.font(FONT.reg).fontSize(FONT.body);
+        const h = doc.heightOfString(smart(b), { width: RIGHT - 120.1, lineGap: 4.9 });
+        ensure(Math.min(h, 60));
         const by = doc.y;
-        doc.text("\u2022", L + 6, by, { lineBreak: false });
-        doc.text(b, L + 22, by, { width: W - 22, align: "justify", lineGap: 2 });
-        doc.moveDown(0.5);
+        doc.text("\u2022", 102.1, by, { lineBreak: false });
+        doc.text(smart(b), 120.1, by, { width: RIGHT - 120.1, align: "left", lineGap: 4.9 });
       });
+      gap(lineHeight() * 0.8);
 
       /* ── Annexure 2: Terms of employment ── */
-      ensure(120);
-      doc.moveDown(0.8);
-      write("ANNEXURE - 2", { bold: true, align: "center", after: 0.6 });
-      write("TERMS OF EMPLOYMENT", { bold: true, size: 9, align: "center", after: 0.6 });
-      write(T.TERMS_INTRO, { align: "justify", after: 0.8 });
+      ensure(lineHeight() * 9);
+      write("ANNEXURE - 2", { bold: true, align: "center" });
+      gap(lineHeight() * 0.9);
+      write("TERMS OF EMPLOYMENT", { bold: true, size: FONT.small - 0.6, align: "center" });
+      gap(lineHeight() * 0.9);
+      write(T.TERMS_INTRO, { x: T_HEAD_X, right: T_RIGHT });
+      gap(lineHeight() * 0.7);
 
       T.TERMS.forEach((section) => {
-        ensure(60);
-        write(section.title, { bold: true, size: 9.5, after: 0.3 });
+        ensure(lineHeight() * 4);
+        write(section.title, { bold: true, size: FONT.small, x: T_HEAD_X, right: T_RIGHT });
+        gap(4.7);
         section.items.forEach((item) => {
-          const x = L + (item.level === 1 ? 36 : 18);
-          const text = fill(item.text);
-          doc.font("Helvetica").fontSize(9.5);
-          const h = doc.heightOfString(text, { width: W - (x - L), lineGap: 1.5 });
-          ensure(Math.min(h, 60) + 4);
-          write(text, { x, size: 9.5, align: "justify", lineGap: 1.5, after: 0.35 });
+          const x = item.level === 1 ? T_SUB_X : T_ITEM_X;
+          write(fill(item.text), { x, right: T_RIGHT });
+          if (item.level === 1) gap(3);
         });
-        doc.moveDown(0.4);
+        gap(9.4);
       });
 
       /* ── Acknowledgement ── */
-      doc.moveDown(2.5);
-      ensure(230);
-      doc.x = L;
-      write(T.ACK_TITLE, { bold: true, size: 9.5, align: "center", after: 2 });
-      write(`I, ____________________________________________________ ${T.ACK_TEXT}`, { align: "justify", after: 1.5 });
-      write(
-        `I confirm my acceptance of the offer and shall report for work on ${joining}.`,
-        { after: 3 },
-      );
+      gap(lineHeight() * 1.5);
+      ensure(lineHeight() * 14 + 120);
+      write(T.ACK_TITLE, { bold: true, size: FONT.small, align: "center" });
+      blank(2);
+      write(`I, ${"_".repeat(50)} ${T.ACK_TEXT}`);
+      blank(2);
+      write(`I confirm my acceptance of the offer and shall report for work on ${joining}.`);
+      blank(2.5);
 
       ["Signature:", "Name:", "Date:", "Place:"].forEach((label) => {
         const ly = doc.y;
-        doc.font("Helvetica").fontSize(10).fillColor(INK).text(label, L + 150, ly, { lineBreak: false });
-        doc.save().lineWidth(0.6).strokeColor("#444").moveTo(L + 225, ly + 11).lineTo(L + W, ly + 11).stroke().restore();
-        doc.y = ly + 28;
+        doc.font(FONT.reg).fontSize(FONT.body).fillColor(INK).text(label, 247.4, ly, { lineBreak: false });
+        doc.save().lineWidth(0.6).strokeColor("#333").moveTo(312.3, ly + 11).lineTo(506, ly + 11).stroke().restore();
+        doc.y = ly + 25;
       });
 
       doc.end();

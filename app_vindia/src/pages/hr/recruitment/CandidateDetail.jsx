@@ -694,6 +694,12 @@ const CandidateDetail = () => {
     ) {
       return "Role, salary and joining date are required.";
     }
+    if (!offerForm.offered_location.trim()) {
+      return "Enter the work location. It is printed in the offer letter.";
+    }
+    if (!offerForm.acceptance_deadline) {
+      return "Enter the acceptance deadline. The letter asks the candidate to accept by this date.";
+    }
     if (!offerForm.greeting_name.trim()) {
       return "Enter the name to greet the candidate with (for example their first name).";
     }
@@ -1550,7 +1556,7 @@ const CandidateDetail = () => {
                   />
                 </label>
                 <label className="cd-field">
-                  Work location
+                  Work location *
                   <input
                     name="offered_location"
                     value={offerForm.offered_location}
@@ -1641,7 +1647,7 @@ const CandidateDetail = () => {
                   />
                 </label>
                 <label className="cd-field">
-                  Acceptance deadline
+                  Acceptance deadline *
                   <input
                     type="date"
                     name="acceptance_deadline"
