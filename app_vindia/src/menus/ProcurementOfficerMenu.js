@@ -9,7 +9,7 @@ export const procurementOfficerMenu = [
     name: "Purchase Requests",
     path: "/operations/procurement/purchase-requests",
     icon: "file-plus",
-  },
+  }, 
 
   {
     name: "Vendors",

@@ -109,7 +109,7 @@ import ApprovedRequests from "../pages/operations/MaterialRequests/ApprovedReque
 import VendorsView from "../pages/operations/procurement/VendorsView";
 
 import ProcurementDailyReport from "../pages/operations/procurement/ProcurementDailyReport";
-
+import DeliveryFollowUp from "../pages/operations/procurement/DeliveryFollowUp";
 
 /* ── SHARED COMPONENTS ───────────────────────────────────── */
 
@@ -2745,6 +2745,16 @@ const AppRoutes = () => {
 
           }
 
+        />
+                <Route
+          path="/operations/procurement/delivery-follow-up"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PROCUREMENT_OFFICER]}>
+              <ProcurementOfficerLayout>
+                <DeliveryFollowUp />
+              </ProcurementOfficerLayout>
+            </ProtectedRoute>
+          }
         />
 
 
