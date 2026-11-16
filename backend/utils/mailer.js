@@ -19,14 +19,19 @@ const transporter = nodemailer.createTransport({
 const FROM = process.env.MAIL_FROM || process.env.SMTP_USER;
 const APP_URL = (process.env.APP_URL || "http://localhost:5173").replace(/\/$/, "");
 
+// Company name used in the BGV and offer emails (override in .env).
+const COMPANY_NAME = process.env.COMPANY_NAME || "Vindia Infrasec";
+const COMPANY_LEGAL_NAME = process.env.COMPANY_LEGAL_NAME || "Vindia Infrasec Pvt Ltd";
+
 /**
  * Send one email. Never throws — always resolves with { success, error }
  * so callers can log the attempt either way instead of crashing a request.
  * `text` is an optional plain-text version (better deliverability).
+ * `attachments` is an optional nodemailer attachments array.
  */
-const sendMail = async ({ to, subject, html, text }) => {
+const sendMail = async ({ to, subject, html, text, attachments }) => {
   try {
-    await transporter.sendMail({ from: FROM, to, subject, html, text });
+    await transporter.sendMail({ from: FROM, to, subject, html, text, attachments });
     return { success: true, error: null };
   } catch (err) {
     console.error("MAILER ERROR:", err.message);
@@ -84,41 +89,50 @@ const aptitudeTestEmailTemplate = (candidateName, jobTitle, testLink) => ({
   `,
 });
 
-const offerReleaseEmailTemplate = (
-  candidateName,
-  jobTitle,
-  offeredRole,
-  offeredSalary,
-  joiningDate,
-  extra = {},
-) => {
-  const { location, employmentType, managerName } = extra;
-  const joining = joiningDate
-    ? new Date(joiningDate).toLocaleDateString("en-IN", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "—";
+/**
+ * Offer email — the PDF offer letter is attached by the controller.
+ * Wording follows the HR offer email sample.
+ * Sign-off: set HR_SIGNATORY_NAME / HR_SIGNATORY_TITLE in .env (for example
+ * "Sheeba" / "HR Manager.").
+ */
+const offerReleaseEmailTemplate = ({ greetingName, offeredRole }) => {
+  const senderName = process.env.HR_SIGNATORY_NAME || "HR Team";
+  const senderTitle = process.env.HR_SIGNATORY_TITLE || "";
 
-  return {
-    subject: `Offer of Employment — ${offeredRole}`,
-    html: `
-    <p>Hi ${esc(candidateName)},</p>
-    <p>Congratulations! We're pleased to offer you the position of
-    <strong>${esc(offeredRole)}</strong> at Vindia Technologies.</p>
-    <ul>
-      <li><strong>Role:</strong> ${esc(offeredRole)}</li>
-      <li><strong>Annual Salary:</strong> ₹${Number(offeredSalary).toLocaleString("en-IN")}</li>
-      <li><strong>Joining Date:</strong> ${esc(joining)}</li>
-      ${location ? `<li><strong>Work Location:</strong> ${esc(location)}</li>` : ""}
-      ${employmentType ? `<li><strong>Employment Type:</strong> ${esc(employmentType)}</li>` : ""}
-      ${managerName ? `<li><strong>Reporting To:</strong> ${esc(managerName)}</li>` : ""}
-    </ul>
-    <p>We're excited to have you join the team. Please reply to this email to confirm your acceptance.</p>
-    <p>Best regards,<br/>Vindia Technologies HR Team</p>
-  `,
-  };
+  const html = `
+    <p>Hello ${esc(greetingName)},</p>
+    <p>We're delighted to offer you the job of ${esc(offeredRole)} - Congratulations!<br/>
+    Please find the Offer Letter attached. Once you accept the offer kindly send the signed copy back to this mail ID.</p>
+    <p>We'll need to do pre-employment screening checks before you can start in your new job.
+    We run these checks to keep our customers and employees safe and as part of our commitment to our regulators.</p>
+    <p>It's really important you accept your contract so that we can begin this process.</p>
+    <p>If you have any questions about your contract, please contact your manager or recruiter.</p>
+    <p>Thanks &amp; Regards,<br/>${esc(senderName)}<br/>${
+      senderTitle ? `${esc(senderTitle)}<br/>` : ""
+    }${esc(COMPANY_LEGAL_NAME)}.</p>
+  `;
+
+  const text = [
+    `Hello ${greetingName},`,
+    "",
+    `We're delighted to offer you the job of ${offeredRole} - Congratulations!`,
+    "Please find the Offer Letter attached. Once you accept the offer kindly send the signed copy back to this mail ID.",
+    "",
+    "We'll need to do pre-employment screening checks before you can start in your new job. We run these checks to keep our customers and employees safe and as part of our commitment to our regulators.",
+    "",
+    "It's really important you accept your contract so that we can begin this process.",
+    "",
+    "If you have any questions about your contract, please contact your manager or recruiter.",
+    "",
+    "Thanks & Regards,",
+    senderName,
+    senderTitle,
+    `${COMPANY_LEGAL_NAME}.`,
+  ]
+    .filter((line, i, arr) => line !== "" || arr[i - 1] !== "")
+    .join("\n");
+
+  return { subject: `${COMPANY_NAME} Offer Letter`, html, text };
 };
 
 // scheduledAt arrives as "YYYY-MM-DDTHH:mm", exactly as HR typed it.
@@ -247,8 +261,6 @@ const welcomeCredentialsEmailTemplate = ({ name, email, employeeCode, tempPasswo
    link to upload to. The list below is easy to edit.
 ═══════════════════════════════════════ */
 
-const BGV_COMPANY = process.env.COMPANY_NAME || "Vindia Infrasec";
-
 const BGV_DOCUMENTS = [
   "Updated resume",
   "Aadhaar card",
@@ -271,7 +283,7 @@ const bgvRequestEmailTemplate = ({ candidateName, jobTitle, driveLink, deadline,
   const html = `
     <p>Hello ${esc(candidateName)},</p>
     <p>Congratulations on moving forward for the <strong>${esc(jobTitle || "position")}</strong>
-    role at ${esc(BGV_COMPANY)}. As the next step we need to complete your background verification.</p>
+    role at ${esc(COMPANY_NAME)}. As the next step we need to complete your background verification.</p>
     <p>Please upload the following documents to our secure drive folder${
       deadlineText ? ` by <strong>${esc(deadlineText)}</strong>` : ""
     }:</p>
@@ -283,13 +295,13 @@ const bgvRequestEmailTemplate = ({ candidateName, jobTitle, driveLink, deadline,
     ${note ? `<p>${esc(note)}</p>` : ""}
     <p>Please keep the file names clear (for example "Aadhaar.pdf"). If you have any trouble with
     the link, just reply to this email.</p>
-    <p>Thanks &amp; Regards,<br/>HR Team<br/>${esc(BGV_COMPANY)}</p>
+    <p>Thanks &amp; Regards,<br/>HR Team<br/>${esc(COMPANY_NAME)}</p>
   `;
 
   const text = [
     `Hello ${candidateName},`,
     "",
-    `Congratulations on moving forward for the ${jobTitle || "position"} role at ${BGV_COMPANY}. As the next step we need to complete your background verification.`,
+    `Congratulations on moving forward for the ${jobTitle || "position"} role at ${COMPANY_NAME}. As the next step we need to complete your background verification.`,
     "",
     `Please upload the following documents${deadlineText ? ` by ${deadlineText}` : ""}:`,
     ...BGV_DOCUMENTS.map((d) => `- ${d}`),
@@ -297,7 +309,7 @@ const bgvRequestEmailTemplate = ({ candidateName, jobTitle, driveLink, deadline,
     `Upload link: ${driveLink}`,
     note ? `\n${note}` : "",
     "",
-    `Thanks & Regards,\nHR Team\n${BGV_COMPANY}`,
+    `Thanks & Regards,\nHR Team\n${COMPANY_NAME}`,
   ].join("\n");
 
   return {

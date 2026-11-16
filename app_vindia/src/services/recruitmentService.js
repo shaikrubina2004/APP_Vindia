@@ -50,6 +50,8 @@ const recruitmentService = {
   updateBGV: (id, data) => api.patch(`${R}/candidates/${id}/bgv`, data),
 
   /* ── Offer ────────────────────────────────────────────── */
+  previewOfferLetter: (id, data) =>
+    api.post(`${R}/candidates/${id}/offer/preview`, data || {}, { responseType: "blob" }),
   releaseOffer: (id) => api.post(`${R}/candidates/${id}/offer/release`),
   recordOfferResponse: (id, data) =>
     api.patch(`${R}/candidates/${id}/offer/response`, data),

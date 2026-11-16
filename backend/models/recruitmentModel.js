@@ -202,6 +202,7 @@ const Recruitment = {
       offered_location,
       offered_employment_type,
       offered_manager_id,
+      offer_letter_data,
     },
   ) => {
     const result = await pool.query(
@@ -213,6 +214,7 @@ const Recruitment = {
            offered_location = $5,
            offered_employment_type = $6,
            offered_manager_id = $7,
+           offer_letter_data = $9::jsonb,
            offer_status = NULL,
            stage = 'offer',
            updated_at = NOW()
@@ -227,6 +229,7 @@ const Recruitment = {
         offered_employment_type || null,
         offered_manager_id || null,
         id,
+        offer_letter_data ? JSON.stringify(offer_letter_data) : null,
       ],
     );
     return result.rows[0];

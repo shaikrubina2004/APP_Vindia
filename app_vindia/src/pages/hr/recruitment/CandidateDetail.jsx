@@ -3,6 +3,16 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import recruitmentService from "../../../services/recruitmentService";
 import { getEmployees } from "../../../services/employeeService";
+import {
+  SALARY_FIELDS,
+  SALARY_UNITS,
+  BREAKUP_KEYS,
+  DEFAULT_OFFICE_ADDRESS,
+  suggestBreakup,
+  sumBreakup,
+  toAnnualRupees,
+  formatINR,
+} from "./offerSalary";
 import "./CandidateDetail.css";
 
 // The aptitude test is taken on the separate aptitude portal, which emails the
@@ -15,13 +25,33 @@ const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Intern"];
 const MANAGER_WORDS = ["manager", "ceo", "design lead", "bdm"];
 
 const EMPTY_OFFER = {
+  // job details
   offered_role: "",
-  offered_salary: "",
+  offered_salary: "", // as typed, in the unit chosen below
+  salary_unit: "lpa", // "lpa" | "annual" | "monthly"
   joining_date: "",
   offered_location: "",
   offered_employment_type: "",
   offered_manager_id: "",
   offer_letter_url: "",
+  // offer letter (PDF) details
+  salutation: "",
+  greeting_name: "",
+  address: "",
+  acceptance_deadline: "",
+  reporting_time: "10:00",
+  reporting_address: DEFAULT_OFFICE_ADDRESS,
+  probation_months: "6",
+  notice_months: "3",
+  band: "Band 1",
+  level: "Level 1",
+  // salary breakup (annual)
+  basic: "",
+  hra: "",
+  special_allowance: "",
+  ex_gratia: "",
+  variable_pay: "",
+  medical_insurance: "",
 };
 
 const EMPTY_ROUND = {
@@ -42,7 +72,7 @@ const HISTORY_LABELS = {
   aptitude_decision: "Aptitude decision",
   interview_scheduled: "Interview scheduled",
   bgv_request: "BGV request email",
-  offer_release: "Offer email",
+  offer_release: "Offer letter email",
   offer_accepted: "Offer accepted",
   offer_declined: "Offer declined",
   login_credentials: "Login credentials",
@@ -133,6 +163,8 @@ const CandidateDetail = () => {
   // offer
   const [showOfferForm, setShowOfferForm] = useState(false);
   const [offerForm, setOfferForm] = useState(EMPTY_OFFER);
+  const [breakupManual, setBreakupManual] = useState(false); // HR edited the breakup by hand
+  const [offerError, setOfferError] = useState(null); // shown inside the Offer panel
   const [responseModal, setResponseModal] = useState(null); // 'accepted' | 'declined' | null
   const [responseNote, setResponseNote] = useState("");
 
@@ -144,15 +176,35 @@ const CandidateDetail = () => {
         const res = await recruitmentService.getCandidateById(id);
         const c = res.data;
         setCandidate(c);
+        const letter = c.offer_letter_data || {};
+        const savedBreakup = letter.salary_breakup || null;
         setOfferForm({
           offered_role: c.offered_role || c.job_title || "",
-          offered_salary: c.offered_salary || "",
+          offered_salary: c.offered_salary ? String(Math.round(Number(c.offered_salary))) : "",
+          salary_unit: c.offered_salary ? "annual" : "lpa",
           joining_date: (c.joining_date_text || "").slice(0, 10),
           offered_location: c.offered_location || "",
           offered_employment_type: c.offered_employment_type || "",
           offered_manager_id: c.offered_manager_id || "",
           offer_letter_url: c.offer_letter_url || "",
+          salutation: letter.salutation || "",
+          greeting_name:
+            letter.greeting_name || (c.name || "").trim().split(/\s+/)[0] || "",
+          address: letter.address || "",
+          acceptance_deadline: letter.acceptance_deadline || "",
+          reporting_time: letter.reporting_time || "10:00",
+          reporting_address: letter.reporting_address || DEFAULT_OFFICE_ADDRESS,
+          probation_months: String(letter.probation_months || 6),
+          notice_months: String(letter.notice_months || 3),
+          band: letter.band || "Band 1",
+          level: letter.level || "Level 1",
+          ...(savedBreakup
+            ? Object.fromEntries(
+                BREAKUP_KEYS.map((k) => [k, String(savedBreakup[k] ?? "")]),
+              )
+            : suggestBreakup(c.offered_salary || 0)),
         });
+        setBreakupManual(Boolean(savedBreakup));
         setBgvNotes(c.bgv_notes || "");
         setScoreForm({
           score: c.aptitude_test_score ?? "",
@@ -581,63 +633,202 @@ const CandidateDetail = () => {
 
   const handleOfferChange = (e) => {
     const { name, value } = e.target;
-    setOfferForm((prev) => ({ ...prev, [name]: value }));
+    setOfferError(null);
+    setOfferForm((prev) => {
+      const next = { ...prev, [name]: value };
+      // until HR edits the breakup by hand, it follows the salary
+      if ((name === "offered_salary" || name === "salary_unit") && !breakupManual) {
+        Object.assign(
+          next,
+          suggestBreakup(toAnnualRupees(next.offered_salary, next.salary_unit)),
+        );
+      }
+      return next;
+    });
+    if (BREAKUP_KEYS.includes(name)) setBreakupManual(true);
   };
 
-  const handleSaveOffer = async () => {
-    clearMsgs();
+  const handleRecalculateBreakup = () => {
+    setOfferError(null);
+    setOfferForm((prev) => ({
+      ...prev,
+      ...suggestBreakup(toAnnualRupees(prev.offered_salary, prev.salary_unit)),
+    }));
+    setBreakupManual(false);
+  };
+
+  // everything the backend needs to save the offer / draw the letter
+  const buildOfferPayload = () => ({
+    offered_role: offerForm.offered_role.trim(),
+    offered_salary: annualSalary, // always saved as yearly rupees
+    joining_date: offerForm.joining_date,
+    offer_letter_url: candidate.offer_letter_url || null,
+    offered_location: offerForm.offered_location.trim() || null,
+    offered_employment_type: offerForm.offered_employment_type || null,
+    offered_manager_id: offerForm.offered_manager_id
+      ? Number(offerForm.offered_manager_id)
+      : null,
+    offer_letter_data: {
+      salutation: offerForm.salutation,
+      greeting_name: offerForm.greeting_name.trim(),
+      address: offerForm.address.trim(),
+      acceptance_deadline: offerForm.acceptance_deadline || "",
+      reporting_time: offerForm.reporting_time || "10:00",
+      reporting_address: offerForm.reporting_address.trim(),
+      probation_months: Number(offerForm.probation_months) || 6,
+      notice_months: Number(offerForm.notice_months) || 3,
+      band: offerForm.band.trim(),
+      level: offerForm.level.trim(),
+      salary_breakup: Object.fromEntries(
+        BREAKUP_KEYS.map((k) => [k, Math.round(Number(offerForm[k]) || 0)]),
+      ),
+    },
+  });
+
+  // returns a message if the form is not ready, otherwise null
+  const validateOfferForm = () => {
     if (
       !offerForm.offered_role.trim() ||
       !offerForm.offered_salary ||
       !offerForm.joining_date
     ) {
-      setActionError(
-        "Role, salary and joining date are required to save an offer.",
+      return "Role, salary and joining date are required.";
+    }
+    if (!offerForm.greeting_name.trim()) {
+      return "Enter the name to greet the candidate with (for example their first name).";
+    }
+    if (!offerForm.address.trim()) {
+      return "Enter the candidate's address. It is printed on the offer letter.";
+    }
+    if (annualSalary < 12000) {
+      return `The yearly salary works out to only ₹${formatINR(annualSalary)}. Check the "Salary entered as" unit (LPA, per year or per month).`;
+    }
+    if (Math.abs(breakupDiff) > 1) {
+      return `The salary breakup adds up to ₹${formatINR(breakupTotal)} but the annual salary is ₹${formatINR(annualSalary)}. Adjust the breakup so both match.`;
+    }
+    return null;
+  };
+
+  // Save the offer, then email the PDF offer letter to the candidate.
+  const handleSaveOffer = async () => {
+    clearMsgs();
+    setOfferError(null);
+
+    const problem = validateOfferForm();
+    if (problem) {
+      setOfferError(problem);
+      return;
+    }
+    if (!candidate.email) {
+      setOfferError(
+        "This candidate has no email address, so the offer letter cannot be sent.",
       );
       return;
     }
+    if (
+      !window.confirm(
+        `Save this offer and email the offer letter to ${candidate.email}?`,
+      )
+    ) {
+      return;
+    }
+
     setBusy(true);
     try {
-      await recruitmentService.updateOfferDetails(id, {
-        offered_role: offerForm.offered_role.trim(),
-        offered_salary: Number(offerForm.offered_salary),
-        joining_date: offerForm.joining_date,
-        offer_letter_url: offerForm.offer_letter_url.trim() || null,
-        offered_location: offerForm.offered_location.trim() || null,
-        offered_employment_type: offerForm.offered_employment_type || null,
-        offered_manager_id: offerForm.offered_manager_id
-          ? Number(offerForm.offered_manager_id)
-          : null,
-      });
-      setShowOfferForm(false);
-      setActionMsg(
-        "Offer details saved. Release the offer to email it to the candidate.",
+      await recruitmentService.updateOfferDetails(id, buildOfferPayload());
+    } catch (err) {
+      setOfferError(err.response?.data?.error || "Failed to save offer details");
+      setBusy(false);
+      return;
+    }
+
+    try {
+      const res = await recruitmentService.releaseOffer(id);
+      if (res.data?.emailSent) {
+        setActionMsg(
+          "Offer saved and the offer letter was emailed. Record the candidate's reply here once it arrives.",
+        );
+      } else {
+        setOfferError(
+          "The offer was saved, but the email could not be sent. Check the SMTP settings, then use Send Offer Letter.",
+        );
+      }
+    } catch (err) {
+      setOfferError(
+        `The offer was saved, but sending failed: ${err.response?.data?.error || "unknown error"}`,
       );
+    } finally {
+      setShowOfferForm(false);
+      await load(true);
+      setBusy(false);
+    }
+  };
+
+  // Send (or resend) the offer letter for the offer as it is saved.
+  const handleReleaseOffer = async () => {
+    setBusy(true);
+    clearMsgs();
+    setOfferError(null);
+    try {
+      const res = await recruitmentService.releaseOffer(id);
+      if (res.data.emailSent) {
+        setActionMsg(
+          "Offer letter emailed to the candidate. Record their reply here once it arrives.",
+        );
+      } else {
+        setOfferError("Could not send the offer email. Check the SMTP settings.");
+      }
       await load(true);
     } catch (err) {
-      setActionError(
-        err.response?.data?.error || "Failed to save offer details",
-      );
+      setOfferError(err.response?.data?.error || "Failed to send the offer letter");
     } finally {
       setBusy(false);
     }
   };
 
-  const handleReleaseOffer = async () => {
+  // Open the offer letter PDF in a new tab without sending anything.
+  // fromForm = true previews what is typed in the form (not saved yet);
+  // false previews the saved offer.
+  const handlePreviewOffer = async (fromForm) => {
+    setOfferError(null);
+    if (fromForm) {
+      const problem = validateOfferForm();
+      if (problem) {
+        setOfferError(problem);
+        return;
+      }
+    }
+    // open the tab right away (inside the click) so pop-up blockers allow it
+    const win = window.open("", "_blank");
     setBusy(true);
-    clearMsgs();
     try {
-      const res = await recruitmentService.releaseOffer(id);
-      setActionMsg(
-        res.data.emailSent
-          ? "Offer emailed to the candidate. Record their reply here once it arrives."
-          : "Could not send the offer email — check SMTP settings.",
+      const res = await recruitmentService.previewOfferLetter(
+        id,
+        fromForm ? buildOfferPayload() : {},
       );
-      await load(true);
+      const url = URL.createObjectURL(
+        new Blob([res.data], { type: "application/pdf" }),
+      );
+      if (win) {
+        win.location.href = url;
+      } else {
+        setOfferError("Allow pop-ups for this site to see the preview.");
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
     } catch (err) {
-      setActionError(
-        err.response?.data?.error || "Failed to release the offer",
-      );
+      if (win) win.close();
+      let message = "Could not generate the preview";
+      const data = err.response?.data;
+      if (data instanceof Blob) {
+        try {
+          message = JSON.parse(await data.text()).error || message;
+        } catch {
+          /* keep the default message */
+        }
+      } else if (data?.error) {
+        message = data.error;
+      }
+      setOfferError(message);
     } finally {
       setBusy(false);
     }
@@ -712,10 +903,15 @@ const CandidateDetail = () => {
   const stage = candidate.stage;
   const interviews = candidate.interviews || [];
   const canReject = !["hired", "rejected"].includes(stage);
+  // an offer counts as "filled in" only once the letter details are saved too
   const hasOfferDetails =
     candidate.offered_role &&
     candidate.offered_salary &&
-    candidate.joining_date_text;
+    candidate.joining_date_text &&
+    candidate.offer_letter_data;
+  const breakupTotal = sumBreakup(offerForm);
+  const annualSalary = toAnnualRupees(offerForm.offered_salary, offerForm.salary_unit);
+  const breakupDiff = annualSalary - breakupTotal;
   const offerStatus = candidate.offer_status || null; // null | sent | accepted | declined
   const canMoveToApproval =
     stage === "interview" && interviews.some((r) => r.status === "completed");
@@ -1290,9 +1486,13 @@ const CandidateDetail = () => {
           {!hasOfferDetails || showOfferForm ? (
             <>
               <p className="cd-note">
-                Fill in the candidate's job details. They appear in the offer
-                email.
+                Fill in the offer details. Saving emails the offer letter (PDF)
+                to the candidate, in your standard offer letter format.
               </p>
+
+              <h3 style={{ fontSize: "0.95rem", margin: "0.9rem 0 0.4rem" }}>
+                Job details
+              </h3>
               <div className="cd-field-row">
                 <label className="cd-field">
                   Position / Role *
@@ -1303,14 +1503,41 @@ const CandidateDetail = () => {
                   />
                 </label>
                 <label className="cd-field">
-                  Annual salary (₹) *
+                  Salary *
                   <input
                     type="number"
+                    step="any"
+                    min="0"
                     name="offered_salary"
                     value={offerForm.offered_salary}
                     onChange={handleOfferChange}
+                    placeholder="e.g. 2.4"
                   />
                 </label>
+              </div>
+              <div className="cd-field-row">
+                <label className="cd-field">
+                  Salary entered as
+                  <select
+                    name="salary_unit"
+                    value={offerForm.salary_unit}
+                    onChange={handleOfferChange}
+                  >
+                    {SALARY_UNITS.map((u) => (
+                      <option key={u.value} value={u.value}>
+                        {u.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="cd-field">
+                  Yearly salary on the letter
+                  <p className="cd-note" style={{ margin: "0.45rem 0 0" }}>
+                    {annualSalary > 0
+                      ? `₹${formatINR(annualSalary)} per year (₹${formatINR(Math.round(annualSalary / 12))} per month)`
+                      : "Enter the salary"}
+                  </p>
+                </div>
               </div>
               <div className="cd-field-row">
                 <label className="cd-field">
@@ -1328,7 +1555,7 @@ const CandidateDetail = () => {
                     name="offered_location"
                     value={offerForm.offered_location}
                     onChange={handleOfferChange}
-                    placeholder="e.g. Mysuru office"
+                    placeholder="e.g. Mysore"
                   />
                 </label>
               </div>
@@ -1364,31 +1591,209 @@ const CandidateDetail = () => {
                   </select>
                 </label>
               </div>
+
+              <h3 style={{ fontSize: "0.95rem", margin: "1.1rem 0 0.4rem" }}>
+                Offer letter details
+              </h3>
+              <div className="cd-field-row">
+                <label className="cd-field">
+                  Salutation
+                  <select
+                    name="salutation"
+                    value={offerForm.salutation}
+                    onChange={handleOfferChange}
+                  >
+                    <option value="">None</option>
+                    <option value="Mr.">Mr.</option>
+                    <option value="Ms.">Ms.</option>
+                    <option value="Mrs.">Mrs.</option>
+                    <option value="Dr.">Dr.</option>
+                  </select>
+                </label>
+                <label className="cd-field">
+                  Greeting name * (“Dear …”)
+                  <input
+                    name="greeting_name"
+                    value={offerForm.greeting_name}
+                    onChange={handleOfferChange}
+                    placeholder="e.g. Rubina"
+                  />
+                </label>
+              </div>
               <label className="cd-field">
-                Offer letter URL (optional)
-                <input
-                  name="offer_letter_url"
-                  value={offerForm.offer_letter_url}
+                Candidate address * (one line per address line)
+                <textarea
+                  rows={3}
+                  name="address"
+                  value={offerForm.address}
                   onChange={handleOfferChange}
-                  placeholder="Optional link"
+                  placeholder={"2/225A, Masidu street,\nVTC: Duvvur, District: Cuddapah,\nAndhra Pradesh, 516175"}
                 />
               </label>
+              <div className="cd-field-row">
+                <label className="cd-field">
+                  Reporting time
+                  <input
+                    type="time"
+                    name="reporting_time"
+                    value={offerForm.reporting_time}
+                    onChange={handleOfferChange}
+                  />
+                </label>
+                <label className="cd-field">
+                  Acceptance deadline
+                  <input
+                    type="date"
+                    name="acceptance_deadline"
+                    value={offerForm.acceptance_deadline}
+                    onChange={handleOfferChange}
+                  />
+                </label>
+              </div>
+              <label className="cd-field">
+                Reporting address (where the candidate reports on day one)
+                <input
+                  name="reporting_address"
+                  value={offerForm.reporting_address}
+                  onChange={handleOfferChange}
+                />
+              </label>
+              <div className="cd-field-row">
+                <label className="cd-field">
+                  Probation period (months)
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    name="probation_months"
+                    value={offerForm.probation_months}
+                    onChange={handleOfferChange}
+                  />
+                </label>
+                <label className="cd-field">
+                  Notice period (months)
+                  <input
+                    type="number"
+                    min="1"
+                    max="6"
+                    name="notice_months"
+                    value={offerForm.notice_months}
+                    onChange={handleOfferChange}
+                  />
+                </label>
+              </div>
+              <div className="cd-field-row">
+                <label className="cd-field">
+                  Band
+                  <input
+                    name="band"
+                    value={offerForm.band}
+                    onChange={handleOfferChange}
+                  />
+                </label>
+                <label className="cd-field">
+                  Level
+                  <input
+                    name="level"
+                    value={offerForm.level}
+                    onChange={handleOfferChange}
+                  />
+                </label>
+              </div>
+
+              <h3 style={{ fontSize: "0.95rem", margin: "1.1rem 0 0.4rem" }}>
+                Salary breakup (Annexure 1)
+              </h3>
+              <div style={{ overflowX: "auto" }}>
+                <table className="cd-table">
+                  <thead>
+                    <tr>
+                      <th>Component</th>
+                      <th>Annual (₹)</th>
+                      <th>Monthly (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {SALARY_FIELDS.map((f) => (
+                      <tr key={f.key}>
+                        <td>{f.label}</td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            name={f.key}
+                            value={offerForm[f.key]}
+                            onChange={handleOfferChange}
+                            style={{ width: "100%" }}
+                          />
+                        </td>
+                        <td>
+                          {formatINR(
+                            Math.round((Number(offerForm[f.key]) || 0) / 12),
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td>
+                        <strong>Total cost to company</strong>
+                      </td>
+                      <td>
+                        <strong>{formatINR(breakupTotal)}</strong>
+                      </td>
+                      <td>
+                        <strong>{formatINR(Math.round(breakupTotal / 12))}</strong>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="cd-note">
+                {!annualSalary
+                  ? "Enter the salary to get a suggested breakup."
+                  : Math.abs(breakupDiff) <= 1
+                    ? "The breakup matches the annual salary."
+                    : `The breakup is ₹${formatINR(Math.abs(breakupDiff))} ${breakupDiff > 0 ? "short of" : "over"} the annual salary.`}{" "}
+                The split is only a suggestion; change any figure.
+              </p>
+              <div className="cd-actions">
+                <button
+                  className="cd-action-btn"
+                  type="button"
+                  disabled={busy}
+                  onClick={handleRecalculateBreakup}
+                >
+                  Recalculate from salary
+                </button>
+              </div>
+
+              {offerError && <p className="cd-inline-error">{offerError}</p>}
               <div className="cd-modal-actions">
                 {hasOfferDetails && (
                   <button
                     className="cd-cancel-btn"
                     disabled={busy}
-                    onClick={() => setShowOfferForm(false)}
+                    onClick={() => {
+                      setOfferError(null);
+                      setShowOfferForm(false);
+                    }}
                   >
                     Cancel
                   </button>
                 )}
                 <button
+                  className="cd-action-btn"
+                  disabled={busy}
+                  onClick={() => handlePreviewOffer(true)}
+                >
+                  Preview PDF
+                </button>
+                <button
                   className="cd-primary-btn"
                   disabled={busy}
                   onClick={handleSaveOffer}
                 >
-                  {busy ? "Saving…" : "Save offer"}
+                  {busy ? "Sending…" : "Save & send offer letter"}
                 </button>
               </div>
             </>
@@ -1458,23 +1863,34 @@ const CandidateDetail = () => {
                 )}
               </p>
 
+              {offerError && <p className="cd-inline-error">{offerError}</p>}
               <div className="cd-actions">
                 {offerStatus !== "accepted" && (
                   <button
                     className="cd-action-btn"
                     disabled={busy}
-                    onClick={() => setShowOfferForm(true)}
+                    onClick={() => {
+                      setOfferError(null);
+                      setShowOfferForm(true);
+                    }}
                   >
                     Edit Offer
                   </button>
                 )}
+                <button
+                  className="cd-action-btn"
+                  disabled={busy}
+                  onClick={() => handlePreviewOffer(false)}
+                >
+                  Preview letter (PDF)
+                </button>
                 {offerStatus === null && (
                   <button
                     className="cd-primary-btn"
                     disabled={busy}
                     onClick={handleReleaseOffer}
                   >
-                    {busy ? "Sending…" : "Release Offer (Email)"}
+                    {busy ? "Sending…" : "Send Offer Letter (Email)"}
                   </button>
                 )}
                 {offerStatus === "sent" && (
@@ -1484,7 +1900,7 @@ const CandidateDetail = () => {
                       disabled={busy}
                       onClick={handleReleaseOffer}
                     >
-                      {busy ? "Sending…" : "Resend offer email"}
+                      {busy ? "Sending…" : "Resend offer letter"}
                     </button>
                     <button
                       className="cd-reject-btn"

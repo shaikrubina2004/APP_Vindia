@@ -8,6 +8,7 @@ const {
   interviewScheduledEmailTemplate,
   bgvRequestEmailTemplate,
 } = require("../utils/mailer");
+const { generateOfferLetterPdf, validateOfferLetterData } = require("../utils/offerLetterPdf");
 
 /* ═══════════════════════════════════════
    JOB OPENINGS
@@ -169,6 +170,7 @@ exports.updateOfferDetails = async (req, res) => {
     const {
       offered_role, offered_salary, joining_date, offer_letter_url,
       offered_location, offered_employment_type, offered_manager_id,
+      offer_letter_data,
     } = req.body;
 
     if (!offered_role || !offered_salary || !joining_date) {
@@ -185,9 +187,16 @@ exports.updateOfferDetails = async (req, res) => {
       return res.status(409).json({ error: "This offer was already accepted and can no longer be edited" });
     }
 
+    // The offer letter PDF needs these details, so they are checked here.
+    const { errors, clean } = validateOfferLetterData(offer_letter_data, offered_salary);
+    if (errors.length) {
+      return res.status(400).json({ error: errors[0], errors });
+    }
+
     const candidate = await Recruitment.updateOfferDetails(req.params.id, {
       offered_role, offered_salary, joining_date, offer_letter_url,
       offered_location, offered_employment_type, offered_manager_id,
+      offer_letter_data: clean,
     });
     res.status(200).json(candidate);
   } catch (err) {
@@ -745,21 +754,41 @@ exports.releaseOffer = async (req, res) => {
       return res.status(400).json({ error: "Save offer details before releasing the offer" });
     }
 
-    const template = offerReleaseEmailTemplate(
-      candidate.name,
-      candidate.job_title,
-      candidate.offered_role,
-      candidate.offered_salary,
-      candidate.joining_date,
-      {
-        location: candidate.offered_location,
-        employmentType: candidate.offered_employment_type,
-        managerName: candidate.offered_manager_name,
-      }
-    );
+    if (!candidate.offer_letter_data) {
+      return res.status(400).json({
+        error: "Open Edit Offer and fill in the letter details (address, salary breakup, ...) before sending the offer letter",
+      });
+    }
+
+    // Build the PDF offer letter and attach it to the email.
+    let pdf;
+    try {
+      pdf = await generateOfferLetterPdf(candidate);
+    } catch (pdfErr) {
+      console.error("OFFER LETTER PDF ERROR:", pdfErr.message);
+      return res.status(500).json({ error: "Could not generate the offer letter PDF" });
+    }
+
+    const letter = candidate.offer_letter_data;
+    const greetingName = letter.greeting_name || candidate.name;
+    const template = offerReleaseEmailTemplate({
+      greetingName,
+      offeredRole: candidate.offered_role,
+    });
+    const fileLabel = String(greetingName).replace(/[^\w .-]/g, "").trim() || "Candidate";
 
     const mailResult = candidate.email
-      ? await sendMail({ to: candidate.email, ...template })
+      ? await sendMail({
+          to: candidate.email,
+          ...template,
+          attachments: [
+            {
+              filename: `${fileLabel} - Offer Letter.pdf`,
+              content: pdf,
+              contentType: "application/pdf",
+            },
+          ],
+        })
       : { success: false, error: "Candidate has no email on file" };
 
     await Recruitment.logCandidateEmail(req.params.id, {
@@ -781,6 +810,51 @@ exports.releaseOffer = async (req, res) => {
   } catch (err) {
     console.error("RELEASE OFFER ERROR:", err.message);
     res.status(500).json({ error: "Failed to release offer" });
+  }
+};
+
+// POST /api/recruitment/candidates/:id/offer/preview
+// Returns the offer letter as a PDF without sending anything.
+// Body: the offer form (offered_role, offered_salary, joining_date,
+// offered_location, offer_letter_data) to preview unsaved changes, or an
+// empty body to preview the offer as it is saved.
+exports.previewOfferLetter = async (req, res) => {
+  try {
+    const candidate = await Recruitment.getCandidateById(req.params.id);
+    if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+
+    const body = req.body || {};
+    let source;
+
+    if (body.offer_letter_data) {
+      const { offered_role, offered_salary, joining_date, offered_location } = body;
+      if (!offered_role || !offered_salary || !joining_date) {
+        return res.status(400).json({ error: "Role, salary and joining date are required" });
+      }
+      const { errors, clean } = validateOfferLetterData(body.offer_letter_data, offered_salary);
+      if (errors.length) return res.status(400).json({ error: errors[0], errors });
+      source = {
+        ...candidate,
+        offered_role,
+        offered_salary,
+        offered_location: offered_location || null,
+        joining_date_text: String(joining_date).slice(0, 10),
+        offer_letter_data: clean,
+      };
+    } else {
+      if (!candidate.offer_letter_data) {
+        return res.status(400).json({ error: "Fill in the letter details first" });
+      }
+      source = candidate;
+    }
+
+    const pdf = await generateOfferLetterPdf(source);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'inline; filename="Offer Letter - preview.pdf"');
+    res.status(200).send(pdf);
+  } catch (err) {
+    console.error("PREVIEW OFFER LETTER ERROR:", err.message);
+    res.status(500).json({ error: "Could not generate the offer letter preview" });
   }
 };
 

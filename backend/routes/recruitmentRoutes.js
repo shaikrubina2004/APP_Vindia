@@ -44,6 +44,7 @@ router.post("/candidates/:id/bgv/send", recruitmentController.sendBgvRequest);
 router.patch("/candidates/:id/bgv", recruitmentController.updateBGV);
 
 /* Offer: release the email, then record the candidate's reply */
+router.post("/candidates/:id/offer/preview", recruitmentController.previewOfferLetter);
 router.post("/candidates/:id/offer/release", recruitmentController.releaseOffer);
 router.patch("/candidates/:id/offer/response", recruitmentController.recordOfferResponse);
 

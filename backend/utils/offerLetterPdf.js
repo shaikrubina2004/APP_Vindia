@@ -14,6 +14,10 @@ const fs = require("fs");
 const path = require("path");
 const T = require("./offerLetterTerms");
 
+// Full-page letterhead artwork (logo, contact details, blue shapes) that is
+// printed behind every page. Replace this file to change the letterhead.
+const LETTERHEAD_IMAGE = path.join(__dirname, "..", "assets", "offer-letterhead.jpg");
+// Only used if the file above is missing: a simpler drawn letterhead.
 const LOGO_LETTERHEAD = path.join(__dirname, "..", "assets", "logo-letterhead.png");
 const LOGO_FALLBACK = path.join(__dirname, "..", "assets", "logo.png");
 
@@ -21,12 +25,12 @@ const LOGO_FALLBACK = path.join(__dirname, "..", "assets", "logo.png");
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
-const MARGIN_L = 70;
-const MARGIN_R = 70;
-const MARGIN_TOP = 152;
-const MARGIN_BOTTOM = 100;
+const MARGIN_L = 84;
+const MARGIN_R = 84;
+const MARGIN_TOP = 172;
+const MARGIN_BOTTOM = 142;
 const L = MARGIN_L;
-const W = PAGE_W - MARGIN_L - MARGIN_R; // 455
+const W = PAGE_W - MARGIN_L - MARGIN_R; // 427
 
 const INK = "#111111";
 const SKY = "#4aa3df";
@@ -151,6 +155,11 @@ function validateOfferLetterData(raw, ctcRaw) {
   if (negative) errors.push("Every salary component must be a number of 0 or more");
 
   const ctc = Math.round(Number(ctcRaw) || 0);
+  if (ctc < 12000) {
+    errors.push(
+      `The yearly salary is only ${inr(ctc)}. Check that the salary was entered in the right unit (LPA, per year or per month).`,
+    );
+  }
   const { ctc: sum } = computeSalary(clean.salary_breakup);
   if (!negative && Math.abs(sum - ctc) > 1) {
     errors.push(
@@ -172,9 +181,27 @@ function poly(doc, points, color, opacity) {
   doc.restore();
 }
 
+let warnedMissingLetterhead = false;
+
 function drawLetterhead(doc) {
   const sx = doc.x;
   const sy = doc.y;
+
+  // preferred: the company's own letterhead artwork as a full-page background
+  if (fs.existsSync(LETTERHEAD_IMAGE)) {
+    doc.image(LETTERHEAD_IMAGE, 0, 0, { width: PAGE_W, height: PAGE_H });
+    doc.fillColor(INK).fillOpacity(1);
+    doc.x = sx;
+    doc.y = sy;
+    return;
+  }
+
+  if (!warnedMissingLetterhead) {
+    warnedMissingLetterhead = true;
+    console.warn(
+      `[offer letter] ${LETTERHEAD_IMAGE} was not found, so a simpler drawn letterhead is used. Copy offer-letterhead.jpg into backend/assets/.`,
+    );
+  }
 
   // soft blue geometric shapes at the top
   poly(doc, [[0, 0], [215, 0], [0, 78]], "#cfe3f1", 0.75);
@@ -352,15 +379,16 @@ function buildPdf(candidate) {
         { label: "House Rent Allowance", key: "hra" },
         { label: "Leave Travel Allowance", na: true },
         { label: "Special Allowance", key: "special_allowance" },
-        { label: "Ex-Gratia Bonus\u00B9", key: "ex_gratia" },
+        { label: "Ex-Gratia Bonus (1)", key: "ex_gratia" },
         { label: "TOTAL FIXED CASH", total: salary.totalFixed, bold: true },
-        { label: "Variable Pay\u00B2", key: "variable_pay" },
+        { label: "Variable Pay (2)", key: "variable_pay" },
         { label: "TARGET CASH COMPENSATION", total: salary.targetCash, bold: true },
         { label: "Medical Insurance Premium", key: "medical_insurance" },
         { label: "TARGET COST TO COMPANY", total: salary.ctc, bold: true },
       ];
       const ROW = 21;
-      const annexHeight = 24 + infoRows.length * ROW + 6 + (salRows.length + 1) * ROW + 150;
+      // title + both tables must fit together; the notes below may flow on
+      const annexHeight = 24 + infoRows.length * ROW + 6 + (salRows.length + 1) * ROW + 40;
       // keep the title and the tables together on one page
       if (doc.y + annexHeight > bottom()) doc.addPage();
       else doc.moveDown(0.6);
