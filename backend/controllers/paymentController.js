@@ -3,6 +3,9 @@ const Payment = require("../models/paymentModel");
 const Invoice = require("../models/invoiceModel");
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
 const { validateFinanceWbs } = require("../utils/financeWbsValidation");
+const { notifyRole } = require("./operationsNotificationsController");
+
+const inr = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
 
 // Accountant permission per financePermissions.js is "view, prepare" —
 // not "release"/"reject". updatePayment previously accepted a raw
@@ -107,6 +110,27 @@ exports.createPayment = asyncHandler(async (req, res) => {
   }
 
   const payment = await Payment.create(req.body);
+
+  // Finance Manager bell: an accountant prepared a payment that is waiting
+  // for release (accountants can only create payments as "pending").
+  if (req.user?.role === "accountant") {
+    try {
+      await notifyRole(
+        "finance_manager",
+        "payment",
+        "Payment awaiting release",
+        `${inr(payment.amount)} prepared by ${req.user.name || "Accountant"}`,
+        "/finance-manager/payments",
+        "info",
+        payment.project_id,
+        payment.id,
+        req.user.id
+      );
+    } catch (notifyErr) {
+      console.error("Payment notification failed:", notifyErr.message);
+    }
+  }
+
   res.status(201).json({ success: true, data: payment });
 });
 
@@ -121,6 +145,29 @@ exports.updatePayment = asyncHandler(async (req, res) => {
   if (!existing) throw new AppError("Payment not found", 404);
 
   const payment = await Payment.update(req.params.id, req.body);
+
+  // Accountant bell: Finance Manager released / changed the payment status.
+  if (
+    payment &&
+    String(existing.status || "").toLowerCase() !== String(payment.status || "").toLowerCase()
+  ) {
+    try {
+      await notifyRole(
+        "accountant",
+        "payment",
+        `Payment ${payment.status}`,
+        `${inr(payment.amount)} \u2014 status changed by ${req.user?.name || "Finance Manager"}.`,
+        "/accountant/payments",
+        String(payment.status).toLowerCase() === "completed" ? "ok" : "info",
+        payment.project_id,
+        payment.id,
+        req.user?.id
+      );
+    } catch (notifyErr) {
+      console.error("Payment status notification failed:", notifyErr.message);
+    }
+  }
+
   res.json({ success: true, data: payment });
 });
 

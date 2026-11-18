@@ -3,6 +3,9 @@ const Invoice = require("../models/invoiceModel");
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
 const { validateFinanceWbs, assertWbsUnchanged } = require("../utils/financeWbsValidation");
 const { notifyProjectClient } = require("../utils/clientNotifications");
+const { notifyRole } = require("./operationsNotificationsController");
+
+const inr = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
 
 // GET /api/finance/invoices
 // Optional query filters: ?project_id=&status=&search=
@@ -38,6 +41,24 @@ exports.createInvoice = asyncHandler(async (req, res) => {
     link: "/client/invoices",
     referenceId: invoice.id,
   });
+
+  // Finance Manager bell: a new invoice was raised (skips the creator).
+  try {
+    await notifyRole(
+      "finance_manager",
+      "invoice",
+      `New invoice ${invoice.invoice_number}`,
+      `${invoice.client_name} — ${inr(invoice.amount)}`,
+      "/finance-manager/invoices",
+      "info",
+      invoice.project_id,
+      invoice.id,
+      req.user?.id
+    );
+  } catch (notifyErr) {
+    console.error("Invoice notification failed:", notifyErr.message);
+  }
+
   res.status(201).json({ success: true, data: invoice });
 });
 
@@ -95,6 +116,23 @@ exports.updateInvoiceStatus = asyncHandler(async (req, res) => {
       link: "/client/invoices",
       referenceId: invoice.id,
     });
+
+    // Accountant bell: Finance Manager changed the invoice status.
+    try {
+      await notifyRole(
+        "accountant",
+        "invoice",
+        `Invoice ${invoice.status}: ${invoice.invoice_number}`,
+        `${invoice.client_name} — ${inr(invoice.amount)}. Status updated by Finance Manager.`,
+        "/accountant/invoices",
+        String(invoice.status).toLowerCase() === "paid" ? "ok" : "info",
+        invoice.project_id,
+        invoice.id,
+        req.user?.id
+      );
+    } catch (notifyErr) {
+      console.error("Invoice status notification failed:", notifyErr.message);
+    }
   }
   res.json({ success: true, data: invoice });
 });

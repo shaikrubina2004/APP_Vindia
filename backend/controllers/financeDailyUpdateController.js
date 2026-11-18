@@ -4,6 +4,7 @@ const FinanceDailyUpdate = require("../models/financeDailyUpdateModel");
 
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
 const { notifyCEO } = require("./ceoNotificationsController");
+const { notifyRole, insertNotification } = require("./operationsNotificationsController");
 
 
 /*
@@ -35,6 +36,25 @@ exports.submitUpdate = asyncHandler(async (req, res) => {
       severity: req.body.overall_status && req.body.overall_status !== "on-track" ? "warning" : "info",
       referenceId: update && update.id,
     });
+  }
+
+  // Accountant's update goes to the Finance Manager for review.
+  if (req.user.role === "accountant") {
+    try {
+      await notifyRole(
+        "finance_manager",
+        "daily_update",
+        `Finance daily update from ${req.user.name || "Accountant"}`,
+        req.body.summary || "Awaiting your review",
+        "/finance-manager/daily-updates/review",
+        req.body.overall_status && req.body.overall_status !== "on-track" ? "warn" : "info",
+        null,
+        update && update.id,
+        req.user.id
+      );
+    } catch (notifyErr) {
+      console.error("Daily update notification failed:", notifyErr.message);
+    }
   }
 
   res.status(201).json({
@@ -160,6 +180,27 @@ exports.reviewUpdate = asyncHandler(async (req, res) => {
 
   if (!row) {
     throw new AppError("Daily update not found", 404);
+  }
+
+  // Tell the accountant who submitted it that it was reviewed.
+  if (row.submitted_by && String(row.submitted_by) !== String(req.user.id)) {
+    try {
+      await insertNotification(
+        row.submitted_by,
+        "daily_update",
+        `Daily update ${status}`,
+        note
+          ? `Finance Manager ${status} your daily update. Note: ${note}`
+          : `Finance Manager ${status} your daily update.`,
+        "/accountant/daily-update",
+        status === "approved" ? "ok" : "warn",
+        null,
+        null,
+        row.id
+      );
+    } catch (notifyErr) {
+      console.error("Daily update review notification failed:", notifyErr.message);
+    }
   }
 
   res.json({

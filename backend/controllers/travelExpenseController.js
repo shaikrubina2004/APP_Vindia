@@ -1,5 +1,8 @@
 // backend/controllers/travelExpenseController.js
 const pool = require("../config/db");
+const { notifyHr, notifyRole, insertNotification } = require("./operationsNotificationsController");
+
+const inr = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
 const { insertArchitectNotification } = require("./architectNotificationsController");
 
 // ── HR roles that bypass PM and go directly to CEO ───────────────────────────
@@ -24,6 +27,41 @@ const isCeoUser = (req) => callerRole(req) === "ceo";
 const isHrUser = (req) => isHRRole(callerRole(req));
 const isHrOrCeoUser = (req) => isCeoUser(req) || isHrUser(req);
 const isSameUser = (a, b) => String(a) === String(b);
+
+// Finance side of travel claims.
+//   view : Finance Manager, Accountant, CEO
+//   pay  : Finance Manager, CEO  (releasing money is a Finance Manager action)
+const isFinanceViewer = (req) =>
+  ["finance_manager", "accountant", "ceo"].includes(callerRole(req));
+const isFinancePayer = (req) =>
+  ["finance_manager", "ceo"].includes(callerRole(req));
+
+// The finance_* columns come from migrations/addTravelFinanceColumns.sql.
+// Until that has been run, approving a request must keep working exactly as
+// before, so we check once and cache a positive answer.
+let financeColumnsReady = false;
+async function hasFinanceColumns() {
+  if (financeColumnsReady) return true;
+  const r = await pool.query(
+    `SELECT COUNT(*)::int AS n
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'travel_expense_requests'
+        AND column_name IN ('finance_status','finance_paid_by','finance_paid_at',
+                            'finance_reference','finance_note')`
+  );
+  financeColumnsReady = r.rows[0].n === 5;
+  return financeColumnsReady;
+}
+
+// Sum of the amounts HR/CEO entered in manual_expenses (JSONB array).
+function totalOfManualExpenses(list) {
+  if (!Array.isArray(list)) return 0;
+  return list.reduce((sum, e) => {
+    const n = parseFloat(e && e.amount);
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -186,6 +224,25 @@ exports.createRequest = async (req, res) => {
     }
 
     await client.query("COMMIT");
+
+    // HR bell: a new travel request is waiting for HR review. HR-submitted
+    // requests go to the CEO instead, so HR is not notified for those.
+    // Never blocks the submission (the request is already saved).
+    if (!isHR) {
+      try {
+        await notifyHr(
+          "travel",
+          `New travel request ${newRequest.request_no}`,
+          `${newRequest.employee_name} — ${newRequest.destination}${newRequest.trip_title ? ` (${newRequest.trip_title})` : ""}`,
+          "/hr/travel",
+          "info",
+          newRequest.id,
+          req.user.id
+        );
+      } catch (notifyErr) {
+        console.error("Travel notification failed:", notifyErr.message);
+      }
+    }
 
     res.status(201).json({
       ...newRequest,
@@ -480,6 +537,42 @@ exports.updateStatus = async (req, res) => {
       [status, reviewed_by || null, review_note || null, id]
     );
 
+    // Approved => the claim now waits for Finance to pay. Put it in the
+    // Finance queue and tell the Finance Manager. Never blocks the approval.
+    let updatedRow = result.rows[0];
+    if (status === "Approved") {
+      try {
+        if (await hasFinanceColumns()) {
+          const queued = await pool.query(
+            `UPDATE travel_expense_requests
+                SET finance_status = COALESCE(finance_status, 'Pending')
+              WHERE id = $1
+              RETURNING *`,
+            [id]
+          );
+          if (queued.rows[0]) updatedRow = queued.rows[0];
+
+          const total = totalOfManualExpenses(updatedRow.manual_expenses);
+          const kind = updatedRow.payment_mode === "self" ? "reimbursement" : "company-paid";
+          await notifyRole(
+            "finance_manager",
+            "travel",
+            `Travel claim ready for payment: ${updatedRow.request_no}`,
+            `${updatedRow.employee_name} \u2014 ${updatedRow.trip_title || updatedRow.destination || "trip"} \u2014 ${
+              total > 0 ? inr(total) : "amount not entered yet"
+            } (${kind})`,
+            "/finance-manager/travel-claims",
+            "info",
+            updatedRow.project_id || null,
+            updatedRow.id,
+            req.user.id
+          );
+        }
+      } catch (financeErr) {
+        console.error("Travel finance hand-off failed:", financeErr.message);
+      }
+    }
+
     // Notify only the specific architect who submitted this request —
     // never broadcast to every architect.
     if (isArchitectRole(row.designation) && row.user_id) {
@@ -499,10 +592,189 @@ exports.updateStatus = async (req, res) => {
       );
     }
 
-    res.json(result.rows[0]);
+    // HR-submitted requests are decided by the CEO, so tell the HR person who
+    // submitted it (their own bell). Regular employees are not touched here.
+    if (submitterIsHR && row.user_id && status !== "Cancelled") {
+      try {
+        const tripLabel = row.trip_title || row.destination || "your trip";
+        await insertNotification(
+          row.user_id,
+          "travel",
+          `Travel request ${status.toLowerCase()}: ${tripLabel}`,
+          status === "Approved"
+            ? `Your travel request for "${tripLabel}" was approved.${review_note ? ` Note: ${review_note}` : ""}`
+            : `Your travel request for "${tripLabel}" was ${status.toLowerCase()}.${review_note ? ` Reason: ${review_note}` : ""}`,
+          "/hr/travelrequest?view=history",
+          status === "Approved" ? "ok" : "warn",
+          null,
+          null,
+          id
+        );
+      } catch (notifyErr) {
+        console.error("Travel decision notification failed:", notifyErr.message);
+      }
+    }
+
+    res.json(updatedRow);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update status" });
+  }
+};
+
+// ── GET /api/travel-expenses/finance/claims ─────────────────────────────────
+// Finance queue: approved travel requests. Optional ?finance_status=Pending|Paid
+// Each row carries the receipts and the total of the manual expense rows, so
+// the Finance page needs no further calls.
+exports.getFinanceClaims = async (req, res) => {
+  if (!isFinanceViewer(req)) {
+    return res
+      .status(403)
+      .json({ message: "Only Finance or the CEO can view travel claims" });
+  }
+
+  try {
+    if (!(await hasFinanceColumns())) {
+      return res.status(503).json({
+        message:
+          "Travel claims are not set up yet. Run backend/migrations/addTravelFinanceColumns.sql once.",
+      });
+    }
+
+    const { finance_status } = req.query;
+    const params = [];
+    let where = `WHERE ter.status = 'Approved' AND ter.finance_status IS NOT NULL`;
+    if (finance_status) {
+      if (!["Pending", "Paid"].includes(finance_status)) {
+        return res.status(400).json({ message: "Invalid finance_status" });
+      }
+      params.push(finance_status);
+      where += ` AND ter.finance_status = $${params.length}`;
+    }
+
+    const result = await pool.query(
+      `SELECT ter.id, ter.request_no, ter.user_id, ter.employee_name,
+              ter.designation, ter.department, ter.trip_title, ter.origin,
+              ter.destination, ter.travel_from_date, ter.travel_to_date,
+              ter.purpose, ter.budget_type, ter.project_id,
+              p.name AS project_name, ter.payment_mode, ter.status,
+              ter.reviewed_at, ter.review_note,
+              COALESCE(ter.manual_expenses, '[]'::jsonb) AS manual_expenses,
+              COALESCE((
+                SELECT SUM(
+                  CASE WHEN e->>'amount' ~ '^[0-9]+(\.[0-9]+)?$'
+                       THEN (e->>'amount')::numeric ELSE 0 END)
+                  FROM jsonb_array_elements(
+                         COALESCE(ter.manual_expenses, '[]'::jsonb)) e
+              ), 0) AS total_amount,
+              COALESCE((
+                SELECT json_agg(json_build_object(
+                         'id', r.id,
+                         'expense_type', r.expense_type,
+                         'file_name', r.file_name,
+                         'file_url', r.file_url)
+                       ORDER BY r.uploaded_at)
+                  FROM travel_expense_receipts r
+                 WHERE r.request_id = ter.id
+              ), '[]'::json) AS receipts,
+              ter.finance_status, ter.finance_paid_at, ter.finance_reference,
+              ter.finance_note, payer.name AS finance_paid_by_name
+         FROM travel_expense_requests ter
+         LEFT JOIN projects p ON p.id = ter.project_id
+         LEFT JOIN users payer ON payer.id = ter.finance_paid_by
+         ${where}
+        ORDER BY CASE WHEN ter.finance_status = 'Pending' THEN 0 ELSE 1 END,
+                 ter.reviewed_at DESC NULLS LAST, ter.id DESC`,
+      params
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("getFinanceClaims:", err);
+    res.status(500).json({ error: "Failed to fetch travel claims" });
+  }
+};
+
+// ── PUT /api/travel-expenses/:id/finance-status ─────────────────────────────
+// Finance Manager (or CEO) marks an approved claim as paid.
+// Body: { status: "Paid", reference?, note? }
+exports.markFinancePaid = async (req, res) => {
+  const { id } = req.params;
+  const { status, reference, note } = req.body || {};
+
+  if (!isFinancePayer(req)) {
+    return res
+      .status(403)
+      .json({ message: "Only the Finance Manager can mark a travel claim as paid" });
+  }
+  if (status !== "Paid") {
+    return res.status(400).json({ message: "status must be 'Paid'" });
+  }
+
+  try {
+    if (!(await hasFinanceColumns())) {
+      return res.status(503).json({
+        message:
+          "Travel claims are not set up yet. Run backend/migrations/addTravelFinanceColumns.sql once.",
+      });
+    }
+
+    const existing = await pool.query(
+      `SELECT id, status, finance_status FROM travel_expense_requests WHERE id = $1`,
+      [id]
+    );
+    if (!existing.rows.length) return res.status(404).json({ message: "Not found" });
+
+    const row = existing.rows[0];
+    if (row.status !== "Approved") {
+      return res.status(409).json({ message: "Only approved requests can be paid" });
+    }
+    if (row.finance_status === "Paid") {
+      return res.status(409).json({ message: "This claim is already marked as paid" });
+    }
+    if (row.finance_status !== "Pending") {
+      return res.status(409).json({
+        message: "This claim is not in the Finance queue (approved before Finance tracking was set up)",
+      });
+    }
+
+    const updated = await pool.query(
+      `UPDATE travel_expense_requests
+          SET finance_status    = 'Paid',
+              finance_paid_by   = $1,
+              finance_paid_at   = NOW(),
+              finance_reference = $2,
+              finance_note      = $3,
+              updated_at        = NOW()
+        WHERE id = $4
+        RETURNING *`,
+      [
+        req.user.id,
+        String(reference || "").trim() || null,
+        String(note || "").trim() || null,
+        id,
+      ]
+    );
+    const paid = updated.rows[0];
+
+    // HR bell: the claim they approved has been paid. Never blocks the update.
+    try {
+      await notifyHr(
+        "travel",
+        `Travel claim paid: ${paid.request_no}`,
+        `${paid.employee_name} \u2014 paid by Finance${paid.finance_reference ? ` (ref ${paid.finance_reference})` : ""}.`,
+        "/hr/travel",
+        "ok",
+        paid.id,
+        req.user.id
+      );
+    } catch (notifyErr) {
+      console.error("Travel paid notification failed:", notifyErr.message);
+    }
+
+    res.json(paid);
+  } catch (err) {
+    console.error("markFinancePaid:", err);
+    res.status(500).json({ error: "Failed to update the travel claim" });
   }
 };
 

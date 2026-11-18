@@ -3,6 +3,9 @@ const Expense = require("../models/expenseModel");
 const Budget = require("../models/budgetModel");
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
 const { validateFinanceWbs, assertWbsUnchanged } = require("../utils/financeWbsValidation");
+const { notifyRole } = require("./operationsNotificationsController");
+
+const inr = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
 
 // Once an expense has moved past pending, its WBS classification
 // becomes part of the accounting record and must not silently move
@@ -72,6 +75,23 @@ exports.createExpense = asyncHandler(async (req, res) => {
 
   // Keep the matching budget's spent_amount in sync
   await Budget.recalcSpent(expense.project_id, expense.category);
+
+  // Finance Manager bell: a new expense was recorded (skips the creator).
+  try {
+    await notifyRole(
+      "finance_manager",
+      "expense",
+      `New expense: ${expense.category}`,
+      `${inr(expense.amount)} recorded by ${req.user?.name || "Accountant"}`,
+      "/finance-manager/expenses",
+      "info",
+      expense.project_id,
+      expense.id,
+      req.user?.id
+    );
+  } catch (notifyErr) {
+    console.error("Expense notification failed:", notifyErr.message);
+  }
 
   res.status(201).json({ success: true, data: expense });
 });

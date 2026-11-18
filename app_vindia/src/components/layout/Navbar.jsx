@@ -68,6 +68,102 @@ const DEFAULT_QUICK_ADD = [
   { label: "Submit Expense", path: "/expenses/submit" },
 ];
 
+// ✅ Roles that use the shared OperationsNotificationBell.
+// Each role gets: a default page + a page per notification type.
+// A notification's own `link` always wins; these are only fallbacks.
+const OPS_BELL_ROLES = {
+  procurement_officer: {
+    request:      "/operations/procurement/purchase-requests",
+    approval:     "/operations/procurement/purchase-orders",
+    receipt:      "/operations/procurement/delivery-follow-up",
+    delay:        "/operations/procurement/delivery-follow-up",
+    incident:     "/operations/procurement/incidents",
+    task:         "/operations/procurement/incidents?page=tasks",
+    rfi:          "/operations/procurement/rfi",
+    daily_update: "/operations/procurement/daily-report",
+    default:      "/operations/procurement/dashboard",
+  },
+  logistics_coordinator: {
+    delivery:     "/operations/logistics/deliveries",
+    delay:        "/operations/logistics/deliveries",
+    receipt:      "/operations/logistics/deliveries",
+    incident:     "/operations/logistics/incidents",
+    task:         "/operations/logistics/incidents?page=tasks",
+    daily_update: "/operations/logistics/daily-update",
+    default:      "/operations/logistics/dashboard",
+  },
+  inventory_controller: {
+    delivery:     "/operations/inventory/stock-in",
+    low_stock:    "/operations/inventory",
+    receipt:      "/operations/inventory/stock-in",
+    request:      "/operations/inventory/stock-out",
+    incident:     "/operations/inventory/incidents",
+    task:         "/operations/inventory/incidents?page=tasks",
+    daily_update: "/operations/inventory/daily-update",
+    default:      "/operations/inventory/dashboard",
+  },
+  operations_manager: {
+    approval:     "/operations/manager/approvals",
+    delay:        "/operations/manager/logistics",
+    receipt:      "/operations/manager/inventory",
+    low_stock:    "/operations/manager/inventory",
+    incident:     "/operations/manager/incidents",
+    daily_update: "/operations/manager/daily-updates",
+    default:      "/operations/manager/dashboard",
+  },
+  office_administrator: {
+    request:      "/operations/administrator/requests",
+    incident:     "/operations/administrator/incidents",
+    daily_update: "/operations/administrator/daily-update",
+    default:      "/operations/administrator/dashboard",
+  },
+  project_manager: {
+    rfi:     "/project-manager/rfi",
+    default: "/project-manager/dashboard",
+  },
+  hr_manager: {
+    leave:        "/hr/leaves",
+    travel:       "/hr/travel",
+    recruitment:  "/hr/recruitment/job-openings",
+    employee:     "/hr/employees",
+    attendance:   "/hr/attendance",
+    incident:     "/hr/incidents",
+    task:         "/hr/incidents?page=tasks",
+    rfi:          "/hr/rfi",
+    default:      "/hr",
+  },
+  hr_executive: {
+    leave:        "/hr/leaves",
+    travel:       "/hr/travel",
+    recruitment:  "/hr/recruitment/job-openings",
+    employee:     "/hr/employees",
+    attendance:   "/hr/attendance",
+    incident:     "/hr/incidents",
+    task:         "/hr/incidents?page=tasks",
+    rfi:          "/hr/rfi",
+    default:      "/hr",
+  },
+  finance_manager: {
+    invoice:      "/finance-manager/invoices",
+    expense:      "/finance-manager/expenses",
+    payment:      "/finance-manager/payments",
+    travel:       "/finance-manager/expenses",
+    approval:     "/finance-manager/invoices",
+    daily_update: "/finance-manager/daily-update",
+    incident:     "/finance-manager/incidents",
+    task:         "/finance-manager/incidents?page=tasks",
+    rfi:          "/finance-manager/rfi",
+    default:      "/finance-manager/dashboard",
+  },
+  accountant: {
+    invoice:      "/accountant/invoices",
+    expense:      "/accountant/expenses",
+    payment:      "/accountant/payments",
+    daily_update: "/accountant/daily-update",
+    default:      "/accountant/dashboard",
+  },
+};
+
 function Navbar() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -91,7 +187,6 @@ function Navbar() {
     mep_engineer:        MEPNotificationBell,
     architect:           ArchitectNotificationBell,
     site_engineer:       ({ userId }) => <SiteEngineerNotificationBell userId={userId} routes={{ rfi: "/site-engineer/rfi", default: "/site-engineer/dashboard" }} />,
-    project_manager:     ({ userId }) => <OperationsNotificationBell userId={userId} role="project_manager" routes={{ rfi: "/project-manager/rfi", default: "/project-manager/dashboard" }} />,
     bda:                           ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
     bda1:                          ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
     bda2:                          ({ userId }) => <BDANotificationBell bdaEmail={userId} />,
@@ -103,6 +198,13 @@ function Navbar() {
   };
 
   const RoleNotification = NOTIFICATION_COMPONENTS[user?.role];
+
+  // Normalised role key (handles "HR Manager", "hr-manager", etc.)
+  const roleKey = String(user?.role || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  const opsBellRoutes = OPS_BELL_ROLES[roleKey];
 
   // ✅ Get quick-add items for current role
   const quickAddItems = QUICK_ADD_ITEMS[user?.role] || DEFAULT_QUICK_ADD;
@@ -177,7 +279,13 @@ function Navbar() {
         </div>
 
         {/* 🔥 Role-Based Notifications */}
-        {RoleNotification && (
+        {opsBellRoutes ? (
+          <OperationsNotificationBell
+            userId={user?.id}
+            role={roleKey}
+            routes={opsBellRoutes}
+          />
+        ) : RoleNotification && (
           ["bda", "bda1", "bda2", "BDA", "business_development", "business_development_analyst", "ceo"].includes(user?.role)
             ? <RoleNotification userId={user.email} />
             : <RoleNotification userId={user.id} />

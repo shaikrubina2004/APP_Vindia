@@ -2,6 +2,7 @@ const pool = require("../config/db");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const { sendMail, welcomeCredentialsEmailTemplate } = require("../utils/mailer");
+const { notifyHr } = require("./operationsNotificationsController");
 
 // ✅ TEMPORARY PASSWORD — a unique, random, 12-character password for each new
 //    login (instead of the same default for everybody). Easy-to-confuse
@@ -230,6 +231,21 @@ const createEmployee = async (req, res) => {
     began = false;
 
     const employee = result.rows[0];
+
+    // HR bell: a new employee was added (skipped when HR added them themselves).
+    try {
+      await notifyHr(
+        "employee",
+        `New employee added: ${employee.name}`,
+        `${employee.designation || ""}${employee.department ? ` — ${employee.department}` : ""}`.trim(),
+        "/hr/employees",
+        "info",
+        employee.id,
+        req.user?.id || null
+      );
+    } catch (notifyErr) {
+      console.error("Employee notification failed:", notifyErr.message);
+    }
 
     // ✅ STEP 4: Email the login details (only when a NEW login was created).
     //    The employee is already saved, so a mail problem never undoes it —

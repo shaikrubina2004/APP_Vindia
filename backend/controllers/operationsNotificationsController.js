@@ -25,6 +25,7 @@ const ROLE_TYPES = {
     "delivery",   // delivery arrived, waiting to be received into stock
     "low_stock",  // item hit or fell below minimum stock
     "receipt",    // goods receipt posted
+    "request",    // approved material request — check stock first
     "incident",
     "task",
     "daily_update", // Operations Manager reviewed their daily update
@@ -34,6 +35,7 @@ const ROLE_TYPES = {
     "delay",     // a delivery on their PO is late
     "request",   // a material request was approved and is waiting for a PO
     "approval",  // their PO was approved / rejected by the Operations Manager
+    "rfi",       // an RFI was raised or updated for them
     "incident", "task", "daily_update",
   ],
 
@@ -58,8 +60,32 @@ const ROLE_TYPES = {
     "incident", "task", "daily_update",
   ],
 
-   finance_manager: [
+  hr_manager: [
+    "leave",       // a leave request is waiting for HR
+    "travel",      // a travel expense request is waiting for HR review
+    "recruitment", // candidate / interview / offer / BGV milestones
+    "employee",    // a new employee was added / hired
+    "attendance",  // attendance regularisation or missed punch
+    "rfi",
     "incident", "task",
+  ],
+  hr_executive: [
+    "leave", "travel", "recruitment", "employee", "attendance", "rfi",
+    "incident", "task",
+  ],
+
+  finance_manager: [
+    "invoice",     // invoice raised / overdue / paid
+    "expense",     // expense or claim waiting for approval
+    "payment",     // payment due / payment recorded
+    "travel",      // travel claim moved to Finance
+    "approval",    // PO or request needing Finance sign-off
+    "daily_update",// CEO reviewed their daily update
+    "rfi",
+    "incident", "task",
+  ],
+  accountant: [
+    "invoice", "expense", "payment", "daily_update", "incident", "task",
   ],
 };
 
@@ -129,7 +155,8 @@ const notifyRole = async (
   link,
   severity = "info",
   projectId = null,
-  referenceId = null
+  referenceId = null,
+  excludeUserId = null   // skip the person who just did the action (no self-notifications)
 ) => {
   if (!isTypeAllowed(roleCode, type)) {
     console.warn(`Skipped "${type}" notification — not a ${roleCode} concern.`);
@@ -139,11 +166,13 @@ const notifyRole = async (
     const users = await pool.query(
       `SELECT u.id FROM users u
        JOIN roles r ON r.id = u.role_id
-       WHERE r.code = $1`,
-      [roleCode]
+       WHERE r.code = $1${excludeUserId ? " AND u.id <> $2" : ""}`,
+      excludeUserId ? [roleCode, excludeUserId] : [roleCode]
     );
     if (!users.rows.length) {
-      console.warn(`notifyRole: no users found with role "${roleCode}"`);
+      if (!excludeUserId) {
+        console.warn(`notifyRole: no users found with role "${roleCode}"`);
+      }
       return;
     }
     for (const u of users.rows) {
@@ -153,6 +182,26 @@ const notifyRole = async (
     }
   } catch (err) {
     console.error("notifyRole failed:", err.message);
+  }
+};
+
+/* ── Internal helper: notify the whole HR team (HR Manager + HR Executive) ──
+   Pass excludeUserId = req.user.id so the person who did the action is not
+   notified about their own action. */
+const HR_ROLE_CODES = ["hr_manager", "hr_executive"];
+const notifyHr = async (
+  type,
+  title,
+  description,
+  link,
+  severity = "info",
+  referenceId = null,
+  excludeUserId = null
+) => {
+  for (const code of HR_ROLE_CODES) {
+    await notifyRole(
+      code, type, title, description, link, severity, null, referenceId, excludeUserId
+    );
   }
 };
 
@@ -245,6 +294,7 @@ module.exports = {
   ROLE_TYPES,
   insertNotification,
   notifyRole,
+  notifyHr,
   getNotifications,
   markOneRead,
   markAllRead,

@@ -1,4 +1,11 @@
 const pool = require("../config/db");
+const { notifyHr } = require("./operationsNotificationsController");
+
+// YYYY-MM-DD in local time (pg DATE columns arrive as local-midnight Date objects)
+const fmtDate = (v) => {
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? String(v || "") : d.toLocaleDateString("en-CA");
+};
 
 const LEAVE_TYPES = new Set([
   "casual",
@@ -182,6 +189,22 @@ exports.applyLeave = async (req, res) => {
     }
 
     const row = result.rows[0];
+
+    // HR bell: a new leave request exists. Never blocks the leave itself.
+    try {
+      await notifyHr(
+        "leave",
+        `${employee.name} applied for ${labelForType(normalizedType)}`,
+        `${fmtDate(fromDate)} to ${fmtDate(toDate)} — ${String(reason).trim().slice(0, 120)}`,
+        "/hr/leaves",
+        "info",
+        row.id,
+        req.user.id
+      );
+    } catch (notifyErr) {
+      console.error("Leave notification failed:", notifyErr.message);
+    }
+
     return res.status(201).json({
       ...shapeLeave(row, normalizedType),
       employee_name: employee.name,
@@ -479,6 +502,23 @@ exports.updateLeaveStatus = async (req, res) => {
         RETURNING *`,
       values
     );
+
+    // HR bell: the reporting manager decided a leave. Never blocks the update.
+    try {
+      const decided = status.toLowerCase();
+      const typeLabel = labelForType(normalizeLeaveType(leave.leave_type, leave.reason));
+      await notifyHr(
+        "leave",
+        `${leave.employee_name}'s leave ${decided}`,
+        `${typeLabel} (${fmtDate(leave.from_date)} to ${fmtDate(leave.to_date)}) was ${decided} by ${reviewer.name}.`,
+        "/hr/leaves",
+        status === "Approved" ? "ok" : "warn",
+        id,
+        req.user.id
+      );
+    } catch (notifyErr) {
+      console.error("Leave decision notification failed:", notifyErr.message);
+    }
 
     return res.status(200).json({
       ...shapeLeave(result.rows[0]),

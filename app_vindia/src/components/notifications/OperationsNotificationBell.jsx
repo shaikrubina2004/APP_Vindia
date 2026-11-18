@@ -25,6 +25,14 @@ const TYPE_CFG = {
   request:   { label: "Request",   color: "#4338ca", bg: "#eef2ff" },
   diary:     { label: "Site Diary", color: "#0f766e", bg: "#f0fdfa" },
   project:   { label: "Project", color: "#1d4ed8", bg: "#eff6ff" },
+  leave:       { label: "Leave",       color: "#0d9488", bg: "#f0fdfa" },
+  travel:      { label: "Travel",      color: "#9333ea", bg: "#faf5ff" },
+  recruitment: { label: "Recruitment", color: "#2563eb", bg: "#eff6ff" },
+  employee:    { label: "Employee",    color: "#4f46e5", bg: "#eef2ff" },
+  attendance:  { label: "Attendance",  color: "#0369a1", bg: "#f0f9ff" },
+  invoice:     { label: "Invoice",     color: "#047857", bg: "#ecfdf5" },
+  expense:     { label: "Expense",     color: "#c2410c", bg: "#fff7ed" },
+  payment:     { label: "Payment",     color: "#0f766e", bg: "#f0fdfa" },
 };
 
 const SEV_COLOR = {
@@ -41,13 +49,15 @@ const SEV_COLOR = {
    backend/controllers/operationsNotificationsController.js            */
 const ROLE_FILTERS = {
   logistics_coordinator: ["all", "delivery", "delay", "receipt", "incident", "task", "daily_update"],
-  inventory_controller:  ["all", "delivery", "low_stock", "receipt", "incident", "task", "daily_update"],
+  inventory_controller:  ["all", "delivery", "low_stock", "receipt", "request", "incident", "task", "daily_update"],
   operations_manager:    ["all", "approval", "delay", "receipt", "low_stock", "daily_update", "incident", "task"],
   office_administrator:  ["all", "request", "daily_update", "incident", "task"],
-  finance_manager:       ["all", "incident", "task"],
   project_manager:       ["all", "approval", "diary", "rfi", "daily_update", "incident", "task"],
-  procurement_officer:   ["all", "request", "approval", "receipt", "delay", "daily_update", "incident", "task"],
-
+  procurement_officer:   ["all", "request", "approval", "receipt", "delay", "rfi", "daily_update", "incident", "task"],
+  hr_manager:            ["all", "leave", "travel", "recruitment", "employee", "attendance", "rfi", "incident", "task"],
+  hr_executive:          ["all", "leave", "travel", "recruitment", "employee", "attendance", "rfi", "incident", "task"],
+  finance_manager:       ["all", "invoice", "expense", "payment", "travel", "approval", "daily_update", "rfi", "incident", "task"],
+  accountant:            ["all", "invoice", "expense", "payment", "daily_update", "incident", "task"],
 };
 
 /* A couple of labels read better when they're role-specific. */
@@ -61,12 +71,13 @@ const ROLE_TITLE = {
   logistics_coordinator: "Logistics",
   inventory_controller: "Inventory",
   finance_manager: "Finance",
+  accountant: "Accounts",
   project_manager: "Project",
   procurement_officer: "Procurement",
   operations_manager: "Operations",
   office_administrator: "Office Admin",
-
-
+  hr_manager: "HR",
+  hr_executive: "HR",
 };
 
 const DEFAULT_FILTERS = ["all", "delivery", "delay", "receipt", "low_stock", "incident", "task"];

@@ -9,6 +9,8 @@ const {
   pmUpdateStatus,
   getManualExpenses,
   saveManualExpenses,
+  getFinanceClaims,
+  markFinancePaid,
 } = require("../controllers/travelExpenseController");
 
 const router = express.Router();
@@ -20,9 +22,16 @@ router.use(auth);
 
 router.post("/",              createRequest);
 router.get("/",               getRequests);
+
+// Finance queue (approved travel claims). MUST stay above "/:id" or Express
+// would treat the word "finance" as a request id.
+router.get("/finance/claims", getFinanceClaims);
 router.get("/:id",            getRequestById);
 router.put("/:id/status",     updateStatus);
 router.put("/:id/pm-status",  pmUpdateStatus);
+
+// Finance Manager marks an approved claim as paid.
+router.put("/:id/finance-status", markFinancePaid);
 
 // Manual expense entry by HR / CEO (company-pays requests)
 // Stored as JSONB on the request row — no extra table needed.

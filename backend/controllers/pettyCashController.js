@@ -2,6 +2,9 @@
 const PettyCash = require("../models/pettyCashModel");
 const { asyncHandler, AppError } = require("../middleware/errorHandler");
 const { validateFinanceWbs } = require("../utils/financeWbsValidation");
+const { notifyRole, insertNotification } = require("./operationsNotificationsController");
+
+const inr = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
 
 const FM_ONLY_ROLES = ["finance_manager", "ceo"];
 
@@ -40,6 +43,24 @@ exports.create = asyncHandler(async (req, res) => {
     project_id, transaction_type, amount, category, description, receipt_url, wbs_id,
     created_by: req.user.id,
   });
+
+  // Finance Manager bell: a petty cash entry is waiting for approval.
+  try {
+    await notifyRole(
+      "finance_manager",
+      "expense",
+      "Petty cash awaiting approval",
+      `${row.transaction_type === "inflow" ? "Inflow" : "Outflow"} ${inr(row.amount)}${row.category ? ` \u2014 ${row.category}` : ""}`,
+      "/accountant/petty-cash",
+      "info",
+      row.project_id,
+      row.id,
+      req.user.id
+    );
+  } catch (notifyErr) {
+    console.error("Petty cash notification failed:", notifyErr.message);
+  }
+
   res.status(201).json({ success: true, data: row });
 });
 
@@ -69,6 +90,26 @@ exports.approve = asyncHandler(async (req, res) => {
   const result = await PettyCash.approve(req.params.id, req.user.id);
   if (result.error === "NOT_FOUND") throw new AppError("Petty cash transaction not found", 404);
   if (result.error === "NOT_PENDING") throw new AppError("Only pending transactions can be approved", 409);
+  // Tell the person who raised it (never the approver themselves).
+  try {
+    const e = result.entry;
+    if (e && e.created_by && String(e.created_by) !== String(req.user.id)) {
+      await insertNotification(
+        e.created_by,
+        "expense",
+        `Petty cash approved`,
+        `Your ${e.transaction_type} entry of ${inr(e.amount)}${e.category ? ` (${e.category})` : ""} was approved.`,
+        "/accountant/petty-cash",
+        "ok",
+        e.project_id,
+        null,
+        e.id
+      );
+    }
+  } catch (notifyErr) {
+    console.error("Petty cash decision notification failed:", notifyErr.message);
+  }
+
   res.json({ success: true, data: result.entry });
 });
 
@@ -79,5 +120,25 @@ exports.reject = asyncHandler(async (req, res) => {
   const result = await PettyCash.reject(req.params.id, req.user.id);
   if (result.error === "NOT_FOUND") throw new AppError("Petty cash transaction not found", 404);
   if (result.error === "NOT_PENDING") throw new AppError("Only pending transactions can be rejected", 409);
+  // Tell the person who raised it (never the approver themselves).
+  try {
+    const e = result.entry;
+    if (e && e.created_by && String(e.created_by) !== String(req.user.id)) {
+      await insertNotification(
+        e.created_by,
+        "expense",
+        `Petty cash rejected`,
+        `Your ${e.transaction_type} entry of ${inr(e.amount)}${e.category ? ` (${e.category})` : ""} was rejected.`,
+        "/accountant/petty-cash",
+        "warn",
+        e.project_id,
+        null,
+        e.id
+      );
+    }
+  } catch (notifyErr) {
+    console.error("Petty cash decision notification failed:", notifyErr.message);
+  }
+
   res.json({ success: true, data: result.entry });
 });

@@ -9,6 +9,25 @@ const {
   bgvRequestEmailTemplate,
 } = require("../utils/mailer");
 const { generateOfferLetterPdf, validateOfferLetterData } = require("../utils/offerLetterPdf");
+const { notifyHr } = require("./operationsNotificationsController");
+
+// HR bell for recruitment milestones. Skips the person who did the action and
+// never blocks the request it is called from.
+const notifyRecruitment = async (req, title, description, severity, candidateId) => {
+  try {
+    await notifyHr(
+      "recruitment",
+      title,
+      description,
+      "/hr/recruitment/job-openings",
+      severity,
+      candidateId,
+      req.user?.id || null
+    );
+  } catch (err) {
+    console.error("Recruitment notification failed:", err.message);
+  }
+};
 
 /* ═══════════════════════════════════════
    JOB OPENINGS
@@ -229,6 +248,15 @@ exports.markHired = async (req, res) => {
     }
 
     const candidate = await Recruitment.markHired(req.params.id, employeeId);
+
+    await notifyRecruitment(
+      req,
+      `${candidate?.name || existing.name} hired`,
+      `Joined${existing.job_title ? ` as ${existing.job_title}` : ""}. Recruitment is complete.`,
+      "ok",
+      Number(req.params.id)
+    );
+
     res.status(200).json(candidate);
   } catch (err) {
     console.error("MARK HIRED ERROR:", err.message);
@@ -448,6 +476,20 @@ exports.completeAptitudeTest = async (req, res) => {
       error_message: null,
     });
 
+    await notifyRecruitment(
+      req,
+      response === "accepted"
+        ? `${candidate?.name || existing.name} accepted the offer`
+        : `${candidate?.name || existing.name} declined the offer`,
+      `${existing.job_title ? `${existing.job_title}. ` : ""}${
+        response === "accepted"
+          ? "Next: add them as an employee and send login details."
+          : "The candidate has been closed."
+      }`,
+      response === "accepted" ? "ok" : "warn",
+      Number(req.params.id)
+    );
+
     res.status(200).json(candidate);
   } catch (err) {
     console.error("COMPLETE APTITUDE TEST ERROR:", err.message);
@@ -536,6 +578,18 @@ exports.recordApproval = async (req, res) => {
 
     const candidate = await Recruitment.recordApproval(req.params.id, { decision, approverId });
     if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+
+    await notifyRecruitment(
+      req,
+      decision === "approved"
+        ? `${candidate.name} approved for hiring`
+        : `${candidate.name} rejected at approval`,
+      decision === "approved"
+        ? "Internal approval granted — move on to background verification."
+        : "Internal approval was declined and the candidate has been closed.",
+      decision === "approved" ? "ok" : "warn",
+      Number(req.params.id)
+    );
 
     res.status(200).json(candidate);
   } catch (err) {
