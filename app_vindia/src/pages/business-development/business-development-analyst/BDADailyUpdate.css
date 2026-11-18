@@ -1,0 +1,34 @@
+/* BDA Daily Update — use the whole screen.
+   The shared Finance daily-update styles cap the page at 960px and centre it;
+   these rules undo that for the BDA page only. */
+
+.bda-daily-wide { width: 100%; }
+
+/* the component's outermost block, whatever its class name is */
+.bda-daily-wide .fdu-root,
+.bda-daily-wide > div {
+  max-width: none !important;
+  width: 100%;
+  margin: 0 !important;
+  padding: 28px 40px 60px;
+  box-sizing: border-box;
+}
+
+.bda-daily-wide .fdu-form { padding: 28px 32px; }
+
+/* more fields per row on a wide screen (Leads and Outreach have 4 fields each) */
+@media (min-width: 1100px) {
+  .bda-daily-wide .fdu-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px 20px; }
+}
+@media (min-width: 1700px) {
+  .bda-daily-wide .fdu-grid { gap: 20px 24px; }
+}
+
+/* long text boxes use the full width */
+.bda-daily-wide .fdu-field--full textarea { width: 100%; box-sizing: border-box; }
+
+@media (max-width: 720px) {
+  .bda-daily-wide .fdu-root,
+  .bda-daily-wide > div { padding: 20px 16px 48px; }
+  .bda-daily-wide .fdu-form { padding: 18px 16px; }
+}

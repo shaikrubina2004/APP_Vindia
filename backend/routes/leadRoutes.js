@@ -67,5 +67,6 @@ router.put("/:id/reassign",         lead.reassignLead);
 router.put("/:id/assign",           protect, lead.assignLead);
 router.put("/:id/permanent-delete", lead.permanentDeleteLead);
 router.put("/:id/ack-preferred-time", lead.ackPreferredTime);
+router.put("/:id/snooze-reminder",  lead.snoozeReminder);
 
 module.exports = router;

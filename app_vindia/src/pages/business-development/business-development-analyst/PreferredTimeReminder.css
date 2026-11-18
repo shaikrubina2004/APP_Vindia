@@ -54,3 +54,5 @@
 .ptr-btn--ghost:hover { background: #f8fafc; }
 .ptr-btn--primary { background: #2563eb; color: #fff; }
 .ptr-btn--primary:hover { background: #1d4ed8; }
+
+.ptr-intro { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: #475569; }

@@ -8,8 +8,15 @@ const {
 } = require("./bdaNotificationsController");
 const {
   ESCALATION_HOURS, UNASSIGNED_SQL, ASSIGNED_TO_ME_SQL, CLOSED_STATUSES,
-  getBdaUsers, getUserById, findBdaByEmail, findBdaByName,
+  getBdaUsers, getCeoUsers, getUserById, findBdaByEmail, findBdaByName,
 } = require("../utils/leadAssignment");
+
+/* SQL fragment: the lead is NOT waiting for the CEO to approve a delete.
+   Also covers the old name JUNK_REQUESTED, and a lead with no status at all. */
+const NOT_DELETE_REQUESTED = (alias = "") => {
+  const c = alias ? `${alias}.status` : "status";
+  return `UPPER(COALESCE(${c}, '')) NOT IN ('DELETE_REQUESTED', 'JUNK_REQUESTED')`;
+};
 
 /* ══════════════════════════════════════
    DASHBOARD SUMMARY
@@ -21,7 +28,7 @@ exports.getDashboardSummary = async (req, res) => {
 
     // Leads: a BDA sees their own leads + the unassigned pool
     const leadFilter = isBda
-      ? `AND (${ASSIGNED_TO_ME_SQL("$1", "$2")} OR ${UNASSIGNED_SQL()}) AND status != 'DELETE_REQUESTED'`
+      ? `AND (${ASSIGNED_TO_ME_SQL("$1", "$2")} OR ${UNASSIGNED_SQL()}) AND ${NOT_DELETE_REQUESTED()}`
       : "";
     const leadVals = isBda ? [name || "", email || ""] : [];
 
@@ -111,9 +118,9 @@ exports.getAllLeads = async (req, res) => {
       const me = ASSIGNED_TO_ME_SQL(`$${vals.length - 1}`, `$${vals.length}`, "l");
       sql += assignedOnly
         // Follow-up page: only the leads that are mine
-        ? ` AND ${me} AND l.status != 'DELETE_REQUESTED'`
+        ? ` AND ${me} AND ${NOT_DELETE_REQUESTED("l")}`
         // Leads page: mine + the unassigned pool (so I can pick things up)
-        : ` AND (${me} OR ${UNASSIGNED_SQL("l")}) AND l.status != 'DELETE_REQUESTED'`;
+        : ` AND (${me} OR ${UNASSIGNED_SQL("l")}) AND ${NOT_DELETE_REQUESTED("l")}`;
     } else if (assignedOnly) {
       // CEO on the follow-up page: every lead that has an owner
       sql += ` AND NOT ${UNASSIGNED_SQL("l")}`;
@@ -188,7 +195,7 @@ exports.createLead = async (req, res) => {
         description || null, date_and_time || null,
         search_category || null, area || null,
         parseInt(designs_sent) || 0,
-        isConverted ? new Date() : null, // ✅ set converted_at if created as converted
+        isConverted ? new Date() : null, // set converted_at if created as converted
         owner ? owner.email : null,
         owner ? owner.name  : null,       // created & owned by the same person
         owner ? new Date()  : null,
@@ -216,9 +223,10 @@ exports.createLead = async (req, res) => {
 
 /* ══════════════════════════════════════
    UPDATE LEAD
-   ✅ Auto-sets converted_at when status
-      changes to "Converted", clears it
-      when status changes away.
+   • converted_at follows the status
+   • Photo set / Design set (1-10): each number can be sent only once
+   • Descriptions are append-only
+   • Next call date (snooze_until), preferred call slot / time
 ══════════════════════════════════════ */
 exports.updateLead = async (req, res) => {
   const { id } = req.params;
@@ -357,22 +365,26 @@ exports.updateLead = async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error("Update lead error:", err.message);
-    res.status(500).json({ error: "Update failed" });
+    // while developing, show the real reason in the red box; never in production
+    const detail = process.env.NODE_ENV === "production" ? "" : `: ${err.message}`;
+    res.status(500).json({ error: "Update failed" + detail });
   }
 };
+
 /* ══════════════════════════════════════
    ADD FOLLOW UP
-   ✅ Notification is only ever sent to the
-      lead's actually-assigned BDA. If the
-      lead has no assigned_to, or the name
-      doesn't match any user, no notification
-      is sent — it no longer silently falls
-      back to broadcasting to every BDA.
+   Notification is only ever sent to the
+   lead's actually-assigned BDA. If the
+   lead has no assigned_to, or the name
+   doesn't match any user, no notification
+   is sent — it no longer silently falls
+   back to broadcasting to every BDA.
 ══════════════════════════════════════ */
 exports.addFollowUp = async (req, res) => {
   const { leadId } = req.params;
-  const { note, status, nextFollowUp } = req.body;
+  const { note, status, nextFollowUp, bda_email } = req.body;
   if (!note) return res.status(400).json({ error: "Note required" });
+  const doneBy = bda_email ? String(bda_email).trim().toLowerCase() : null;
 
   try {
     const own = await pool.query(
@@ -383,10 +395,20 @@ exports.addFollowUp = async (req, res) => {
     if (own.rows[0].unassigned)
       return res.status(409).json({ error: "Assign this lead to a BDA before adding a follow-up" });
 
-    await pool.query(
-      "INSERT INTO followups (lead_id, note, status, next_followup) VALUES ($1, $2, $3, $4)",
-      [leadId, note, status || null, nextFollowUp || null]
-    );
+    // done_by = the BDA who saved this follow-up (used by the Daily Update numbers).
+    // If the column hasn't been added yet (error 42703) fall back to the old insert.
+    try {
+      await pool.query(
+        "INSERT INTO followups (lead_id, note, status, next_followup, done_by) VALUES ($1, $2, $3, $4, $5)",
+        [leadId, note, status || null, nextFollowUp || null, doneBy]
+      );
+    } catch (e) {
+      if (e.code !== "42703") throw e;
+      await pool.query(
+        "INSERT INTO followups (lead_id, note, status, next_followup) VALUES ($1, $2, $3, $4)",
+        [leadId, note, status || null, nextFollowUp || null]
+      );
+    }
 
     const updateFields = [];
     const updateVals   = [];
@@ -396,7 +418,7 @@ exports.addFollowUp = async (req, res) => {
       updateFields.push(`status = $${n++}`);
       updateVals.push(status);
 
-      // ✅ Also handle converted_at if status set via follow-up
+      // Also handle converted_at if status set via follow-up
       const isConverted = status.toLowerCase() === "converted";
       if (isConverted) {
         updateFields.push(`converted_at = COALESCE(converted_at, NOW())`);
@@ -519,7 +541,7 @@ exports.importLeadsFromExcel = async (req, res) => {
           keys["search_category"] || null,
           keys["area"] || null,
           parseInt(keys["designs_sent"]) || 0,
-          isConverted ? new Date() : null, // ✅
+          isConverted ? new Date() : null,
           owner ? owner.email : null,
           owner ? "Import"    : null,
           owner ? new Date()  : null,
@@ -654,9 +676,11 @@ exports.exportLeadsToExcel = async (req, res) => {
 };
 
 /* ══════════════════════════════════════
-   JUNK / DELETE / REASSIGN
+   DELETE REQUESTS  (BDA asks -> CEO approves or rejects)
+   request-junk      BDA: status = DELETE_REQUESTED, CEO notified
+   permanent-delete  CEO: approve — the lead is deleted
+   reject-delete     CEO: refuse — the lead returns to the BDA
 ══════════════════════════════════════ */
-
 exports.requestJunk = async (req, res) => {
   try {
     const by = String((req.body && req.body.requested_by) || "").trim() || null;
@@ -700,7 +724,7 @@ exports.rejectDelete = async (req, res) => {
   try {
     const { rows } = await pool.query(
       `UPDATE leads
-          SET status              = COALESCE(NULLIF(status_before_delete, ''), 'New'),
+          SET status               = COALESCE(NULLIF(status_before_delete, ''), 'New'),
               status_before_delete = NULL,
               junk_requested_at    = NULL,
               delete_requested_by  = NULL
@@ -725,7 +749,8 @@ exports.reassignLead = async (req, res) => {
       `UPDATE leads
           SET assigned_to=$1, assigned_email=$2, assigned_by='Admin',
               assigned_at=CASE WHEN $1::text IS NULL THEN NULL ELSE NOW() END,
-              status='New', delete_requested_at=NULL
+              status='New', junk_requested_at=NULL,
+              status_before_delete=NULL, delete_requested_by=NULL
         WHERE id=$3`,
       [owner ? owner.name : null, owner ? owner.email : null, req.params.id]
     );
@@ -902,42 +927,185 @@ exports.assignLead = async (req, res) => {
   }
 };
 
+/* ══════════════════════════════════════════════════════════════════
+   DAILY UPDATE NUMBERS  (filled in automatically, nobody types them)
+   GET /api/leads/daily-summary        (login required)
+
+   Everything is for the LOGGED-IN BDA (taken from the login token, so nobody
+   can ask for another BDA's numbers) and for TODAY in India time.
+
+     leads_total            leads that became the BDA's own today
+                            (Assign to me, assigned by the CEO, or added by them)
+     leads_qualified        leads the BDA marked "Interested" in a follow-up today
+     leads_converted        leads of the BDA that became Converted today
+     leads_deleted          delete requests the BDA sent today
+     followups_done         follow-ups the BDA saved today
+     followups_due_tomorrow open leads of the BDA whose next call date is tomorrow
+     followups_overdue      open leads of the BDA whose next call date has passed
+══════════════════════════════════════════════════════════════════ */
+exports.getDailySummary = async (req, res) => {
+  try {
+    const actor = await getUserById(req.user.id);
+    if (!actor) return res.status(401).json({ error: "User not found" });
+    const name  = actor.name || "";
+    const email = (actor.email || "").toLowerCase();
+
+    // "today" in India, and a timezone-safe way to turn any timestamp into an IST date
+    const TODAY = `(NOW() AT TIME ZONE 'Asia/Kolkata')::date`;
+    const istDay = (col) => `(${col}::timestamptz AT TIME ZONE 'Asia/Kolkata')::date`;
+
+    const mine = ASSIGNED_TO_ME_SQL("$1", "$2", "l");
+    const num  = async (sql, params) => parseInt((await pool.query(sql, params)).rows[0].n, 10) || 0;
+    const me   = [name, email];
+
+    // follow-ups saved by this BDA. Older rows have no done_by, so they count
+    // for the lead's current owner. (If done_by doesn't exist yet: owner only.)
+    const followupCount = async (extraWhere, distinctLeads) => {
+      const select = distinctLeads ? "COUNT(DISTINCT f.lead_id)" : "COUNT(*)";
+      const build  = (who) => `
+        SELECT ${select} AS n
+          FROM followups f JOIN leads l ON l.id = f.lead_id
+         WHERE ${istDay("f.created_at")} = ${TODAY}
+           ${extraWhere}
+           AND ${who}`;
+      try {
+        return await num(build(`(LOWER(f.done_by) = LOWER($2) OR (f.done_by IS NULL AND ${mine}))`), me);
+      } catch (e) {
+        if (e.code !== "42703") throw e;
+        return await num(build(mine), me);
+      }
+    };
+
+    const openLead = `l.deleted_by_admin = false
+                      AND ${NOT_DELETE_REQUESTED("l")}
+                      AND LOWER(COALESCE(l.status, '')) <> ALL($3)`;
+
+    const [
+      leads_total, leads_converted, leads_deleted,
+      leads_qualified, followups_done,
+      followups_due_tomorrow, followups_overdue,
+    ] = await Promise.all([
+      num(`SELECT COUNT(*) AS n FROM leads l
+            WHERE ${mine} AND l.assigned_at IS NOT NULL
+              AND ${istDay("l.assigned_at")} = ${TODAY}`, me),
+      num(`SELECT COUNT(*) AS n FROM leads l
+            WHERE ${mine} AND l.deleted_by_admin = false AND l.converted_at IS NOT NULL
+              AND ${istDay("l.converted_at")} = ${TODAY}`, me),
+      num(`SELECT COUNT(*) AS n FROM leads l
+            WHERE l.junk_requested_at IS NOT NULL
+              AND ${istDay("l.junk_requested_at")} = ${TODAY}
+              AND LOWER(TRIM(COALESCE(l.delete_requested_by, ''))) = LOWER(TRIM($1))`, [name]),
+      followupCount(`AND LOWER(COALESCE(f.status, '')) IN ('interested', 'intrested')`, true),
+      followupCount("", false),
+      num(`SELECT COUNT(*) AS n FROM leads l
+            WHERE ${mine} AND ${openLead}
+              AND l.snooze_until IS NOT NULL AND DATE(l.snooze_until) = ${TODAY} + 1`,
+          [...me, CLOSED_STATUSES]),
+      num(`SELECT COUNT(*) AS n FROM leads l
+            WHERE ${mine} AND ${openLead}
+              AND l.snooze_until IS NOT NULL AND DATE(l.snooze_until) < ${TODAY}`,
+          [...me, CLOSED_STATUSES]),
+    ]);
+
+    res.json({
+      success: true,
+      summary: {
+        leads_total, leads_qualified, leads_converted, leads_deleted,
+        followups_done, followups_due_tomorrow, followups_overdue,
+      },
+    });
+  } catch (err) {
+    console.error("Daily summary error:", err.message);
+    res.status(500).json({ error: "Failed to calculate today's numbers" });
+  }
+};
+
+/* ══════════════════════════════════════════════════════════════════
+   POP-UP REMINDERS  (shown by PreferredTimeReminder.jsx)
+     "preferred" — the lead's Preferred Call Time slot has started
+     "snooze"    — the BDA pressed Snooze on the Follow Up page
+══════════════════════════════════════════════════════════════════ */
+const REMINDER_COLUMNS = `l.id, l.name, l.phone, l.city, l.status, l.lead_type,
+  l.preferred_call_type, l.preferred_call_time, l.preferred_call_slot,
+  l.description, l.description_notes`;
+
+/* Everything of THIS BDA's that should pop up right now.
+   Snoozed reminders come first (the BDA asked for them explicitly). */
 exports.getDueReminders = async (req, res) => {
   try {
     const { name, email } = req.query;
     if (!name && !email) return res.json({ reminders: [] });
+    const params = [name || "", email || "", CLOSED_STATUSES];
+    const mine   = ASSIGNED_TO_ME_SQL("$1", "$2", "l");
 
-    const { rows } = await pool.query(
-      `SELECT l.id, l.name, l.phone, l.city, l.status, l.lead_type,
-              l.preferred_call_type, l.preferred_call_time, l.preferred_call_slot,
-              l.description, l.description_notes
-         FROM leads l
-        WHERE l.deleted_by_admin = false
-          AND ${ASSIGNED_TO_ME_SQL("$1", "$2", "l")}
-          AND l.preferred_call_time IS NOT NULL
-          AND l.preferred_call_time <= NOW()
-          AND l.preferred_call_time >  NOW() - INTERVAL '3 days'
-          AND (l.preferred_call_ack IS NULL OR l.preferred_call_ack < l.preferred_call_time)
-          AND LOWER(COALESCE(l.status, '')) <> ALL($3)
-        ORDER BY l.preferred_call_time ASC
-        LIMIT 10`,
-      [name || "", email || "", CLOSED_STATUSES]
-    );
-    res.json({ reminders: rows });
+    const [snoozed, preferred] = await Promise.all([
+      pool.query(
+        `SELECT ${REMINDER_COLUMNS}, 'snooze' AS reminder_kind
+           FROM leads l
+          WHERE l.deleted_by_admin = false
+            AND ${mine}
+            AND l.snooze_remind_at IS NOT NULL
+            AND l.snooze_remind_at <= NOW()
+            AND LOWER(COALESCE(l.status, '')) <> ALL($3)
+          ORDER BY l.snooze_remind_at ASC
+          LIMIT 10`, params),
+      // looks back 3 days so a reminder isn't lost if the BDA wasn't logged in then
+      pool.query(
+        `SELECT ${REMINDER_COLUMNS}, 'preferred' AS reminder_kind
+           FROM leads l
+          WHERE l.deleted_by_admin = false
+            AND ${mine}
+            AND l.preferred_call_time IS NOT NULL
+            AND l.preferred_call_time <= NOW()
+            AND l.preferred_call_time >  NOW() - INTERVAL '3 days'
+            AND (l.preferred_call_ack IS NULL OR l.preferred_call_ack < l.preferred_call_time)
+            AND LOWER(COALESCE(l.status, '')) <> ALL($3)
+          ORDER BY l.preferred_call_time ASC
+          LIMIT 10`, params),
+    ]);
+
+    res.json({ reminders: [...snoozed.rows, ...preferred.rows] });
   } catch (err) {
     console.error("Due reminders error:", err.message);
     res.status(500).json({ error: "Failed to load reminders" });
   }
 };
 
-/* BDA pressed "Got it" — don't show this popup again for that time */
+/* BDA pressed "Got it". body.kind = "snooze" clears the snooze;
+   anything else marks the preferred-time pop-up as seen. */
 exports.ackPreferredTime = async (req, res) => {
   try {
-    await pool.query(
-      "UPDATE leads SET preferred_call_ack = NOW() WHERE id = $1", [req.params.id]);
+    if ((req.body && req.body.kind) === "snooze") {
+      await pool.query("UPDATE leads SET snooze_remind_at = NULL WHERE id = $1", [req.params.id]);
+    } else {
+      await pool.query("UPDATE leads SET preferred_call_ack = NOW() WHERE id = $1", [req.params.id]);
+    }
     res.json({ success: true });
   } catch (err) {
     console.error("Ack reminder error:", err.message);
     res.status(500).json({ error: "Failed to dismiss reminder" });
+  }
+};
+
+/* Snooze button: pop up again in 1 or 2 hours.
+   PUT /api/leads/:id/snooze-reminder   { minutes: 60 | 120 } */
+exports.snoozeReminder = async (req, res) => {
+  try {
+    const minutes = Number(req.body && req.body.minutes);
+    if (![60, 120].includes(minutes))
+      return res.status(400).json({ error: "Snooze must be 1 or 2 hours" });
+
+    const { rows } = await pool.query(
+      `UPDATE leads
+          SET snooze_remind_at = NOW() + ($2::int * INTERVAL '1 minute')
+        WHERE id = $1 AND deleted_by_admin = false
+    RETURNING snooze_remind_at`,
+      [req.params.id, minutes]
+    );
+    if (!rows.length) return res.status(404).json({ error: "Lead not found" });
+    res.json({ success: true, remindAt: rows[0].snooze_remind_at });
+  } catch (err) {
+    console.error("Snooze reminder error:", err.message);
+    res.status(500).json({ error: "Failed to set the reminder" });
   }
 };

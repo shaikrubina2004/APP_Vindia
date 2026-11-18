@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import { useAuth } from "../../../context/useAuth";
-import PreferredTimeReminder from "./PreferredTimeReminder";
 import "./BDALeads.css";
 
 const API = "http://localhost:5000/api";
@@ -374,12 +373,12 @@ const SetPicker = ({ label, prefix, sent, value, onChange }) => (
   <div className="bda-field">
     <label className="bda-field__label">{label}</label>
     <select className="bda-field__input" value={value} onChange={e => onChange(e.target.value)}>
-      <option value="">— Select {prefix.toLowerCase()} to mark as sent —</option>
+      <option value="">Select {prefix.toLowerCase()} to mark as sent</option>
       {SET_NUMBERS.map(n => {
         const done = sent.includes(n);
         return (
           <option key={n} value={n} disabled={done}>
-            {prefix} {n}{done ? "  ✓ already sent" : ""}
+            {prefix} {n}{done ? "  (already sent)" : ""}
           </option>
         );
       })}
@@ -389,7 +388,7 @@ const SetPicker = ({ label, prefix, sent, value, onChange }) => (
     ) : sent.length > 0 ? (
       <div className="bda-setchips">
         <span className="bda-setchips__label">Sent:</span>
-        {sent.map(n => <span key={n} className="bda-setchip">{prefix} {n} ✓</span>)}
+        {sent.map(n => <span key={n} className="bda-setchip">{prefix} {n}</span>)}
       </div>
     ) : (
       <p className="bda-field__hint">Nothing sent yet.</p>
@@ -543,8 +542,8 @@ const EditModal = ({ lead, onClose, onSave, bdaEmail, bdaName, isCEO }) => {
                          onChange={v => set("preferred_call_slot", v)} options={CALL_SLOTS.map(x => x.label)} />
             <div className="bda-field bda-field--wide">
               <p className="bda-field__hint" style={{ margin: 0 }}>
-                📅 After you press Save, this lead appears on the Follow Up page for the Next Call Date.
-                🔔 A pop-up reminds you when the chosen time slot starts.
+                After you press Save, this lead appears on the Follow Up page for the Next Call Date.
+                A pop-up reminds you when the chosen time slot starts.
               </p>
             </div>
 
@@ -555,7 +554,7 @@ const EditModal = ({ lead, onClose, onSave, bdaEmail, bdaName, isCEO }) => {
             {locking.length > 0 && (
               <div className="bda-field bda-field--wide">
                 <p className="bda-lockwarn">
-                  🔒 Saving will mark <b>{locking.join(" and ")}</b> as sent. This can't be undone,
+                  Saving will mark <b>{locking.join(" and ")}</b> as sent. This can't be undone,
                   and it can't be sent to this customer again.
                 </p>
               </div>
@@ -575,7 +574,7 @@ const EditModal = ({ lead, onClose, onSave, bdaEmail, bdaName, isCEO }) => {
                     title="Saved descriptions can't be edited — add a new description below"
                   />
                   <div className="bda-desc__meta">
-                    <span>🔒 Description {i + 1}</span>
+                    <span>Description {i + 1} (saved)</span>
                     {fmtNoteMeta(d) && <span>{fmtNoteMeta(d)}</span>}
                   </div>
                 </div>
@@ -1039,7 +1038,6 @@ const BDALeads = () => {
               <span className="bda-chip2__num">{counts.deleteReq}</span>
               <span className="bda-chip2__label">Delete Requests</span>
             </div>
-            <span className="bda-chip2__icon">🗑️</span>
           </div>
         )}
       </div>
@@ -1181,17 +1179,6 @@ const BDALeads = () => {
       )}
 
       {toast && <div className={`bda-toast bda-toast--${toast.type}`}>{toast.msg}</div>}
-
-      {/* ── PREFERRED-CALL-TIME POPUP (BDAs only) ── */}
-      <PreferredTimeReminder
-        email={bdaEmail}
-        name={bdaName}
-        enabled={!isCEO && !!user}
-        onOpenLead={(id) => {
-          const l = leads.find(x => x.id === id);
-          if (l) setEditLead(l);
-        }}
-      />
 
       {/* ── EDIT MODAL ── */}
       {editLead && (
