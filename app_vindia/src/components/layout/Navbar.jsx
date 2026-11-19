@@ -147,7 +147,7 @@ const OPS_BELL_ROLES = {
     invoice:      "/finance-manager/invoices",
     expense:      "/finance-manager/expenses",
     payment:      "/finance-manager/payments",
-    travel:       "/finance-manager/expenses",
+    travel:       "/finance-manager/travel-claims",
     approval:     "/finance-manager/invoices",
     daily_update: "/finance-manager/daily-update",
     incident:     "/finance-manager/incidents",

@@ -1,35 +1,231 @@
+// src/routes/FinanceRoutes.jsx
+
 import { Routes, Route } from "react-router-dom";
-import MEPLayout from "../layouts/MEPLayout";
-import MEPDashboard from "../pages/MEP Engineer/MEPDashboard";
-import MEPDailylog from "../pages/MEP Engineer/MEPDailylog";
-import MEPDrawings from "../pages/MEP Engineer/MEPDrawings";
-import MEPUploads from "../pages/MEP Engineer/MEPUploads";
-import MEPVerssionControll from "../pages/MEP Engineer/MEPVerssionControll";
-import MEPCoordination from "../pages/MEP Engineer/MEPCoordination";
+
+/* ── FINANCE COMPONENTS ──────────────────────────────────── */
+import FinanceManagerDashboard from "../pages/Finance/FinanceManagerDashboard";
+import InvoiceManagement from "../pages/Finance/InvoiceManagement";
+import BudgetPlanning from "../pages/Finance/BudgetPlanning";
+import PaymentTracking from "../pages/Finance/PaymentTracking";
+import ExpenseTracking from "../pages/Finance/ExpenseTracking";
+import TravelClaims from "../pages/Finance/TravelClaims";
+import CostReporting from "../pages/Finance/CostReporting";
+import VendorManagement from "../pages/Finance/VendorManagement";
+import FinanceSettings from "../pages/Finance/FinanceSettings";
+
+import FinanceDailyUpdate from "../pages/Finance/FinanceDailyUpdate";
+import FinanceDailyUpdateReview from "../pages/Finance/FinanceDailyUpdateReview";
 import AppShell from "../components/incidents/AppShell";
-import SharedDrawingPage from "../components/project/SharedDrawingPage";
 import RFIPage from "../pages/StructuralEngineer/RFI";
 import RFIDetailPage from "../pages/StructuralEngineer/RFIDetails";
+// Add this only if the file exists
+// import AccountantDailyUpdate from "../pages/Finance/AccountantDailyUpdate";
 
-function MEPRoutes() {
+import ProtectedRoute from "./ProtectedRoute";
+import { ROLES } from "../roles";
+
+const ACCOUNTANT_ACCESS = [ROLES.ACCOUNTANT, ROLES.FINANCE_MANAGER, ROLES.CEO];
+
+const MANAGER_ACCESS = [ROLES.FINANCE_MANAGER, ROLES.CEO];
+
+const FINANCE_MANAGER_ONLY = [ROLES.FINANCE_MANAGER];
+
+const FinanceRoutes = () => {
   return (
     <Routes>
-      <Route path="/" element={<MEPLayout />}>
-        {" "}
-        {/* ✅ layout wraps as parent */}
-        <Route path="dashboard" element={<MEPDashboard />} />
-        <Route path="daily-log" element={<MEPDailylog />} />
-        <Route path="drawings" element={<MEPDrawings />} />
-        <Route path="shared/drawings" element={<SharedDrawingPage />} />
-        <Route path="version-control" element={<MEPVerssionControll />} />
-        <Route path="incidents" element={<AppShell key="mep-incidents" />} />
-        <Route path="coordination" element={<MEPCoordination />} />
-        <Route path="upload" element={<MEPUploads />} />
-        <Route path="rfi" element={<RFIPage />} />
-        <Route path="rfi/:id" element={<RFIDetailPage />} />
-      </Route>
+      {/* =====================================================
+          DASHBOARD
+      ====================================================== */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={MANAGER_ACCESS}>
+            <FinanceManagerDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          INVOICES
+          Accountant can view/create/update status.
+          Manager can delete according to backend permissions.
+      ====================================================== */}
+      <Route
+        path="/invoices"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <InvoiceManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          BUDGET MANAGEMENT
+      ====================================================== */}
+      <Route
+        path="/budget"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <BudgetPlanning />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          PAYMENTS
+      ====================================================== */}
+      <Route
+        path="/payments"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <PaymentTracking />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          EXPENSES
+      ====================================================== */}
+      <Route
+        path="/expenses"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <ExpenseTracking />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          TRAVEL CLAIMS
+          Approved travel requests waiting for payment.
+          Finance Manager / CEO can mark them paid (backend enforces it).
+      ====================================================== */}
+      <Route
+        path="/travel-claims"
+        element={
+          <ProtectedRoute allowedRoles={MANAGER_ACCESS}>
+            <TravelClaims />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          COST REPORTING
+      ====================================================== */}
+      <Route
+        path="/cost-analysis"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <CostReporting />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          VENDORS
+      ====================================================== */}
+      <Route
+        path="/vendors"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <VendorManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          SETTINGS
+          Backend allows only Finance Manager and CEO.
+      ====================================================== */}
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute allowedRoles={MANAGER_ACCESS}>
+            <FinanceSettings />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          FINANCE MANAGER DAILY UPDATE
+          Finance Manager submits own update.
+      ====================================================== */}
+      <Route
+        path="/daily-update"
+        element={
+          <ProtectedRoute allowedRoles={FINANCE_MANAGER_ONLY}>
+            <FinanceDailyUpdate />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          ACCOUNTANT DAILY UPDATE REVIEW
+          Finance Manager reviews accountant submissions.
+      ====================================================== */}
+      <Route
+        path="/daily-updates/review"
+        element={
+          <ProtectedRoute allowedRoles={FINANCE_MANAGER_ONLY}>
+            <FinanceDailyUpdateReview />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+    INCIDENTS + TASKS
+    Shared AppShell component — same one Logistics/Inventory/
+    Procurement use. Task Queue is a tab inside it (?page=tasks).
+====================================================== */}
+      <Route
+        path="/incidents"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <AppShell key="finance-incidents" />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+    RFI
+    Shared RFIPage/RFIDetailPage — same one Logistics/Inventory
+    already use.
+====================================================== */}
+      <Route
+        path="/rfi"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <RFIPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/rfi/:id"
+        element={
+          <ProtectedRoute allowedRoles={ACCOUNTANT_ACCESS}>
+            <RFIDetailPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          ACCOUNTANT DAILY UPDATE
+          Uncomment only after creating the component.
+      ====================================================== */}
+      {/*
+      <Route
+        path="/accountant/daily-update"
+        element={
+          <ProtectedRoute
+            allowedRoles={[ROLES.ACCOUNTANT]}
+          >
+            <AccountantDailyUpdate />
+          </ProtectedRoute>
+        }
+      />
+      */}
     </Routes>
   );
-}
+};
 
-export default MEPRoutes;
+export default FinanceRoutes;

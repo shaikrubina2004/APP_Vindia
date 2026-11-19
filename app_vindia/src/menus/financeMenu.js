@@ -27,6 +27,11 @@ const financeMenu = [
     icon: "trending-down",
   },
   {
+    name: "Travel Claims",
+    path: "/finance-manager/travel-claims",
+    icon: "navigation",
+  },
+  {
     name: "Cost Analysis",
     path: "/finance-manager/cost-analysis",
     icon: "trending-up",
