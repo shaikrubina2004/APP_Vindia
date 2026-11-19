@@ -2071,25 +2071,27 @@ const AppRoutes = () => {
 
         />
 
+        {/* BDA only — the page reads the logged-in BDA's own leads/follow-ups
+            (GET /api/bda-daily-updates/stats is restricted to role "bda"). */}
         <Route
 
-        path="/bda/daily-update"
+          path="/bda/daily-update"
 
-        element={
+          element={
 
-          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
+            <ProtectedRoute allowedRoles={[ROLES.BDA]}>
 
-            <BDALayout>
+              <BDALayout>
 
-              <BDADailyUpdate />
+                <BDADailyUpdate />
 
-            </BDALayout>
+              </BDALayout>
 
-          </ProtectedRoute>
+            </ProtectedRoute>
 
-        }
+          }
 
-      />
+        />
 
 
         {/* ══ DIGITAL MARKETING ═════════════════════════════ */}

@@ -3,9 +3,9 @@ import axios from "axios";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, PieChart, Pie, Cell, Legend, LineChart, Line,
-  AreaChart, Area,
 } from "recharts";
 import "./BDAReports.css";
+import "./BDAReportsExtra.css";
 
 const API = "http://localhost:5000/api";
 
@@ -14,8 +14,17 @@ const STATUS_COLORS  = {
   new:"#2563eb", interested:"#8b5cf6", "follow up":"#f59e0b",
   converted:"#10b981", contacted:"#059669", "not interested":"#94a3b8", junk:"#ef4444",
 };
-// Distinct colors for BDA bars in time chart
-const BDA_TIME_COLORS = ["#2563eb","#8b5cf6","#10b981","#f59e0b","#ef4444","#06b6d4","#ec4899","#f43f5e"];
+// Source-quality thresholds (used for the "Verdict" column)
+const MIN_LEADS_FOR_VERDICT = 10;
+const sourceVerdict = (r) => {
+  if (r.total < MIN_LEADS_FOR_VERDICT) return { label: "Low data", tone: "gray" };
+  if (r.junk_rate >= 40) return { label: "Cut / fix targeting", tone: "red" };
+  if (r.qualified_rate >= 40 && r.junk_rate <= 25) return { label: "Invest more", tone: "green" };
+  return { label: "Maintain", tone: "amber" };
+};
+const fmtINR = (n) =>
+  n == null ? "—" : "₹" + Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+const monthNow = () => new Date().toISOString().slice(0, 7);
 
 function fmtNum(n) { return Number(n||0).toLocaleString("en-IN"); }
 
@@ -28,9 +37,6 @@ function fmtSec(s) {
   if (sec === 0) return `${m}m`;
   return `${m}m ${sec}s`;
 }
-
-/** Seconds as a fraction of 300 (5 min cap) → percentage */
-function secToPct(s) { return Math.min(((Number(s)||0) / 300) * 100, 100).toFixed(1); }
 
 const Sk = ({ h=120, r=10 }) => (
   <div className="rp-sk" style={{ height:h, borderRadius:r }} />
@@ -63,7 +69,11 @@ const BDAReports = ({ role }) => {
   const [sources,     setSources]     = useState([]);
   const [timeData,    setTimeData]    = useState(null);
   const [exporting,   setExporting]   = useState(null);
-  const [loadError,   setLoadError]   = useState("");
+  const [options,     setOptions]     = useState({ bdas: [], sources: [] });
+  const [costAvailable, setCostAvailable] = useState(true);
+  const [spendLog,    setSpendLog]    = useState([]);
+  const [spendForm,   setSpendForm]   = useState({ source: "", month: monthNow(), amount: "" });
+  const [spendMsg,    setSpendMsg]    = useState(null);
 
   /* Filters */
   const [from, setFrom]           = useState("");
@@ -78,23 +88,33 @@ const BDAReports = ({ role }) => {
   const [timeTo,     setTimeTo]     = useState("");
   const [timeBdaF,   setTimeBdaF]   = useState("");
 
-  // ✅ Only CEO is allowed to see this page's data — skip fetching
-  // entirely for anyone else instead of quietly hitting endpoints
-  // that will now reject them server-side.
-  // FIX: depend on isCEO. `role` arrives from useAuth() AFTER the first render
-  // (the user is read from localStorage in an effect), so an empty dependency
-  // array ran once with role === undefined, decided "not CEO", and never
-  // fetched again -> every card showed 0.
+  // Only the CEO can see this page's data — skip fetching for anyone else.
   useEffect(() => {
     if (isCEO) {
       loadAll();
       loadTimeData();
+      loadOptions();
+      loadSpend();
     } else {
       setLoading(false);
       setTimeLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCEO]);
+  }, []);
+
+  /* Every BDA (even with 0 leads) + every lead source — for the dropdowns */
+  const loadOptions = async () => {
+    try {
+      const res = await axios.get(`${API}/reports/filter-options`, { params: { role } });
+      setOptions({ bdas: res.data.bdas || [], sources: res.data.sources || [] });
+    } catch (err) { console.error("Filter options error:", err); }
+  };
+
+  const loadSpend = async () => {
+    try {
+      const res = await axios.get(`${API}/reports/source-spend`, { params: { role } });
+      setSpendLog(res.data.data || []);
+    } catch (err) { console.error("Spend load error:", err); }
+  };
 
   const loadAll = async (filters = {}) => {
     setLoading(true);
@@ -106,20 +126,19 @@ const BDAReports = ({ role }) => {
       if (filters.source)      params.source      = filters.source;
       if (filters.assigned_to) params.assigned_to = filters.assigned_to;
 
+      // the same filters now drive Overview, BDA Performance and Source Analysis
       const [ovRes, bdaRes, srcRes] = await Promise.all([
         axios.get(`${API}/reports/overview`, { params }),
-        axios.get(`${API}/reports/user-performance`, { params: { role } }),
-        axios.get(`${API}/reports/source-performance`, { params: { role } }),
+        axios.get(`${API}/reports/user-performance`, { params }),
+        axios.get(`${API}/reports/source-performance`, { params }),
       ]);
 
       setOverview(ovRes.data);
       setBda(bdaRes.data.data || []);
       setSources(srcRes.data.data || []);
-      setLoadError("");
+      setCostAvailable(srcRes.data.costAvailable !== false);
     } catch (err) {
       console.error("Reports load error:", err);
-      const status = err.response?.status ? `HTTP ${err.response.status} — ` : "";
-      setLoadError(status + (err.response?.data?.error || err.response?.data?.message || err.message));
     } finally {
       setLoading(false);
     }
@@ -140,6 +159,33 @@ const BDAReports = ({ role }) => {
     } finally {
       setTimeLoading(false);
     }
+  };
+
+  const saveSpend = async (e) => {
+    e.preventDefault();
+    setSpendMsg(null);
+    try {
+      await axios.post(`${API}/reports/source-spend`, {
+        role,
+        source: spendForm.source,
+        month:  spendForm.month,
+        amount: spendForm.amount,
+      });
+      setSpendForm(f => ({ ...f, amount: "" }));
+      setSpendMsg({ ok: true, text: "Spend saved." });
+      loadSpend();
+      loadAll({ from, to, status: statusF, source: sourceF, assigned_to: assignedF });
+    } catch (err) {
+      setSpendMsg({ ok: false, text: err?.response?.data?.error || "Couldn't save spend." });
+    }
+  };
+
+  const deleteSpend = async (id) => {
+    try {
+      await axios.delete(`${API}/reports/source-spend/${id}`, { params: { role } });
+      loadSpend();
+      loadAll({ from, to, status: statusF, source: sourceF, assigned_to: assignedF });
+    } catch (err) { console.error("Delete spend error:", err); }
   };
 
   const applyFilters = () => {
@@ -235,71 +281,74 @@ const BDAReports = ({ role }) => {
     bda.filter(b => b.bda_name !== "Unassigned")
   , [bda]);
 
-  /* ── Sources ── */
-  const normalizedSources = useMemo(() => {
-    const merged = {};
-    sources.forEach(s => {
-      const key = (s.source || "Unknown").toLowerCase();
-      if (!merged[key]) {
-        merged[key] = {
-          source: s.source.charAt(0).toUpperCase() + s.source.slice(1).toLowerCase(),
-          total: 0, converted: 0,
-        };
-      }
-      merged[key].total     += parseInt(s.total);
-      merged[key].converted += parseInt(s.converted);
-    });
-    return Object.values(merged).map(s => ({
-      ...s,
-      conversion_rate: s.total > 0 ? ((s.converted / s.total) * 100).toFixed(1) : "0.0",
-    }));
-  }, [sources]);
+  /* ── Sources (already grouped + normalised by the server) ── */
+  const sourceRows = useMemo(() =>
+    sources.map(s => ({ ...s, verdict: sourceVerdict(s) }))
+  , [sources]);
 
-  const bdaNames = useMemo(() =>
-    [...new Set(bda.filter(b => b.bda_name !== "Unassigned").map(b => b.bda_name))]
-  , [bda]);
+  const sourceTotals = useMemo(() => {
+    const t = sourceRows.reduce((a, s) => ({
+      total: a.total + s.total, qualified: a.qualified + s.qualified,
+      junk: a.junk + s.junk, spend: a.spend + (s.spend || 0),
+    }), { total: 0, qualified: 0, junk: 0, spend: 0 });
+    return {
+      ...t,
+      qualifiedRate: t.total ? (t.qualified * 100 / t.total).toFixed(1) : "0.0",
+      junkRate: t.total ? (t.junk * 100 / t.total).toFixed(1) : "0.0",
+      cpl: t.spend > 0 && t.total > 0 ? t.spend / t.total : null,
+      cpql: t.spend > 0 && t.qualified > 0 ? t.spend / t.qualified : null,
+    };
+  }, [sourceRows]);
 
-  /* ── Time chart data — BDA summary bar ── */
-  const bdaTimeBarData = useMemo(() => {
-    if (!timeData?.bdaSummary) return [];
-    return timeData.bdaSummary.map(b => ({
-      name:          b.bda_name?.split("@")[0] || "Unknown",
-      fullName:      b.bda_name,
-      totalMin:      (Number(b.total_sec) / 60).toFixed(1),
-      avgSec:        Number(b.avg_sec_per_session) || 0,
-      leadsTouched:  Number(b.leads_touched),
-      sessions:      Number(b.total_sessions),
-      editSessions:  Number(b.edit_sessions),
-      viewSessions:  Number(b.view_sessions),
-    }));
-  }, [timeData]);
+  /* 100%-stacked quality mix per source */
+  const qualityMixData = useMemo(() =>
+    sourceRows.filter(s => s.total > 0).map(s => ({
+      source: s.source, total: s.total,
+      Qualified: s.qualified_rate,
+      Other: Math.max(0, +(100 - s.qualified_rate - s.junk_rate).toFixed(1)),
+      Junk: s.junk_rate,
+      qualifiedN: s.qualified, otherN: s.other, junkN: s.junk,
+    }))
+  , [sourceRows]);
 
-  /* ── Daily trend ── */
-  const dailyTrendData = useMemo(() => {
-    if (!timeData?.dailyTrend) return [];
-    return timeData.dailyTrend.map(d => ({
-      day:           d.day,
-      minutesSpent:  (Number(d.total_sec) / 60).toFixed(1),
-      leadsTouched:  Number(d.leads_touched),
-      activeBDAs:    Number(d.active_bdas),
-    }));
-  }, [timeData]);
+  const costChartData = useMemo(() =>
+    sourceRows.filter(s => s.cost_per_lead != null).map(s => ({
+      source: s.source,
+      "Cost per lead": s.cost_per_lead,
+      "Cost per qualified lead": s.cost_per_qualified,
+    }))
+  , [sourceRows]);
 
-  /* ── Top leads by time ── */
-  const topLeadsData = useMemo(() => timeData?.topLeads || [], [timeData]);
+  /* Headline insights for deciding where to invest */
+  const insights = useMemo(() => {
+    const eligible = sourceRows.filter(s => s.total >= MIN_LEADS_FOR_VERDICT);
+    const best = [...eligible].sort((a, b) => b.qualified_rate - a.qualified_rate)[0];
+    const worst = [...eligible].filter(s => s.junk > 0).sort((a, b) => b.junk_rate - a.junk_rate)[0];
+    const cheapest = [...sourceRows].filter(s => s.cost_per_qualified != null)
+      .sort((a, b) => a.cost_per_qualified - b.cost_per_qualified)[0];
+    return { best, worst, cheapest };
+  }, [sourceRows]);
 
-  /* ── Session breakdown ── */
-  const sessionBreakdown = useMemo(() => {
-    if (!timeData?.sessionBreakdown) return { view:0, edit:0 };
-    const obj = {};
-    timeData.sessionBreakdown.forEach(s => { obj[s.session_type] = s; });
-    return obj;
-  }, [timeData]);
-
-  /* ── Unique BDA emails for time filter dropdown ── */
-  const timeBdaOptions = useMemo(() =>
-    [...new Set((timeData?.bdaSummary || []).map(b => b.bda_email))]
+  /* ── Time Spent ── */
+  const timeTotals = timeData?.totals || {};
+  const timeBdaRows = useMemo(() =>
+    (timeData?.bdaSummary || []).map(b => ({
+      name:        (b.bda_name || b.bda_email || "Unknown"),
+      email:       b.bda_email,
+      reviewMin:   +(Number(b.review_sec) / 60).toFixed(1),
+      updateMin:   +(Number(b.update_sec) / 60).toFixed(1),
+      totalSec:    Number(b.total_sec),
+      avgLeadMin:  +(Number(b.avg_sec_per_lead) / 60).toFixed(1),
+      avgLeadSec:  Number(b.avg_sec_per_lead) || 0,
+      leads:       Number(b.leads_engaged),
+      sessions:    Number(b.sessions),
+    }))
   , [timeData]);
+
+  const avgTimePerLeadSec = Number(timeTotals.leads_engaged) > 0
+    ? Math.round(Number(timeTotals.total_sec) / Number(timeTotals.leads_engaged)) : 0;
+
+  const topLeadsData = useMemo(() => timeData?.topLeads || [], [timeData]);
 
   const SECTIONS = [
     { key:"overview", label:"📊 Overview" },
@@ -318,7 +367,7 @@ const BDAReports = ({ role }) => {
           <h1 className="bda-title">Reports & Analytics</h1>
         </div>
         <div className="bda-header-actions">
-          <button className="bda-btn-outline" onClick={() => { if (!isCEO) return; loadAll({}); loadTimeData({}); }}>↻ Refresh</button>
+          <button className="bda-btn-outline" onClick={() => { loadAll({}); loadTimeData({}); loadOptions(); loadSpend(); }}>↻ Refresh</button>
           {isCEO && (
             <>
               <button className="bda-btn-outline" onClick={handleExportAll} disabled={exporting !== null}>
@@ -360,8 +409,8 @@ const BDAReports = ({ role }) => {
               <label className="rp-filter-label">Source</label>
               <select className="rp-filter-input" value={sourceF} onChange={e => setSourceF(e.target.value)}>
                 <option value="">All Sources</option>
-                {["JustDial","Meta Ads","Facebook/Meta","Google Ads","YouTube Ads","Manual","Website","Walk-in","Referral"].map(s =>
-                  <option key={s} value={s}>{s}</option>
+                {options.sources.map(s =>
+                  <option key={s.key} value={s.key}>{s.label}</option>
                 )}
               </select>
             </div>
@@ -369,7 +418,7 @@ const BDAReports = ({ role }) => {
               <label className="rp-filter-label">Assigned To</label>
               <select className="rp-filter-input" value={assignedF} onChange={e => setAssignedF(e.target.value)}>
                 <option value="">All BDA</option>
-                {bdaNames.map(n => <option key={n} value={n}>{n}</option>)}
+                {options.bdas.map(b => <option key={b.email || b.name} value={b.name}>{b.name}</option>)}
               </select>
             </div>
             <div className="rp-filter-actions">
@@ -379,17 +428,6 @@ const BDAReports = ({ role }) => {
               )}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ── LOAD ERROR (so a failed request is never silently shown as zeros) ── */}
-      {isCEO && loadError && (
-        <div style={{ background:"#fef2f2", border:"1px solid #fecaca", color:"#b91c1c",
-                      borderRadius:10, padding:"12px 16px", marginBottom:16, fontSize:13,
-                      display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
-          <span>⚠ Could not load reports: <b>{loadError}</b></span>
-          <button className="bda-btn-outline" style={{ fontSize:12, padding:"5px 12px" }}
-                  onClick={() => { loadAll({}); loadTimeData({}); }}>Retry</button>
         </div>
       )}
 
@@ -427,7 +465,7 @@ const BDAReports = ({ role }) => {
                   </div>
                   <div className="rp-kpi rp-kpi--amber">
                     <p className="rp-kpi__label">Active BDAs</p>
-                    <p className="rp-kpi__value">{bdaTableData.length}</p>
+                    <p className="rp-kpi__value">{bdaTableData.filter(b => Number(b.total_leads) > 0).length}</p>
                   </div>
                 </>
               )}
@@ -541,62 +579,240 @@ const BDAReports = ({ role }) => {
 
         {/* ════════════ SOURCE ANALYSIS ════════════ */}
         {activeSection === "sources" && (
-          <div className="rp-card rp-card--full">
-            <div className="rp-card__header">
-              <h3 className="rp-card__title">Source Analysis</h3>
-              <p className="rp-card__sub">Which sources generate the best leads</p>
+          <div className="rpx-stack">
+
+            {/* ── Headline numbers ── */}
+            <div className="rp-kpis">
+              {loading ? [1,2,3,4].map(i => <Sk key={i} h={90} />) : (
+                <>
+                  <div className="rp-kpi rp-kpi--blue">
+                    <p className="rp-kpi__label">Total Leads</p>
+                    <p className="rp-kpi__value">{fmtNum(sourceTotals.total)}</p>
+                  </div>
+                  <div className="rp-kpi rp-kpi--green">
+                    <p className="rp-kpi__label">Quality Lead Rate</p>
+                    <p className="rp-kpi__value">{sourceTotals.qualifiedRate}%</p>
+                  </div>
+                  <div className="rp-kpi rp-kpi--red">
+                    <p className="rp-kpi__label">Junk Rate</p>
+                    <p className="rp-kpi__value">{sourceTotals.junkRate}%</p>
+                  </div>
+                  <div className="rp-kpi rp-kpi--amber">
+                    <p className="rp-kpi__label">Cost per Lead</p>
+                    <p className="rp-kpi__value" style={{ fontSize: 24 }}>
+                      {costAvailable ? fmtINR(sourceTotals.cpl) : "—"}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
-            {loading ? <Sk h={240} /> : (
-              <>
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={normalizedSources} margin={{ top:10, right:12, left:-20, bottom:0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
-                    <XAxis dataKey="source" tick={{ fill:"#94a3b8", fontSize:11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill:"#94a3b8", fontSize:11 }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="total" name="Total" radius={[4,4,0,0]}>
-                      {normalizedSources.map((_, i) => <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />)}
-                    </Bar>
-                    <Bar dataKey="converted" name="Converted" fill="#10b981" radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-                <div className="rp-table-wrap" style={{ marginTop:20 }}>
+
+            {/* ── Where to invest: 3 plain-language insights ── */}
+            {!loading && (
+              <div className="rpx-insights">
+                <div className="rpx-insight rpx-insight--green">
+                  <span className="rpx-insight__k">Best quality source</span>
+                  <strong>{insights.best ? insights.best.source : "—"}</strong>
+                  <span className="rpx-insight__s">
+                    {insights.best
+                      ? `${insights.best.qualified_rate}% of its ${insights.best.total} leads are qualified`
+                      : `Needs ${MIN_LEADS_FOR_VERDICT}+ leads per source`}
+                  </span>
+                </div>
+                <div className="rpx-insight rpx-insight--red">
+                  <span className="rpx-insight__k">Most junk</span>
+                  <strong>{insights.worst ? insights.worst.source : "—"}</strong>
+                  <span className="rpx-insight__s">
+                    {insights.worst
+                      ? `${insights.worst.junk_rate}% of its ${insights.worst.total} leads are junk`
+                      : "No junk recorded"}
+                  </span>
+                </div>
+                <div className="rpx-insight rpx-insight--blue">
+                  <span className="rpx-insight__k">Cheapest qualified lead</span>
+                  <strong>{insights.cheapest ? insights.cheapest.source : "—"}</strong>
+                  <span className="rpx-insight__s">
+                    {insights.cheapest
+                      ? `${fmtINR(insights.cheapest.cost_per_qualified)} per qualified lead`
+                      : costAvailable ? "Add spend below to see costs" : "Clear the BDA filter to see costs"}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ── Charts ── */}
+            <div className="rp-charts-row">
+              <div className="rp-card rp-card--wide">
+                <div className="rp-card__header">
+                  <h3 className="rp-card__title">Lead Quality by Source</h3>
+                  <p className="rp-card__sub">Share of each source's leads that are qualified, other or junk</p>
+                </div>
+                {loading ? <Sk h={240} /> : qualityMixData.length === 0 ? (
+                  <div className="ts-chart-empty">No leads in this period</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={Math.max(220, qualityMixData.length * 46 + 40)}>
+                    <BarChart data={qualityMixData} layout="vertical" margin={{ top: 4, right: 24, left: 4, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" horizontal={false} />
+                      <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="source" width={88} tick={{ fill: "#475569", fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        cursor={{ fill: "rgba(37,99,235,.05)" }}
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null;
+                          const d = payload[0].payload;
+                          return (
+                            <div className="rp-tooltip">
+                              <p className="rp-tooltip__label">{d.source} · {d.total} leads</p>
+                              <p style={{ color: "#059669", fontSize: 12, fontWeight: 600 }}>Qualified: {d.qualifiedN} ({d.Qualified}%)</p>
+                              <p style={{ color: "#64748b", fontSize: 12 }}>Other: {d.otherN} ({d.Other}%)</p>
+                              <p style={{ color: "#dc2626", fontSize: 12, fontWeight: 600 }}>Junk: {d.junkN} ({d.Junk}%)</p>
+                            </div>
+                          );
+                        }}
+                      />
+                      <Legend iconType="square" iconSize={10} formatter={v => <span style={{ fontSize: 11, color: "#64748b" }}>{v}</span>} />
+                      <Bar dataKey="Qualified" stackId="q" fill="#10b981" />
+                      <Bar dataKey="Other"     stackId="q" fill="#cbd5e1" />
+                      <Bar dataKey="Junk"      stackId="q" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              <div className="rp-card">
+                <div className="rp-card__header">
+                  <h3 className="rp-card__title">Cost by Source</h3>
+                  <p className="rp-card__sub">Per lead vs per qualified lead (₹)</p>
+                </div>
+                {loading ? <Sk h={240} /> : costChartData.length === 0 ? (
+                  <div className="ts-chart-empty" style={{ textAlign: "center", padding: "0 16px" }}>
+                    {costAvailable ? "Log marketing spend below to see cost per lead" : "Cost is per source — clear the BDA filter"}
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={Math.max(220, costChartData.length * 60 + 40)}>
+                    <BarChart data={costChartData} margin={{ top: 10, right: 8, left: -6, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
+                      <XAxis dataKey="source" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(v) => fmtINR(v)} />
+                      <Legend iconType="square" iconSize={10} formatter={v => <span style={{ fontSize: 11, color: "#64748b" }}>{v}</span>} />
+                      <Bar dataKey="Cost per lead" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Cost per qualified lead" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            {/* ── Scorecard table ── */}
+            <div className="rp-card rp-card--full">
+              <div className="rp-card__header">
+                <h3 className="rp-card__title">Source Scorecard</h3>
+                <p className="rp-card__sub">Quality, junk, conversion and cost — use this to decide where to invest</p>
+              </div>
+              {loading ? <Sk h={200} /> : (
+                <div className="rp-table-wrap">
                   <table className="rp-table">
                     <thead>
-                      <tr><th>Source</th><th>Total Leads</th><th>Converted</th><th>Conv. Rate</th></tr>
+                      <tr>
+                        <th>Source</th><th>Leads</th><th>Qualified</th><th>Junk</th>
+                        <th>Converted</th><th>Spend</th><th>Cost / Lead</th>
+                        <th>Cost / Qualified</th><th>Verdict</th>
+                      </tr>
                     </thead>
                     <tbody>
-                      {normalizedSources.map((s, i) => (
-                        <tr key={i}>
+                      {sourceRows.length === 0 ? (
+                        <tr><td colSpan={9} style={{ textAlign: "center", color: "#94a3b8", padding: "28px 0" }}>No source data</td></tr>
+                      ) : sourceRows.map((s, i) => (
+                        <tr key={s.source_key}>
                           <td>
                             <span className="rp-source-dot" style={{ background: SOURCE_COLORS[i % SOURCE_COLORS.length] }} />
                             {s.source}
                           </td>
                           <td>{s.total}</td>
-                          <td><span className="rp-badge rp-badge--green">{s.converted}</span></td>
-                          <td>
-                            <span className="rp-rate" style={{
-                              color: s.conversion_rate >= 20 ? "#16a34a" : s.conversion_rate >= 10 ? "#f59e0b" : "#ef4444"
-                            }}>
-                              {s.conversion_rate || 0}%
-                            </span>
-                          </td>
+                          <td>{s.qualified} <span className="rpx-muted">({s.qualified_rate}%)</span></td>
+                          <td>{s.junk} <span className="rpx-muted">({s.junk_rate}%)</span></td>
+                          <td>{s.converted} <span className="rpx-muted">({s.conversion_rate}%)</span></td>
+                          <td>{costAvailable && s.spend > 0 ? fmtINR(s.spend) : "—"}</td>
+                          <td>{costAvailable ? fmtINR(s.cost_per_lead) : "—"}</td>
+                          <td>{costAvailable ? fmtINR(s.cost_per_qualified) : "—"}</td>
+                          <td><span className={`rpx-pill rpx-pill--${s.verdict.tone}`}>{s.verdict.label}</span></td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </>
-            )}
+              )}
+              <p className="rpx-note">
+                <b>Qualified</b> = Interested + Follow Up + Converted. <b>Junk</b> = marked junk or deleted
+                as junk (included here even after deletion, so bad sources can't hide).
+                <b> Verdict</b> (needs {MIN_LEADS_FOR_VERDICT}+ leads): <i>Invest more</i> = qualified ≥ 40% and junk ≤ 25%;
+                <i> Cut / fix targeting</i> = junk ≥ 40%; otherwise <i>Maintain</i>.
+                Sources with no spend logged (Walk-in, Referral, Manual…) show "—" for cost.
+              </p>
+            </div>
+
+            {/* ── Spend log ── */}
+            <div className="rp-card rp-card--full">
+              <div className="rp-card__header">
+                <h3 className="rp-card__title">Marketing Spend</h3>
+                <p className="rp-card__sub">Enter what you spent on each source per month — this powers cost per lead</p>
+              </div>
+              <form className="rpx-spend-form" onSubmit={saveSpend}>
+                <div className="rp-filter-group">
+                  <label className="rp-filter-label">Source</label>
+                  <select className="rp-filter-input" required value={spendForm.source}
+                    onChange={e => setSpendForm(f => ({ ...f, source: e.target.value }))}>
+                    <option value="">Select source</option>
+                    {options.sources.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div className="rp-filter-group">
+                  <label className="rp-filter-label">Month</label>
+                  <input className="rp-filter-input" type="month" required value={spendForm.month}
+                    onChange={e => setSpendForm(f => ({ ...f, month: e.target.value }))} />
+                </div>
+                <div className="rp-filter-group">
+                  <label className="rp-filter-label">Amount spent (₹)</label>
+                  <input className="rp-filter-input" type="number" min="0" step="1" required placeholder="0"
+                    value={spendForm.amount}
+                    onChange={e => setSpendForm(f => ({ ...f, amount: e.target.value }))} />
+                </div>
+                <button className="bda-btn-primary" type="submit" style={{ fontSize: 12, padding: "9px 18px" }}>Save spend</button>
+              </form>
+              {spendMsg && <p className={`rpx-msg ${spendMsg.ok ? "ok" : "bad"}`}>{spendMsg.text}</p>}
+
+              {spendLog.length > 0 && (
+                <div className="rp-table-wrap" style={{ marginTop: 14 }}>
+                  <table className="rp-table">
+                    <thead><tr><th>Month</th><th>Source</th><th>Amount</th><th></th></tr></thead>
+                    <tbody>
+                      {spendLog.map(r => (
+                        <tr key={r.id}>
+                          <td>{r.month}</td>
+                          <td style={{ textTransform: "capitalize" }}>{r.source_key}</td>
+                          <td>{fmtINR(r.amount)}</td>
+                          <td><button type="button" className="rpx-link-btn" onClick={() => deleteSpend(r.id)}>Remove</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="rpx-note">
+                Spend is matched by month: a date filter includes every month it touches. Saving the same
+                source + month again replaces the amount.
+              </p>
+            </div>
           </div>
         )}
 
-        {/* ════════════ TIME SPENT PER LEAD ════════════ */}
+        {/* ════════════ TIME SPENT ════════════ */}
         {activeSection === "time" && (
           <div className="ts-section">
 
             {/* ── Time filters ── */}
-            <div className="rp-filters" style={{ marginBottom:18 }}>
+            <div className="rp-filters" style={{ marginBottom: 18 }}>
               <div className="rp-filters__row">
                 <div className="rp-filter-group">
                   <label className="rp-filter-label">From</label>
@@ -610,178 +826,163 @@ const BDAReports = ({ role }) => {
                   <label className="rp-filter-label">BDA</label>
                   <select className="rp-filter-input" value={timeBdaF} onChange={e => setTimeBdaF(e.target.value)}>
                     <option value="">All BDA</option>
-                    {timeBdaOptions.map(e => <option key={e} value={e}>{e}</option>)}
+                    {options.bdas.map(b => <option key={b.email} value={b.email}>{b.name}</option>)}
                   </select>
                 </div>
                 <div className="rp-filter-actions">
-                  <button className="bda-btn-primary" style={{ fontSize:12, padding:"7px 16px" }} onClick={applyTimeFilters}>Apply</button>
-                  {(timeFrom||timeTo||timeBdaF) && (
-                    <button className="bda-btn-outline" style={{ fontSize:12, padding:"7px 14px" }} onClick={clearTimeFilters}>Clear</button>
+                  <button className="bda-btn-primary" style={{ fontSize: 12, padding: "7px 16px" }} onClick={applyTimeFilters}>Apply</button>
+                  {(timeFrom || timeTo || timeBdaF) && (
+                    <button className="bda-btn-outline" style={{ fontSize: 12, padding: "7px 14px" }} onClick={clearTimeFilters}>Clear</button>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* ── KPI row ── */}
             {timeLoading ? (
               <div className="rp-kpis"><Sk h={90} /><Sk h={90} /><Sk h={90} /><Sk h={90} /></div>
-            ) : !timeData || (!timeData.bdaSummary?.length && !timeData.topLeads?.length) ? (
+            ) : !timeBdaRows.length ? (
               <div className="ts-empty">
                 <div className="ts-empty__icon">⏱</div>
                 <p className="ts-empty__title">No activity data</p>
-                <p className="ts-empty__sub">Time tracking will appear here once BDAs start viewing or editing leads.</p>
+                <p className="ts-empty__sub">Time appears here once BDAs open or edit leads.</p>
               </div>
             ) : (
               <>
                 {/* KPIs */}
-                <div className="rp-kpis" style={{ marginBottom:18 }}>
+                <div className="rp-kpis" style={{ marginBottom: 18 }}>
                   <div className="rp-kpi rp-kpi--blue">
-                    <p className="rp-kpi__label">Total Time Tracked</p>
-                    <p className="rp-kpi__value" style={{ fontSize:22 }}>
-                      {fmtSec(timeData.bdaSummary.reduce((a,b) => a + Number(b.total_sec), 0))}
-                    </p>
+                    <p className="rp-kpi__label">Total Time on Leads</p>
+                    <p className="rp-kpi__value" style={{ fontSize: 22 }}>{fmtSec(timeTotals.total_sec)}</p>
                   </div>
                   <div className="rp-kpi rp-kpi--purple">
-                    <p className="rp-kpi__label">Leads Touched</p>
-                    <p className="rp-kpi__value">{timeData.topLeads?.length || 0}</p>
+                    <p className="rp-kpi__label">Leads Engaged</p>
+                    <p className="rp-kpi__value">{fmtNum(timeTotals.leads_engaged)}</p>
                   </div>
                   <div className="rp-kpi rp-kpi--green">
-                    <p className="rp-kpi__label">Edit Sessions</p>
-                    <p className="rp-kpi__value">{fmtNum(sessionBreakdown.edit?.sessions || 0)}</p>
+                    <p className="rp-kpi__label">Avg Time per Lead</p>
+                    <p className="rp-kpi__value" style={{ fontSize: 22 }}>{fmtSec(avgTimePerLeadSec)}</p>
                   </div>
                   <div className="rp-kpi rp-kpi--amber">
-                    <p className="rp-kpi__label">View Sessions</p>
-                    <p className="rp-kpi__value">{fmtNum(sessionBreakdown.view?.sessions || 0)}</p>
+                    <p className="rp-kpi__label">BDAs Active</p>
+                    <p className="rp-kpi__value">{fmtNum(timeTotals.active_bdas)}</p>
                   </div>
                 </div>
 
-                {/* Row 1: BDA time bar + daily area */}
-                <div className="rp-charts-row" style={{ marginBottom:16 }}>
-                  {/* BDA Time Spent Bar Chart */}
+                {/* Charts */}
+                <div className="rp-charts-row" style={{ marginBottom: 16 }}>
                   <div className="rp-card rp-card--wide">
                     <div className="rp-card__header">
                       <div>
-                        <h3 className="rp-card__title">Time Spent Per Lead — By BDA</h3>
-                        <p className="rp-card__sub">Total minutes each BDA spent on leads (5 min cap per session)</p>
+                        <h3 className="rp-card__title">Time Invested by BDA</h3>
+                        <p className="rp-card__sub">Minutes spent reviewing lead details vs updating leads</p>
                       </div>
                     </div>
-                    {bdaTimeBarData.length === 0 ? (
-                      <div className="ts-chart-empty">No data yet</div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height={220}>
-                        <BarChart data={bdaTimeBarData} margin={{ top:10, right:12, left:-10, bottom:0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
-                          <XAxis dataKey="name" tick={{ fill:"#94a3b8", fontSize:11 }} axisLine={false} tickLine={false} />
-                          <YAxis tick={{ fill:"#94a3b8", fontSize:11 }} axisLine={false} tickLine={false}
-                            label={{ value:"Min", angle:-90, position:"insideLeft", fill:"#cbd5e1", fontSize:10 }} />
-                          <Tooltip
-                            content={({ active, payload, label }) => {
-                              if (!active || !payload?.length) return null;
-                              const d = payload[0]?.payload;
-                              return (
-                                <div className="rp-tooltip">
-                                  <p className="rp-tooltip__label">{d?.fullName || label}</p>
-                                  <p style={{ color:"#2563eb", fontSize:12, fontWeight:600 }}>Total: {d?.totalMin} min</p>
-                                  <p style={{ color:"#8b5cf6", fontSize:12 }}>Leads touched: {d?.leadsTouched}</p>
-                                  <p style={{ color:"#10b981", fontSize:12 }}>Edit sessions: {d?.editSessions}</p>
-                                  <p style={{ color:"#f59e0b", fontSize:12 }}>View sessions: {d?.viewSessions}</p>
-                                </div>
-                              );
-                            }}
-                          />
-                          <Bar dataKey="totalMin" name="Minutes" radius={[6,6,0,0]}>
-                            {bdaTimeBarData.map((_, i) => (
-                              <Cell key={i} fill={BDA_TIME_COLORS[i % BDA_TIME_COLORS.length]} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
+                    <ResponsiveContainer width="100%" height={240}>
+                      <BarChart data={timeBdaRows} margin={{ top: 10, right: 12, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
+                        <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false}
+                          label={{ value: "Minutes", angle: -90, position: "insideLeft", fill: "#cbd5e1", fontSize: 10 }} />
+                        <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(37,99,235,.05)" }} />
+                        <Legend iconType="square" iconSize={10} formatter={v => <span style={{ fontSize: 11, color: "#64748b" }}>{v}</span>} />
+                        <Bar dataKey="reviewMin" name="Reviewing (min)" stackId="t" fill="#2563eb" />
+                        <Bar dataKey="updateMin" name="Updating (min)"  stackId="t" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
 
-                  {/* Daily Activity Area Chart */}
                   <div className="rp-card">
                     <div className="rp-card__header">
                       <div>
-                        <h3 className="rp-card__title">Daily Activity</h3>
-                        <p className="rp-card__sub">Minutes tracked per day (last 30 days)</p>
+                        <h3 className="rp-card__title">Average Time per Lead</h3>
+                        <p className="rp-card__sub">Minutes per lead each BDA works on</p>
                       </div>
                     </div>
-                    {dailyTrendData.length === 0 ? (
-                      <div className="ts-chart-empty">No activity yet</div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height={220}>
-                        <AreaChart data={dailyTrendData} margin={{ top:10, right:12, left:-20, bottom:0 }}>
-                          <defs>
-                            <linearGradient id="timeGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%"  stopColor="#2563eb" stopOpacity={0.15} />
-                              <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
-                          <XAxis dataKey="day" tick={{ fill:"#94a3b8", fontSize:10 }} axisLine={false} tickLine={false}
-                            interval={Math.floor(dailyTrendData.length / 6)} />
-                          <YAxis tick={{ fill:"#94a3b8", fontSize:11 }} axisLine={false} tickLine={false} />
-                          <Tooltip content={<ChartTooltip />} />
-                          <Area type="monotone" dataKey="minutesSpent" name="Minutes" stroke="#2563eb" strokeWidth={2}
-                            fill="url(#timeGrad)" dot={false} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    )}
+                    <ResponsiveContainer width="100%" height={240}>
+                      <BarChart data={timeBdaRows} margin={{ top: 10, right: 12, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" />
+                        <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          cursor={{ fill: "rgba(139,92,246,.06)" }}
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null;
+                            const d = payload[0].payload;
+                            return (
+                              <div className="rp-tooltip">
+                                <p className="rp-tooltip__label">{d.name}</p>
+                                <p style={{ color: "#8b5cf6", fontSize: 12, fontWeight: 600 }}>Avg per lead: {fmtSec(d.avgLeadSec)}</p>
+                                <p style={{ color: "#64748b", fontSize: 12 }}>Leads engaged: {d.leads}</p>
+                                <p style={{ color: "#64748b", fontSize: 12 }}>Total: {fmtSec(d.totalSec)}</p>
+                              </div>
+                            );
+                          }}
+                        />
+                        <Bar dataKey="avgLeadMin" name="Avg min / lead" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
 
-                {/* Row 2: BDA summary table + Top leads */}
+                {/* Tables */}
                 <div className="ts-bottom-row">
-                  {/* BDA Summary table */}
                   <div className="rp-card ts-card-left">
                     <div className="rp-card__header">
                       <h3 className="rp-card__title">BDA Time Summary</h3>
-                      <p className="rp-card__sub">Engagement depth per team member</p>
+                      <p className="rp-card__sub">Effort per lead for each team member</p>
                     </div>
                     <div className="rp-table-wrap">
                       <table className="rp-table">
                         <thead>
                           <tr>
-                            <th>BDA</th>
-                            <th>Leads</th>
-                            <th>Total Time</th>
-                            <th>Avg / Session</th>
-                            <th>Sessions</th>
-                            <th>Engagement</th>
+                            <th>BDA</th><th>Leads Engaged</th><th>Total Time</th>
+                            <th>Avg / Lead</th><th>Reviewing</th><th>Updating</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {bdaTimeBarData.length === 0 ? (
-                            <tr><td colSpan={6} style={{ textAlign:"center", color:"#94a3b8", padding:"24px 0" }}>No data</td></tr>
-                          ) : bdaTimeBarData.map((b, i) => (
-                            <tr key={i}>
-                              <td className="rp-td-name">{b.fullName || b.name}</td>
-                              <td>{b.leadsTouched}</td>
+                          {timeBdaRows.map(b => (
+                            <tr key={b.email}>
+                              <td className="rp-td-name">{b.name}</td>
+                              <td>{b.leads}</td>
+                              <td><span className="ts-time-badge">{fmtSec(b.totalSec)}</span></td>
+                              <td>{fmtSec(b.avgLeadSec)}</td>
+                              <td>{fmtSec(Math.round(b.reviewMin * 60))}</td>
+                              <td>{fmtSec(Math.round(b.updateMin * 60))}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="rp-card ts-card-right">
+                    <div className="rp-card__header">
+                      <h3 className="rp-card__title">Top Leads by Time Invested</h3>
+                      <p className="rp-card__sub">Time each BDA spent on an individual lead</p>
+                    </div>
+                    <div className="rp-table-wrap">
+                      <table className="rp-table rpx-top-leads">
+                        <thead>
+                          <tr><th>#</th><th>Lead</th><th>BDA</th><th>Time Spent</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                          {topLeadsData.length === 0 ? (
+                            <tr><td colSpan={5} style={{ textAlign: "center", color: "#94a3b8", padding: "24px 0" }}>No data</td></tr>
+                          ) : topLeadsData.map((l, i) => (
+                            <tr key={`${l.lead_id}-${l.bda_email}`}>
+                              <td style={{ color: "#94a3b8", fontSize: 11 }}>{i + 1}</td>
                               <td>
-                                <span className="ts-time-badge">
-                                  {b.totalMin} min
-                                </span>
+                                <div style={{ fontWeight: 600, fontSize: 12, color: "#1a2a4a" }}>{l.lead_name}</div>
+                                <div style={{ fontSize: 10, color: "#94a3b8" }}>{l.phone}</div>
                               </td>
-                              <td>{fmtSec(b.avgSec)}</td>
+                              <td style={{ fontSize: 12 }}>{l.bda_name}</td>
                               <td>
-                                <span style={{ fontSize:11, color:"#64748b" }}>
-                                  👁 {b.viewSessions} · ✏️ {b.editSessions}
-                                </span>
+                                <span className="ts-time-badge">{fmtSec(l.total_sec)}</span>
+                                <div className="rpx-muted">{l.sessions} {Number(l.sessions) === 1 ? "visit" : "visits"}</div>
                               </td>
                               <td>
-                                {/* Mini engagement bar — fraction of 5min max */}
-                                <div className="ts-eng-bar">
-                                  <div
-                                    className="ts-eng-fill"
-                                    style={{
-                                      width: `${Math.min((b.avgSec / 300) * 100, 100)}%`,
-                                      background: BDA_TIME_COLORS[i % BDA_TIME_COLORS.length],
-                                    }}
-                                  />
-                                </div>
-                                <span style={{ fontSize:10, color:"#94a3b8" }}>
-                                  {((b.avgSec / 300) * 100).toFixed(0)}% of 5m
+                                <span className="rp-badge" style={{ background: "#f0f9ff", color: "#0369a1", fontSize: 10 }}>
+                                  {l.lead_status || "—"}
                                 </span>
                               </td>
                             </tr>
@@ -790,62 +991,14 @@ const BDAReports = ({ role }) => {
                       </table>
                     </div>
                   </div>
-
-                  {/* Top Leads by time */}
-                  <div className="rp-card ts-card-right">
-                    <div className="rp-card__header">
-                      <h3 className="rp-card__title">Most-Visited Leads</h3>
-                      <p className="rp-card__sub">Top 10 leads by total time spent</p>
-                    </div>
-                    <div className="rp-table-wrap">
-                      <table className="rp-table">
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>Lead</th>
-                            <th>Status</th>
-                            <th>Sessions</th>
-                            <th>Time</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {topLeadsData.slice(0,10).length === 0 ? (
-                            <tr><td colSpan={5} style={{ textAlign:"center", color:"#94a3b8", padding:"24px 0" }}>No data</td></tr>
-                          ) : topLeadsData.slice(0,10).map((l, i) => {
-                            const pct = Math.min((Number(l.total_sec) / 300) * 100, 100);
-                            return (
-                              <tr key={l.lead_id}>
-                                <td style={{ color:"#94a3b8", fontSize:11 }}>{i + 1}</td>
-                                <td>
-                                  <div style={{ fontWeight:600, fontSize:12, color:"#1a2a4a" }}>{l.lead_name}</div>
-                                  <div style={{ fontSize:10, color:"#94a3b8" }}>{l.phone}</div>
-                                </td>
-                                <td>
-                                  <span className="rp-badge" style={{
-                                    background: "#f0f9ff",
-                                    color: "#0369a1",
-                                    fontSize:10,
-                                  }}>
-                                    {l.lead_status || "—"}
-                                  </span>
-                                </td>
-                                <td style={{ fontSize:12, color:"#64748b" }}>{l.sessions}</td>
-                                <td>
-                                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                                    <div className="ts-eng-bar" style={{ width:50 }}>
-                                      <div className="ts-eng-fill" style={{ width:`${pct}%`, background:"#2563eb" }} />
-                                    </div>
-                                    <span className="ts-time-badge">{fmtSec(l.total_sec)}</span>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
                 </div>
+
+                <p className="rpx-note" style={{ marginTop: 14 }}>
+                  <b>How time is measured:</b> the clock runs while a lead is open. <b>Reviewing</b> = the lead's
+                  details are expanded; <b>Updating</b> = the edit window is open. Each visit is capped at
+                  5 minutes so a tab left open doesn't inflate the numbers. <b>Leads Engaged</b> = distinct leads
+                  a BDA opened. CEO browsing is excluded.
+                </p>
               </>
             )}
           </div>

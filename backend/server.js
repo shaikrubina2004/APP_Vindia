@@ -119,6 +119,9 @@ const metaRoutes = require("./routes/metaRoutes");
 const googleAdsRoutes = require("./routes/googleAdsRoutes");
 const bdaNotifRoutes = require("./routes/bdaNotificationRoutes");
 
+/* ✅ BDA Daily Update (auto lead/follow-up counts per BDA) */
+const bdaDailyUpdateRoutes = require("./routes/bdaDailyUpdateRoutes");
+
 /* ✅ Finance Manager */
 const financeRoutes = require("./routes/financeRoutes");
 const financeDailyUpdateRoutes = require("./routes/financeDailyUpdateRoutes");
@@ -293,6 +296,9 @@ app.use("/api/pm-reports", pmReportRoutes);
 app.use("/api/meta", metaRoutes);
 app.use("/api/google-ads", googleAdsRoutes);
 app.use("/api/bda-notifications", bdaNotifRoutes);
+
+/* ✅ BDA Daily Update — stats / submit (bda) + inbox (ceo) */
+app.use("/api/bda-daily-updates", bdaDailyUpdateRoutes);
 
 /* ✅ Finance Manager */
 app.use("/api/finance", financeRoutes);

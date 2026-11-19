@@ -1,0 +1,52 @@
+/* Extra styles for Source Analysis + Time Spent (loaded after BDAReports.css) */
+
+.rpx-stack { display: flex; flex-direction: column; gap: 16px; }
+
+/* red KPI variant (same shape as the existing blue / green / purple / amber) */
+.rp-kpi--red::before { background: #ef4444; }
+.rp-kpi--red .rp-kpi__value { color: #ef4444; }
+
+/* ── "Where to invest" insight tiles ── */
+.rpx-insights { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.rpx-insight {
+  display: flex; flex-direction: column; gap: 4px;
+  background: #fff; border-radius: 14px; padding: 16px 18px;
+  border: 1px solid rgba(0,0,0,.06); border-left-width: 4px;
+  box-shadow: 0 1px 6px rgba(15,23,42,.04);
+}
+.rpx-insight--green { border-left-color: #10b981; }
+.rpx-insight--red   { border-left-color: #ef4444; }
+.rpx-insight--blue  { border-left-color: #2563eb; }
+.rpx-insight__k { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; }
+.rpx-insight strong { font-size: 20px; color: #1a2a4a; }
+.rpx-insight__s { font-size: 12px; color: #64748b; }
+
+/* ── Verdict pills ── */
+.rpx-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.rpx-pill--green { background: #dcfce7; color: #15803d; }
+.rpx-pill--amber { background: #fef3c7; color: #b45309; }
+.rpx-pill--red   { background: #fee2e2; color: #b91c1c; }
+.rpx-pill--gray  { background: #f1f5f9; color: #64748b; }
+
+.rpx-muted { color: #94a3b8; font-size: 11px; }
+.rpx-note  { margin: 14px 0 0; font-size: 11.5px; line-height: 1.6; color: #64748b; }
+
+/* ── Spend form ── */
+.rpx-spend-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
+.rpx-msg { margin: 10px 0 0; font-size: 12px; font-weight: 600; }
+.rpx-msg.ok  { color: #15803d; }
+.rpx-msg.bad { color: #b91c1c; }
+.rpx-link-btn { background: none; border: none; color: #dc2626; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; }
+.rpx-link-btn:hover { text-decoration: underline; }
+
+@media (max-width: 900px) {
+  .rpx-insights { grid-template-columns: 1fr; }
+}
+
+/* ── Time Spent bottom row: stop wide content pushing the right card off-screen ── */
+.ts-bottom-row { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+.ts-card-left, .ts-card-right { min-width: 0; }
+.rpx-top-leads td { white-space: normal; vertical-align: middle; }
+@media (max-width: 1100px) {
+  .ts-bottom-row { grid-template-columns: minmax(0, 1fr); }
+}
