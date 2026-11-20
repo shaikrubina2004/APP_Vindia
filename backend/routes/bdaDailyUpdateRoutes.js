@@ -5,12 +5,15 @@ const c = require("../controllers/bdaDailyUpdateController");
 
 router.use(protect);
 
+/* every role code that is a BDA (same list as utils/leadAssignment.js) */
+const BDA_ROLES = ["bda", "bda1", "bda2", "business_development", "business_development_analyst"];
+
 /* BDA (role code "bda") */
-router.get("/stats",         requireRole("bda"), c.getStats);
-router.get("/today",         requireRole("bda"), c.getToday);
-router.get("/mine",          requireRole("bda"), c.getMine);
-router.post("/",             requireRole("bda"), c.submit);
-router.post("/other-report", requireRole("bda"), c.submitOther);
+router.get("/stats",         requireRole(...BDA_ROLES), c.getStats);
+router.get("/today",         requireRole(...BDA_ROLES), c.getToday);
+router.get("/mine",          requireRole(...BDA_ROLES), c.getMine);
+router.post("/",             requireRole(...BDA_ROLES), c.submit);
+router.post("/other-report", requireRole(...BDA_ROLES), c.submitOther);
 
 /* CEO inbox */
 router.get("/",              requireRole("ceo"), c.getAllForCeo);

@@ -6,8 +6,13 @@ const pool = require("../config/db");
     time-spent handlers; exports stay in reportController.js)
 ════════════════════════════════════════════════════════════════ */
 
-/* roles.name values that mean "BDA" (case / spaces tolerant) */
-const BDA_ROLE_SQL = `LOWER(REPLACE(r.name, ' ', '_')) IN ('bda','business_development_analyst')`;
+/* Role codes that mean "BDA" — same list as utils/leadAssignment.js.
+   Matches roles.code OR the normalised roles.name; skips deactivated users. */
+const BDA_CODES_SQL = `('bda','bda1','bda2','business_development','business_development_analyst')`;
+const BDA_ROLE_SQL = `(LOWER(r.code) IN ${BDA_CODES_SQL}
+                       OR LOWER(REPLACE(TRIM(r.name), ' ', '_')) IN ${BDA_CODES_SQL})
+                      AND COALESCE(LOWER(u.status), 'active')
+                          NOT IN ('inactive','disabled','suspended','terminated','deleted')`;
 
 /* Statuses that count as junk / rejected lead */
 const JUNK_STATUS_SQL = `('junk','junk_requested','delete_requested')`;
@@ -414,7 +419,8 @@ exports.getTimeSpentReport = async (req, res) => {
       `LOWER(t.bda_email) NOT IN (
          SELECT LOWER(u.email) FROM users u
            JOIN roles r ON r.id = u.role_id
-          WHERE u.email IS NOT NULL AND LOWER(r.name) = 'ceo')`,
+          WHERE u.email IS NOT NULL
+            AND (LOWER(r.code) = 'ceo' OR LOWER(TRIM(r.name)) = 'ceo'))`,
     ];
     const vals = [];
     if (from) {

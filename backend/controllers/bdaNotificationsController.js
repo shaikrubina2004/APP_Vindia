@@ -5,6 +5,9 @@ const { getBdaUsers, getCeoUsers, UNASSIGNED_SQL, CLOSED_STATUSES } = require(".
    BDA NOTIFICATION HELPERS
 ══════════════════════════════════════ */
 
+/* Follow-up reminder types (they replace each other when a follow-up changes) */
+const FOLLOWUP_TYPES = ["followup_overdue", "followup_today", "followup_upcoming"];
+
 /* Create a notification (internal helper) */
 async function createNotification({ type, title, description, severity = "info", lead_id = null, bda_email = null }) {
   await pool.query(
@@ -14,6 +17,23 @@ async function createNotification({ type, title, description, severity = "info",
   );
 }
 exports.createNotification = createNotification;
+
+/* Mark a lead's still-unread follow-up reminders as read.
+   Used when the follow-up changes or the lead leaves the BDA, so the bell
+   never shows a reminder for a date that no longer applies.
+   email omitted → applies to everyone who has one for that lead. */
+async function clearFollowUpReminders(leadId, email = null) {
+  await pool.query(
+    `UPDATE bda_notifications
+        SET is_read = true
+      WHERE lead_id = $1
+        AND type = ANY($2)
+        AND is_read = false
+        AND ($3::text IS NULL OR LOWER(bda_email) = LOWER($3))`,
+    [leadId, FOLLOWUP_TYPES, email]
+  );
+}
+exports.clearFollowUpReminders = clearFollowUpReminders;
 
 /* Send the same notification to a list of emails — ONE ROW PER PERSON,
    so each BDA has their own read / unread state. (Previously a single
@@ -29,17 +49,32 @@ async function notifyMany(emails, payload) {
 }
 exports.notifyMany = notifyMany;
 
+/* One-time clean-up (per server start): rows with NO email are the old shared
+   "global" notifications. They can't be marked read per person any more, so
+   they used to come back as unread on every refresh and the bell badge never
+   reached 0. Mark them read once; they are no longer returned. */
+let legacyCleaned = null;
+function cleanLegacyGlobalRows() {
+  if (!legacyCleaned) {
+    legacyCleaned = pool
+      .query(`UPDATE bda_notifications SET is_read = true WHERE bda_email IS NULL AND is_read = false`)
+      .catch(err => { legacyCleaned = null; console.error("Legacy notification clean-up error:", err.message); });
+  }
+  return legacyCleaned;
+}
+
 /* ══════════════════════════════════════
    GET ALL NOTIFICATIONS FOR A USER
    GET /api/bda-notifications?bda_email=x
-   (own rows + legacy global rows)
+   (the person's own rows only)
 ══════════════════════════════════════ */
 exports.getNotifications = async (req, res) => {
   try {
     const { bda_email } = req.query;
+    await cleanLegacyGlobalRows();
     const { rows } = await pool.query(
       `SELECT * FROM bda_notifications
-       WHERE (LOWER(bda_email) = LOWER($1) OR bda_email IS NULL)
+       WHERE LOWER(bda_email) = LOWER($1)
        ORDER BY created_at DESC
        LIMIT 100`,
       [bda_email || ""]
@@ -139,9 +174,9 @@ exports.notifyNewLead = async ({ leadId, name, source, phone }) => {
   };
 
   if (!emails.length) {
-    // No users resolved (misconfigured roles) — fall back to legacy global row
-    console.warn("notifyNewLead: no BDA/CEO users found, using global fallback row");
-    await createNotification({ ...payload, bda_email: null });
+    // No users resolved (misconfigured roles). A row with no email is never
+    // shown any more, so just make the problem visible in the server log.
+    console.error("notifyNewLead: no active BDA/CEO users found — check roles.code / users.status. Lead", leadId, "was not announced.");
     return;
   }
   await notifyMany(emails, payload);
@@ -196,6 +231,9 @@ exports.clearPoolAlerts = async (leadId, exceptEmail = "") => {
    TRIGGER: LEAD ESCALATED (back to the pool)
 ══════════════════════════════════════ */
 exports.notifyEscalated = async ({ leadId, name, phone, prevEmail, prevName, reason }) => {
+  // The lead is back in the pool: nobody owns its old follow-up reminders any more
+  await clearFollowUpReminders(leadId);
+
   const [bdas, ceos] = await Promise.all([getBdaUsers(), getCeoUsers()]);
   const prev = (prevEmail || "").toLowerCase();
 
@@ -379,6 +417,10 @@ exports.generateFollowUpNotifications = async () => {
 ══════════════════════════════════════ */
 exports.notifyFollowUp = async ({ leadId, name, phone, nextFollowUp, assignedTo }) => {
   if (!nextFollowUp) return; // no date set, skip
+
+  // A new follow-up date replaces the old one: retire the BDA's earlier
+  // reminders for this lead so the bell doesn't show two dates at once.
+  if (assignedTo) await clearFollowUpReminders(leadId, assignedTo);
 
   const today    = new Date();
   today.setHours(0, 0, 0, 0);
