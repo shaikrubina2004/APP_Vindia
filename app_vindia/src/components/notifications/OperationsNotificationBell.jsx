@@ -33,6 +33,7 @@ const TYPE_CFG = {
   invoice:     { label: "Invoice",     color: "#047857", bg: "#ecfdf5" },
   expense:     { label: "Expense",     color: "#c2410c", bg: "#fff7ed" },
   payment:     { label: "Payment",     color: "#0f766e", bg: "#f0fdfa" },
+  hiring:      { label: "Hiring",      color: "#be185d", bg: "#fdf2f8" },
 };
 
 const SEV_COLOR = {
@@ -50,13 +51,13 @@ const SEV_COLOR = {
 const ROLE_FILTERS = {
   logistics_coordinator: ["all", "delivery", "delay", "receipt", "incident", "task", "daily_update"],
   inventory_controller:  ["all", "delivery", "low_stock", "receipt", "request", "incident", "task", "daily_update"],
-  operations_manager:    ["all", "approval", "delay", "receipt", "low_stock", "daily_update", "incident", "task"],
+  operations_manager:    ["all", "approval", "hiring", "delay", "receipt", "low_stock", "daily_update", "incident", "task"],
   office_administrator:  ["all", "request", "daily_update", "incident", "task"],
-  project_manager:       ["all", "approval", "diary", "rfi", "daily_update", "incident", "task"],
+  project_manager:       ["all", "approval", "hiring", "diary", "rfi", "daily_update", "incident", "task"],
   procurement_officer:   ["all", "request", "approval", "receipt", "delay", "rfi", "daily_update", "incident", "task"],
-  hr_manager:            ["all", "leave", "travel", "recruitment", "employee", "attendance", "rfi", "incident", "task"],
+  hr_manager:            ["all", "leave", "travel", "recruitment", "hiring", "employee", "attendance", "rfi", "incident", "task"],
   hr_executive:          ["all", "leave", "travel", "recruitment", "employee", "attendance", "rfi", "incident", "task"],
-  finance_manager:       ["all", "invoice", "expense", "payment", "travel", "approval", "daily_update", "rfi", "incident", "task"],
+  finance_manager:       ["all", "invoice", "expense", "payment", "travel", "approval", "hiring", "daily_update", "rfi", "incident", "task"],
   accountant:            ["all", "invoice", "expense", "payment", "daily_update", "incident", "task"],
 };
 

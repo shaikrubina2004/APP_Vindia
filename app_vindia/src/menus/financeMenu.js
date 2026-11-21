@@ -32,6 +32,11 @@ const financeMenu = [
     icon: "navigation",
   },
   {
+    name: "Hiring Requests",
+    path: "/finance-manager/hiring-requests",
+    icon: "user-plus",
+  },
+  {
     name: "Cost Analysis",
     path: "/finance-manager/cost-analysis",
     icon: "trending-up",

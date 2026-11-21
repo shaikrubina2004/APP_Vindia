@@ -13,6 +13,14 @@ import OperationsNotificationBell from "../../components/notifications/Operation
 import "../../styles/layout/Navbar.css";
 import logo from "../../assets/logo.png.png";
 
+// ✅ Managers can raise a hiring request (Manager -> Finance -> HR).
+// "Submit Expense" stays so these roles keep the item they had before.
+const HIRING_QUICK_ADD = [
+  { label: "Hiring Request",     path: "/hiring-requests/new" },
+  { label: "My Hiring Requests", path: "/hiring-requests" },
+  { label: "Submit Expense",     path: "/expenses/submit" },
+];
+
 // ✅ Role-based quick-add menu items
 const QUICK_ADD_ITEMS = {
   project_coordinator: [
@@ -61,6 +69,13 @@ const QUICK_ADD_ITEMS = {
     { label: "Add Lead",        path: "/bda/add-lead" },
     { label: "Add Follow-up",   path: "/bda/follow-up" },
   ],
+
+  // ✅ Manager roles: Hiring Request lives in the Add menu
+  project_manager:    HIRING_QUICK_ADD,
+  operations_manager: HIRING_QUICK_ADD,
+  finance_manager:    HIRING_QUICK_ADD,
+  hr_manager:         HIRING_QUICK_ADD,
+  bd_manager:         HIRING_QUICK_ADD,
 };
 
 // Fallback for unknown roles
@@ -207,7 +222,8 @@ function Navbar() {
   const opsBellRoutes = OPS_BELL_ROLES[roleKey];
 
   // ✅ Get quick-add items for current role
-  const quickAddItems = QUICK_ADD_ITEMS[user?.role] || DEFAULT_QUICK_ADD;
+  const quickAddItems =
+    QUICK_ADD_ITEMS[roleKey] || QUICK_ADD_ITEMS[user?.role] || DEFAULT_QUICK_ADD;
 
   const handleLogout = () => {
     setIsProfileOpen(false);

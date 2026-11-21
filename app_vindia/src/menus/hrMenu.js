@@ -2,6 +2,7 @@ export const hrMenu = [
   { name: "HR Dashboard", path: "/hr", icon: "home" },
   { name: "Employees", path: "/hr/employees", icon: "users" },
   { name: "Recruitment", path: "/hr/recruitment/job-openings", icon: "briefcase" },
+  { name: "Hiring Requests", path: "/hr/hiring-requests", icon: "user-plus" },
   { name: "Incidents", path: "/hr/incidents", icon: "alert-triangle" },
   { name: "Tasks", path: "/hr/incidents?page=tasks", icon: "check-square" },
   { name: "RFI", path: "/hr/rfi", icon: "message-square" },

@@ -295,6 +295,11 @@ import LogisticsDailyUpdate from "../pages/operations/logistics/LogisticsDailyUp
 
 import ManagerReports from "../SharedResourse/ManagerReports";
 
+// Hiring requests (managers raise -> Finance -> HR)
+import HiringRequestForm from "../pages/hiring/HiringRequestForm";
+import MyHiringRequests from "../pages/hiring/MyHiringRequests";
+import HiringReviewQueue from "../pages/hiring/HiringReviewQueue";
+
 import Settings from "../SharedResourse/Settings";
 import Profile from "../SharedResourse/Profile";
 
@@ -319,6 +324,16 @@ const TIMESHEET_ROLES = Object.values(ROLES).filter(
 
 ═══════════════════════════════════════════════════════════ */
 
+
+// Roles allowed to raise hiring requests (must match MANAGER_ROLES in
+// backend/controllers/hiringRequestController.js)
+const HIRING_MANAGER_ROLES = [
+  ROLES.PROJECT_MANAGER,
+  ROLES.OPERATIONS_MANAGER,
+  ROLES.FINANCE_MANAGER,
+  ROLES.HR_MANAGER,
+  ROLES.BD_MANAGER,
+];
 
 const AppRoutes = () => {
 
@@ -899,6 +914,18 @@ const AppRoutes = () => {
 
         />
 
+
+        {/* ── HR: HIRING REQUESTS (approve what Finance has cleared) ── */}
+        <Route
+          path="/hr/hiring-requests"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.HR_MANAGER, ROLES.CEO]}>
+              <HRLayout>
+                <HiringReviewQueue stage="hr" />
+              </HRLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ── HR RECRUITMENT ─────────────────────────────── */}
 
@@ -2071,27 +2098,25 @@ const AppRoutes = () => {
 
         />
 
-        {/* BDA only — the page reads the logged-in BDA's own leads/follow-ups
-            (GET /api/bda-daily-updates/stats is restricted to role "bda"). */}
         <Route
 
-          path="/bda/daily-update"
+        path="/bda/daily-update"
 
-          element={
+        element={
 
-            <ProtectedRoute allowedRoles={[ROLES.BDA]}>
+          <ProtectedRoute allowedRoles={[ROLES.CEO, ROLES.BDA]}>
 
-              <BDALayout>
+            <BDALayout>
 
-                <BDADailyUpdate />
+              <BDADailyUpdate />
 
-              </BDALayout>
+            </BDALayout>
 
-            </ProtectedRoute>
+          </ProtectedRoute>
 
-          }
+        }
 
-        />
+      />
 
 
         {/* ══ DIGITAL MARKETING ═════════════════════════════ */}
@@ -2878,6 +2903,38 @@ const AppRoutes = () => {
 
         />
 
+
+        {/* ══ MANAGERS: HIRING REQUESTS ═══════════════════════ */}
+        <Route
+          path="/hiring-requests"
+          element={
+            <ProtectedRoute allowedRoles={HIRING_MANAGER_ROLES}>
+              <RoleLayout>
+                <MyHiringRequests />
+              </RoleLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hiring-requests/new"
+          element={
+            <ProtectedRoute allowedRoles={HIRING_MANAGER_ROLES}>
+              <RoleLayout>
+                <HiringRequestForm />
+              </RoleLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hiring-requests/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={HIRING_MANAGER_ROLES}>
+              <RoleLayout>
+                <HiringRequestForm />
+              </RoleLayout>
+            </ProtectedRoute>
+          }
+        />
 
         {/* ══ SETTINGS ══════════════════════════════════════ */}
 

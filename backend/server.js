@@ -29,6 +29,7 @@ const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const recruitmentRoutes = require("./routes/recruitmentRoutes");
+const hiringRequestRoutes = require("./routes/hiringRequestRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const rolesRoutes = require("./routes/rolesRoutes");
@@ -119,9 +120,6 @@ const metaRoutes = require("./routes/metaRoutes");
 const googleAdsRoutes = require("./routes/googleAdsRoutes");
 const bdaNotifRoutes = require("./routes/bdaNotificationRoutes");
 
-/* ✅ BDA Daily Update (auto lead/follow-up counts per BDA) */
-const bdaDailyUpdateRoutes = require("./routes/bdaDailyUpdateRoutes");
-
 /* ✅ Finance Manager */
 const financeRoutes = require("./routes/financeRoutes");
 const financeDailyUpdateRoutes = require("./routes/financeDailyUpdateRoutes");
@@ -194,6 +192,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/recruitment", recruitmentRoutes);
+app.use("/api/hiring-requests", hiringRequestRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/roles", rolesRoutes);
@@ -296,9 +295,6 @@ app.use("/api/pm-reports", pmReportRoutes);
 app.use("/api/meta", metaRoutes);
 app.use("/api/google-ads", googleAdsRoutes);
 app.use("/api/bda-notifications", bdaNotifRoutes);
-
-/* ✅ BDA Daily Update — stats / submit (bda) + inbox (ceo) */
-app.use("/api/bda-daily-updates", bdaDailyUpdateRoutes);
 
 /* ✅ Finance Manager */
 app.use("/api/finance", financeRoutes);

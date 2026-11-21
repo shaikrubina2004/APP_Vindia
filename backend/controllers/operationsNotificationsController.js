@@ -44,6 +44,7 @@ const ROLE_TYPES = {
     "diary",     // a Site Engineer submitted the daily diary
     "rfi",       // an RFI was raised or updated for the PM
     "project",   // a new project was created and assigned to this PM
+    "hiring",    // status updates on hiring requests they raised
     "incident", "task", "daily_update",
   ],
 
@@ -52,6 +53,7 @@ const ROLE_TYPES = {
     "delay",     // late delivery
     "receipt",   // goods received with a shortage or damage
     "low_stock", // stock at or below minimum
+    "hiring",    // status updates on hiring requests they raised
     "incident", "task", "daily_update",
   ],
 
@@ -65,6 +67,7 @@ const ROLE_TYPES = {
     "travel",      // a travel expense request is waiting for HR review
     "recruitment", // candidate / interview / offer / BGV milestones
     "employee",    // a new employee was added / hired
+    "hiring",      // a hiring request is waiting for HR / their own request updated
     "attendance",  // attendance regularisation or missed punch
     "rfi",
     "incident", "task",
@@ -80,6 +83,7 @@ const ROLE_TYPES = {
     "payment",     // payment due / payment recorded
     "travel",      // travel claim moved to Finance
     "approval",    // PO or request needing Finance sign-off
+    "hiring",      // a hiring request is waiting for Finance budget approval
     "daily_update",// CEO reviewed their daily update
     "rfi",
     "incident", "task",
