@@ -122,6 +122,9 @@ const bdaNotifRoutes = require("./routes/bdaNotificationRoutes");
 /* ✅ BDA Daily Update (auto lead/follow-up counts per BDA) */
 const bdaDailyUpdateRoutes = require("./routes/bdaDailyUpdateRoutes");
 
+/* ✅ BDA follow-up cover (missed follow-up → another BDA calls) */
+const leadCoverRoutes = require("./routes/leadCoverRoutes");
+
 /* ✅ Finance Manager */
 const financeRoutes = require("./routes/financeRoutes");
 const financeDailyUpdateRoutes = require("./routes/financeDailyUpdateRoutes");
@@ -299,6 +302,7 @@ app.use("/api/bda-notifications", bdaNotifRoutes);
 
 /* ✅ BDA Daily Update — stats / submit (bda) + inbox (ceo) */
 app.use("/api/bda-daily-updates", bdaDailyUpdateRoutes);
+app.use("/api/lead-cover", leadCoverRoutes);
 
 /* ✅ Finance Manager */
 app.use("/api/finance", financeRoutes);
@@ -327,10 +331,11 @@ app.use(errorHandler);
       `leads` table on startup (idempotent, safe to run every boot).
       Same SQL lives in migrations/lead_assignment.sql.
 
-   2. escalateStaleLeads (every 30 min) — an ASSIGNED lead that nobody
-      follows up on (no follow-up within LEAD_ESCALATION_HOURS, or a
-      follow-up date missed by more than LEAD_OVERDUE_GRACE_DAYS) goes
-      back to the unassigned pool. Every other BDA + the CEO is notified.
+   2. escalateStaleLeads (every 30 min) — an assigned lead is NEVER taken back.
+      When its owner misses a follow-up date (no follow-up on/after the due
+      date), another BDA is asked to cover it: notification + pop-up + it shows
+      on their Follow-ups page. The BDA who follows up first keeps the lead.
+      (name kept for history; see bdaNotificationsController + utils/leadCover)
 
    3. generateFollowUpNotifications (daily 08:00 IST) — reminds the
       OWNER BDA about overdue / today's / tomorrow's follow-ups.
@@ -340,6 +345,7 @@ app.use(errorHandler);
 */
 const cron = require("node-cron");
 const { ensureLeadAssignmentSchema } = require("./utils/leadAssignment");
+const { ensureLeadCoverSchema } = require("./utils/leadCover");
 const {
   escalateStaleLeads,
   generateFollowUpNotifications,
@@ -353,7 +359,8 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 
   // Schema first, THEN schedule the jobs (they use the new columns)
-  ensureLeadAssignmentSchema().then(() => {
+  ensureLeadAssignmentSchema().then(async () => {
+    await ensureLeadCoverSchema().catch(() => {});   // cover columns + triggers (logs its own error)
     cron.schedule("*/30 * * * *", escalateStaleLeads, {
       timezone: "Asia/Kolkata",
     });

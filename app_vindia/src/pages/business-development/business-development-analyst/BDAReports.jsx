@@ -22,6 +22,16 @@ const sourceVerdict = (r) => {
   if (r.qualified_rate >= 40 && r.junk_rate <= 25) return { label: "Invest more", tone: "green" };
   return { label: "Maintain", tone: "amber" };
 };
+/* Lead "temperature" buckets for the quality chart (derived from lead status).
+   Colours are the SAME ones the Overview donut uses for these statuses, so a
+   colour means the same thing everywhere on the page. Left → right = best → worst. */
+const QUALITY_BUCKETS = [
+  { key: "Converted", label: "Converted",                               color: "#10b981" }, // green  = Converted
+  { key: "Hot",       label: "Hot (Interested)",                        color: "#8b5cf6" }, // purple = Interested
+  { key: "Warm",      label: "Warm (Follow Up)",                        color: "#f59e0b" }, // amber  = Follow up
+  { key: "Cool",      label: "Cool (New / Contacted / Not interested)", color: "#06b6d4" }, // cyan
+  { key: "Junk",      label: "Junk",                                    color: "#ef4444" }, // red    = Junk
+];
 const fmtINR = (n) =>
   n == null ? "—" : "₹" + Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 });
 const monthNow = () => new Date().toISOString().slice(0, 7);
@@ -300,15 +310,19 @@ const BDAReports = ({ role }) => {
     };
   }, [sourceRows]);
 
-  /* 100%-stacked quality mix per source */
+  /* 100%-stacked quality mix per source: Converted / Hot / Warm / Cool / Junk.
+     Bar values are exact shares (they add up to exactly 100, so the axis never
+     shows 100.1%); the rounded % shown in the tooltip is computed from the counts. */
   const qualityMixData = useMemo(() =>
-    sourceRows.filter(s => s.total > 0).map(s => ({
-      source: s.source, total: s.total,
-      Qualified: s.qualified_rate,
-      Other: Math.max(0, +(100 - s.qualified_rate - s.junk_rate).toFixed(1)),
-      Junk: s.junk_rate,
-      qualifiedN: s.qualified, otherN: s.other, junkN: s.junk,
-    }))
+    sourceRows.filter(s => s.total > 0).map(s => {
+      const share = (n) => (n * 100) / s.total;
+      return {
+        source: s.source, total: s.total,
+        Converted: share(s.converted), Hot: share(s.hot), Warm: share(s.warm),
+        Cool: share(s.cool), Junk: share(s.junk),
+        convertedN: s.converted, hotN: s.hot, warmN: s.warm, coolN: s.cool, junkN: s.junk,
+      };
+    })
   , [sourceRows]);
 
   const costChartData = useMemo(() =>
@@ -645,7 +659,7 @@ const BDAReports = ({ role }) => {
               <div className="rp-card rp-card--wide">
                 <div className="rp-card__header">
                   <h3 className="rp-card__title">Lead Quality by Source</h3>
-                  <p className="rp-card__sub">Share of each source's leads that are qualified, other or junk</p>
+                  <p className="rp-card__sub">Share of each source's leads by temperature: converted, hot, warm, cool or junk</p>
                 </div>
                 {loading ? <Sk h={240} /> : qualityMixData.length === 0 ? (
                   <div className="ts-chart-empty">No leads in this period</div>
@@ -653,7 +667,7 @@ const BDAReports = ({ role }) => {
                   <ResponsiveContainer width="100%" height={Math.max(220, qualityMixData.length * 46 + 40)}>
                     <BarChart data={qualityMixData} layout="vertical" margin={{ top: 4, right: 24, left: 4, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" horizontal={false} />
-                      <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <XAxis type="number" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} allowDataOverflow unit="%" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
                       <YAxis type="category" dataKey="source" width={88} tick={{ fill: "#475569", fontSize: 12 }} axisLine={false} tickLine={false} />
                       <Tooltip
                         cursor={{ fill: "rgba(37,99,235,.05)" }}
@@ -663,17 +677,29 @@ const BDAReports = ({ role }) => {
                           return (
                             <div className="rp-tooltip">
                               <p className="rp-tooltip__label">{d.source} · {d.total} leads</p>
-                              <p style={{ color: "#059669", fontSize: 12, fontWeight: 600 }}>Qualified: {d.qualifiedN} ({d.Qualified}%)</p>
-                              <p style={{ color: "#64748b", fontSize: 12 }}>Other: {d.otherN} ({d.Other}%)</p>
-                              <p style={{ color: "#dc2626", fontSize: 12, fontWeight: 600 }}>Junk: {d.junkN} ({d.Junk}%)</p>
+                              {QUALITY_BUCKETS.map(b => (
+                                <p key={b.key} style={{ fontSize: 12, color: "#475569" }}>
+                                  <span className="rpx-dot" style={{ background: b.color }} />
+                                  {b.key}: <b>{d[b.key.toLowerCase() + "N"]}</b> ({((d[b.key.toLowerCase() + "N"] * 100) / d.total).toFixed(1)}%)
+                                </p>
+                              ))}
                             </div>
                           );
                         }}
                       />
-                      <Legend iconType="square" iconSize={10} formatter={v => <span style={{ fontSize: 11, color: "#64748b" }}>{v}</span>} />
-                      <Bar dataKey="Qualified" stackId="q" fill="#10b981" />
-                      <Bar dataKey="Other"     stackId="q" fill="#cbd5e1" />
-                      <Bar dataKey="Junk"      stackId="q" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                      <Legend
+                        content={() => (
+                          <div className="rpx-legend">
+                            {QUALITY_BUCKETS.map(b => (
+                              <span key={b.key}><i style={{ background: b.color }} />{b.label}</span>
+                            ))}
+                          </div>
+                        )}
+                      />
+                      {QUALITY_BUCKETS.map((b, i) => (
+                        <Bar key={b.key} dataKey={b.key} stackId="q" fill={b.color}
+                          radius={i === QUALITY_BUCKETS.length - 1 ? [0, 4, 4, 0] : 0} />
+                      ))}
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -715,14 +741,14 @@ const BDAReports = ({ role }) => {
                   <table className="rp-table">
                     <thead>
                       <tr>
-                        <th>Source</th><th>Leads</th><th>Qualified</th><th>Junk</th>
+                        <th>Source</th><th>Leads</th><th>Qualified</th><th>Hot / Warm / Cool</th><th>Junk</th>
                         <th>Converted</th><th>Spend</th><th>Cost / Lead</th>
                         <th>Cost / Qualified</th><th>Verdict</th>
                       </tr>
                     </thead>
                     <tbody>
                       {sourceRows.length === 0 ? (
-                        <tr><td colSpan={9} style={{ textAlign: "center", color: "#94a3b8", padding: "28px 0" }}>No source data</td></tr>
+                        <tr><td colSpan={10} style={{ textAlign: "center", color: "#94a3b8", padding: "28px 0" }}>No source data</td></tr>
                       ) : sourceRows.map((s, i) => (
                         <tr key={s.source_key}>
                           <td>
@@ -731,6 +757,11 @@ const BDAReports = ({ role }) => {
                           </td>
                           <td>{s.total}</td>
                           <td>{s.qualified} <span className="rpx-muted">({s.qualified_rate}%)</span></td>
+                          <td>
+                            <span className="rpx-temp rpx-temp--hot">{s.hot}</span>
+                            <span className="rpx-temp rpx-temp--warm">{s.warm}</span>
+                            <span className="rpx-temp rpx-temp--cool">{s.cool}</span>
+                          </td>
                           <td>{s.junk} <span className="rpx-muted">({s.junk_rate}%)</span></td>
                           <td>{s.converted} <span className="rpx-muted">({s.conversion_rate}%)</span></td>
                           <td>{costAvailable && s.spend > 0 ? fmtINR(s.spend) : "—"}</td>
@@ -744,7 +775,8 @@ const BDAReports = ({ role }) => {
                 </div>
               )}
               <p className="rpx-note">
-                <b>Qualified</b> = Interested + Follow Up + Converted. <b>Junk</b> = marked junk or deleted
+                <b>Hot</b> = Interested, <b>Warm</b> = Follow Up, <b>Cool</b> = New, Contacted or Not Interested,
+                <b>Converted</b> = won. <b>Qualified</b> = Converted + Hot + Warm. <b>Junk</b> = marked junk or deleted
                 as junk (included here even after deletion, so bad sources can't hide).
                 <b> Verdict</b> (needs {MIN_LEADS_FOR_VERDICT}+ leads): <i>Invest more</i> = qualified ≥ 40% and junk ≤ 25%;
                 <i> Cut / fix targeting</i> = junk ≥ 40%; otherwise <i>Maintain</i>.
