@@ -329,6 +329,10 @@ exports.sourcePerformance = async (req, res) => {
                             AND LOWER(l.status) IN ${QUALIFIED_STATUS_SQL}) AS qualified,
          COUNT(*) FILTER (WHERE l.deleted_by_admin = false
                             AND LOWER(l.status) = 'converted') AS converted,
+         COUNT(*) FILTER (WHERE l.deleted_by_admin = false
+                            AND LOWER(l.status) = 'interested') AS hot,
+         COUNT(*) FILTER (WHERE l.deleted_by_admin = false
+                            AND LOWER(l.status) = 'follow up') AS warm,
          COUNT(*) FILTER (WHERE l.deleted_by_admin = true
                             OR LOWER(l.status) IN ${JUNK_STATUS_SQL}) AS junk
        FROM leads l
@@ -367,12 +371,14 @@ exports.sourcePerformance = async (req, res) => {
         total: toInt(r.total),
         qualified: toInt(r.qualified),
         converted: toInt(r.converted),
+        hot: toInt(r.hot),
+        warm: toInt(r.warm),
         junk: toInt(r.junk),
       };
     });
     // a source with spend but no leads in the period is still worth showing
     Object.keys(spendMap).forEach((k) => {
-      if (!merged[k]) merged[k] = { total: 0, qualified: 0, converted: 0, junk: 0 };
+      if (!merged[k]) merged[k] = { total: 0, qualified: 0, converted: 0, hot: 0, warm: 0, junk: 0 };
     });
 
     const data = Object.entries(merged)
@@ -384,7 +390,11 @@ exports.sourcePerformance = async (req, res) => {
           total: m.total,
           qualified: m.qualified,
           converted: m.converted,
+          hot: m.hot,    // status Interested
+          warm: m.warm,  // status Follow Up
           junk: m.junk,
+          // everything else that isn't junk: New, Contacted, Not Interested
+          cool: Math.max(m.total - m.qualified - m.junk, 0),
           other: Math.max(m.total - m.qualified - m.junk, 0),
           qualified_rate: pct(m.qualified, m.total),
           conversion_rate: pct(m.converted, m.total),

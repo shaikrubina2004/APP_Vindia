@@ -261,81 +261,130 @@ exports.notifyEscalated = async ({ leadId, name, phone, prevEmail, prevName, rea
 };
 
 /* ══════════════════════════════════════
-   JOB: ESCALATE STALE LEADS
-   Runs every 30 min (see server.js).
-   Rule A — assigned, never followed up, older than ESCALATION_HOURS
-   Rule B — follow-up date missed by more than OVERDUE_GRACE_DAYS
-   The lead is returned to the pool, flagged escalated, and every
-   other BDA + the CEO is notified.
+   JOB: MISSED FOLLOW-UP → ANOTHER BDA COVERS      (every 30 min, see server.js)
+   (function name kept so server.js needn't change; it no longer takes
+    leads back to the pool — an assigned lead stays with its owner FOREVER)
+
+   A follow-up is MISSED when its date has passed and no follow-up was logged
+   on or after that date. The lead then gets a temporary "cover" BDA:
+     • the other BDA with the fewest leads currently being covered
+     • they get a notification + pop-up and see it on their Follow-up page
+     • the owner is told; the BDA who follows up FIRST keeps the lead
+   (cover BDA → lead is assigned to them; owner first → cover just ends)
+
+   FOLLOWUP_COVER_AFTER_HOUR (optional, 0-23, IST): hand over on the due date
+   itself once that hour passes (e.g. 18 = 6 PM). Default: after the date ends.
 ══════════════════════════════════════ */
 exports.escalateStaleLeads = async () => {
-  const { ESCALATION_HOURS, OVERDUE_GRACE_DAYS } = require("../utils/leadAssignment");
+  const { getBdaUsers } = require("../utils/leadAssignment");
+  const { ensureLeadCoverSchema } = require("../utils/leadCover");
   try {
-    const { rows } = await pool.query(
-      `WITH stale AS (
-         SELECT l.id,
-                l.assigned_to    AS prev_name,
-                l.assigned_email AS prev_email,
-                CASE
-                  WHEN l.snooze_until IS NOT NULL
-                   AND DATE(l.snooze_until) < ((NOW() AT TIME ZONE 'Asia/Kolkata')::date - $2::int)
-                    THEN 'follow-up date missed'
-                  ELSE 'no follow-up within ' || $1::int || 'h of assignment'
-                END AS reason
-           FROM leads l
-          WHERE l.deleted_by_admin = false
-            AND NOT ${UNASSIGNED_SQL("l")}
-            AND LOWER(COALESCE(l.status, '')) <> ALL($3)
-            AND (
-                  -- Rule A: never followed up since being assigned
-                  ( l.assigned_at IS NOT NULL
-                    AND l.assigned_at < NOW() - make_interval(hours => $1::int)
-                    AND NOT EXISTS (
-                          SELECT 1 FROM followups f
-                           WHERE f.lead_id = l.id AND f.created_at >= l.assigned_at)
-                    AND l.snooze_until IS NULL )
-               OR
-                  -- Rule B: promised a follow-up date and missed it
-                  -- (only a date set AFTER the lead was assigned counts: old dates on
-                  --  legacy leads, or inherited from a previous owner, are not this
-                  --  BDA's missed promise)
-                  ( l.snooze_until IS NOT NULL
-                    AND l.assigned_at IS NOT NULL
-                    AND DATE(l.snooze_until) >= (l.assigned_at AT TIME ZONE 'Asia/Kolkata')::date
-                    AND DATE(l.snooze_until) < ((NOW() AT TIME ZONE 'Asia/Kolkata')::date - $2::int) )
-                )
-            FOR UPDATE OF l SKIP LOCKED
-       )
-       UPDATE leads l
-          SET last_assignee    = s.prev_name,
-              assigned_to      = NULL,
-              assigned_email   = NULL,
-              assigned_by      = NULL,
-              assigned_at      = NULL,
-              snooze_until     = NULL,
-              escalated_at     = NOW(),
-              escalation_count = l.escalation_count + 1
-         FROM stale s
-        WHERE l.id = s.id
-    RETURNING l.id, l.name, l.phone, s.prev_name, s.prev_email, s.reason`,
-      [ESCALATION_HOURS, OVERDUE_GRACE_DAYS, CLOSED_STATUSES]
-    );
+    await ensureLeadCoverSchema();
 
-    for (const r of rows) {
-      await exports.notifyEscalated({
-        leadId:    r.id,
-        name:      r.name,
-        phone:     r.phone,
-        prevEmail: r.prev_email,
-        prevName:  r.prev_name,
-        reason:    r.reason,
-      }).catch(e => console.error("Escalation notify error:", e.message));
+    const H = parseInt(process.env.FOLLOWUP_COVER_AFTER_HOUR, 10);
+    const sameDayHour = Number.isInteger(H) && H >= 0 && H < 24 ? H : 24;   // 24 = never same day
+    const TODAY = `(NOW() AT TIME ZONE 'Asia/Kolkata')::date`;
+
+    const { rows: missed } = await pool.query(
+      `SELECT l.id, l.name, l.phone, l.snooze_until,
+              l.assigned_to AS owner_name,
+              COALESCE(l.assigned_email, u.email) AS owner_email
+         FROM leads l
+         LEFT JOIN users u
+           ON REGEXP_REPLACE(LOWER(TRIM(u.name)), '\\s+', ' ', 'g') =
+              REGEXP_REPLACE(LOWER(TRIM(l.assigned_to)), '\\s+', ' ', 'g')
+        WHERE l.deleted_by_admin = false
+          AND NOT ${UNASSIGNED_SQL("l")}
+          AND LOWER(COALESCE(l.status, '')) <> ALL($1)
+          AND l.cover_email IS NULL
+          AND l.snooze_until IS NOT NULL
+          AND ( DATE(l.snooze_until) < ${TODAY}
+                OR ( $2::int < 24 AND DATE(l.snooze_until) = ${TODAY}
+                     AND EXTRACT(HOUR FROM (NOW() AT TIME ZONE 'Asia/Kolkata')) >= $2::int ) )
+          -- nobody has followed up on/after the due date
+          AND NOT EXISTS (
+                SELECT 1 FROM followups f
+                 WHERE f.lead_id = l.id
+                   AND f.created_at >= (DATE(l.snooze_until)::timestamp AT TIME ZONE 'Asia/Kolkata'))
+        ORDER BY l.snooze_until ASC`,
+      [CLOSED_STATUSES, sameDayHour]
+    );
+    if (!missed.length) return 0;
+
+    const bdas = (await getBdaUsers()).filter(u => u.email);
+
+    // current cover load per BDA, so a batch is spread fairly
+    const { rows: loadRows } = await pool.query(
+      `SELECT LOWER(cover_email) AS email, COUNT(*) AS n, MAX(cover_since) AS last_at
+         FROM leads
+        WHERE cover_email IS NOT NULL AND deleted_by_admin = false
+          AND LOWER(COALESCE(status, '')) <> ALL($1)
+        GROUP BY 1`,
+      [CLOSED_STATUSES]
+    );
+    const load = {};
+    loadRows.forEach(r => { load[r.email] = { n: Number(r.n), last: r.last_at ? new Date(r.last_at).getTime() : 0 }; });
+
+    const norm = x => String(x || "").trim().replace(/\s+/g, " ").toLowerCase();
+    const fmt = d => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" });
+    let covered = 0;
+
+    for (const l of missed) {
+      const candidates = bdas.filter(u =>
+        l.owner_email ? u.email.toLowerCase() !== String(l.owner_email).toLowerCase()
+                      : norm(u.name) !== norm(l.owner_name));
+      if (!candidates.length) continue;                    // only one BDA → owner keeps it, nothing to do
+
+      candidates.sort((a, b) => {
+        const la = load[a.email.toLowerCase()] || { n: 0, last: 0 };
+        const lb = load[b.email.toLowerCase()] || { n: 0, last: 0 };
+        return la.n - lb.n || la.last - lb.last || String(a.name).localeCompare(String(b.name));
+      });
+      const pick = candidates[0];
+
+      // guard against a second run / a follow-up logged a moment ago
+      const upd = await pool.query(
+        `UPDATE leads
+            SET cover_email = $2, cover_name = $3, cover_since = NOW(),
+                cover_count = cover_count + 1
+          WHERE id = $1 AND cover_email IS NULL
+        RETURNING id`,
+        [l.id, pick.email, pick.name]
+      );
+      if (!upd.rows.length) continue;
+
+      const key = pick.email.toLowerCase();
+      const cur = load[key] || { n: 0, last: 0 };
+      load[key] = { n: cur.n + 1, last: Date.now() };
+      covered++;
+
+      const due = fmt(l.snooze_until);
+      const owner = l.owner_name || "another BDA";
+      await createNotification({
+        type:        "followup_overdue",
+        title:       `Follow-up needed: ${l.name}`,
+        description: `${owner}'s lead ${l.name} (${l.phone || "No phone"}) was due for a follow-up on ${due} and was not attended. Please follow up now — it is on your Follow-ups page. Log a follow-up and the lead becomes yours.`,
+        severity:    "critical",
+        lead_id:     l.id,
+        bda_email:   pick.email,
+      }).catch(e => console.error("Cover notify (cover BDA) error:", e.message));
+
+      if (l.owner_email) {
+        await createNotification({
+          type:        "followup_overdue",
+          title:       `Follow-up missed: ${l.name}`,
+          description: `You didn't follow up ${l.name} on ${due}. ${pick.name} has been asked to call now. Follow up first if you want to keep it — whoever follows up first keeps the lead.`,
+          severity:    "warn",
+          lead_id:     l.id,
+          bda_email:   l.owner_email,
+        }).catch(e => console.error("Cover notify (owner) error:", e.message));
+      }
     }
 
-    if (rows.length) console.log(`⚡ Escalated ${rows.length} lead(s) back to the pool`);
-    return rows.length;
+    if (covered) console.log(`📞 ${covered} missed follow-up(s) handed to a covering BDA`);
+    return covered;
   } catch (err) {
-    console.error("❌ Escalation job error:", err.message);
+    console.error("❌ Missed follow-up job error:", err.message);
     return 0;
   }
 };
@@ -368,7 +417,7 @@ exports.generateFollowUpNotifications = async () => {
       const { rows } = await pool.query(
         `SELECT 1 FROM bda_notifications
           WHERE lead_id = $1 AND type = $2 AND LOWER(bda_email) = LOWER($3)
-            AND (created_at AT TIME ZONE 'Asia/Kolkata')::date = ${TODAY}
+            AND (created_at::timestamptz AT TIME ZONE 'Asia/Kolkata')::date = ${TODAY}
           LIMIT 1`,
         [leadId, type, email]
       );

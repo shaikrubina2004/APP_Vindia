@@ -1,11 +1,18 @@
 const pool = require("../config/db");
 
 const IST_TODAY = `(NOW() AT TIME ZONE 'Asia/Kolkata')::date`;
+/* NOTE: timestamp columns are stored WITHOUT a time zone (UTC clock). They are cast
+   with ::timestamptz before converting to IST, otherwise anything logged before
+   11:00 AM IST lands on the previous day. */
 
 /* How leads are linked to a BDA across the app: leads.assigned_to holds the
    user's name or email (see BDAAddLead). Match either, case-insensitively.
    Unassigned leads (NULL) are NOT counted for anyone. */
-const MATCH = `LOWER(l.assigned_to) IN (LOWER($1), LOWER($2))`;
+const MATCH = `(LOWER(l.assigned_to) IN (LOWER($1), LOWER($2))
+                OR LOWER(l.assigned_email) = LOWER($2))`;
+
+/* Finished leads never count as due / overdue (same list as utils/leadAssignment.js) */
+const CLOSED_STATUSES = ["converted", "not interested", "junk", "junk_requested", "delete_requested"];
 
 async function getUser(id) {
   const { rows } = await pool.query(
@@ -23,6 +30,7 @@ async function computeStats(user) {
   const [added, qualified, converted, deleted, done, tomorrow, overdue] =
     await Promise.all([
       pool.query(
+        // No. of leads = every lead currently assigned to this BDA
         `SELECT COUNT(*) FROM leads l
           WHERE ${MATCH} AND l.deleted_by_admin = false`,
         p
@@ -34,12 +42,12 @@ async function computeStats(user) {
            SELECT l.id FROM leads l
             WHERE ${MATCH} AND l.deleted_by_admin = false
               AND LOWER(l.status) IN ('interested','qualified')
-              AND (l.created_at AT TIME ZONE 'Asia/Kolkata')::date = ${IST_TODAY}
+              AND (l.created_at::timestamptz AT TIME ZONE 'Asia/Kolkata')::date = ${IST_TODAY}
            UNION
            SELECT l.id FROM followups f JOIN leads l ON l.id = f.lead_id
             WHERE ${MATCH} AND l.deleted_by_admin = false
               AND LOWER(f.status) IN ('interested','qualified')
-              AND (f.created_at AT TIME ZONE 'Asia/Kolkata')::date = ${IST_TODAY}
+              AND (f.created_at::timestamptz AT TIME ZONE 'Asia/Kolkata')::date = ${IST_TODAY}
          ) q`,
         p
       ),
@@ -47,7 +55,7 @@ async function computeStats(user) {
         `SELECT COUNT(*) FROM leads l
           WHERE ${MATCH} AND l.deleted_by_admin = false
             AND l.converted_at IS NOT NULL
-            AND (l.converted_at AT TIME ZONE 'Asia/Kolkata')::date = ${IST_TODAY}`,
+            AND (l.converted_at::timestamptz AT TIME ZONE 'Asia/Kolkata')::date = ${IST_TODAY}`,
         p
       ),
       // Deleted = leads this BDA sent to junk today (admin may have already
@@ -55,27 +63,34 @@ async function computeStats(user) {
       pool.query(
         `SELECT COUNT(*) FROM leads l
           WHERE ${MATCH} AND l.junk_requested_at IS NOT NULL
-            AND (l.junk_requested_at AT TIME ZONE 'Asia/Kolkata')::date = ${IST_TODAY}`,
+            AND (l.junk_requested_at::timestamptz AT TIME ZONE 'Asia/Kolkata')::date = ${IST_TODAY}`,
         p
       ),
       pool.query(
         `SELECT COUNT(*) FROM followups f JOIN leads l ON l.id = f.lead_id
           WHERE ${MATCH} AND l.deleted_by_admin = false
-            AND (f.created_at AT TIME ZONE 'Asia/Kolkata')::date = ${IST_TODAY}`,
+            AND (f.created_at::timestamptz AT TIME ZONE 'Asia/Kolkata')::date = ${IST_TODAY}`,
         p
       ),
+      // Due tomorrow / overdue = LEADS whose CURRENT next follow-up date
+      // (leads.snooze_until) is tomorrow / already past. One lead counts once,
+      // however many follow-ups it has had — same rule the 8 AM reminders and
+      // the escalation job use.
       pool.query(
-        `SELECT COUNT(*) FROM followups f JOIN leads l ON l.id = f.lead_id
+        `SELECT COUNT(*) FROM leads l
           WHERE ${MATCH} AND l.deleted_by_admin = false
-            AND DATE(f.next_followup) = ${IST_TODAY} + 1`,
-        p
+            AND l.snooze_until IS NOT NULL
+            AND LOWER(COALESCE(l.status, '')) <> ALL($3)
+            AND DATE(l.snooze_until) = ${IST_TODAY} + 1`,
+        [...p, CLOSED_STATUSES]
       ),
-      // Same "overdue" definition the BDA dashboard already uses.
       pool.query(
-        `SELECT COUNT(*) FROM followups f JOIN leads l ON l.id = f.lead_id
+        `SELECT COUNT(*) FROM leads l
           WHERE ${MATCH} AND l.deleted_by_admin = false
-            AND DATE(f.next_followup) < ${IST_TODAY}`,
-        p
+            AND l.snooze_until IS NOT NULL
+            AND LOWER(COALESCE(l.status, '')) <> ALL($3)
+            AND DATE(l.snooze_until) < ${IST_TODAY}`,
+        [...p, CLOSED_STATUSES]
       ),
     ]);
 
